@@ -1,6 +1,7 @@
 import operator
 
 import pytest
+
 from midirp import midi
 
 

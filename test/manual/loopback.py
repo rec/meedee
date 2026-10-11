@@ -14,6 +14,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
+
 from midirp import midi
 from midirp._clients import MidiInput, MidiOutput
 

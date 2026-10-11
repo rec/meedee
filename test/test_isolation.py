@@ -16,6 +16,7 @@ from typing import Self
 from unittest.mock import patch
 
 import pytest
+
 from midirp import midi
 from midirp._native import CallbackBridge
 from midirp._transport import (

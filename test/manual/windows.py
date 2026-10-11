@@ -3,6 +3,7 @@
 import sys
 
 import pytest
+
 from midirp import midi
 
 
