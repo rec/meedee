@@ -93,6 +93,7 @@ matches. Native-mode handles retain midir's original equality behavior.
 ```python
 from midirp import midi
 
+
 def play_note(port_id: str) -> None:
     output = midi.MidiOutput("note example")
     port = output.find_port_by_id(port_id)
@@ -119,6 +120,7 @@ sending and closing when message order matters.
 ```python
 from queue import Full, Queue
 from midirp import midi
+
 
 def receive_one(port_id: str) -> tuple[int, bytes]:
     messages: Queue[tuple[int, bytes]] = Queue(maxsize=1)
@@ -214,6 +216,7 @@ virtual output sends data to other clients' inputs:
 ```python
 from queue import Full, Queue
 from midirp import midi
+
 
 def receive_virtual() -> tuple[int, bytes]:
     messages: Queue[tuple[int, bytes]] = Queue(maxsize=1)
