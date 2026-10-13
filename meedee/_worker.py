@@ -37,7 +37,7 @@ class Producer:
         self.messages = ReceiveQueue(byte_limit)
         self.stopped = Event()
         self.dropped = 0
-        self.thread = Thread(target=self.emit, daemon=True, name="midirp forwarding")
+        self.thread = Thread(target=self.emit, daemon=True, name="meedee forwarding")
         self.thread.start()
 
     def __call__(self, timestamp: int, message: bytes) -> None:

@@ -2,21 +2,21 @@
 
 ## Purpose and review baseline
 
-This report collects four issue groups found while developing midirp, a Python
+This report collects four issue groups found while developing meedee, a Python
 binding for midir. It is intended for discussion with midir's developers when
-midirp is released. The IDs B3–B6 preserve the identifiers from our original
+meedee is released. The IDs B3–B6 preserve the identifiers from our original
 review; they are not upstream GitHub issue numbers. B6 contains several related
 portability and error-reporting concerns, which could warrant separate upstream
 issues.
 
 The source observations below were checked against the Cargo registry copy of
-**midir 0.11.0** selected by midirp's Cargo.lock on **2026-10-09**. The CoreMIDI
+**midir 0.11.0** selected by meedee's Cargo.lock on **2026-10-09**. The CoreMIDI
 wrapper dependency is **coremidi 0.9.2**. Source links use the midir `v0.11.0` tag;
 line numbers refer to that version. We have not established whether a later
 release or the development branch already addresses these findings. Please
 recheck that before submitting or implementing a patch.
 
-**Status:** preparation and transfer out of midirp's implementation backlog are
+**Status:** preparation and transfer out of meedee's implementation backlog are
 complete. These findings are not fixed by this report, and this document has
 not been sent to the maintainers. The owner will approach them at release time.
 
@@ -246,7 +246,7 @@ A related resource limit is visible in
 [CoreMIDI SysEx continuation](https://github.com/Boddlnagg/midir/blob/v0.11.0/src/backend/coremidi/mod.rs#L109-L121)
 and [ALSA SysEx handling](https://github.com/Boddlnagg/midir/blob/v0.11.0/src/backend/alsa/mod.rs#L884-L888):
 continued input without terminating `F7` can grow native assembly storage before
-any user callback runs. This is the upstream portion of midirp's broader R2
+any user callback runs. This is the upstream portion of meedee's broader R2
 resource review, not a fifth report group. A post-callback queue budget cannot
 limit that storage. A bound and defined resynchronization policy would mitigate
 malformed or abandoned SysEx; allocator exhaustion has not been reproduced.
@@ -279,7 +279,7 @@ Suggested resolution: distinguish transient readiness changes, recoverable
 loss, and terminal errors; ensure repeated errors cannot spin indefinitely or
 hide a stop request. Expose terminal failure/loss through a defined application
 mechanism. Rust logging can be useful, but a caller without a configured logger
-may receive no visible diagnostic. midirp currently has no Python logging
+may receive no visible diagnostic. meedee currently has no Python logging
 bridge for these upstream records.
 
 ### ALSA send semantics and backend validation
@@ -315,9 +315,9 @@ truncated input, concatenated messages, encoder partial consumption, and drain
 failure according to the chosen contract. Establish backend-specific expected
 results before calling any happy-path test a portability guarantee.
 
-## Current midirp containment and upstream handoff
+## Current meedee containment and upstream handoff
 
-midirp defaults to a fresh child process per client, deadlines around native
+meedee defaults to a fresh child process per client, deadlines around native
 operations, and disposal of a failed worker. This contains many native hangs
 and process crashes. It does not repair native lifetime errors, recover lost
 messages, cap unfinished native SysEx, or repair a shared OS MIDI service.

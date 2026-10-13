@@ -17,9 +17,9 @@ from unittest.mock import patch
 
 import pytest
 
-from midirp import midi
-from midirp._native import CallbackBridge
-from midirp._transport import (
+from meedee import midi
+from meedee._native import CallbackBridge
+from meedee._transport import (
     RECEIVE_CAPACITY,
     Context,
     Delivery,
@@ -31,15 +31,15 @@ from midirp._transport import (
 @pytest.fixture
 def workers(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[Popen[bytes]]]:
     children: list[Popen[bytes]] = []
-    fixture = Path(__file__).parent / "native" / "midirp_worker.py"
+    fixture = Path(__file__).parent / "native" / "meedee_worker.py"
 
     def launch(command: list[str], stdin: int, stdout: int) -> Popen[bytes]:
-        assert command == [sys.executable, "-m", "midirp._worker"]
+        assert command == [sys.executable, "-m", "meedee._worker"]
         child = Popen([sys.executable, str(fixture)], stdin=stdin, stdout=stdout)
         children.append(child)
         return child
 
-    monkeypatch.setattr("midirp._transport.subprocess.Popen", launch)
+    monkeypatch.setattr("meedee._transport.subprocess.Popen", launch)
     yield children
     for c in children:
         if c.poll() is None:
@@ -124,8 +124,8 @@ def test_in_process_mode_does_not_start_child_processes(
             return []
 
     with (
-        patch("midirp._native.MidiInput", LocalClient),
-        patch("midirp._native.MidiOutput", LocalClient),
+        patch("meedee._native.MidiInput", LocalClient),
+        patch("meedee._native.MidiOutput", LocalClient),
     ):
         local = client("local", isolated=False)
         assert local.ports() == []
@@ -248,7 +248,7 @@ def test_send_snapshots_mutable_and_strided_buffers(
         def connect(self, port: object, name: str) -> LocalConnection:
             return LocalConnection()
 
-    with patch("midirp._native.MidiOutput", LocalClient):
+    with patch("meedee._native.MidiOutput", LocalClient):
         output = midi.MidiOutput("check_bytes", isolated=isolated)
         connection = output.connect(output.ports()[0], "test")
         connection.send(message)
@@ -299,8 +299,8 @@ def test_context_exit_preserves_body_and_close_failures(
             return LocalConnection()
 
     with (
-        patch("midirp._native.MidiInput", LocalClient),
-        patch("midirp._native.MidiOutput", LocalClient),
+        patch("meedee._native.MidiInput", LocalClient),
+        patch("meedee._native.MidiOutput", LocalClient),
     ):
         if direction == "input":
             source = midi.MidiInput("hang_close", isolated=isolated, timeout=0.5)
@@ -356,8 +356,8 @@ def test_lookup_rejects_duplicate_ids_and_preserves_missing_results(
             return [Port(), Port()] if self.name == "ambiguous" else [Port()]
 
     with (
-        patch("midirp._native.MidiInput", LocalClient),
-        patch("midirp._native.MidiOutput", LocalClient),
+        patch("meedee._native.MidiInput", LocalClient),
+        patch("meedee._native.MidiOutput", LocalClient),
     ):
         source = client("ambiguous", isolated=isolated)
         identifier = source.ports()[0].id()
@@ -392,9 +392,9 @@ def test_zero_id_is_rejected_only_for_coremidi(
             raise AssertionError("Invalid ID reached native opening")
 
     with (
-        patch("midirp._native.MidiInput", LocalClient),
-        patch("midirp._native.MidiOutput", LocalClient),
-        patch("midirp._clients.sys.platform", platform),
+        patch("meedee._native.MidiInput", LocalClient),
+        patch("meedee._native.MidiOutput", LocalClient),
+        patch("meedee._clients.sys.platform", platform),
     ):
         source = client("test", isolated=False)
         port = source.ports()[0]
@@ -506,7 +506,7 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
                 bridge.deliver(17, b"\xf8")
             return LocalConnection(bridge)
 
-    with patch("midirp._native.MidiInput", LocalClient):
+    with patch("meedee._native.MidiInput", LocalClient):
         source = midi.MidiInput("early" if delivered else "quiet", isolated=isolated)
         start = monotonic()
         connection = source.connect(
@@ -544,7 +544,7 @@ def test_incompatible_callback_signatures_do_not_consume_the_client(
         def ports(self) -> list[object]:
             return [LocalPort()]
 
-    with patch("midirp._native.MidiInput", LocalClient):
+    with patch("meedee._native.MidiInput", LocalClient):
         source = midi.MidiInput("early", isolated=isolated)
         for c in (one_argument, extra_argument, keyword_only):
             with pytest.raises(TypeError, match="two positional arguments"):
@@ -585,7 +585,7 @@ def test_deferred_callbacks_are_rejected_without_consuming_the_client(
         def ports(self) -> list[object]:
             return [LocalPort()]
 
-    with patch("midirp._native.MidiInput", LocalClient):
+    with patch("meedee._native.MidiInput", LocalClient):
         source = midi.MidiInput("early", isolated=isolated)
         for c in (callback, partial(callback), Receiver(), partial(Receiver())):
             with pytest.raises(TypeError, match="synchronous and not a generator"):
@@ -675,7 +675,7 @@ def test_shutdown_terminates_and_reaps_a_child_stuck_in_native_close(
     output = midi.MidiOutput("hang_close", timeout=1)
     connection = output.connect(output.ports()[0], "test")
     started = monotonic()
-    with patch("midirp._transport.SHUTTING_DOWN", False):
+    with patch("meedee._transport.SHUTTING_DOWN", False):
         shutdown()
         with pytest.raises(RuntimeError, match="shutdown"):
             midi.MidiOutput("late client")
@@ -769,7 +769,7 @@ def test_deferred_results_are_reported_without_execution_and_delivery_continues(
             return LocalConnection(bridge)
 
     with (
-        patch("midirp._native.MidiInput", LocalClient),
+        patch("meedee._native.MidiInput", LocalClient),
         patch("sys.unraisablehook", error_hook),
         warnings.catch_warnings(record=True) as warning_records,
     ):

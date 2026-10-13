@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyInt;
 
 /// The upstream input filters, including all eight valid combinations.
-#[pyclass(frozen, eq, module = "midirp.midi")]
+#[pyclass(frozen, eq, module = "meedee.midi")]
 #[derive(PartialEq, Eq)]
 pub struct Ignore {
     pub native: midir::Ignore,

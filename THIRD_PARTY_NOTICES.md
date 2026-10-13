@@ -2,7 +2,7 @@
 
 Pinned Rust dependency license texts for the supported build targets follow.
 Dual-licensed dependencies are used under their MIT option where available.
-Build-only dependencies are included for completeness. midirp's own MIT license
+Build-only dependencies are included for completeness. meedee's own MIT license
 is in LICENSE.
 
 block2, objc2, and objc2-encode omit license files from their crate archives.
@@ -1580,7 +1580,7 @@ Linux wheel artifacts include libasound, distributed under LGPL-2.1-or-later.
 The complete license follows. The CI artifact supplies the corresponding
 alsa-lib source RPM beside the wheel. It contains upstream sources and
 distribution patches. The bundled shared library can be replaced with an
-ABI-compatible modified build in the installed midirp.libs directory.
+ABI-compatible modified build in the installed meedee.libs directory.
 See https://github.com/alsa-project/alsa-lib for the upstream project.
 No ALSA library is bundled in macOS or Windows wheels.
 

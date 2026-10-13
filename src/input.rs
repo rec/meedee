@@ -12,13 +12,13 @@ use crate::lifecycle::{self, Managed, Resource};
 use crate::state::Client;
 
 /// A MIDI input client that is unavailable while its connection is open.
-#[pyclass(frozen, module = "midirp.midi")]
+#[pyclass(frozen, module = "meedee.midi")]
 pub struct MidiInput {
     state: Arc<Client<midir::MidiInput>>,
 }
 
 /// An opaque input-port handle obtained from discovery.
-#[pyclass(frozen, module = "midirp.midi")]
+#[pyclass(frozen, module = "meedee.midi")]
 pub struct MidiInputPort {
     native: midir::MidiInputPort,
 }
@@ -145,7 +145,7 @@ impl MidiInput {
 }
 
 /// Owns the single GC-visible callable and its original Python client.
-#[pyclass(frozen, weakref, module = "midirp.midi")]
+#[pyclass(frozen, weakref, module = "meedee.midi")]
 pub struct MidiInputConnection {
     resource: Arc<Managed<midir::MidiInput, midir::MidiInputConnection<()>>>,
     client: Py<MidiInput>,

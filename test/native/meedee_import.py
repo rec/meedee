@@ -10,15 +10,15 @@ def main() -> None:
         patch("atexit.register", side_effect=AssertionError("cleanup was initialized")),
     ):
         try:
-            from midirp import midi
+            from meedee import midi
         except RuntimeError as error:
             assert "free-threaded builds are unsupported" in str(error)
         else:
             raise AssertionError("free-threaded build was accepted")
-        assert "midirp._native" not in sys.modules
+        assert "meedee._native" not in sys.modules
 
     # Rejection leaves no initialized runtime or private module behind.
-    from midirp import midi
+    from meedee import midi
 
     assert midi.__version__
 

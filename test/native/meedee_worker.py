@@ -8,8 +8,8 @@ from collections.abc import Callable
 from threading import Event
 from unittest.mock import patch
 
-from midirp import midi
-from midirp._worker import Sender, Worker, serve
+from meedee import midi
+from meedee._worker import Sender, Worker, serve
 
 
 class InputPort:
@@ -122,7 +122,7 @@ class OutputConnection:
 
 
 def main() -> None:
-    from midirp import _native
+    from meedee import _native
 
     with (
         patch.object(_native, "MidiInput", Input),

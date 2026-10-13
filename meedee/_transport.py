@@ -52,7 +52,7 @@ class Delivery:
         Thread(
             target=dispatch,
             args=(weakref.ref(self), self.messages),
-            name="midirp callback",
+            name="meedee callback",
             daemon=True,
         ).start()
 
@@ -93,17 +93,17 @@ class Context:
         self.worker_dropped = 0
         self.disposing = False
         self.process: subprocess.Popen[bytes] = subprocess.Popen(
-            [sys.executable, "-m", "midirp._worker"],
+            [sys.executable, "-m", "meedee._worker"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
         try:
             CONTEXTS.add(self)
             Thread(
-                target=write_requests, args=(self,), daemon=True, name="midirp requests"
+                target=write_requests, args=(self,), daemon=True, name="meedee requests"
             ).start()
             Thread(
-                target=read_results, args=(self,), daemon=True, name="midirp results"
+                target=read_results, args=(self,), daemon=True, name="meedee results"
             ).start()
         except (RuntimeError, MemoryError) as error:
             self.fail("Cannot start MIDI communication threads", error)
@@ -269,7 +269,7 @@ class Context:
             except ProcessLookupError:
                 pass
             except OSError as error:
-                print(f"midirp: cannot terminate worker: {error}", file=sys.stderr)
+                print(f"meedee: cannot terminate worker: {error}", file=sys.stderr)
             try:
                 self.replies.put_nowait(("dead", None))
             except Full:
@@ -282,7 +282,7 @@ class Context:
                     target=close_deferred,
                     args=(self, generation),
                     daemon=True,
-                    name="midirp cleanup",
+                    name="meedee cleanup",
                 ).start()
             except RuntimeError:
                 self.fail("Cannot start deferred MIDI close")
@@ -292,7 +292,7 @@ class Context:
             self.disposing = True
             try:
                 Thread(
-                    target=dispose, args=(self,), daemon=True, name="midirp disposal"
+                    target=dispose, args=(self,), daemon=True, name="meedee disposal"
                 ).start()
             except RuntimeError:
                 self.fail("Cannot start MIDI worker disposal")
@@ -428,7 +428,7 @@ def shutdown() -> None:
         try:
             c.process.wait(timeout=max(0, reap_deadline - monotonic()))
         except subprocess.TimeoutExpired:
-            print("midirp: worker termination could not be confirmed", file=sys.stderr)
+            print("meedee: worker termination could not be confirmed", file=sys.stderr)
     for d in deliveries:
         # Native children are stopped first. Arbitrary Python cannot be cancelled.
         d.bridge.drain()

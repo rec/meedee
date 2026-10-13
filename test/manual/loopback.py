@@ -15,8 +15,8 @@ from uuid import uuid4
 
 import pytest
 
-from midirp import midi
-from midirp._clients import MidiInput, MidiOutput
+from meedee import midi
+from meedee._clients import MidiInput, MidiOutput
 
 
 @pytest.fixture(params=[True, False], autouse=True)
@@ -43,11 +43,11 @@ def test_virtual_loopback_preserves_bytes_timestamps_and_filters(
 ) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.MidiInput("midirp validation input")
-    target = midi.MidiOutput("midirp validation output")
+    source = midi.MidiInput("meedee validation input")
+    target = midi.MidiOutput("meedee validation output")
     if bits is not None:
         source.ignore(midi.Ignore(bits))
-    token = f"midirp-{uuid4().hex}"
+    token = f"meedee-{uuid4().hex}"
     with ExitStack() as stack:
         if direction == "input":
             incoming = stack.enter_context(source.create_virtual(token, receiver))
@@ -79,10 +79,10 @@ def test_virtual_loopback_preserves_bytes_timestamps_and_filters(
 
 def test_duplicate_names_keep_distinct_port_identity_and_lookup() -> None:
     require_unix()
-    token = f"midirp-duplicate-{uuid4().hex}"
-    first = midi.MidiOutput("midirp duplicate")
-    second = midi.MidiOutput("midirp duplicate")
-    observer = midi.MidiInput("midirp identity observer")
+    token = f"meedee-duplicate-{uuid4().hex}"
+    first = midi.MidiOutput("meedee duplicate")
+    second = midi.MidiOutput("meedee duplicate")
+    observer = midi.MidiInput("meedee identity observer")
     with first.create_virtual(token), second.create_virtual(token):
         ports = [p for p in observer.ports() if token in observer.port_name(p)]
         assert len(ports) == 2
@@ -100,10 +100,10 @@ def test_duplicate_names_keep_distinct_port_identity_and_lookup() -> None:
 
 def test_close_restores_clients_for_reopen_and_propagates_context_errors() -> None:
     require_unix()
-    source = midi.MidiInput("midirp reopen input")
-    target = midi.MidiOutput("midirp reopen output")
+    source = midi.MidiInput("meedee reopen input")
+    target = midi.MidiOutput("meedee reopen output")
     source.ignore(midi.Ignore.TIME | midi.Ignore.ACTIVE_SENSE)
-    token = f"midirp-reopen-{uuid4().hex}"
+    token = f"meedee-reopen-{uuid4().hex}"
     receiver = Collector()
     # Keep the endpoint alive while checking healthy output-client reuse.
     # Replacing it is a topology change that can itself cause a native error.
@@ -133,10 +133,10 @@ def test_disappeared_virtual_endpoint_requires_a_fresh_isolated_discovery_client
     isolation: bool,
 ) -> None:
     require_unix()
-    source = midi.MidiInput("midirp disappearance input")
-    target = midi.MidiOutput("midirp disappearance output")
+    source = midi.MidiInput("meedee disappearance input")
+    target = midi.MidiOutput("meedee disappearance output")
     receiver = Collector()
-    token = f"midirp-disappearance-{uuid4().hex}"
+    token = f"meedee-disappearance-{uuid4().hex}"
     with source.create_virtual(token, receiver):
         (port,) = (p for p in target.ports() if token in target.port_name(p))
     with pytest.raises(midi.PortInfoError):
@@ -147,9 +147,9 @@ def test_disappeared_virtual_endpoint_requires_a_fresh_isolated_discovery_client
     else:
         assert isinstance(target.ports(), list)
     # Reopening is deliberate, never an automatic retry of an uncertain send.
-    token = f"midirp-reappeared-{uuid4().hex}"
+    token = f"meedee-reappeared-{uuid4().hex}"
     with source.create_virtual(token, receiver):
-        fresh = midi.MidiOutput("midirp fresh disappearance output")
+        fresh = midi.MidiOutput("meedee fresh disappearance output")
         (port,) = (p for p in fresh.ports() if token in fresh.port_name(p))
         with fresh.connect(port, token) as outgoing:
             outgoing.send(b"\x90\x3c\x7f")
@@ -166,7 +166,7 @@ def test_native_interpreter_exit_drains_live_connections_and_queued_traffic(
         capture_output=True,
         text=True,
         timeout=20,
-        env={**environ, "MIDIRP_TEST_ISOLATED": "1" if isolation else "0"},
+        env={**environ, "MEEDEE_TEST_ISOLATED": "1" if isolation else "0"},
     )
     assert result.stderr == ""
 
@@ -175,9 +175,9 @@ def test_native_interpreter_exit_drains_live_connections_and_queued_traffic(
 def test_larger_sysex_is_preserved_after_close(size: int) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.MidiInput("midirp SysEx input")
-    target = midi.MidiOutput("midirp SysEx output")
-    token = f"midirp-sysex-{uuid4().hex}"
+    source = midi.MidiInput("meedee SysEx input")
+    target = midi.MidiOutput("meedee SysEx output")
+    token = f"meedee-sysex-{uuid4().hex}"
     message = b"\xf0\x7d" + bytes(i % 128 for i in range(size - 3)) + b"\xf7"
     with source.create_virtual(token, receiver) as incoming:
         (port,) = (p for p in target.ports() if token in target.port_name(p))
@@ -196,9 +196,9 @@ def test_burst_delivery_records_software_loopback_timing() -> None:
     def receive(timestamp: int, message: bytes) -> None:
         arrivals.put((perf_counter_ns(), message))
 
-    source = midi.MidiInput("midirp timing input")
-    target = midi.MidiOutput("midirp timing output")
-    token = f"midirp-timing-{uuid4().hex}"
+    source = midi.MidiInput("meedee timing input")
+    target = midi.MidiOutput("meedee timing output")
+    token = f"meedee-timing-{uuid4().hex}"
     count = 1000
     sent: dict[bytes, int] = {}
     with source.create_virtual(token, receive):

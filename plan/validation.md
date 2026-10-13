@@ -369,7 +369,7 @@ callback constraints. Source review does not prove driver shutdown safety.
 
 - Public API, stubs, byte ownership, exceptions, state restoration, concurrent
   close, GC, and finalization have device-free coverage.
-- Package name `midirp`: PyPI JSON endpoint returned HTTP 404 on 2026-10-08.
+- Original package name `midirp`: PyPI JSON endpoint returned HTTP 404 on 2026-10-08.
   This is a point-in-time check, not a reservation or guarantee of availability.
 - Project license: MIT, explicitly chosen by the owner. LICENSE and the
   third-party notices are included in source and wheel distributions.
@@ -432,7 +432,7 @@ release wheel built from the source archive passes all 128 applicable tests
 outside the checkout. Wheel/source metadata checks confirm the 3.15 classifier,
 Python minimum, lack of runtime dependencies, and current packaged Python
 sources/stubs. The artifact is
-`midirp-0.1.0-cp315-cp315-macosx_11_0_arm64.whl`.
+`midirp-0.1.0-cp315-cp315-macosx_11_0_arm64.whl` (the package name at that time).
 
 Ruff, formatting, ty, pyupgrade with the retained 3.11 minimum, Cargo formatting,
 and the scoped diff check pass. Strict Clippy with Rust 1.99 fails on the existing
@@ -449,3 +449,24 @@ under the checkout's CPython 3.11.7. This does not establish a 3.15-specific
 defect; the native initialization failure's cause remains undiagnosed. Native
 MIDI I/O under 3.15, Linux/Windows 3.15 builds, and cross-platform 3.15 fault
 behavior remain unvalidated. No hardware was accessed.
+
+## Project rename to meedee, 2026-10-13
+
+The Python distribution, package/import paths, Cargo package, native class and
+exception module names, worker entry point, test fixtures, and release artifact
+names now use `meedee`. The toolkit plan is `plan/meedee.md`. Existing GitHub
+URLs and historical wheel names remain accurate records of the original project.
+No dependency versions or backend implementation changed.
+
+All 129 device-free repository tests pass on CPython 3.11.7 and 3.15.0 on macOS
+arm64. A renamed 3.15 release wheel built from its source archive passes all
+128 applicable Python tests in a separate environment outside the checkout.
+Both existing distribution checks pass against the new wheel and source archive,
+including metadata, typing, native module, Python sources, and test fixture paths.
+Ruff, formatting, ty, pyupgrade with the 3.11 minimum, Cargo formatting, and
+`git diff --check` pass. The release build still reports the previously recorded
+`AtomicU8::fetch_update` deprecation warning. No native MIDI endpoints were opened.
+
+The default development environment was restored to Python 3.11. Release CI
+continues to run only on published releases, testing Python 3.11 and 3.15.
+The GitHub repository and local checkout directory have not been renamed.

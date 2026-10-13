@@ -39,7 +39,7 @@ native handles or user callables. No new dependencies or version changes.
 
 ## API and identity
 
-Keep the public compiled `midirp.midi` module, error classes, and `Ignore` values.
+Keep the public compiled `meedee.midi` module, error classes, and `Ignore` values.
 Register the original native client/port/connection classes in an internal native
 module; install one public Python ownership facade supporting both modes.
 Keep `__init__.py` empty and retain the existing native implementation.

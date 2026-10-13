@@ -42,7 +42,7 @@ The successful CoreMIDI burst is one measurement, not a throughput guarantee.
 Primary binding evidence is in [state.rs](../src/state.rs),
 [lifecycle.rs](../src/lifecycle.rs), [callback.rs](../src/callback.rs),
 [input.rs](../src/input.rs), [output.rs](../src/output.rs),
-[ignore.rs](../src/ignore.rs), and [the public stub](../midirp/midi.pyi).
+[ignore.rs](../src/ignore.rs), and [the public stub](../meedee/midi.pyi).
 Upstream evidence was read from the exact Cargo registry sources selected by
 [Cargo.lock](../Cargo.lock). Source links below identify those versions; line
 references and function names refer to that pinned source, not a newer release.
@@ -166,7 +166,7 @@ to a hardware endpoint opens a native connection; it does not create hardware.
 
 | Object/lifetime event | Current behavior and external effect |
 | --- | --- |
-| Import `midirp.midi` | Starts four native cleanup threads and registers exit cleanup, without initializing MIDI. Import can fail if that thread cannot be started. |
+| Import `meedee.midi` | Starts four native cleanup threads and registers exit cleanup, without initializing MIDI. Import can fail if that thread cannot be started. |
 | Create then immediately discard an unused client on ALSA | Opens then drops its sequencer resource. Registration changes may be visible to other clients. No MIDI messages are intentionally sent. |
 | Create then immediately discard an unused client on WinMM | Constructors retain filter state or an empty output client and ignore client names; native handles open at connect time. |
 | Create then immediately discard an unused client on CoreMIDI | Allocates a native CoreMIDI client that upstream deliberately retains until process termination. In-process destruction does not dispose it; default worker exit reclaims it. |
@@ -246,7 +246,7 @@ and [Ignore](https://github.com/Boddlnagg/midir/blob/v0.11.0/src/lib.rs):
 
 | Rust surface | Python surface | Difference |
 | --- | --- | --- |
-| `MidiInput`, `MidiOutput`, both port and connection types | Same class names in `midirp.midi` | Package/module namespace changes. |
+| `MidiInput`, `MidiOutput`, both port and connection types | Same class names in `meedee.midi` | Package/module namespace changes. |
 | `MidiInput::new`, `MidiOutput::new` | Class constructors | No public `.new()` method. |
 | `ports`, `port_name`, `find_port_by_id`, `ignore`, `connect`, `id`, `send`, `close` | Same method spellings where exposed | Ownership, types, results, and errors are adapted. |
 | `port_count()` | Not exposed | Use `len(client.ports())`, which constructs the discovered list. |

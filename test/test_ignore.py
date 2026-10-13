@@ -2,7 +2,7 @@ import operator
 
 import pytest
 
-from midirp import midi
+from meedee import midi
 
 
 @pytest.mark.parametrize(

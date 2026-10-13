@@ -1,8 +1,8 @@
-# midirp
+# meedee
 
 Typed Python bindings for [midir](https://github.com/Boddlnagg/midir), with raw
 MIDI bytes, native timestamps, and explicit connection ownership. Import the
-API from `midirp.midi`. There are no Python runtime dependencies.
+API from `meedee.midi`. There are no Python runtime dependencies.
 
 The build matrix exercises standard, GIL-enabled CPython 3.11–3.14 on macOS
 arm64/x86_64, Linux x86_64 (ALSA), and Windows x86_64 (WinMM). Build and unit
@@ -23,7 +23,7 @@ uv run maturin build --release --locked --sdist --out dist
 ```
 
 `--sdist` builds the wheel from the source archive, checking its completeness.
-Install a CI or locally built wheel with `uv pip install /path/to/midirp.whl`
+Install a CI or locally built wheel with `uv pip install /path/to/meedee.whl`
 using an interpreter matching its CPython version and architecture. A wheel
 installation needs no Rust compiler. Source builds require Rust 1.87 or later,
 a C linker, and a supported Python interpreter. macOS requires Xcode Command
@@ -44,7 +44,7 @@ and maturin 1.15.0. Wheels are interpreter-specific rather than abi3.
 Each client defaults to a fresh MIDI child process:
 
 ```python
-from midirp import midi
+from meedee import midi
 
 output = midi.MidiOutput("my application", isolated=True, timeout=5.0)
 ```
@@ -69,7 +69,7 @@ interpreters have not been validated.
 ## Discover and select a port
 
 ```python
-from midirp import midi
+from meedee import midi
 
 output = midi.MidiOutput("my application")
 for port in output.ports():
@@ -91,7 +91,7 @@ same direction. Opening resolves the ID again and rejects absent or ambiguous
 matches. Native-mode handles retain midir's original equality behavior.
 
 ```python
-from midirp import midi
+from meedee import midi
 
 
 def play_note(port_id: str) -> None:
@@ -119,7 +119,7 @@ sending and closing when message order matters.
 
 ```python
 from queue import Full, Queue
-from midirp import midi
+from meedee import midi
 
 
 def receive_one(port_id: str) -> tuple[int, bytes]:
@@ -215,7 +215,7 @@ virtual output sends data to other clients' inputs:
 
 ```python
 from queue import Full, Queue
-from midirp import midi
+from meedee import midi
 
 
 def receive_virtual() -> tuple[int, bytes]:
@@ -362,9 +362,9 @@ interpreter. Standard GIL-enabled CPython is the tested contract.
 
 ```sh
 uv run --frozen pytest
-uv run --frozen ruff check --select B,E,F,I midirp test
-uv run --frozen ruff format --check midirp test
-uv run --frozen ty check midirp test
+uv run --frozen ruff check --select B,E,F,I meedee test
+uv run --frozen ruff format --check meedee test
+uv run --frozen ty check meedee test
 cargo fmt --check
 PYO3_PYTHON="$PWD/.venv/bin/python" cargo clippy --locked --all-targets -- -D warnings
 PYO3_PYTHON="$PWD/.venv/bin/python" cargo test --locked
@@ -387,6 +387,6 @@ Run these only with permission on the target host. CI runs only when a GitHub
 release is published and excludes native device checks. Linux needs a sequencer device;
 Windows I/O needs an explicitly chosen external port. See the
 [implementation plan](plan/plan.md), [validation record](plan/validation.md), and
-[third-party notices](THIRD_PARTY_NOTICES.md). midirp is licensed under
+[third-party notices](THIRD_PARTY_NOTICES.md). meedee is licensed under
 [MIT](LICENSE). Publication requires a separate decision after the remaining
 native and artifact validation gates are resolved.

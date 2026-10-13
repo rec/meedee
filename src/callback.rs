@@ -14,7 +14,7 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::errors::{failed_error, CallbackThreadError};
 
 /// Reuses the native callback contract on a parent-process dispatch thread.
-#[pyclass(frozen, module = "midirp._native")]
+#[pyclass(frozen, module = "meedee._native")]
 pub struct CallbackBridge {
     callback: Callback,
 }
@@ -350,7 +350,7 @@ mod tests {
             .unwrap()
             .call_method1("insert", (0, path.to_str().unwrap()))
             .unwrap();
-        PyModule::import(py, "midirp_callbacks").unwrap()
+        PyModule::import(py, "meedee_callbacks").unwrap()
     }
 
     fn driver(

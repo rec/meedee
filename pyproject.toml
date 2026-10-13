@@ -3,7 +3,7 @@ requires = ["maturin==1.15.0"]
 build-backend = "maturin"
 
 [project]
-name = "midirp"
+name = "meedee"
 dynamic = ["version"]
 description = "Python bindings for the midir Rust MIDI library"
 readme = "README.md"
@@ -38,7 +38,7 @@ dev = [
 
 [tool.maturin]
 python-source = "."
-module-name = "midirp.midi"
+module-name = "meedee.midi"
 locked = true
 
 [tool.uv]
@@ -47,9 +47,9 @@ cache-keys = [
     { file = "Cargo.toml" },
     { file = "Cargo.lock" },
     { file = "src/**/*.rs" },
-    { file = "midirp/*.py" },
-    { file = "midirp/*.pyi" },
-    { file = "midirp/py.typed" },
+    { file = "meedee/*.py" },
+    { file = "meedee/*.pyi" },
+    { file = "meedee/py.typed" },
     { file = "README.md" },
 ]
 

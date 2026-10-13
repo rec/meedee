@@ -1,4 +1,4 @@
-# midirp: immutable Rust and Python MIDI toolkit
+# meedee: immutable Rust and Python MIDI toolkit
 
 ## 1. Purpose and scope
 
@@ -96,7 +96,7 @@ fields. Track document versions and test-vector provenance with the code.
 There are three libraries/crates, not three production executable binaries:
 
 1. **libremidi**, the third-party C++ OS MIDI transport library.
-2. **midirp**, our Rust toolkit: immutable values, codecs, stateful interpretation,
+2. **meedee**, our Rust toolkit: immutable values, codecs, stateful interpretation,
    tuning, profiles, files, timing, and port integration.
 3. **Our Python binding**, exposing those Rust features through Python values,
    exceptions, iterators, and the existing optional process isolation.
@@ -122,8 +122,8 @@ wrapper. The C++ build/link step is an explicit requirement for Rust binaries
 and Python wheels; Rust-only applications still require no Python runtime.
 
 Use a Cargo workspace with the toolkit and binding as separate packages.
-Provisional package names are `midirp` and `midirp-python`; the binding keeps the
-existing extension identity until an explicit namespace decision. Keep the
+Package names are `meedee` and `meedee-python`; the Python extension identity
+is `meedee.midi`. Keep the
 Python package at the repository root. Preserve current dependency versions
 unless an approved requirement forces a change.
 
@@ -555,7 +555,7 @@ its packet sequence against advertised transport capabilities. Timestamps do
 not imply scheduled send; scheduling is a separate operation with a selected
 clock and cancellation policy.
 
-Retain midirp's existing default Python process isolation and its in-process
+Retain meedee's existing default Python process isolation and its in-process
 option while evaluating Pi costs. Rust-only I/O initially runs natively with
 clear native-hang limitations. It must not launch a Python interpreter as its
 isolation mechanism. A Rust helper process would be a separate architecture

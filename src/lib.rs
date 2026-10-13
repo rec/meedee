@@ -42,7 +42,7 @@ fn midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<output::MidiOutput>()?;
     module.add_class::<output::MidiOutputPort>()?;
     module.add_class::<output::MidiOutputConnection>()?;
-    let native = PyModule::new(py, "midirp._native")?;
+    let native = PyModule::new(py, "meedee._native")?;
     for name in [
         "MidiError",
         "InitError",
@@ -69,8 +69,8 @@ fn midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native.add_function(wrap_pyfunction!(callback::check_thread, &native)?)?;
     PyModule::import(py, "sys")?
         .getattr("modules")?
-        .set_item("midirp._native", native)?;
-    let clients = PyModule::import(py, "midirp._clients")?;
+        .set_item("meedee._native", native)?;
+    let clients = PyModule::import(py, "meedee._clients")?;
     for name in [
         "MidiInput",
         "MidiInputPort",
@@ -80,7 +80,7 @@ fn midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "MidiOutputConnection",
     ] {
         let class = clients.getattr(name)?;
-        class.setattr("__module__", "midirp.midi")?;
+        class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;
     }
     Ok(())

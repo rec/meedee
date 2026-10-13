@@ -1,4 +1,4 @@
-# midirp implementation plan
+# meedee implementation plan
 
 ## Purpose and current state
 
@@ -123,7 +123,7 @@ None.
 
 These are proposed product decisions, not requirements supplied by the user:
 
-- Distribution name: `midirp`, subject to package-index name availability.
+- Distribution name: `meedee`, subject to package-index name availability.
 - Use PyO3 for the extension and maturin as the Python build backend.
 - Start with standard, GIL-enabled CPython 3.11 and later supported releases.
   Declare only the versions actually exercised by CI.
@@ -186,7 +186,7 @@ src/
     input.rs               # Input client, connection, callback bridge
     output.rs              # Output client and connection
     errors.rs              # Error translation
-midirp/
+meedee/
     __init__.py            # Empty
     midi.pyi               # Public native API signatures and docstrings
     py.typed
@@ -203,10 +203,10 @@ plan/
 ```
 
 Configure maturin with `python-source = "."` and
-`module-name = "midirp.midi"`. Set the Rust module name accordingly and build a
-`cdylib`. The canonical import is `from midirp.midi import MidiInput`.
+`module-name = "meedee.midi"`. Set the Rust module name accordingly and build a
+`cdylib`. The canonical import is `from meedee.midi import MidiInput`.
 Keep `__init__.py` empty and define native objects' Python module as
-`midirp.midi`, so documentation and exceptions agree with imports.
+`meedee.midi`, so documentation and exceptions agree with imports.
 
 Use the [maturin mixed-project and typing guidance](https://www.maturin.rs/project_layout.html).
 Inspect the built wheel to verify the extension, stub, and `py.typed` are present.

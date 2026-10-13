@@ -143,7 +143,7 @@ pub fn initialize(py: Python<'_>) -> PyResult<()> {
     // SAFETY: attached to a live interpreter; process state requires the main interpreter.
     if unsafe { pyo3::ffi::PyInterpreterState_GetID(pyo3::ffi::PyInterpreterState_Get()) } != 0 {
         return Err(PyRuntimeError::new_err(
-            "midirp does not support subinterpreters",
+            "meedee does not support subinterpreters",
         ));
     }
     if PyModule::import(py, "sysconfig")?
@@ -151,7 +151,7 @@ pub fn initialize(py: Python<'_>) -> PyResult<()> {
         .is_truthy()?
     {
         return Err(PyRuntimeError::new_err(
-            "midirp requires a standard GIL-enabled Python build; free-threaded builds are unsupported",
+            "meedee requires a standard GIL-enabled Python build; free-threaded builds are unsupported",
         ));
     }
     if RUNTIME.get().is_none() {
@@ -218,7 +218,7 @@ impl Runtime {
         for index in 0..CLEANUP_WORKERS {
             let cleanup = Arc::clone(&runtime.cleanup);
             let worker = thread::Builder::new()
-                .name(format!("midirp cleanup {index}"))
+                .name(format!("meedee cleanup {index}"))
                 .spawn(move || {
                     loop {
                         let resource = {

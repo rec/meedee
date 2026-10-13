@@ -4,14 +4,14 @@ import sys
 
 import pytest
 
-from midirp import midi
+from meedee import midi
 
 
 def test_windows_virtual_creation_preserves_available_client_state() -> None:
     if sys.platform != "win32":
         pytest.skip("WinMM unsupported-path check requires Windows")
-    source = midi.MidiInput("midirp Windows input")
-    target = midi.MidiOutput("midirp Windows output")
+    source = midi.MidiInput("meedee Windows input")
+    target = midi.MidiOutput("meedee Windows output")
     source.ignore(midi.Ignore.SYSEX)
     before_input = source.ports()
     before_output = target.ports()

@@ -15,22 +15,22 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
     for w in wheels:
         with ZipFile(w) as archive:
             names = archive.namelist()
-            assert "midirp/midi.pyi" in names
-            assert "midirp/py.typed" in names
+            assert "meedee/midi.pyi" in names
+            assert "meedee/py.typed" in names
             assert {
-                "midirp/_clients.py",
-                "midirp/_transport.py",
-                "midirp/_worker.py",
-                "midirp/_native.pyi",
+                "meedee/_clients.py",
+                "meedee/_transport.py",
+                "meedee/_worker.py",
+                "meedee/_native.pyi",
             } <= set(names)
-            assert archive.read("midirp/__init__.py") == b""
+            assert archive.read("meedee/__init__.py") == b""
             assert any(
-                n.startswith("midirp/midi.") and n.endswith((".so", ".pyd"))
+                n.startswith("meedee/midi.") and n.endswith((".so", ".pyd"))
                 for n in names
             )
             (metadata_name,) = (n for n in names if n.endswith(".dist-info/METADATA"))
             metadata = BytesParser().parsebytes(archive.read(metadata_name))
-            assert metadata["Name"] == "midirp"
+            assert metadata["Name"] == "meedee"
             assert metadata["Version"] == version
             assert metadata["Requires-Python"] == ">=3.11"
             assert metadata.get_all("Requires-Dist") is None
@@ -38,8 +38,8 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             assert any(n.endswith("/licenses/LICENSE") for n in names)
             assert any(n.endswith("/licenses/THIRD_PARTY_NOTICES.md") for n in names)
             assert (
-                archive.read("midirp/midi.pyi")
-                == (project / "midirp" / "midi.pyi").read_bytes()
+                archive.read("meedee/midi.pyi")
+                == (project / "meedee" / "midi.pyi").read_bytes()
             )
             if "manylinux" in w.name:
                 assert any(".libs/libasound" in n for n in names)
@@ -62,16 +62,16 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "README.md",
                 "LICENSE",
                 "THIRD_PARTY_NOTICES.md",
-                "midirp/midi.pyi",
-                "midirp/py.typed",
-                "midirp/_clients.py",
-                "midirp/_transport.py",
-                "midirp/_worker.py",
-                "midirp/_native.pyi",
+                "meedee/midi.pyi",
+                "meedee/py.typed",
+                "meedee/_clients.py",
+                "meedee/_transport.py",
+                "meedee/_worker.py",
+                "meedee/_native.pyi",
                 "src/lib.rs",
                 "src/lifecycle.rs",
-                "test/native/midirp_callbacks.py",
-                "test/native/midirp_worker.py",
+                "test/native/meedee_callbacks.py",
+                "test/native/meedee_worker.py",
                 "test/test_isolation.py",
             } <= names
             assert not any(n.startswith(("target/", ".venv/", ".git/")) for n in names)

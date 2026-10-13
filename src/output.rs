@@ -12,13 +12,13 @@ use crate::lifecycle::{self, Managed, Resource};
 use crate::state::Client;
 
 /// A MIDI output client that is unavailable while its connection is open.
-#[pyclass(frozen, module = "midirp.midi")]
+#[pyclass(frozen, module = "meedee.midi")]
 pub struct MidiOutput {
     state: Arc<Client<midir::MidiOutput>>,
 }
 
 /// An opaque output-port handle obtained from discovery.
-#[pyclass(frozen, module = "midirp.midi")]
+#[pyclass(frozen, module = "meedee.midi")]
 pub struct MidiOutputPort {
     native: midir::MidiOutputPort,
 }
@@ -46,7 +46,7 @@ impl MidiOutputPort {
 }
 
 /// Owns a native output connection and keeps its original Python client alive.
-#[pyclass(frozen, module = "midirp.midi")]
+#[pyclass(frozen, module = "meedee.midi")]
 pub struct MidiOutputConnection {
     resource: Arc<Managed<midir::MidiOutput, midir::MidiOutputConnection>>,
     client: Py<MidiOutput>,
@@ -279,7 +279,7 @@ pub(crate) mod tests {
                 .call_method1("insert", (0, path.to_str().unwrap()))
                 .unwrap();
             let driver = OutputDriver::new(py);
-            PyModule::import(py, "midirp_callbacks")
+            PyModule::import(py, "meedee_callbacks")
                 .unwrap()
                 .call_method1("verify_send_boundary", (driver.bind(py),))
                 .unwrap();
