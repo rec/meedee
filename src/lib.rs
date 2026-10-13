@@ -9,6 +9,9 @@ mod state;
 mod callback;
 mod lifecycle;
 
+#[cfg(test)]
+mod api_prototype;
+
 /// Python bindings for midir. Importing this module does not open a MIDI client.
 #[pymodule]
 fn midi(module: &Bound<'_, PyModule>) -> PyResult<()> {

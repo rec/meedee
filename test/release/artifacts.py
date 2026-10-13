@@ -69,9 +69,11 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/_worker.py",
                 "meedee/_native.pyi",
                 "src/lib.rs",
+                "src/api_prototype.rs",
                 "src/lifecycle.rs",
                 "test/native/meedee_callbacks.py",
                 "test/native/meedee_worker.py",
+                "test/native/meedee_messages.py",
                 "test/test_isolation.py",
             } <= names
             assert not any(n.startswith(("target/", ".venv/", ".git/")) for n in names)
