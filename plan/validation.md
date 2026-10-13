@@ -553,3 +553,15 @@ dependencies. `cargo clippy --locked -p meedee --all-targets -- -D warnings` and
 Python 3.11 using the extracted Rust values. The existing Python suite passes
 all 129 tests after rebuilding. No dependency versions changed in Cargo.lock.
 The production transport still uses midir pending the rest of slice 2.
+
+## Slice 2: private extension and public messages
+
+The binary is now `meedee._core`. Public `meedee.messages` and `meedee.midi`
+loaders register native definitions; message import does not initialize cleanup,
+import transport clients, or create MIDI resources. NoteOn/SysEx wrappers use the
+shared Rust values and the existing frozen representation fixture. Python 3.11
+passes 131 tests, including public-message and fresh-import checks. The Python
+3.15 native representation contract and all 131 Python tests pass. A release wheel built from its sdist
+and both artifact checks pass with the new binary and independent Rust crate.
+Ruff, formatting, ty, pyupgrade and Cargo formatting pass. The existing Rust
+1.99 fetch_update deprecation warning remains; MSRV stays 1.87.

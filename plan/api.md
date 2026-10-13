@@ -126,8 +126,10 @@ the interpreter-independent core without reimplementing validation.
 
 ## Evidence and measurements
 
-`src/api_prototype.rs` is compiled only for Rust tests. The existing Python
-lifecycle harness runs it with the other native unit tests. Its Python fixture
+The native wrappers now live in `src/messages.rs`, registering production
+classes in `meedee.messages` through the private `meedee._core` binary. Their
+values and validation live in the dependency-free `crates/meedee` Rust toolkit.
+The existing Python lifecycle harness runs the native representation test. Its Python fixture
 is `test/native/meedee_messages.py`, using standard-library assertions because
 an embedded interpreter does not automatically import the development venv's
 pytest installation.
@@ -143,7 +145,7 @@ Run the focused prototype with the selected interpreter:
 
 ```sh
 PYO3_PYTHON="$PWD/.venv/bin/python" CARGO_HOME="$PWD/target/cargo-home" \
-  cargo test --locked api_prototype -- --nocapture --test-threads=1
+  cargo test --locked messages::python_representation -- --nocapture --test-threads=1
 ```
 
 Observations on macOS arm64, five runs of 10,000 constructions per sample:

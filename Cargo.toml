@@ -9,7 +9,7 @@ publish = false
 license = "MIT"
 
 [lib]
-name = "midi"
+name = "_core"
 crate-type = ["cdylib", "rlib"]
 
 [workspace]

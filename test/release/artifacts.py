@@ -10,12 +10,18 @@ from zipfile import ZipFile
 def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
     project = Path(__file__).resolve().parents[2]
     version = tomllib.loads((project / "Cargo.toml").read_text())["package"]["version"]
-    wheels = list((project / "dist").glob("*.whl"))
+    wheels = list((project / "dist").glob("meedee-*.whl"))
     assert wheels, "Build a wheel into dist/ before running distribution checks"
     for w in wheels:
         with ZipFile(w) as archive:
             names = archive.namelist()
             assert "meedee/midi.pyi" in names
+            assert {
+                "meedee/_core.pyi",
+                "meedee/messages.py",
+                "meedee/messages.pyi",
+                "meedee/midi.py",
+            } <= set(names)
             assert "meedee/py.typed" in names
             assert {
                 "meedee/_clients.py",
@@ -25,7 +31,7 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             } <= set(names)
             assert archive.read("meedee/__init__.py") == b""
             assert any(
-                n.startswith("meedee/midi.") and n.endswith((".so", ".pyd"))
+                n.startswith("meedee/_core.") and n.endswith((".so", ".pyd"))
                 for n in names
             )
             (metadata_name,) = (n for n in names if n.endswith(".dist-info/METADATA"))
@@ -50,7 +56,7 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
 
 def test_source_distribution_contains_build_typing_and_test_sources() -> None:
     project = Path(__file__).resolve().parents[2]
-    sources = list((project / "dist").glob("*.tar.gz"))
+    sources = list((project / "dist").glob("meedee-*.tar.gz"))
     assert sources, "Build a source distribution into dist/ first"
     for s in sources:
         with tarfile.open(s) as archive:
@@ -69,7 +75,10 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/_worker.py",
                 "meedee/_native.pyi",
                 "src/lib.rs",
-                "src/api_prototype.rs",
+                "src/messages.rs",
+                "crates/meedee/Cargo.toml",
+                "crates/meedee/src/lib.rs",
+                "crates/meedee/src/messages.rs",
                 "src/lifecycle.rs",
                 "test/native/meedee_callbacks.py",
                 "test/native/meedee_worker.py",

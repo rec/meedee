@@ -9,12 +9,23 @@ mod state;
 mod callback;
 mod lifecycle;
 
-#[cfg(test)]
-mod api_prototype;
+mod messages;
 
-/// Python bindings for midir. Importing this module does not open a MIDI client.
+/// One private binary. Public loaders select which definitions to register.
 #[pymodule]
-fn midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
+    Ok(())
+}
+
+#[pyfunction]
+fn populate_messages(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    messages::register(module)
+}
+
+#[pyfunction]
+fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     lifecycle::initialize(module.py())?;
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
     let py = module.py();

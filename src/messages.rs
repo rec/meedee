@@ -1,9 +1,7 @@
-//! Device-free representation prototype. Promote these values once in slice 2;
-//! this module is deliberately absent from production wheels.
+//! Frozen Python message classes backed by the shared Rust toolkit.
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::path::Path;
 
 use meedee::messages;
 use pyo3::buffer::PyBuffer;
@@ -211,15 +209,21 @@ fn value_hash(value: &impl Hash) -> u64 {
     hasher.finish()
 }
 
+pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<Message>()?;
+    module.add_class::<NoteOn>()?;
+    module.add_class::<SysEx>()?;
+    Ok(())
+}
+
+#[cfg(test)]
 #[test]
 fn python_representation_contract_and_measurements() {
     Python::initialize();
     Python::attach(|py| {
         let module = PyModule::new(py, "meedee.messages").unwrap();
-        module.add_class::<Message>().unwrap();
-        module.add_class::<NoteOn>().unwrap();
-        module.add_class::<SysEx>().unwrap();
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("test/native");
+        register(&module).unwrap();
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test/native");
         PyModule::import(py, "sys")
             .unwrap()
             .getattr("path")

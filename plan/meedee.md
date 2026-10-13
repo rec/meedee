@@ -635,14 +635,16 @@ and wire evidence before stateful interpretation or live writes.
    language mappings. Prototype Python subclass/field behavior and Pi-relevant
    object overhead. Gate: no unacknowledged dependency or transport assumption.
    Evidence: [API contract](api.md), [specification baselines](specifications.md),
-   and the test-only native prototype. No new public types are shipped yet.
+   and the native representation contract. Slice 2 promotes NoteOn and SysEx
+   to public `meedee.messages` values.
 2. **Rust toolkit extraction and libremidi transport replacement (in progress).**
    The dependency-free `crates/meedee` crate owns the prototype NoteOn/SysEx
    values; Python wrappers use those values. The root package is `meedee-python`.
    Vendored CoreMIDI checked input teardown passes focused normal/sanitizer tests.
-   Native transport ownership is awaiting the owner's threading decision.
-   Separate
-   the shared core and our Python binding; implement the safe C API wrapper,
+   Native transport ownership uses one dedicated Rust thread per client, as
+   selected by the owner; creation, operations and teardown stay on that thread.
+   This is not yet integrated into the transport.
+   Separate the shared core and our Python binding; implement the safe C API wrapper,
    native build integration, and replace midir throughout the transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.
    Gate: Rust use requires no Python; FFI ownership, shutdown, byte/UMP capability
