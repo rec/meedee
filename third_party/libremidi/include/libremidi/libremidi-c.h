@@ -250,7 +250,8 @@ int libremidi_midi_in_is_connected(const libremidi_midi_in_handle*);
 LIBREMIDI_EXPORT
 libremidi_timestamp libremidi_midi_in_absolute_timestamp(libremidi_midi_in_handle*);
 
-// CoreMIDI input teardown is checked before deletion. Other backends retain
+// CoreMIDI, WinMM and Windows MIDI Services inputs are checked before deletion.
+// Other backends retain
 // their existing destructor behavior and are not certified by this check.
 // Returns zero after deletion (also for null). On a negative result, the handle
 // remains valid and callback contexts must remain alive. Do not discard them.

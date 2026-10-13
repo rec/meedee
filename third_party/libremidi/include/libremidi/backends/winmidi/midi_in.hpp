@@ -4,6 +4,7 @@
 #include <libremidi/backends/winmidi/observer.hpp>
 #include <libremidi/detail/midi_in.hpp>
 #include <libremidi/detail/midi_stream_decoder.hpp>
+#include <libremidi/detail/callback_lifetime.hpp>
 
 NAMESPACE_LIBREMIDI::winmidi
 {
@@ -96,6 +97,8 @@ public:
 
   stdx::error open_port(const input_port& port, std::string_view) override
   {
+    m_callbacks.resume();
+    m_disconnected = false;
     auto device_id = get_if<std::string>(&port.device);
     if (!device_id)
       return std::errc::invalid_argument;
@@ -125,6 +128,7 @@ public:
               const winrt::Microsoft::Windows::Devices::Midi2::MidiMessageReceivedEventArgs& args) {
         process_message(args);
       });
+      m_event_registered = true;
   #else
       m_endpoint.as(libremidi::IID_IMidiEndpointConnectionRaw, m_raw_endpoint.put_void());
 
@@ -150,6 +154,8 @@ public:
     using namespace winrt::Microsoft::Windows::Devices::Midi2;
     using namespace winrt::Microsoft::Windows::Devices::Midi2::Endpoints::Virtual;
 
+    m_callbacks.resume();
+    m_disconnected = false;
     auto conf = setup_virtualdevice_config(configuration.client_name, port_name, port_name, MidiFunctionBlockDirection::BlockInput);
 
     m_virtual = MidiVirtualDeviceManager::CreateVirtualDevice(conf);
@@ -173,6 +179,7 @@ public:
               const winrt::Microsoft::Windows::Devices::Midi2::MidiMessageReceivedEventArgs& args) {
         process_message(args);
       });
+      m_event_registered = true;
 
       m_endpoint.Open();
 
@@ -197,6 +204,9 @@ public:
   void process_message(
       const winrt::Microsoft::Windows::Devices::Midi2::MidiMessageReceivedEventArgs& msg)
   {
+    const callback_lifetime::scope guard{m_callbacks};
+    if (!guard.accepts_delivery())
+      return;
     static constexpr timestamp_backend_info timestamp_info{
         .has_absolute_timestamps = true,
         .absolute_is_monotonic = false,
@@ -231,6 +241,9 @@ public:
       UINT32 wordCount,
       UINT32 *ump)
   {
+    const callback_lifetime::scope guard{m_callbacks};
+    if (!guard.accepts_delivery())
+      return;
     static constexpr timestamp_backend_info timestamp_info{
         .has_absolute_timestamps = true,
         .absolute_is_monotonic = false,
@@ -255,35 +268,58 @@ public:
 
   stdx::error close_port() override
   {
-    if(!m_endpoint)
-      return std::errc::not_connected;
+    if (!m_callbacks.begin_close())
+      return std::errc::operation_in_progress;
 
+    try
+    {
 #if LIBREMIDI_WINMIDI_HAS_COM_EXTENSIONS
-    if(m_raw_endpoint) {
-      m_raw_endpoint->RemoveMessagesReceivedCallback();
-      m_raw_endpoint = nullptr;
-    }
-    // When no raw API: everything goes through revoke_token.
-    // Otherwise: only virtual ports.
-    else if(m_virtual)
+      if (m_raw_endpoint)
+      {
+        if (FAILED(m_raw_endpoint->RemoveMessagesReceivedCallback()))
+          return std::errc::io_error;
+        m_raw_endpoint = nullptr;
+      }
 #endif
-      m_endpoint.MessageReceived(m_revoke_token);
-
-    m_session.DisconnectEndpointConnection(m_endpoint.ConnectionId());
+      if (m_endpoint && m_event_registered)
+      {
+        m_endpoint.MessageReceived(m_revoke_token);
+        m_event_registered = false;
+      }
+      if (m_endpoint && !m_disconnected)
+      {
+        m_session.DisconnectEndpointConnection(m_endpoint.ConnectionId());
+        m_disconnected = true;
+      }
+      // Keep the endpoint and callback object alive until callbacks already in
+      // progress return. A timed-out close must not become a successful retry
+      // simply because the endpoint was disconnected in the first attempt.
+      if (!m_callbacks.wait_until(std::chrono::steady_clock::now()
+                                  + std::chrono::milliseconds{50}))
+        return std::errc::timed_out;
 
 #if LIBREMIDI_WINMIDI_HAS_VIRTUAL_DEVICE
-    if (m_virtual)
-    {
-      m_virtual.Cleanup();
-      m_virtual = nullptr;
+      if (m_virtual)
+      {
+        m_virtual.Cleanup();
+        m_virtual = nullptr;
+      }
+#endif
+      m_endpoint = nullptr;
+      return stdx::error{};
     }
-  #endif
-    return stdx::error{};
+    catch (...)
+    {
+      return std::errc::io_error;
+    }
   }
 
   virtual timestamp absolute_timestamp() const noexcept override { return {}; }
 
 private:
+  callback_lifetime m_callbacks;
+  bool m_event_registered{};
+  bool m_disconnected{};
   MidiSession m_session;
   winrt::event_token m_revoke_token{};
   winrt::Microsoft::Windows::Devices::Midi2::MidiEndpointConnection m_endpoint{nullptr};

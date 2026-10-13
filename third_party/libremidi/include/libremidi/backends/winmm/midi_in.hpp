@@ -5,7 +5,7 @@
 #include <libremidi/detail/midi_in.hpp>
 #include <libremidi/detail/midi_stream_decoder.hpp>
 
-#include <atomic>
+#include <libremidi/detail/callback_lifetime.hpp>
 
 NAMESPACE_LIBREMIDI
 {
@@ -30,27 +30,6 @@ class midi_in_winmm final
     CRITICAL_SECTION& cs;
   };
 
-  // Registers the callback with do_close(), which waits for the count to reach
-  // zero before it touches anything the callback may be using.
-  struct callback_guard
-  {
-    explicit callback_guard(midi_in_winmm& s) noexcept
-        : self{s}
-    {
-      self.callback_thread.store(GetCurrentThreadId());
-      self.in_callback.fetch_add(1);
-    }
-    ~callback_guard()
-    {
-      self.in_callback.fetch_sub(1);
-      self.callback_thread.store(0);
-    }
-
-    callback_guard(const callback_guard&) = delete;
-    callback_guard& operator=(const callback_guard&) = delete;
-
-    midi_in_winmm& self;
-  };
 
 public:
   struct
@@ -87,7 +66,7 @@ public:
 
   stdx::error do_open(std::size_t portNumber)
   {
-    if (this->inHandle)
+    if (this->inHandle || !this->sysexBuffer.empty())
     {
       // A previous close failed: reopening would overwrite the handle of a
       // device that is still running and leak it for good.
@@ -96,7 +75,7 @@ public:
     }
 
     // Keep callbacks out until the setup is complete.
-    this->closing.store(true);
+    this->callbacks.begin_close();
 
     MMRESULT result = midiInOpen(
         &this->inHandle, portNumber, std::bit_cast<DWORD_PTR>(&midiInputCallback),
@@ -147,7 +126,7 @@ public:
     }
 
     // Everything the callback may touch is now in place.
-    this->closing.store(false);
+    this->callbacks.resume();
 
     result = midiInStart(this->inHandle);
     midi_start_timestamp = std::chrono::steady_clock::now();
@@ -186,9 +165,15 @@ public:
   {
     // Both midi_in::close_port() and ~midi_in_winmm() end up here, and the port
     // may never have been opened at all - in which case _mutex may not even
-    // have been initialized, so this check has to come before the locking.
-    if (!this->inHandle)
+    // have been initialized. Empty resources can be handled before locking.
+    if (!this->callbacks.begin_close())
+      return std::errc::operation_in_progress;
+    if (!this->inHandle && this->sysexBuffer.empty())
+    {
+      if (!this->callbacks.wait_until(std::chrono::steady_clock::now() + close_timeout))
+        return std::errc::timed_out;
       return stdx::error{};
+    }
 
     EnterCriticalSection(&(this->_mutex));
     const scoped_leave leave{this->_mutex};
@@ -207,8 +192,6 @@ private:
   // Must be called with _mutex held.
   stdx::error do_close()
   {
-    this->closing.store(true);
-
     const HMIDIIN handle = this->inHandle;
 
     if (handle)
@@ -223,28 +206,16 @@ private:
     const auto deadline = std::chrono::steady_clock::now() + close_timeout;
 
     // Wait out the callbacks still running: they may be reading the buffers we
-    // are about to free. This pairs with the fetch_add in callback_guard, and
+    // are about to free. This pairs with the callback_lifetime scope, and
     // both sides need sequential consistency - the callback registers before it
-    // reads `closing`, so either it is counted here or it sees the store and
-    // gives up.
+    // checks whether delivery is retired, so either it is counted here or it
+    // sees retirement and gives up.
     //
     // Note what this deliberately is not: a lock. Holding one across the user's
     // message callback would invert against any lock the closing thread already
     // holds - which, in a host tearing a device down, is not hypothetical.
     // Waiting can only cost the deadline.
-    bool quiesced = true;
-    if (this->callback_thread.load() != GetCurrentThreadId())
-    {
-      while (this->in_callback.load() != 0)
-      {
-        if (std::chrono::steady_clock::now() >= deadline)
-        {
-          quiesced = false;
-          break;
-        }
-        SwitchToThread();
-      }
-    }
+    const bool quiesced = this->callbacks.wait_until(deadline);
 
     const auto retry_while_playing = [deadline](auto&& fn) {
       for (;;)
@@ -367,10 +338,10 @@ private:
 
     auto& self = *reinterpret_cast<midi_in_winmm*>(instancePtr);
 
-    // Registering before reading `closing` is what makes do_close() wait for
+    // Registering before checking retirement makes do_close() wait for
     // this callback instead of racing it.
-    const callback_guard guard{self};
-    if (self.closing.load())
+    const callback_lifetime::scope guard{self.callbacks};
+    if (!guard.accepts_delivery())
       return;
 
     static constexpr timestamp_backend_info timestamp_info{
@@ -431,10 +402,9 @@ private:
     // avoid requeueing it, else the computer suddenly reboots after
     // one or two minutes.
     //
-    // The closing check is not redundant: on_bytes() above ran user code, which
-    // may have closed the port from this very thread and freed the header we
-    // are about to requeue.
-    if (!self.closing.load() && sysex->dwBytesRecorded > 0)
+    // on_bytes() above ran user code. Another thread may have retired delivery
+    // while it ran; do not requeue a buffer into a device being closed.
+    if (guard.accepts_delivery() && sysex->dwBytesRecorded > 0)
     {
       if (midiInAddBuffer(self.inHandle, sysex, sizeof(MIDIHDR)) != MMSYSERR_NOERROR)
       {
@@ -456,12 +426,7 @@ private:
   // https://groups.google.com/forum/#!topic/mididev/6OUjHutMpEo
   CRITICAL_SECTION _mutex;
 
-  std::atomic_bool closing{false};
-  std::atomic_int in_callback{0};
-
-  // Lets a close requested from inside the callback skip the wait it would
-  // otherwise deadlock on.
-  std::atomic<DWORD> callback_thread{};
+  callback_lifetime callbacks;
 
   std::chrono::steady_clock::time_point midi_start_timestamp;
 

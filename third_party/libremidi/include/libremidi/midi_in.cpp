@@ -350,9 +350,10 @@ stdx::error midi_in::close_port()
     return std::errc::not_connected;
 
   stdx::error ret = std::errc::operation_not_supported;
-  // CoreMIDI may own a callback-bearing port after a failed connection attempt.
+  // These backends may own callback resources after a failed open or close.
   const auto api = get_current_api();
-  if (m_impl->is_port_open() || api == API::COREMIDI || api == API::COREMIDI_UMP)
+  if (m_impl->is_port_open() || api == API::COREMIDI || api == API::COREMIDI_UMP
+      || api == API::WINDOWS_MM || api == API::WINDOWS_MIDI_SERVICES)
     ret = m_impl->close_port();
 
   if (ret != stdx::error{})

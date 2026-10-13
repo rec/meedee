@@ -565,3 +565,41 @@ passes 131 tests, including public-message and fresh-import checks. The Python
 and both artifact checks pass with the new binary and independent Rust crate.
 Ruff, formatting, ty, pyupgrade and Cargo formatting pass. The existing Rust
 1.99 fetch_update deprecation warning remains; MSRV stays 1.87.
+
+## Slice 2: Windows checked input teardown, awaiting native qualification
+
+Owner-approved fork commit `0932a62c05117a8f9b9d9b86ebac326c059531ba` extends checked C input free to WinMM
+and Windows MIDI Services. The shared guard refuses self-close even with nested
+or overlapping callbacks and waits for active callbacks after source retirement.
+WinMM retains partial resources after timeout; MIDI Services checks raw callback
+removal and makes successful teardown idempotent. Failed free retains the handle
+and requires the caller to retain its callback context.
+
+The callback-lifetime target (14 assertions / three cases), property target
+(30 / four), and CoreMIDI teardown target (40 / three) pass on macOS arm64
+normally and with ASan/UBSan. The Windows backend headers have not been compiled
+or run on this host. Native Windows validation is outstanding; these results do
+not certify Windows driver/API teardown guarantees. Direct C++ destruction is
+still outside the checked C API lifetime contract. The production transport
+remains midir until integration and qualification are complete.
+
+Fork follow-up `07c7cfb1237be1ddeaa097a81f79cc9456c087ee` adds `winmm_teardown_test`, using fake WinMM
+MIDI device calls and real Windows synchronization. It is Windows-only and
+unvalidated here. No Windows compiler or runner is currently available to this
+thread. Owner input about a Windows validation route is pending. The existing
+release-only GitHub workflow was not changed.
+
+From a separate Windows checkout of the pinned fork, byte-backend qualification
+(no hardware or Windows MIDI Services runtime required):
+
+```powershell
+cmake -S . -B build -DLIBREMIDI_TESTS=ON -DLIBREMIDI_NO_BOOST=ON -DLIBREMIDI_NO_WINMIDI=ON -DLIBREMIDI_NO_WINUWP=ON -DLIBREMIDI_NO_KDMAPI=ON -DLIBREMIDI_NO_JACK=ON -DLIBREMIDI_NO_PIPEWIRE=ON -DLIBREMIDI_NO_NETWORK=ON -DLIBREMIDI_NO_KEYBOARD=ON
+cmake --build build --config Debug --target libremidi winmm_teardown_test callback_lifetime_test
+ctest --test-dir build -C Debug -R '^(winmm_teardown|callback_lifetime)_test$' --output-on-failure
+```
+
+This does not compile the Windows MIDI Services backend. That separate gate
+requires the pinned Services SDK headers and C++/WinRT tooling, with build-time
+downloads disabled or pinned. Do not infer native UMP qualification from a
+successful WinMM build. Integration of the dedicated client thread, safe native
+wrapper, transport replacement and Pi cross-build are still unfinished.

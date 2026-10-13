@@ -419,9 +419,11 @@ int libremidi_midi_in_free(libremidi_midi_in_handle* ptr)
   try
   {
     const auto api = ptr->self.get_current_api();
-    // Other backends have their own destructor contracts; do not add a second
-    // explicit close without qualifying them (some closes are not idempotent).
-    if (api == libremidi::API::COREMIDI || api == libremidi::API::COREMIDI_UMP)
+    // Checked backends keep failed cleanup retryable and successful cleanup
+    // idempotent before the destructor's final close.
+    if (api == libremidi::API::COREMIDI || api == libremidi::API::COREMIDI_UMP
+        || api == libremidi::API::WINDOWS_MM
+        || api == libremidi::API::WINDOWS_MIDI_SERVICES)
     {
       if (ptr->self.close_port() != stdx::error{})
         return -EIO;

@@ -2,13 +2,13 @@
 
 Repository: `git@github.com:rec/libremidi.git`
 
-Revision: `56eedef9c6b6d8a5a4cc5bed0d4bd2cdaf08d209`
+Revision: `07c7cfb1237be1ddeaa097a81f79cc9456c087ee`
 
 Imported 2026-10-13 from the fork's `master` branch. This is a commit pin,
 not the previously audited upstream v5.4.3 release archive. The fork already
 contained other changes at base `996a73c216756de2dd6d58e66245ecae4830f9ff`.
 
-The CoreMIDI fixes are separate commits:
+The fork fixes are separate commits:
 
 - [69e060e61b2d4962f283a9838f3307edb050a9bd](https://github.com/rec/libremidi/commit/69e060e61b2d4962f283a9838f3307edb050a9bd):
   reject failed integer-property queries; report a discovery error and omit
@@ -26,6 +26,19 @@ The CoreMIDI fixes are separate commits:
 - [56eedef9c6b6d8a5a4cc5bed0d4bd2cdaf08d209](https://github.com/rec/libremidi/commit/56eedef9c6b6d8a5a4cc5bed0d4bd2cdaf08d209):
   scope the explicit pre-delete close to CoreMIDI. Other backends retain their
   existing destructor behavior; this patch does not certify their teardown.
+
+- [0932a62c05117a8f9b9d9b86ebac326c059531ba](https://github.com/rec/libremidi/commit/0932a62c05117a8f9b9d9b86ebac326c059531ba):
+  extend checked input deletion to WinMM and Windows MIDI Services. A shared
+  callback-lifetime guard rejects self-close, suppresses retired delivery and
+  retains the object until active callbacks finish. WinMM can finish cleanup
+  after its device handle has closed; MIDI Services records revoked/disconnected
+  state and clears its endpoint only after draining, making success idempotent.
+
+- [07c7cfb1237be1ddeaa097a81f79cc9456c087ee](https://github.com/rec/libremidi/commit/07c7cfb1237be1ddeaa097a81f79cc9456c087ee):
+  add the Windows-only `winmm_teardown_test` with test-local fake device calls.
+  It covers failed close, successful native close with an active callback,
+  repeated timeout, rejected reopen and callback self-close. This target has
+  not been compiled or run on this Mac; Windows validation is required.
 
 No additional local modifications are applied to the imported files. Included
 paths are `CMakeLists.txt`, `cmake/`, `include/`, `src/`, `LICENSE.md`, `README.md`,
@@ -52,9 +65,13 @@ The property target passes 30 assertions in four test cases. The teardown target
 passes 40 assertions in three test cases, using fake CoreMIDI clients, ports and
 endpoints. It checks failure retention, repeated explicit cleanup, a still-live
 callback after failure, successful deletion, and both failed-open rollback paths.
-Both targets pass on macOS arm64. Both focused targets
-also pass with AddressSanitizer and UndefinedBehaviorSanitizer. These checks
-demonstrate the fixed property handling, not whole-backend safety or hardware I/O.
+The portable callback-lifetime target adds 14 assertions in three cases for
+self-close, nested/overlapping callbacks, drain failure and reopening after drain.
+All three targets pass on macOS arm64, and all three also pass with AddressSanitizer and UndefinedBehaviorSanitizer. These checks
+exercise property handling, CoreMIDI disposal faults and the shared lifetime
+logic. They do not compile or execute the Windows backend headers: native WinMM
+and Windows MIDI Services build/test qualification remains outstanding. They do
+not establish whole-backend safety or hardware I/O.
 
 Example focused build from the project root:
 
@@ -64,9 +81,9 @@ cmake -S third_party/libremidi -B target/libremidi-properties -G Ninja \
   -DLIBREMIDI_NO_JACK=ON -DLIBREMIDI_NO_PIPEWIRE=ON \
   -DLIBREMIDI_NO_NETWORK=ON -DLIBREMIDI_NO_KEYBOARD=ON \
   -DCMAKE_BUILD_TYPE=Debug -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
-cmake --build target/libremidi-properties --target coremidi_properties_test coremidi_teardown_test
+cmake --build target/libremidi-properties --target coremidi_properties_test coremidi_teardown_test callback_lifetime_test
 ctest --test-dir target/libremidi-properties \
-  -R '^coremidi_(properties|teardown)_test$' --output-on-failure
+  -R '^(coremidi_properties|coremidi_teardown|callback_lifetime)_test$' --output-on-failure
 ```
 
 The existing upstream test configuration obtains Catch2 when tests are enabled.

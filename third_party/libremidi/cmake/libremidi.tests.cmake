@@ -20,6 +20,10 @@ if(LIBREMIDI_CI)
     target_compile_definitions(libremidi ${_public} LIBREMIDI_CI)
 endif()
 
+add_executable(callback_lifetime_test tests/unit/callback_lifetime.cpp)
+target_link_libraries(callback_lifetime_test PRIVATE libremidi Catch2::Catch2WithMain)
+add_test(NAME callback_lifetime_test COMMAND callback_lifetime_test)
+
 add_executable(conversion_test tests/unit/conversion.cpp)
 target_link_libraries(conversion_test PRIVATE libremidi Catch2::Catch2WithMain)
 
@@ -71,6 +75,18 @@ add_test(NAME midi_stream_decoder_test COMMAND midi_stream_decoder_test)
 add_test(NAME midi_timing_test COMMAND midi_timing_test)
 add_test(NAME rawio_test COMMAND rawio_test)
 add_test(NAME observer_filters_test COMMAND observer_filters_test)
+
+if(LIBREMIDI_HAS_WINMM)
+  add_executable(winmm_teardown_test tests/unit/winmm_teardown.cpp)
+  # Compile the backend with test-only call substitution, without linking the
+  # production backend's different inline definition into the same executable.
+  target_include_directories(winmm_teardown_test PRIVATE "${PROJECT_SOURCE_DIR}/include")
+  target_compile_features(winmm_teardown_test PRIVATE cxx_std_20)
+  target_compile_definitions(winmm_teardown_test PRIVATE
+    LIBREMIDI_NO_BOOST LIBREMIDI_NO_BOOST_VARIANT2 UNICODE=1 _UNICODE=1)
+  target_link_libraries(winmm_teardown_test PRIVATE Catch2::Catch2WithMain winmm)
+  add_test(NAME winmm_teardown_test COMMAND winmm_teardown_test)
+endif()
 
 if(LIBREMIDI_HAS_COREMIDI)
   add_executable(coremidi_properties_test tests/unit/coremidi_properties.cpp)
