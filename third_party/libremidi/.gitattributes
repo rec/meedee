@@ -1,0 +1,4 @@
+# Preserve pinned upstream bytes, including CRLF and existing whitespace.
+* -text -whitespace
+SOURCE.md text whitespace
+.gitattributes text whitespace

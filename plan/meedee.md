@@ -37,9 +37,18 @@ None.
 
 The selected transport is libremidi, a cross-platform C++20 library with MIDI
 1.0 byte and native UMP APIs. The existing repository still uses midir until
-the transport replacement slice is implemented. Pin a reviewed libremidi
-release and its build requirements during that slice; this plan does not
-change installed dependencies.
+the transport replacement slice is implemented. The source pin and selected
+build requirements are recorded below; installed dependencies have not yet
+changed.
+
+The owner selected bundled, statically linked sources with CMake; native OS
+backends only; MIDI 1.0 packets by default with explicit UMP selection; and
+Absolute input timestamps by default with explicit capture disabling. The Pi
+target is Zero 2 W with 64-bit Raspberry Pi OS. The selected vendored source is
+now the owner's fork at `46853bd6b0e53e25d918076fca9752552fe49414`, including
+two separately committed CoreMIDI property fixes. See
+[source provenance](../third_party/libremidi/SOURCE.md). Backend integration
+and cross-platform build qualification remain unfinished.
 
 libremidi provides MIDI 2.0 transport through CoreMIDI UMP, ALSA UMP, and
 Windows MIDI Services. Availability depends on the OS version, installed
@@ -122,8 +131,10 @@ wrapper. The C++ build/link step is an explicit requirement for Rust binaries
 and Python wheels; Rust-only applications still require no Python runtime.
 
 Use a Cargo workspace with the toolkit and binding as separate packages.
-Package names are `meedee` and `meedee-python`; the Python extension identity
-is `meedee.midi`. Keep the
+Package names are `meedee` and `meedee-python`; the selected private Python
+extension identity is `meedee._core`. Small public-module loaders register the
+native definitions in `meedee.messages`, `meedee.events`, and `meedee.midi`;
+pure message/event imports must not initialize MIDI workers. Keep the
 Python package at the repository root. Preserve current dependency versions
 unless an approved requirement forces a change.
 
@@ -197,14 +208,13 @@ operation returning a new object. Reject invalid fields and ranges at creation
 and replacement. Pattern matching should be considered in the representation
 prototype, without relying on mutable dictionaries or dynamic aliases.
 
-The representation choice is an implementation gate: current repository
-preferences favor frozen Pydantic models, while native frozen PyO3 values may
-better preserve one Rust-owned representation and Pi resource budgets.
-Prototype the immutable base/subclass contract and measure both construction
-and stream overhead before selecting one. No dependency is added by this plan.
-If Pydantic is selected, use `frozen=True` in declarations and Rust-backed
-validation/encoding; unchecked copy/construction must not bypass validation
-at a transport or file boundary.
+The owner selected native frozen PyO3 values on 2026-10-13, preserving Rust-owned
+validation without adding a Python runtime dependency. Python constructors are
+keyword-only and reject coercion, including booleans for integer fields.
+Wrong types raise `TypeError`; invalid values raise `ValueError`.
+The slice-1 [API contract and prototype](api.md) verifies the base/subclass
+contract and records construction/memory observations. Production module
+integration and stream/Pi measurements remain later qualification gates.
 
 Immutability must be deep. A frozen model containing a list or dict still has
 mutable contents. SysEx payloads use immutable bytes. Tuning/other aggregates
@@ -620,10 +630,12 @@ No toolchain or dependency changes are made by this planning request.
 Each slice can contain several commits. The ordering establishes shared values
 and wire evidence before stateful interpretation or live writes.
 
-1. **Specification/API prototype.** Obtain normative revisions; define value
+1. **Specification/API prototype (completed).** Obtain normative revisions; define value
    types, deep immutability, message hierarchy, units, errors, namespace, and
    language mappings. Prototype Python subclass/field behavior and Pi-relevant
    object overhead. Gate: no unacknowledged dependency or transport assumption.
+   Evidence: [API contract](api.md), [specification baselines](specifications.md),
+   and the test-only native prototype. No new public types are shipped yet.
 2. **Rust toolkit extraction and libremidi transport replacement.** Separate
    the shared core and our Python binding; implement the safe C API wrapper,
    native build integration, and replace midir throughout the transport path.
@@ -697,19 +709,22 @@ validation.
 
 Decisions to settle before dependent implementation:
 
-- Pin the libremidi release, native build/packaging method, C API coverage, and
-  byte/UMP backends to qualify on each platform; codec/file support alone does
-  not meet the live MIDI 2.0 requirement.
-- Python representation: frozen Pydantic models versus native frozen values,
-  with proven deep immutability, real inheritance, and measured cost.
-- Public namespace and current raw API disposition; preserve the current
-  empty-`__init__.py`/no-re-export rules unless the owner explicitly changes them.
-- Exact board/OS/ABI and acceptable Pi workloads.
+- The libremidi source pin and static CMake build are selected; verify C API
+  coverage, offline native build/packaging inputs, and byte/UMP backends on each
+  platform. Codec/file support alone does not meet the live MIDI 2.0 requirement.
+- Native frozen Python representation is selected; integrate it into the
+  production modules and qualify stream/Pi costs using the prototype evidence.
+- Public namespace is `meedee.messages`, `meedee.events`, and `meedee.midi`,
+  without top-level re-exports. Current transport can be replaced without
+  compatibility aliases; keep `__init__.py` empty.
+- Pi Zero 2 W and a 64-bit Raspberry Pi OS ABI are selected; establish the exact
+  image/sysroot and acceptable workloads before cross-build and performance claims.
 - Fine-control/parameter observation policies and initial MTS/GM2/CI subscopes,
   after access to the detailed normative documents.
 - Canonical custom file choice: proposed binary first versus text instead;
   concrete schema, completion semantics, and versioning before implementation.
-- Default timestamp capture and explicit conversion/clock-mapping policies.
+- Absolute input timestamp capture is enabled by default, with an explicit off
+  option. Validate backend origins/fallbacks and explicit clock-mapping policies.
 
 These decisions do not block preparing this plan. They prevent later code from
 silently inventing behavior, promising unavailable transport, or relaxing the

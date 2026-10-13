@@ -470,3 +470,58 @@ Ruff, formatting, ty, pyupgrade with the 3.11 minimum, Cargo formatting, and
 The default development environment was restored to Python 3.11. Release CI
 continues to run only on published releases, testing Python 3.11 and 3.15.
 The GitHub repository and local checkout directory have not been renamed.
+
+## Immutable API prototype, slice 1, 2026-10-13
+
+The owner selected native frozen PyO3 values, separate messages/events/transport
+modules without top-level re-exports, and keyword-only strict constructors.
+The test-only prototype checks `Message`, `NoteOn`, and `SysEx`; production
+transport and package dependencies remain unchanged. See [api.md](api.md) for
+the API contract and measurements and [specifications.md](specifications.md)
+for the official document baselines and acquired-file identities.
+
+All 129 repository tests pass under CPython 3.11.7, including the Rust harness's
+two new prototype tests and the existing shutdown/finalization checks. The
+focused release prototype also passes under CPython 3.11.7 and 3.15.0. Both
+distribution checks pass against a Python 3.15 wheel built from the source
+archive, including the new Rust prototype and Python fixture in that archive.
+Ruff, formatting, ty, pyupgrade, Cargo formatting and `git diff --check` pass.
+Clippy completes with the existing Rust 1.99 `fetch_update` deprecation warning;
+strict `-D warnings` fails at that unchanged line. No new Clippy findings appeared.
+
+Native values use less Python-tracked memory than the minimal slotted dataclass
+baseline; optimized construction also measured faster on this host. Results do
+not measure Rust heap payload allocations, total resident memory, real stream
+load or Pi performance. No MIDI clients or endpoints were opened.
+
+Git staging initially failed because the session denied creation of
+`.git/index.lock`, independently of GitHub authentication. The permission
+was corrected on 2026-10-13 so the pending prototype could be committed.
+
+## CoreMIDI fixes in the libremidi fork, 2026-10-13
+
+Two separate commits were created and pushed to `rec/libremidi`:
+
+- `69e060e61b2d4962f283a9838f3307edb050a9bd`: failed integer-property queries
+  return no value; discovery reports an error and omits the affected port.
+- `46853bd6b0e53e25d918076fca9752552fe49414`: string properties use checked,
+  length-aware UTF-8 conversion with Core Foundation ownership, removing the
+  uninitialized fixed buffer and termination assumption.
+
+The first commit's two focused cases passed before it was committed. The final
+four cases pass all 30 assertions, including AddressSanitizer and
+UndefinedBehaviorSanitizer builds on macOS arm64. Property getter stubs emulate
+failure without writing the output. Real Core Foundation string conversion is
+checked with long ASCII, multibyte text, embedded NUL, empty values and an invalid
+UTF-16 surrogate. The tests create no MIDI clients or endpoints and query no devices.
+
+The fork's selected build sources and focused test sources are imported under
+`third_party/libremidi`, pinned to the second commit. Every imported file's raw
+Git blob hash matches that revision. The vendored copy independently builds and
+passes the focused target. Provenance, retained license texts and omissions are
+recorded in `third_party/libremidi/SOURCE.md`. The ASCII input-name conversion
+is deliberately unchanged; it was not one of the two requested fixes.
+
+This source import does not yet link libremidi into meedee or remove midir.
+Meedee's `.git/index.lock` initially prevented the source-import commit.
+The permission was corrected on 2026-10-13; the fork commits were already pushed.

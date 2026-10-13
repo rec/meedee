@@ -5,6 +5,12 @@ Dual-licensed dependencies are used under their MIT option where available.
 Build-only dependencies are included for completeness. meedee's own MIT license
 is in LICENSE.
 
+Vendored libremidi sources are pinned to fork revision
+46853bd6b0e53e25d918076fca9752552fe49414. Their BSD 2-clause and inherited
+MIT/BSD license texts are retained in third_party/libremidi/LICENSE.md.
+See third_party/libremidi/SOURCE.md for provenance and the two CoreMIDI fixes.
+This source is not yet linked into the current midir-based extension.
+
 block2, objc2, and objc2-encode omit license files from their crate archives.
 Their shared MIT text is retained from the upstream objc2 repository's
 LICENSE-MIT.txt at revision e45c53301628aec4ead5c086dde282942ca972db,

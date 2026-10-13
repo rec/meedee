@@ -1,0 +1,61 @@
+# Vendored libremidi source
+
+Repository: `git@github.com:rec/libremidi.git`
+
+Revision: `46853bd6b0e53e25d918076fca9752552fe49414`
+
+Imported 2026-10-13 from the fork's `master` branch. This is a commit pin,
+not the previously audited upstream v5.4.3 release archive. The fork already
+contained other changes at base `996a73c216756de2dd6d58e66245ecae4830f9ff`.
+
+The two CoreMIDI fixes are separate commits:
+
+- [69e060e61b2d4962f283a9838f3307edb050a9bd](https://github.com/rec/libremidi/commit/69e060e61b2d4962f283a9838f3307edb050a9bd):
+  reject failed integer-property queries; report a discovery error and omit
+  the port rather than inventing an ID.
+- [46853bd6b0e53e25d918076fca9752552fe49414](https://github.com/rec/libremidi/commit/46853bd6b0e53e25d918076fca9752552fe49414):
+  convert name properties to checked, length-aware UTF-8 data with automatic
+  Core Foundation ownership; remove the fixed buffer and C-string assumption.
+
+No additional local modifications are applied to the imported files. Included
+paths are `CMakeLists.txt`, `cmake/`, `include/`, `src/`, `LICENSE.md`, `README.md`,
+`tests/include_catch.hpp`, `tests/unit/`, and `tests/integration/`. Upstream
+examples, documentation, CI files, and the large MIDI file test corpus are
+omitted. These sources support the planned native build and the focused
+CoreMIDI regression target; this subset does not promise the full upstream
+test suite or examples. Tests remain disabled for production builds.
+`SOURCE.md` and `.gitattributes` are import metadata; the latter preserves
+upstream line endings and whitespace without relaxing checks on our metadata.
+
+The upstream license texts are retained in [LICENSE.md](LICENSE.md). Preserve
+their notices when linking this source into distributed wheels and binaries.
+
+## Regression checks
+
+`tests/unit/coremidi_properties.cpp` supplies deterministic CoreMIDI property
+getter stubs. A failed integer query does not write its output. String values
+are real Core Foundation objects; conversion tests cover long ASCII, multibyte
+UTF-8, embedded NUL, empty values and an unpaired UTF-16 surrogate. The observer
+failure path is tested without creating MIDI clients or querying devices.
+
+All 30 assertions in four test cases pass on macOS arm64. The focused target
+also passes with AddressSanitizer and UndefinedBehaviorSanitizer. These checks
+demonstrate the fixed property handling, not whole-backend safety or hardware I/O.
+
+Example focused build from the project root:
+
+```sh
+cmake -S third_party/libremidi -B target/libremidi-properties -G Ninja \
+  -DLIBREMIDI_TESTS=ON -DLIBREMIDI_NO_BOOST=ON \
+  -DLIBREMIDI_NO_JACK=ON -DLIBREMIDI_NO_PIPEWIRE=ON \
+  -DLIBREMIDI_NO_NETWORK=ON -DLIBREMIDI_NO_KEYBOARD=ON \
+  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+cmake --build target/libremidi-properties --target coremidi_properties_test
+ctest --test-dir target/libremidi-properties \
+  -R '^coremidi_properties_test$' --output-on-failure
+```
+
+The existing upstream test configuration obtains Catch2 when tests are enabled.
+Production build integration must disable tests and avoid unpinned build-time
+downloads. Native backend replacement and packaging integration are still the
+remaining work of meedee slice 2; source vendoring alone does not replace midir.
