@@ -237,6 +237,8 @@ LIBREMIDI_EXPORT
 int libremidi_midi_observer_free(libremidi_midi_observer_handle*);
 
 /// MIDI input API (read MIDI messages)
+// On error, *out may remain non-null if native cleanup failed. The caller must
+// retain the handle and its callback contexts until midi_in_free succeeds.
 LIBREMIDI_EXPORT
 int libremidi_midi_in_new(
     const libremidi_midi_configuration*, const libremidi_api_configuration*,
@@ -248,6 +250,11 @@ int libremidi_midi_in_is_connected(const libremidi_midi_in_handle*);
 LIBREMIDI_EXPORT
 libremidi_timestamp libremidi_midi_in_absolute_timestamp(libremidi_midi_in_handle*);
 
+// CoreMIDI input teardown is checked before deletion. Other backends retain
+// their existing destructor behavior and are not certified by this check.
+// Returns zero after deletion (also for null). On a negative result, the handle
+// remains valid and callback contexts must remain alive. Do not discard them.
+// Destruction through the C++ API is not covered by this checked C API contract.
 LIBREMIDI_EXPORT
 int libremidi_midi_in_free(libremidi_midi_in_handle*);
 

@@ -372,33 +372,31 @@ int libremidi_midi_in_new(
       return -EINVAL;
   }
 
-  // Open the port
+  // A failed open can still leave callback-bearing native resources behind.
+  // Preserve the handle if checked cleanup cannot confirm their retirement.
   auto ptr = *out;
   if (!ptr)
     return -EINVAL;
 
-  if (c->virtual_port)
+  try
   {
-    if (auto ret = ptr->self.open_virtual_port(c->port_name); ret != stdx::error{})
-    {
-      *out = nullptr;
-      delete ptr;
-      return -EIO;
-    }
+    auto result = c->virtual_port
+                      ? ptr->self.open_virtual_port(c->port_name)
+                      : ptr->self.open_port(
+                            *reinterpret_cast<const libremidi::input_port*>(c->in_port));
+    if (result == stdx::error{})
+      return 0;
   }
-  else
+  catch (...)
   {
-    auto port = reinterpret_cast<const libremidi::input_port*>(c->in_port);
-    if (auto ret = ptr->self.open_port(*port); ret != stdx::error{})
-    {
-      *out = nullptr;
-      delete ptr;
-      return -EIO;
-    }
+    // C++ exceptions must not cross the C ABI. The caller still owns *out.
   }
 
-  return 0;
+  if (libremidi_midi_in_free(ptr) == 0)
+    *out = nullptr;
+  return -EIO;
 }
+
 int libremidi_midi_in_is_connected(const libremidi_midi_in_handle* in)
 {
   if (!in)
@@ -415,6 +413,25 @@ libremidi_timestamp libremidi_midi_in_absolute_timestamp(libremidi_midi_in_handl
 
 int libremidi_midi_in_free(libremidi_midi_in_handle* ptr)
 {
+  if (!ptr)
+    return 0;
+
+  try
+  {
+    const auto api = ptr->self.get_current_api();
+    // Other backends have their own destructor contracts; do not add a second
+    // explicit close without qualifying them (some closes are not idempotent).
+    if (api == libremidi::API::COREMIDI || api == libremidi::API::COREMIDI_UMP)
+    {
+      if (ptr->self.close_port() != stdx::error{})
+        return -EIO;
+    }
+  }
+  catch (...)
+  {
+    return -EIO;
+  }
+
   delete ptr;
   return 0;
 }

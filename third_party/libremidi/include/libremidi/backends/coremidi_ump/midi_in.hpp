@@ -39,9 +39,6 @@ public:
     // Close a connection if it exists.
     close_port();
 
-    if (this->endpoint)
-      MIDIEndpointDispose(this->endpoint);
-
     close_client(*this);
   }
 
@@ -66,17 +63,17 @@ public:
 
     if (result != noErr)
     {
-      close_client(*this);
       libremidi_handle_error(
           this->configuration, "error creating macOS MIDI input port: " + std::to_string(result));
       return from_osstatus(result);
     }
 
+    // Retain the port even when connecting fails, so checked cleanup can retry.
+    this->port = port;
+
     // Make the connection.
     if (result = MIDIPortConnectSource(port, source, nullptr); result != noErr)
     {
-      MIDIPortDispose(port);
-      close_client(*this);
       libremidi_handle_error(this->configuration, "error connecting macOS MIDI input port.");
       return from_osstatus(result);
     }

@@ -45,8 +45,8 @@ The owner selected bundled, statically linked sources with CMake; native OS
 backends only; MIDI 1.0 packets by default with explicit UMP selection; and
 Absolute input timestamps by default with explicit capture disabling. The Pi
 target is Zero 2 W with 64-bit Raspberry Pi OS. The selected vendored source is
-now the owner's fork at `46853bd6b0e53e25d918076fca9752552fe49414`, including
-two separately committed CoreMIDI property fixes. See
+now the owner's fork at `56eedef9c6b6d8a5a4cc5bed0d4bd2cdaf08d209`, including
+two separately committed CoreMIDI property fixes and checked input teardown. See
 [source provenance](../third_party/libremidi/SOURCE.md). Backend integration
 and cross-platform build qualification remain unfinished.
 

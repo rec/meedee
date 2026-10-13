@@ -76,6 +76,9 @@ if(LIBREMIDI_HAS_COREMIDI)
   add_executable(coremidi_properties_test tests/unit/coremidi_properties.cpp)
   target_link_libraries(coremidi_properties_test PRIVATE libremidi Catch2::Catch2WithMain)
   add_test(NAME coremidi_properties_test COMMAND coremidi_properties_test)
+  add_executable(coremidi_teardown_test tests/unit/coremidi_teardown.cpp)
+  target_link_libraries(coremidi_teardown_test PRIVATE libremidi Catch2::Catch2WithMain)
+  add_test(NAME coremidi_teardown_test COMMAND coremidi_teardown_test)
 endif()
 
 # PipeWire shared-context regression tests. Standalone programs (no Catch2):

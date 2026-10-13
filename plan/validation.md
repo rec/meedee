@@ -525,3 +525,21 @@ is deliberately unchanged; it was not one of the two requested fixes.
 This source import does not yet link libremidi into meedee or remove midir.
 Meedee's `.git/index.lock` initially prevented the source-import commit.
 The permission was corrected on 2026-10-13; the fork commits were already pushed.
+
+## Slice 2: checked native input teardown, 2026-10-13
+
+Fork commit `debce21b71838cf205749ceafd9a17da397af823` adds checked CoreMIDI endpoint/port disposal and a C API
+ownership contract: failed free retains the input; failed open retains it when
+rollback fails. The caller must keep callback context alive. Direct C++ destruction
+and other backends' internal disposal guarantees are not proven by this patch.
+
+Focused property tests (30 assertions) and teardown tests (40 assertions) pass
+normally and under AddressSanitizer/UndefinedBehaviorSanitizer on macOS arm64.
+Tests use fake CoreMIDI handles and no MIDI device access. The owner's dirty
+`/Users/tom/code/libremidi` checkout was not edited. Sources were imported from
+the published fork into the pinned vendor directory; transport replacement remains
+unfinished and no native whole-backend safety claim is made.
+
+Follow-up fork commit `56eedef9c6b6d8a5a4cc5bed0d4bd2cdaf08d209` limits explicit pre-delete close to CoreMIDI:
+other backends' destructors may close again without idempotency. The same focused
+normal and sanitizer tests pass after this correction.
