@@ -1,10 +1,10 @@
 [package]
-name = "meedee"
+name = "meedee-python"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.87"
 description = "Python bindings for the midir Rust MIDI library"
-repository = "https://github.com/rec/midirp"
+repository = "https://github.com/rec/meedee"
 publish = false
 license = "MIT"
 
@@ -12,6 +12,12 @@ license = "MIT"
 name = "midi"
 crate-type = ["cdylib", "rlib"]
 
+[workspace]
+members = ["crates/meedee"]
+default-members = ["."]
+resolver = "2"
+
 [dependencies]
+meedee = { path = "crates/meedee" }
 midir = "=0.11.0"
 pyo3 = "=0.29.3"

@@ -636,7 +636,12 @@ and wire evidence before stateful interpretation or live writes.
    object overhead. Gate: no unacknowledged dependency or transport assumption.
    Evidence: [API contract](api.md), [specification baselines](specifications.md),
    and the test-only native prototype. No new public types are shipped yet.
-2. **Rust toolkit extraction and libremidi transport replacement.** Separate
+2. **Rust toolkit extraction and libremidi transport replacement (in progress).**
+   The dependency-free `crates/meedee` crate owns the prototype NoteOn/SysEx
+   values; Python wrappers use those values. The root package is `meedee-python`.
+   Vendored CoreMIDI checked input teardown passes focused normal/sanitizer tests.
+   Native transport ownership is awaiting the owner's threading decision.
+   Separate
    the shared core and our Python binding; implement the safe C API wrapper,
    native build integration, and replace midir throughout the transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.

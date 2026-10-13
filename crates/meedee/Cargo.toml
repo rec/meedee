@@ -1,0 +1,12 @@
+[package]
+name = "meedee"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.87"
+description = "Immutable MIDI values and native MIDI toolkit"
+repository = "https://github.com/rec/meedee"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/lib.rs"

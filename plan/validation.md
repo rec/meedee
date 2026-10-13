@@ -543,3 +543,13 @@ unfinished and no native whole-backend safety claim is made.
 Follow-up fork commit `56eedef9c6b6d8a5a4cc5bed0d4bd2cdaf08d209` limits explicit pre-delete close to CoreMIDI:
 other backends' destructors may close again without idempotency. The same focused
 normal and sanitizer tests pass after this correction.
+
+## Slice 2: independent Rust values
+
+`cargo test --locked -p meedee` passes the two boundary/payload tests without
+Python. `cargo tree -p meedee` contains only the toolkit itself; it has no external
+dependencies. `cargo clippy --locked -p meedee --all-targets -- -D warnings` and
+`cargo fmt --all --check` pass. The Python representation contract passes on
+Python 3.11 using the extracted Rust values. The existing Python suite passes
+all 129 tests after rebuilding. No dependency versions changed in Cargo.lock.
+The production transport still uses midir pending the rest of slice 2.

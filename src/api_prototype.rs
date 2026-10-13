@@ -5,6 +5,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
+use meedee::messages;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -21,42 +22,9 @@ impl Message {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct NoteOnValue {
-    channel: u8,
-    note: u8,
-    velocity: u8,
-}
-
-impl NoteOnValue {
-    fn new(channel: i64, note: i64, velocity: i64) -> Result<Self, ValueError> {
-        Ok(Self {
-            channel: bounded(channel, "channel", 1, 16)?,
-            note: bounded(note, "note", 0, 127)?,
-            velocity: bounded(velocity, "velocity", 0, 127)?,
-        })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct SysExValue {
-    data: Box<[u8]>,
-}
-
-impl SysExValue {
-    fn new(data: Vec<u8>) -> Result<Self, ValueError> {
-        if data.iter().any(|value| *value > 127) {
-            return Err(ValueError("SysEx payload bytes must be in 0..=127".into()));
-        }
-        Ok(Self {
-            data: data.into_boxed_slice(),
-        })
-    }
-}
-
 #[pyclass(frozen, extends = Message, module = "meedee.messages")]
 struct NoteOn {
-    value: NoteOnValue,
+    value: messages::NoteOn,
 }
 
 #[pymethods]
@@ -69,7 +37,7 @@ impl NoteOn {
         velocity: &Bound<'_, PyAny>,
     ) -> PyResult<PyClassInitializer<Self>> {
         Ok(PyClassInitializer::from(Message).add_subclass(Self {
-            value: NoteOnValue::new(
+            value: messages::NoteOn::new(
                 integer(channel, "channel")?,
                 integer(note, "note")?,
                 integer(velocity, "velocity")?,
@@ -80,23 +48,25 @@ impl NoteOn {
 
     #[getter]
     fn channel(&self) -> u8 {
-        self.value.channel
+        self.value.channel()
     }
 
     #[getter]
     fn note(&self) -> u8 {
-        self.value.note
+        self.value.note()
     }
 
     #[getter]
     fn velocity(&self) -> u8 {
-        self.value.velocity
+        self.value.velocity()
     }
 
     fn __repr__(&self) -> String {
         format!(
             "NoteOn(channel={}, note={}, velocity={})",
-            self.value.channel, self.value.note, self.value.velocity
+            self.value.channel(),
+            self.value.note(),
+            self.value.velocity()
         )
     }
 
@@ -112,9 +82,9 @@ impl NoteOn {
 
     #[pyo3(signature = (**changes))]
     fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
-        let mut channel = i64::from(self.value.channel);
-        let mut note = i64::from(self.value.note);
-        let mut velocity = i64::from(self.value.velocity);
+        let mut channel = i64::from(self.value.channel());
+        let mut note = i64::from(self.value.note());
+        let mut velocity = i64::from(self.value.velocity());
         if let Some(changes) = changes {
             for (name, value) in changes.iter() {
                 match name.extract::<String>()?.as_str() {
@@ -128,7 +98,7 @@ impl NoteOn {
         Py::new(
             py,
             PyClassInitializer::from(Message).add_subclass(Self {
-                value: NoteOnValue::new(channel, note, velocity).map_err(value_error)?,
+                value: messages::NoteOn::new(channel, note, velocity).map_err(value_error)?,
             }),
         )
     }
@@ -150,7 +120,7 @@ impl NoteOn {
 
 #[pyclass(frozen, extends = Message, module = "meedee.messages")]
 struct SysEx {
-    value: SysExValue,
+    value: messages::SysEx,
 }
 
 #[pymethods]
@@ -165,7 +135,7 @@ impl SysEx {
 
     #[getter]
     fn data<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
-        PyBytes::new(py, &self.value.data)
+        PyBytes::new(py, self.value.data())
     }
 
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
@@ -212,16 +182,6 @@ impl SysEx {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct ValueError(String);
-
-fn bounded(value: i64, field: &str, low: i64, high: i64) -> Result<u8, ValueError> {
-    if !(low..=high).contains(&value) {
-        return Err(ValueError(format!("{field} must be in {low}..={high}")));
-    }
-    Ok(value as u8)
-}
-
 fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {
     if !value.get_type().is(value.py().get_type::<PyInt>()) {
         return Err(PyTypeError::new_err(format!("{field} must be an int")));
@@ -231,34 +191,24 @@ fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {
         .map_err(|_| PyValueError::new_err(format!("{field} is out of range")))
 }
 
-fn payload(data: &Bound<'_, PyAny>) -> PyResult<SysExValue> {
+fn payload(data: &Bound<'_, PyAny>) -> PyResult<messages::SysEx> {
     let buffer = PyBuffer::<u8>::get(data)?;
     if buffer.dimensions() != 1 || !buffer.is_c_contiguous() {
         return Err(PyTypeError::new_err(
             "data must be a one-dimensional contiguous unsigned-byte buffer",
         ));
     }
-    SysExValue::new(buffer.to_vec(data.py())?).map_err(value_error)
+    messages::SysEx::new(buffer.to_vec(data.py())?).map_err(value_error)
 }
 
-fn value_error(error: ValueError) -> PyErr {
-    PyValueError::new_err(error.0)
+fn value_error(error: messages::ValueError) -> PyErr {
+    PyValueError::new_err(error.to_string())
 }
 
 fn value_hash(value: &impl Hash) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
-}
-
-#[test]
-fn native_values_preserve_boundaries_and_reject_invalid_payloads() {
-    assert_eq!(NoteOnValue::new(1, 0, 0).unwrap().channel, 1);
-    assert_eq!(NoteOnValue::new(16, 127, 127).unwrap().velocity, 127);
-    assert!(NoteOnValue::new(0, 60, 100).is_err());
-    assert!(NoteOnValue::new(17, 60, 100).is_err());
-    assert!(SysExValue::new(vec![0, 127]).is_ok());
-    assert!(SysExValue::new(vec![128]).is_err());
 }
 
 #[test]
@@ -291,8 +241,8 @@ fn python_representation_contract_and_measurements() {
         println!("prototype: {results}");
         println!(
             "Rust value sizes: NoteOn={}, SysEx={}",
-            std::mem::size_of::<NoteOnValue>(),
-            std::mem::size_of::<SysExValue>()
+            std::mem::size_of::<messages::NoteOn>(),
+            std::mem::size_of::<messages::SysEx>()
         );
     });
 }
