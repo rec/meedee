@@ -737,3 +737,12 @@ Decisions to settle before dependent implementation:
 These decisions do not block preparing this plan. They prevent later code from
 silently inventing behavior, promising unavailable transport, or relaxing the
 immutable message contract.
+
+## 17. Completion reminder
+
+- [ ] When all work here is finished, remind Tom to send the libremidi fork
+  commits upstream for review, with their regression tests and validation
+  limitations. Use the commit history recorded in
+  [source provenance](../third_party/libremidi/SOURCE.md). This reminder is for
+  project completion, not merely completion of slice 2. Do not submit the
+  commits or contact upstream developers automatically.
