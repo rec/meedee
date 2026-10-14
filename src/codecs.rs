@@ -120,6 +120,32 @@ fn encode<'py>(py: Python<'py>, message: &Bound<'py, PyAny>) -> PyResult<Bound<'
     Ok(PyBytes::new(py, &messages::encode_message(message)?))
 }
 
+#[pyfunction]
+fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
+    codecs::expand(&messages::extract_command(command)?)
+        .into_iter()
+        .map(|message| {
+            messages::to_python(py, meedee::messages::AnyMessage::ControlChange(message))
+        })
+        .collect()
+}
+
+#[pyfunction]
+pub fn prepare_command(
+    protocol: crate::packets::Protocol,
+    command: &Bound<'_, PyAny>,
+) -> PyResult<(String, std::collections::HashMap<String, i64>, usize)> {
+    let command = messages::extract_command(command)?;
+    if protocol != crate::packets::Protocol::Midi1 {
+        return Err(crate::errors::CapabilityError::new_err(
+            "compound commands require MIDI 1.0 byte transport",
+        ));
+    }
+    let total = codecs::expand(&command).len();
+    let (name, fields) = messages::command_wire(&command);
+    Ok((name, fields, total))
+}
+
 fn items_to_python(py: Python<'_>, items: Vec<codecs::DecodeItem>) -> PyResult<Vec<Py<PyAny>>> {
     items
         .into_iter()
@@ -137,5 +163,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Diagnostic>()?;
     module.add_class::<Decoder>()?;
     module.add_function(wrap_pyfunction!(encode, module)?)?;
+    module.add_function(wrap_pyfunction!(expand, module)?)?;
     Ok(())
 }

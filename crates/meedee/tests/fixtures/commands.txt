@@ -1,0 +1,14 @@
+# Independent CC bytes, standard controller assignments and meedee release policy.
+# Fields: channel, controller/value or parameter/value/resolution, as applicable.
+ControlChange14 1 7 10000 | b0 07 4e b0 27 10
+ControlChange14 16 31 16383 | bf 1f 7f bf 3f 7f
+ControlChange14 1 0 0 | b0 00 00 b0 20 00
+ControlChange14 1 6 128 | b0 06 01 b0 26 00
+RpnSet 1 0 2 7 | b0 65 00 b0 64 00 b0 06 02 b0 65 7f b0 64 7f
+RpnSet 16 16382 0 14 | bf 65 7f bf 64 7e bf 06 00 bf 26 00 bf 65 7f bf 64 7f
+NrpnSet 1 1234 10000 14 | b0 63 09 b0 62 52 b0 06 4e b0 26 10 b0 65 7f b0 64 7f
+NrpnSet 16 16383 127 7 | bf 63 7f bf 62 7f bf 06 7f bf 65 7f bf 64 7f
+RpnIncrement 2 1 | b1 65 00 b1 64 01 b1 60 00 b1 65 7f b1 64 7f
+RpnDecrement 1 2 | b0 65 00 b0 64 02 b0 61 00 b0 65 7f b0 64 7f
+NrpnIncrement 3 129 | b2 63 01 b2 62 01 b2 60 00 b2 65 7f b2 64 7f
+NrpnDecrement 16 16383 | bf 63 7f bf 62 7f bf 61 00 bf 65 7f bf 64 7f

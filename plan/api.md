@@ -1,6 +1,6 @@
 # meedee API contract and representation prototype
 
-Slices 1–3, updated 2026-10-14. This document records the approved API choices,
+Slices 1–4, updated 2026-10-14. This document records the approved API choices,
 the original device-free prototype, and the MIDI 1.0 byte codec.
 Platform qualification and higher-level protocols remain separate plan gates.
 
@@ -22,6 +22,7 @@ Public definitions belong to these modules, without top-level re-exports:
 | --- | --- |
 | `meedee.messages` | `Message` and concrete musical values/commands |
 | `meedee.codecs` | Pure byte encoding and incremental decoding; no native I/O |
+| `meedee.controls` | Optional per-source control and parameter observations |
 | `meedee.events` | `Event`, `Timestamp`, and clock descriptors |
 | `meedee.midi` | Discovery, transport capabilities, clients, connections and transport errors |
 
@@ -177,8 +178,101 @@ not UMP or Standard MIDI Files.
 
 Events/timestamps, transport integration and receive filters remain separate
 from this codec. Transport callbacks continue to receive ReceivedPacket;
-timestamped typed integration belongs to slice 10. Fine CC, RPN/NRPN, tuning,
-GM profiles and file formats retain their later slices.
+timestamped typed integration belongs to slice 10. Fine CC and RPN/NRPN are
+provided by slice 4 below; tuning, GM profiles and files retain later slices.
+
+### Slice 4 compound commands and observations, approved 2026-10-14
+
+Seven frozen Message subclasses are added in `meedee.messages`:
+ControlChange14(channel, controller, value), RpnSet/NrpnSet(channel, parameter,
+value, resolution), and RpnIncrement/RpnDecrement/NrpnIncrement/NrpnDecrement
+(channel, parameter). All fields are keyword-only strict integers, with checked
+replacement, annotations and class patterns as for primitive messages.
+ControlChange14 uses controller 0–31 and value 0–16383. Parameter identifiers
+are 0–16383 except RPN 16383, which is null selection and cannot be set/stepped;
+NRPN 16383 remains a legitimate identifier. Set resolution is required and
+exactly 7 or 14, with value 0–127 or 0–16383 respectively. Changing resolution
+does not rescale a value. All commands retain channel numbering 1–16.
+
+`codecs.expand(command)` returns a fresh list of frozen primitive ControlChange
+messages. `codecs.encode` stays primitive-only and rejects commands. A fine-CC
+command emits MSB followed by LSB. Parameter commands always send both selectors
+MSB first, then Data Entry MSB (and LSB for resolution 14), or one Data Increment/
+Decrement with data byte zero. They finish with RPN 127/127 to release selection,
+including after NRPN operations. No selector caching or NRPN-null convention is
+introduced. Generic values represent raw data bits, not profile-specific physical
+units. Increment/decrement has no amount field or guessed absolute value.
+
+Rust `Message` is now the common marker trait. The existing encoding method
+moves to `PrimitiveMessage: Message`; method-style encoding callers import that
+subtrait. Free `codecs::encode` retains its behavior. `Command: Message` exposes
+expansion and `AnyCommand` stores the seven command families inline, separate
+from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
+
+`OutputConnection.send_command(command)` accepts these commands on MIDI 1.0
+outputs, rejecting UMP before sending. Raw `send` remains unchanged. One native
+owner-thread operation and the existing connection serialization cover the whole
+sequence, including release; raw sends, other commands and close cannot run
+between its steps on that connection. This is not atomicity against other
+clients, processes or external device state. The default isolated deadline
+covers the whole command, not each individual message. In-process calls retain
+their existing unbounded native-driver wait.
+
+`CompoundSendError` derives from SendError and exposes completed_messages and
+total_messages. The count is the prefix accepted without a backend error, not
+physical confirmation. The failed message may also have had effects. A worker
+crash/timeout, lost reply or native owner-thread failure can make progress
+unknown (None). If a complete success reply arrives before worker failure is
+observed, the error preserves the fully accepted count instead. Original worker timeout/crash details are the raised exception's
+cause; worker_failure retains the underlying worker diagnosis. Cancellation
+still propagates KeyboardInterrupt/SystemExit. No retry or additional cleanup
+send occurs after a failed step. Invalidation follows existing send failure
+rules. In-process closed remains false until native ownership is disposed,
+even though the failed connection already rejects sends. Release cannot be
+guaranteed after failure. Python error construction occurs after dropping the
+connection mutex, so import hooks/exception constructors cannot run under it.
+
+`meedee.controls.Interpreter()` is pure and optional. Use one instance per source;
+it has fixed state for 16 channels and no parameter cache or source registry.
+`feed(primitive_message)` returns frozen ControlObservation, ParameterObservation,
+ParameterStep and Diagnostic values; it does not return, mutate or replace raw
+messages. Non-control primitives still advance its zero-based input index.
+No SysEx payload is copied merely to ignore that input. Keep the raw stream
+separately. Feeding a compound command is an error; expand or decode it first.
+
+ControlObservation contains channel/controller/value/resolution and first_index/
+last_index. A new coarse CC reports its exact seven-bit value and forgets the
+previous fine component. A later fine CC reports a 14-bit value using that known
+coarse component; further LSBs reuse it until a new MSB or reset. An LSB before
+its MSB produces MissingCoarse and is never buffered for a future MSB. Unrelated
+messages may intervene. Bank Select 0/32 stays raw, and Data Entry 6/38 belongs
+to parameter interpretation rather than a generic knob observation.
+
+ParameterObservation adds family (Rpn/Nrpn) and parameter. It emits coarse data
+at resolution 7 and complete observed pairs at 14. ParameterStep has direction
+(Increment/Decrement) instead of an absolute value or magnitude. CC 96/97 data
+bytes do not become an amount. A step invalidates cached coarse data because
+the new absolute value is unknown. Observation ranges include selector context
+for parameters and the contributing coarse/fine inputs for generic controls.
+
+Selector halves may arrive in either order. After a complete selection is edited,
+or a family changes, both halves must be observed afresh. Previous selection/data
+context is invalidated with a diagnostic. Data received while selection is
+missing/partial yields MissingSelection/IncompleteSelection; a fine value without
+coarse data yields MissingCoarse. A normal first selector simply waits for its
+partner; the incomplete diagnostic is emitted if parameter data arrives too soon.
+This intentionally declines compliant devices that change only one selector
+half, rather than guessing inherited context. RPN-null clears both families.
+
+`reset()` clears all source state and emits StateReset at the next input index
+without advancing it, a boundary-position diagnostic. SystemReset does the same
+at its input position; Reset All Controllers clears only its channel. No physical
+default values are invented or sent. All Notes Off is not a controller reset.
+Diagnostics expose kind, optional channel/controller, and first/last indexes.
+Indexes count fed primitives, retain their position across reset, and saturate
+at usize::MAX. No timeout or silent-loss detector invents stream boundaries.
+Call reset after known loss/reconnect; also reset the byte decoder when needed.
+Timestamped observations and device/profile-specific semantics remain later work.
 
 The prototype does not interpret manufacturer IDs, enforce a complete vendor
 message schema, assemble packets or implement SysEx8. Do not use its generic

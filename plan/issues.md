@@ -96,6 +96,10 @@ the limit is not a total-memory or processing-time budget. Packet floods,
 oversized sends, discovery lists and
 allocation/process aborts remain resource risks. Rust/native allocation failures
 are not universally recoverable Python exceptions.
+The optional control interpreter has fixed state for 16 channels of one source;
+many application-created interpreters and retained observation lists still cost
+memory. Built-in commands expand to at most six messages, but their native
+duration remains driver-dependent.
 
 Known drop counters cover native admission and queue overflow, not driver loss,
 user-code exceptions or packets lost with a crashing child. CPU/GIL contention
@@ -133,6 +137,16 @@ notification. Use a separate decoder per source, reset after observed loss,
 and finish at end of stream. Its strict SysEx policy discards implicit non-F7
 termination with a diagnostic, despite the standard permitting it. Message
 encoding includes explicit statuses and is not Standard MIDI File encoding.
+
+Compound commands require expand/send_command, not primitive encode or raw send.
+Their serialization covers one connection, not other clients/applications using
+the device. A completed prefix is backend acceptance, not physical confirmation;
+the failed step may have effects, and process loss/timeouts leave progress unknown.
+There is no retry or post-failure cleanup send, so parameter selection can remain
+active or partially changed. In-process failed connections retain ownership until
+teardown, even while rejecting sends. The optional interpreter cannot repair
+unknown loss and deliberately declines single-half edits to a completed parameter
+selection. Callers retain raw messages and reset source state after known loss.
 
 Timestamps are exact signed nanoseconds or None. Zero is valid. Clock identity
 distinguishes connections and isolated children but does not synchronize them.

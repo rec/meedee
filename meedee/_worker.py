@@ -6,7 +6,7 @@ from queue import Empty, Full
 from threading import Event, Lock, Thread
 from typing import BinaryIO, cast
 
-from . import midi
+from . import messages, midi
 
 # isort: split
 from . import _native
@@ -109,11 +109,15 @@ class Worker:
             if self.producer is not None:
                 self.producer.stop()
             return None
-        if operation == "send":
+        if operation in ("send", "send_command"):
             if args[1] != self.generation or not isinstance(
                 self.connection, _native.OutputConnection
             ):
                 raise BusyError("MIDI connection is closed")
+            if operation == "send_command":
+                name, fields, _ = cast(tuple[str, dict[str, int], int], args[0])
+                self.connection.send_command(getattr(messages, name)(**fields))
+                return None
             data = args[0]
             self.connection.send(
                 midi.UmpPacket(words=cast(tuple[int, ...], data))
@@ -169,7 +173,7 @@ def serve(worker: Worker, source: BinaryIO) -> None:
             result = worker.perform(operation, args)
         except BusyError as error:
             worker.sender.send(
-                "error", ("StateError", str(error), False, dropped(worker))
+                "error", ("StateError", error.args, False, dropped(worker))
             )
         except (
             midi.MidiError,
@@ -189,7 +193,7 @@ def serve(worker: Worker, source: BinaryIO) -> None:
                 if isinstance(error, MemoryError)
                 else type(error).__name__
             )
-            worker.sender.send("error", (kind, str(error), fatal, dropped(worker)))
+            worker.sender.send("error", (kind, error.args, fatal, dropped(worker)))
             if fatal:
                 return
         else:

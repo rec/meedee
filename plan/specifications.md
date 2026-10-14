@@ -73,3 +73,24 @@ signed bend conversion and preserved zero-velocity NoteOn. Parser tests cover
 running status, reserved statuses, real-time interleaving and malformed streams.
 These are meedee regression vectors derived from the cited layouts, not an
 official MIDI certification suite or copied full specification tables.
+
+## Slice 4 control and parameter evidence, 2026-10-14
+
+The acquired 4.2.1 baseline's Control Change section describes paired controllers
+0–31/32–63, repeated fine updates and clearing the previous fine component when
+a new coarse value arrives. Its Registered and Non-Registered Parameter Numbers
+section describes two selector halves and Data Entry/Increment/Decrement.
+The Association's current [controller/RPN table](https://midi.org/midi-1-0-control-change-messages)
+provides selector identifiers 98–101, Data Entry 6/38, direction-only Increment/
+Decrement 96/97 (data N/A), and the RPN 127/127 release affecting both families.
+The implementation uses those raw protocol assignments. It does not implement
+RP-018's parameter-specific receiver response/units or profile-specific scaling.
+
+The shared independent vectors in `crates/meedee/tests/fixtures/commands.txt`
+state complete expected CC bytes, including meedee's selected release policy.
+Tests distinguish valid NRPN 16383 from RPN-null and preserve seven-bit coarse
+observations instead of inventing an observed fine zero. The fresh-selector-half
+receive rule is an explicitly approved conservative deviation: devices allowed
+to edit only one selector half will not receive inferred parameter observations.
+Physical instrument responses and cross-platform native qualification remain
+separate from wire layout/state-machine validation.

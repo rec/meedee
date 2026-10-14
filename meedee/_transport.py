@@ -14,6 +14,7 @@ from time import monotonic
 from typing import BinaryIO, NoReturn, cast
 
 from . import _native
+from ._errors import CompoundSendError
 from ._wire import decode, decode_clock, payload_size
 from .events import Clock, ReceivedPacket
 
@@ -157,7 +158,7 @@ class Context:
             raise _native.StateError(
                 "MIDI client is unavailable while connecting, connected, or closing"
             )
-        if operation == "send" and (
+        if operation in ("send", "send_command") and (
             args[1] != self.generation or self.state != "connected"
         ):
             raise _native.StateError("MIDI connection is closed")
@@ -171,15 +172,24 @@ class Context:
                 f"MIDI worker failed; create a new client: {self.failure}"
             )
         if tag == "error":
-            kind, message, fatal, dropped = cast(tuple[str, str, bool, int], payload)
+            kind, arguments, fatal, dropped = cast(
+                tuple[str, tuple[object, ...], bool, int], payload
+            )
             self.update_dropped(dropped)
-            error = ERROR_TYPES[kind](message)
+            error = ERROR_TYPES[kind](*arguments)
             if fatal:
-                self.fail(message, error)
+                self.fail(str(error), error)
             raise error
         result, dropped = cast(tuple[object, int], payload)
         self.update_dropped(dropped)
         if self.failure and operation != "shutdown":
+            if operation == "send_command":
+                # A successful reply proves every step was accepted, even if
+                # worker death was observed before this thread resumed.
+                total = cast(tuple[str, dict[str, int], int], args[0])[2]
+                raise CompoundSendError(
+                    self.failure, total, total
+                ) from self.failure_exception
             raise _native.StateError(
                 f"MIDI worker failed; create a new client: {self.failure}"
             )
@@ -389,12 +399,13 @@ def read_results(context: Context) -> None:
             else:
                 context.replies.put_nowait((tag, payload))
                 if tag == "error":
-                    kind, message, fatal, dropped = cast(
-                        tuple[str, str, bool, int], payload
+                    kind, arguments, fatal, dropped = cast(
+                        tuple[str, tuple[object, ...], bool, int], payload
                     )
                     if fatal:
                         # Preserve the reported cause before observing pipe EOF.
-                        context.fail(message, ERROR_TYPES[kind](message))
+                        error = ERROR_TYPES[kind](*arguments)
+                        context.fail(str(error), error)
                 if tag == "shutdown":
                     context.failure = "MIDI worker shut down"
                     context.state = "failed"
@@ -475,6 +486,7 @@ ERROR_TYPES: dict[str, type[Exception]] = {
     "PortInfoError": _native.PortInfoError,
     "ConnectError": _native.ConnectError,
     "SendError": _native.SendError,
+    "CompoundSendError": CompoundSendError,
     "StateError": _native.StateError,
     "CallbackThreadError": _native.CallbackThreadError,
     "NativePanicError": _native.NativePanicError,

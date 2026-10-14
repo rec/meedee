@@ -30,6 +30,11 @@ pub enum Error {
     CallbackThread,
     Worker(String),
     Resource(&'static str),
+    CompoundSend {
+        completed_messages: Option<usize>,
+        total_messages: usize,
+        cause: Box<Error>,
+    },
 }
 
 impl fmt::Display for Error {
@@ -44,11 +49,25 @@ impl fmt::Display for Error {
             Self::CallbackThread => {
                 f.write_str("transport operations are forbidden inside MIDI callbacks")
             }
+            Self::CompoundSend {
+                completed_messages,
+                total_messages,
+                cause,
+            } => {
+                write!(f, "compound MIDI send failed (completed {completed_messages:?} of {total_messages} messages): {cause}")
+            }
         }
     }
 }
 
-impl StdError for Error {}
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Self::CompoundSend { cause, .. } => Some(cause.as_ref()),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Protocol {
@@ -360,6 +379,45 @@ impl Drop for InputConnection {
 }
 
 impl OutputConnection {
+    /// Send a complete command in one owner-thread operation. No other send or
+    /// close on this connection can run between its primitive messages. The
+    /// failed message may have effects even when its backend returns an error.
+    pub fn send_command(&self, command: &(impl crate::messages::Command + ?Sized)) -> Result<()> {
+        if self.protocol != Protocol::Midi1 {
+            return Err(Error::Capability(
+                "compound commands require MIDI 1.0 byte transport",
+            ));
+        }
+        let packets: Vec<Packet> = crate::codecs::expand(command)
+            .iter()
+            .map(|message| Packet::Bytes(crate::codecs::encode(message)))
+            .collect();
+        let total_messages = packets.len();
+        self.worker
+            .call(move |native| {
+                for (completed_messages, packet) in packets.iter().enumerate() {
+                    native.send(packet).map_err(|cause| Error::CompoundSend {
+                        completed_messages: Some(completed_messages),
+                        total_messages,
+                        cause: Box::new(cause),
+                    })?;
+                }
+                Ok(())
+            })
+            .map_err(|cause| {
+                if matches!(cause, Error::CompoundSend { .. }) {
+                    return cause;
+                }
+                let completed_messages =
+                    matches!(cause, Error::Busy | Error::CallbackThread).then_some(0);
+                Error::CompoundSend {
+                    completed_messages,
+                    total_messages,
+                    cause: Box::new(cause),
+                }
+            })
+    }
+
     /// Backend acceptance, not physical delivery. A multi-packet UMP send can
     /// fail after accepting a prefix; its error reports that word count. No retry.
     pub fn send(&self, packet: &Packet) -> Result<()> {

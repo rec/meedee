@@ -9,6 +9,7 @@ mod callback;
 mod lifecycle;
 
 mod codecs;
+mod controls;
 mod messages;
 mod packets;
 mod ports;
@@ -23,7 +24,13 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
     module.add_function(wrap_pyfunction!(populate_events, module)?)?;
     module.add_function(wrap_pyfunction!(populate_codecs, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_controls, module)?)?;
     Ok(())
+}
+
+#[pyfunction]
+fn populate_controls(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    controls::register(module)
 }
 
 #[pyfunction]
@@ -93,6 +100,7 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native.add_class::<callback::CallbackBridge>()?;
     native.add_function(wrap_pyfunction!(callback::check_thread, &native)?)?;
     native.add_function(wrap_pyfunction!(packets::prepare_send, &native)?)?;
+    native.add_function(wrap_pyfunction!(codecs::prepare_command, &native)?)?;
     PyModule::import(py, "sys")?
         .getattr("modules")?
         .set_item("meedee._native", native)?;
@@ -102,5 +110,8 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;
     }
+    let error = PyModule::import(py, "meedee._errors")?.getattr("CompoundSendError")?;
+    error.setattr("__module__", "meedee.midi")?;
+    module.add("CompoundSendError", error)?;
     Ok(())
 }

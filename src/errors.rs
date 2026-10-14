@@ -3,7 +3,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyTimeoutError};
-use pyo3::PyResult;
+use pyo3::prelude::*;
 
 /// Callers must invalidate affected ownership when a native call unwinds.
 pub fn native_call<T>(operation: &str, call: impl FnOnce() -> T) -> PyResult<T> {
@@ -56,6 +56,20 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
         Error::CallbackThread => CallbackThreadError::new_err(error.to_string()),
         Error::Resource(message) => ResourceError::new_err(message),
         Error::Worker(message) => ResourceError::new_err(message),
+        Error::CompoundSend {
+            completed_messages,
+            total_messages,
+            cause,
+        } => Python::attach(|py| {
+            match PyModule::import(py, "meedee.midi")
+                .and_then(|module| module.getattr("CompoundSendError"))
+                .and_then(|class| {
+                    class.call1((cause.to_string(), completed_messages, total_messages))
+                }) {
+                Ok(error) => PyErr::from_value(error),
+                Err(error) => error,
+            }
+        }),
         Error::Native(message) => match operation {
             "init" => InitError::new_err(message),
             "ports" => PortInfoError::new_err(message),

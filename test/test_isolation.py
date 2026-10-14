@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meedee import midi
+from meedee import messages, midi
 from meedee._native import CallbackBridge
 from meedee._transport import (
     RECEIVE_CAPACITY,
@@ -942,6 +942,84 @@ def test_native_drop_count_arrives_with_packets_without_an_extra_request(
     assert connection.dropped_packets == 7
     connection.close()
     assert connection.dropped_packets == 7
+
+
+@pytest.mark.parametrize("accepted", range(6))
+def test_compound_failure_preserves_progress_through_the_worker_pipe(
+    accepted: int, workers: list[Popen[bytes]]
+) -> None:
+    source = output_client(f"partial_command_{accepted}")
+    connection = source.connect(source.ports()[0])
+    command = messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+    with pytest.raises(midi.CompoundSendError, match="device disconnected") as error:
+        connection.send_command(command)
+    assert isinstance(error.value, midi.SendError)
+    assert error.value.completed_messages == accepted
+    assert error.value.total_messages == 6
+    assert connection.closed
+    failure = source.worker_failure
+    assert isinstance(failure, midi.CompoundSendError)
+    assert (failure.completed_messages, failure.total_messages) == (accepted, 6)
+    assert failure.__traceback__ is None
+    workers[0].wait(timeout=3)
+
+
+@pytest.mark.parametrize("mode", ["hang_send", "crash_send"])
+def test_compound_worker_loss_reports_unknown_progress(
+    mode: str, workers: list[Popen[bytes]]
+) -> None:
+    source = output_client(mode, timeout=1)
+    connection = source.connect(source.ports()[0])
+    with pytest.raises(midi.CompoundSendError) as error:
+        connection.send_command(
+            messages.ControlChange14(channel=1, controller=7, value=10000)
+        )
+    assert error.value.completed_messages is None
+    assert error.value.total_messages == 2
+    assert connection.closed
+    workers[0].wait(timeout=3)
+
+
+def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
+    workers: list[Popen[bytes]],
+) -> None:
+    source = output_client("check_command")
+    connection = source.connect(source.ports()[0])
+    with pytest.raises(TypeError):
+        connection.send_command(b"\xb0\x07\x01")  # ty: ignore[invalid-argument-type]
+    connection.send_command(
+        messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+    )
+    connection.close()
+    assert source.worker_failure is None
+    ump = output_client("healthy", protocol=midi.Protocol.Ump)
+    with ump.connect(ump.ports()[0]) as connection:
+        with pytest.raises(midi.CapabilityError):
+            connection.send_command(
+                messages.ControlChange14(channel=1, controller=7, value=10000)
+            )
+        assert not connection.closed
+
+
+def test_worker_failure_after_command_acknowledgment_preserves_complete_progress(
+    workers: list[Popen[bytes]],
+) -> None:
+    source = output_client("healthy")
+    connection = source.connect(source.ports()[0])
+    context = cast(Context, source._context)  # ty: ignore[unresolved-attribute]
+
+    def acknowledged(*args: object, **kwargs: object) -> tuple[str, tuple[None, int]]:
+        context.fail("worker exited after acknowledging command")
+        return "ok", (None, 0)
+
+    with patch.object(context.replies, "get", side_effect=acknowledged):
+        with pytest.raises(midi.CompoundSendError) as error:
+            connection.send_command(
+                messages.ControlChange14(channel=1, controller=7, value=10000)
+            )
+    assert error.value.completed_messages == error.value.total_messages == 2
+    assert connection.closed
+    workers[0].wait(timeout=3)
 
 
 def test_failed_clock_allocation_discards_the_open_worker(

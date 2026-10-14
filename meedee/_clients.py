@@ -10,7 +10,8 @@ from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, midi
+from . import _native, messages, midi
+from ._errors import CompoundSendError
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
 from .events import Clock, ReceivedPacket
 
@@ -299,6 +300,36 @@ class OutputConnection:
                 ],
                 serial=True,
             )
+
+    def send_command(
+        self,
+        command: messages.ControlChange14
+        | messages.RpnSet
+        | messages.NrpnSet
+        | messages.RpnIncrement
+        | messages.RpnDecrement
+        | messages.NrpnIncrement
+        | messages.NrpnDecrement,
+    ) -> None:
+        _native.check_thread()
+        wire = _native.prepare_command(self._client._protocol, command)
+        total = wire[2]
+        try:
+            if self._native is not None:
+                self._native.send_command(command)
+            else:
+                if self.closed:
+                    raise _native.StateError("MIDI connection is closed or failed")
+                assert self._client._context is not None
+                self._client._context.request(
+                    "send_command", [wire, self._generation], serial=True
+                )
+        except (
+            _native.WorkerError,
+            _native.WorkerTimeoutError,
+            _native.NativePanicError,
+        ) as error:
+            raise CompoundSendError(str(error), None, total) from error
 
     @property
     def closed(self) -> bool:

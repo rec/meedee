@@ -85,6 +85,32 @@ pub struct OutputConnection {
 }
 #[pymethods]
 impl OutputConnection {
+    fn send_command(&self, py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<()> {
+        check_blocking_thread()?;
+        let command = crate::messages::extract_command(command)?;
+        if self.protocol != Protocol::Midi1 {
+            return Err(crate::errors::CapabilityError::new_err(
+                "compound commands require MIDI 1.0 byte transport",
+            ));
+        }
+        let mut failure = None;
+        let result =
+            self.resource
+                .native
+                .send(&self.resource.client, py, &command, |native, command| {
+                    native.send_command(command).map_err(|error| {
+                        failure = Some(error);
+                        crate::errors::SendError::new_err("compound MIDI send failed")
+                    })
+                });
+        // Construct the Python progress exception after releasing the connection
+        // lock. Importing/calling a Python exception class can execute user code.
+        match failure {
+            Some(error) => Err(transport_error(error, "send")),
+            None => result,
+        }
+    }
+
     fn send(&self, py: Python<'_>, packet: &Bound<'_, PyAny>) -> PyResult<()> {
         check_blocking_thread()?;
         let packet = extract_packet(packet)?;

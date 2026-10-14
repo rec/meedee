@@ -753,3 +753,55 @@ matrix and shell syntax pass local checks. CI has not run.
 This slice needs no hardware access and no new native runtime flow was run.
 The real macOS I/O, Windows/Services and selected Pi qualification gaps from
 slice 2 remain open. Passing pure codec checks does not close those gates.
+
+## Slice 4 fine controls and RPN/NRPN, 2026-10-14
+
+Seven frozen command families, primitive expansion, per-connection serialized
+compound output and the pure per-source interpreter are implemented. The
+approved conservative policies are recorded in [api.md](api.md): explicit
+resolution, fresh selectors on output and after edited selections on input,
+RPN-null release, wire-order CC pairing, indexed observations and explicit loss
+reset. Raw transport, primitive codecs and timestamps retain their existing
+surface. Rust's approved common Message marker now has PrimitiveMessage and
+Command subtraits; free primitive encoding retains its behavior.
+
+Python 3.11.7 and 3.15.0 each pass 183 tests. The Rust workspace passes 69
+ordinary tests with five ignored cases; pytest separately runs the three
+finalization cases. Six new pure Rust control tests and Python tests consume
+independent command vectors and cover coarse/fine ordering, repeated LSBs,
+partial/family-changing selectors, RPN-null versus NRPN 16383, direction-only
+steps, stale absolute context, reset/loss and source/channel separation.
+Python also covers frozen command/observation contracts, strict arguments,
+replacement and pure imports without transport initialization.
+
+Two added device-free native boundary tests inject failure at every boundary
+of a six-message command, verifying the exact accepted prefix and absence of
+retry/extra cleanup, and race 50 commands against 50 raw sends to verify no
+interleaving within a command. The Python adapter fixture checks both successful
+compound sending and conversion of a native partial failure into structured
+progress, subsequent send rejection and eventual teardown. Its Python exception
+helper is exercised with the uv-built binding package. Error construction is
+outside the connection mutex. Native ownership remains distinct from failed
+state: in-process closed becomes true only after teardown finishes.
+
+Controlled worker faults preserve all six known failure prefixes across the
+pipe and classify crash/timeout progress as unknown. An acknowledgment/failure
+race preserves the fully accepted count if the complete reply arrived first.
+Known failure diagnostics remain traceback-free on worker_failure. The original
+raw transport tests also pass with the structured exception-argument protocol.
+
+Cargo formatting, workspace Clippy, Ruff, formatting, ty and pyupgrade pass.
+The existing Rust 1.99 atomic deprecation remains the only local Clippy warning
+exception; CI retains Rust 1.87. No dependency versions or vendored backend
+sources changed. A CPython 3.11 wheel rebuilt from the source distribution
+passes all 182 installed-package tests outside the checkout and both archive
+checks. Sources include the control modules, exception helper, native boundary
+tests and shared command vectors. The release-only trigger, endpoint Python
+matrix and workflow shell syntax were verified; no release/CI run was created.
+
+No new hardware/native-service flow was run. Real macOS I/O, Windows/Services,
+physical failure scenarios and selected Pi qualification remain open. Per-client
+serialization and software fixtures do not prove atomicity against other
+applications, physical delivery, parameter-specific units or native-driver
+liveness. Selection release and exact progress cannot be guaranteed after a
+failed/unknown operation; no recovery send is attempted automatically.

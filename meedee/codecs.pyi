@@ -2,9 +2,19 @@
 
 from enum import Enum
 
+from . import messages
 from .messages import Message
 
 def encode(message: Message) -> bytes: ...
+def expand(
+    command: messages.ControlChange14
+    | messages.RpnSet
+    | messages.NrpnSet
+    | messages.RpnIncrement
+    | messages.RpnDecrement
+    | messages.NrpnIncrement
+    | messages.NrpnDecrement,
+) -> list[messages.ControlChange]: ...
 
 class Decoder:
     def __init__(self, *, sysex_limit: int = 1048576) -> None: ...

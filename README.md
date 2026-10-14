@@ -2,14 +2,15 @@
 
 A Rust MIDI toolkit with matching Python bindings, using vendored
 [libremidi](https://github.com/celtera/libremidi) for native transport. Python
-imports are `meedee.midi`, `meedee.events`, `meedee.messages` and `meedee.codecs`;
-the package root is empty. There are no Python runtime dependencies.
+imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`
+and `meedee.controls`; the package root is empty. There are no Python runtime
+dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
-codec are available. Tuning, fine controls, MIDI 2.0 values and file support
-are later slices in [the plan](plan/meedee.md). Transport sends raw packets;
-encode musical values explicitly before sending.
+codec, fine controls and RPN/NRPN commands are available. Tuning, MIDI 2.0 values
+and file support are later slices in [the plan](plan/meedee.md). Encode primitive
+messages for raw transport; use `send_command` for compound CC commands.
 
 ## Messages and byte codecs
 
@@ -47,6 +48,48 @@ Encoding adds full status/framing bytes. No timestamps are invented or attached
 to decoded values; transport callbacks remain raw. Input snapshots and returned
 lists have memory costs beyond the retained SysEx limit. Details and remaining
 protocol boundaries are in [the API contract](plan/api.md).
+
+## Fine controls and parameters
+
+```python
+from meedee.codecs import expand
+from meedee.controls import Interpreter
+from meedee.messages import NrpnSet
+
+command = NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+primitives = expand(command)
+interpreter = Interpreter()  # One per independent input source.
+observations = [o for m in primitives for o in interpreter.feed(m)]
+# An open MIDI 1.0 output can send the whole command:
+# connection.send_command(command)
+```
+
+`ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
+explicit 7-/14-bit resolution. Increment/decrement commands represent one
+directional operation, with no guessed amount or physical unit. Each parameter
+command selects afresh and finishes with RPN-null, without reserving an NRPN
+identifier. Raw `send()` and primitive `encode()` remain unchanged; use `expand`
+to inspect commands and `send_command` to serialize their complete sequence.
+UMP outputs reject these MIDI 1.0 commands rather than translating silently.
+
+`send_command` prevents interleaving on its connection. `CompoundSendError`
+reports the known completed-message prefix and total count. A failed message
+may already have effects; worker loss or timeout reports unknown progress
+(`completed_messages=None`). It never retries or sends more cleanup after an
+error, so selection release is not guaranteed after failure. Other applications
+can still interleave traffic on the device.
+
+The optional interpreter returns frozen, indexed observations and diagnostics
+alongside your retained raw stream. It never fabricates a missing fine value or
+an absolute value from a relative step. A new coarse CC forgets old fine state;
+repeated fine updates can use that known coarse value. A changed complete RPN/
+NRPN selection requires both halves afresh, a deliberate conservative policy
+that declines single-half selector edits. Bank Select and Data Entry are not
+presented as generic knobs. Reset after known loss/reconnect; SystemReset and
+Reset All Controllers invalidate the applicable local state automatically.
+There are no timers, guessed device defaults, timestamps or source registry.
+Rust exposes the same values and state machine; its common Message marker has
+PrimitiveMessage and Command subtraits for encoding and expansion.
 
 ## Python transport
 

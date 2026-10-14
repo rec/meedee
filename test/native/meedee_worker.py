@@ -9,7 +9,7 @@ from threading import Event, Thread
 from typing import cast
 from unittest.mock import patch
 
-from meedee import midi
+from meedee import codecs, midi
 from meedee._worker import Sender, Worker, serve
 from meedee.events import Clock, ReceivedPacket
 
@@ -182,6 +182,26 @@ class OutputConnection:
             raise midi.SendError("device disconnected")
         if self.mode == "check_bytes" and packet != b"\xf0\x7d\x00\xff\xf7":
             raise midi.SendError("bytes changed in transport")
+
+    def send_command(self, command: object) -> None:
+        packets = [codecs.encode(p) for p in codecs.expand(command)]  # ty: ignore[invalid-argument-type]
+        if self.mode.startswith("partial_command_"):
+            accepted = int(self.mode.rpartition("_")[2])
+            raise midi.CompoundSendError("device disconnected", accepted, len(packets))
+        if self.mode == "check_command":
+            expected = bytes.fromhex(
+                "b0 63 09 b0 62 52 b0 06 4e b0 26 10 b0 65 7f b0 64 7f"
+            )
+            if b"".join(packets) != expected:
+                raise midi.CompoundSendError(
+                    "command changed in transport", 0, len(packets)
+                )
+            return
+        for index, packet in enumerate(packets):
+            try:
+                self.send(packet)
+            except midi.SendError as error:
+                raise midi.CompoundSendError(str(error), index, len(packets)) from error
 
     def close(self) -> None:
         if self.mode == "hang_close":

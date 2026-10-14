@@ -4,7 +4,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use meedee::messages;
-use meedee::messages::Message as RustMessage;
+use meedee::messages::PrimitiveMessage;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -181,7 +181,7 @@ impl SysEx {
     }
 }
 
-macro_rules! short_messages {
+macro_rules! message_classes {
     ($($name:ident $signature:tt { $($field:ident),* };)*) => {
         $(
             #[pyclass(frozen, extends = Message, module = "meedee.messages")]
@@ -242,6 +242,13 @@ macro_rules! short_messages {
             }
         )*
 
+    };
+}
+
+macro_rules! short_messages {
+    ($($name:ident $signature:tt { $($field:ident),* };)*) => {
+        message_classes! { $($name $signature { $($field),* };)* }
+
         fn register_short(module: &Bound<'_, PyModule>) -> PyResult<()> {
             $(module.add_class::<$name>()?;)*
             Ok(())
@@ -270,6 +277,19 @@ macro_rules! short_messages {
                     PyClassInitializer::from(Message).add_subclass($name { value }))?.into_any()),)*
             }
         }
+
+        pub fn control_input(message: &Bound<'_, PyAny>) -> PyResult<meedee::controls::InputMessage> {
+            use meedee::controls::InputMessage;
+            if let Ok(message) = message.extract::<PyRef<'_, ControlChange>>() {
+                return Ok(InputMessage::ControlChange(message.value.clone()));
+            }
+            if message.is_instance_of::<SystemReset>() { return Ok(InputMessage::SystemReset); }
+            if message.is_instance_of::<NoteOn>() || message.is_instance_of::<SysEx>()
+                $(|| message.is_instance_of::<$name>())* {
+                return Ok(InputMessage::Other);
+            }
+            Err(PyTypeError::new_err("interpreter input must be a primitive MIDI 1.0 message"))
+        }
     };
 }
 
@@ -290,6 +310,39 @@ short_messages! {
     Stop () {};
     ActiveSensing () {};
     SystemReset () {};
+}
+
+macro_rules! command_messages {
+    ($($name:ident $signature:tt { $($field:ident),* };)*) => {
+        message_classes! { $($name $signature { $($field),* };)* }
+
+        fn register_commands(module: &Bound<'_, PyModule>) -> PyResult<()> {
+            $(module.add_class::<$name>()?;)*
+            Ok(())
+        }
+        pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
+            $(if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
+                return Ok(messages::AnyCommand::$name(command.value.clone()));
+            })*
+            Err(PyTypeError::new_err("command must be a supported fine-CC or RPN/NRPN command"))
+        }
+        pub fn command_wire(command: &messages::AnyCommand) -> (String, std::collections::HashMap<String, i64>) {
+            match command {
+                $(messages::AnyCommand::$name(value) => (stringify!($name).into(),
+                    [$( (stringify!($field).into(), i64::from(value.$field())) ),*].into_iter().collect()),)*
+            }
+        }
+    };
+}
+
+command_messages! {
+    ControlChange14 (*, channel, controller, value) { channel, controller, value };
+    RpnSet (*, channel, parameter, value, resolution) { channel, parameter, value, resolution };
+    NrpnSet (*, channel, parameter, value, resolution) { channel, parameter, value, resolution };
+    RpnIncrement (*, channel, parameter) { channel, parameter };
+    RpnDecrement (*, channel, parameter) { channel, parameter };
+    NrpnIncrement (*, channel, parameter) { channel, parameter };
+    NrpnDecrement (*, channel, parameter) { channel, parameter };
 }
 
 pub fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {
@@ -326,6 +379,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<NoteOn>()?;
     module.add_class::<SysEx>()?;
     register_short(module)?;
+    register_commands(module)?;
     Ok(())
 }
 

@@ -7,8 +7,13 @@
 use crate::messages::*;
 
 /// Encode exactly one primitive message without running-status compression.
-pub fn encode(message: &(impl Message + ?Sized)) -> Vec<u8> {
+pub fn encode(message: &(impl PrimitiveMessage + ?Sized)) -> Vec<u8> {
     message.encode()
+}
+
+/// Expand a semantic command into ordered primitive CC messages. No I/O occurs.
+pub fn expand(command: &(impl Command + ?Sized)) -> Vec<ControlChange> {
+    command.expand()
 }
 
 /// A malformed byte-stream condition. Offsets refer to bytes across all feeds.
@@ -239,10 +244,10 @@ fn short_message(status: u8, data: [u8; 2]) -> AnyMessage {
 
 macro_rules! encode_short {
     ($($name:ident ($value:ident) => $bytes:expr;)*) => {
-        $(impl Message for $name {
+        $(impl PrimitiveMessage for $name {
             fn encode(&$value) -> Vec<u8> { $bytes }
         })*
-        impl Message for AnyMessage {
+        impl PrimitiveMessage for AnyMessage {
             fn encode(&self) -> Vec<u8> {
                 match self {
                     $(Self::$name(message) => message.encode(),)*
@@ -253,7 +258,7 @@ macro_rules! encode_short {
     };
 }
 
-impl Message for SysEx {
+impl PrimitiveMessage for SysEx {
     fn encode(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(self.data().len() + 2);
         bytes.push(0xf0);
@@ -261,6 +266,77 @@ impl Message for SysEx {
         bytes.push(0xf7);
         bytes
     }
+}
+
+fn cc(channel: u8, controller: u8, value: u8) -> ControlChange {
+    ControlChange::new(channel.into(), controller.into(), value.into())
+        .expect("expanded fields have validated wire ranges")
+}
+
+fn parameter_command(
+    channel: u8,
+    parameter: u16,
+    msb: u8,
+    data: &[(u8, u8)],
+) -> Vec<ControlChange> {
+    let mut messages = vec![
+        cc(channel, msb, (parameter >> 7) as u8),
+        cc(channel, msb - 1, (parameter & 127) as u8),
+    ];
+    messages.extend(
+        data.iter()
+            .map(|&(controller, value)| cc(channel, controller, value)),
+    );
+    messages.extend([cc(channel, 101, 127), cc(channel, 100, 127)]);
+    messages
+}
+
+impl Command for ControlChange14 {
+    fn expand(&self) -> Vec<ControlChange> {
+        vec![
+            cc(self.channel(), self.controller(), (self.value() >> 7) as u8),
+            cc(
+                self.channel(),
+                self.controller() + 32,
+                (self.value() & 127) as u8,
+            ),
+        ]
+    }
+}
+
+macro_rules! parameter_commands {
+    (sets: $($set:ident => $selector:literal),*; steps: $($step:ident => ($family:literal, $controller:literal)),* $(;)?) => {
+        $(impl Command for $set {
+            fn expand(&self) -> Vec<ControlChange> {
+                let data = if self.resolution() == 7 {
+                    vec![(6, self.value() as u8)]
+                } else {
+                    vec![(6, (self.value() >> 7) as u8), (38, (self.value() & 127) as u8)]
+                };
+                parameter_command(self.channel(), self.parameter(), $selector, &data)
+            }
+        })*
+        $(impl Command for $step {
+            fn expand(&self) -> Vec<ControlChange> {
+                parameter_command(self.channel(), self.parameter(), $family, &[($controller, 0)])
+            }
+        })*
+        impl Command for AnyCommand {
+            fn expand(&self) -> Vec<ControlChange> {
+                match self {
+                    Self::ControlChange14(command) => command.expand(),
+                    $(Self::$set(command) => command.expand(),)*
+                    $(Self::$step(command) => command.expand(),)*
+                }
+            }
+        }
+    };
+}
+
+parameter_commands! {
+    sets: RpnSet => 101, NrpnSet => 99;
+    steps: RpnIncrement => (101, 96), RpnDecrement => (101, 97),
+           NrpnIncrement => (99, 96), NrpnDecrement => (99, 97);
 }
 
 encode_short! {

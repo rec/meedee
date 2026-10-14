@@ -667,9 +667,16 @@ and wire evidence before stateful interpretation or live writes.
    discards SysEx lacking F7 on a new status, with a diagnostic. Timestamps,
    receive filters and typed transport integration remain later work. See
    [the API contract](api.md) and shared wire fixtures for the precise scope.
-4. **Fine CC and RPN/NRPN.** Add compound output and source/channel stateful
+4. **Fine CC and RPN/NRPN (implemented).** Add compound output and source/channel stateful
    interpretation. Gate: split/reordered/missing pairs, relative updates,
    resets/loss, selector changes, and partial sends have defined tested results.
+   Seven frozen commands expand into primitive CCs; send_command serializes all
+   steps including RPN-null release and reports known/unknown progress without
+   retries. The optional pure interpreter has one fixed 16-channel state table
+   per source, indexed immutable observations, conservative fresh selector halves
+   and explicit reset/loss diagnostics. Generic CC pairing follows wire order;
+   relative parameter steps do not invent absolute values. The API contract
+   records the approved Rust Message/PrimitiveMessage/Command trait split.
 5. **MTS.** Implement tuning values and the selected standard message families.
    Gate: normative vectors, quantization reporting, checksums/sentinels, and
    request/reply state pass before any authorized instrument operation.

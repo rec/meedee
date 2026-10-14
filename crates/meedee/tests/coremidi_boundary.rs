@@ -1,7 +1,7 @@
 #![cfg(target_os = "macos")]
 
 use meedee::transport::{
-    Input, InputOptions, Output, OutputOptions, Packet, Protocol, TimestampMode,
+    Error, Input, InputOptions, Output, OutputOptions, Packet, Protocol, TimestampMode,
 };
 use meedee_coremidi_fixture::{emit, enable, endpoint_exists, fail_disposal, fail_send_after};
 use std::sync::{
@@ -9,6 +9,121 @@ use std::sync::{
     mpsc, Arc,
 };
 use std::time::Duration;
+
+#[test]
+fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {
+    enable();
+    let command = meedee::messages::NrpnSet::new(1, 1234, 10000, 14).unwrap();
+    let expected = meedee::codecs::expand(&command);
+    for accepted in 0..expected.len() {
+        let name = format!("compound-failure-{accepted}");
+        let (sender, receiver) = mpsc::channel();
+        let input = Input::new(InputOptions::default())
+            .unwrap()
+            .create_virtual(&name, move |packet| {
+                sender.send(packet.packet).unwrap();
+            })
+            .unwrap();
+        let output = Output::new(OutputOptions::default()).unwrap();
+        let port = output
+            .ports()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name() == name)
+            .unwrap();
+        fail_send_after(u32::try_from(port.backend_id()).unwrap(), accepted as i32);
+        let output = output.connect(&port).unwrap();
+        assert!(
+            matches!(output.send_command(&command), Err(Error::CompoundSend { completed_messages: Some(n), total_messages: 6, .. }) if n == accepted)
+        );
+        let actual: Vec<_> = receiver.try_iter().collect();
+        let expected: Vec<_> = expected[..accepted]
+            .iter()
+            .map(|m| Packet::Bytes(meedee::codecs::encode(m)))
+            .collect();
+        assert_eq!(actual, expected);
+        drop(output);
+        drop(input.close().unwrap());
+    }
+}
+
+#[test]
+fn simultaneous_raw_and_compound_sends_do_not_interleave_command_messages() {
+    use std::sync::{Barrier, Mutex};
+    enable();
+    let received = Arc::new(Mutex::new(Vec::new()));
+    let capture = Arc::clone(&received);
+    let name = "compound-serialization";
+    let input = Input::new(InputOptions::default())
+        .unwrap()
+        .create_virtual(name, move |packet| {
+            capture.lock().unwrap().push(packet.packet);
+        })
+        .unwrap();
+    let output = Output::new(OutputOptions::default()).unwrap();
+    let port = output
+        .ports()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name() == name)
+        .unwrap();
+    let output = output.connect(&port).unwrap();
+    let barrier = Barrier::new(2);
+    std::thread::scope(|scope| {
+        scope.spawn(|| {
+            barrier.wait();
+            for _ in 0..50 {
+                loop {
+                    match output
+                        .send_command(&meedee::messages::RpnSet::new(1, 0, 128, 14).unwrap())
+                    {
+                        Ok(()) => break,
+                        Err(Error::CompoundSend {
+                            completed_messages: Some(0),
+                            cause,
+                            ..
+                        }) if *cause == Error::Busy => std::thread::yield_now(),
+                        result => panic!("unexpected fixture send result {result:?}"),
+                    }
+                }
+            }
+        });
+        scope.spawn(|| {
+            barrier.wait();
+            for _ in 0..50 {
+                loop {
+                    match output.send(&Packet::Bytes(vec![0xf8])) {
+                        Ok(()) => break,
+                        Err(Error::Busy) => std::thread::yield_now(),
+                        result => panic!("unexpected fixture send result {result:?}"),
+                    }
+                }
+            }
+        });
+    });
+    let expected: Vec<_> =
+        meedee::codecs::expand(&meedee::messages::RpnSet::new(1, 0, 128, 14).unwrap())
+            .iter()
+            .map(|m| Packet::Bytes(meedee::codecs::encode(m)))
+            .collect();
+    let mut received = received.lock().unwrap().clone().into_iter().peekable();
+    let mut commands = 0;
+    let mut clocks = 0;
+    while let Some(packet) = received.next() {
+        if packet == Packet::Bytes(vec![0xf8]) {
+            clocks += 1;
+        } else {
+            assert_eq!(packet, expected[0]);
+            for packet in &expected[1..] {
+                assert_eq!(received.next().as_ref(), Some(packet));
+            }
+            commands += 1;
+        }
+    }
+    assert_eq!((commands, clocks), (50, 50));
+    drop(output.close().unwrap());
+    drop(input.close().unwrap());
+}
 
 #[test]
 fn ffi_round_trip_preserves_bytes_ump_clocks_and_client_ownership() {
