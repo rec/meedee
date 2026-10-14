@@ -86,6 +86,13 @@ if(LIBREMIDI_HAS_WINMM)
     LIBREMIDI_NO_BOOST LIBREMIDI_NO_BOOST_VARIANT2 UNICODE=1 _UNICODE=1)
   target_link_libraries(winmm_teardown_test PRIVATE Catch2::Catch2WithMain winmm)
   add_test(NAME winmm_teardown_test COMMAND winmm_teardown_test)
+  add_executable(winmm_output_test tests/unit/winmm_output.cpp)
+  target_include_directories(winmm_output_test PRIVATE "${PROJECT_SOURCE_DIR}/include")
+  target_compile_features(winmm_output_test PRIVATE cxx_std_20)
+  target_compile_definitions(winmm_output_test PRIVATE
+    LIBREMIDI_NO_BOOST LIBREMIDI_NO_BOOST_VARIANT2 UNICODE=1 _UNICODE=1)
+  target_link_libraries(winmm_output_test PRIVATE Catch2::Catch2WithMain winmm)
+  add_test(NAME winmm_output_test COMMAND winmm_output_test)
 endif()
 
 if(LIBREMIDI_HAS_COREMIDI)

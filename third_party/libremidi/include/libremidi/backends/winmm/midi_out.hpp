@@ -134,7 +134,7 @@ public:
       }
 
       // Pack MIDI bytes into double word.
-      DWORD packet;
+      DWORD packet{};
       std::copy_n(message, size, (unsigned char*)&packet);
 
       // Send the message immediately.
@@ -149,7 +149,7 @@ public:
   }
 
 private:
-  HMIDIOUT outHandle; // Handle to Midi Output Device
+  HMIDIOUT outHandle{}; // Handle to Midi Output Device
   std::vector<char> buffer;
 };
 

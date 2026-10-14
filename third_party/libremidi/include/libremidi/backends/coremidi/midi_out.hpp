@@ -58,7 +58,6 @@ public:
     OSStatus result = MIDIOutputPortCreate(this->client, toCFString(portName).get(), &port);
     if (result != noErr)
     {
-      close_client(*this);
       libremidi_handle_error(this->configuration, "error creating macOS MIDI output port.");
       return from_osstatus(result);
     }

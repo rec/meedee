@@ -260,6 +260,8 @@ LIBREMIDI_EXPORT
 int libremidi_midi_in_free(libremidi_midi_in_handle*);
 
 /// MIDI output API (send MIDI messages)
+// On error, *out may remain non-null when rollback fails. Retain it and its
+// error callback context until midi_out_free succeeds.
 LIBREMIDI_EXPORT
 int libremidi_midi_out_new(
     const libremidi_midi_configuration*, const libremidi_api_configuration*,
@@ -283,6 +285,9 @@ LIBREMIDI_EXPORT
 int libremidi_midi_out_schedule_ump(
     libremidi_midi_out_handle*, int64_t ts, const libremidi_midi2_symbol*, size_t);
 
+// CoreMIDI byte/UMP endpoint and port disposal is checked before deletion.
+// On failure the handle and callback contexts must remain alive. This does not
+// certify client disposal, other backends or direct C++ destruction.
 LIBREMIDI_EXPORT
 int libremidi_midi_out_free(libremidi_midi_out_handle*);
 

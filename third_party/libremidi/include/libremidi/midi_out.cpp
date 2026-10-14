@@ -173,12 +173,19 @@ stdx::error midi_out::open_virtual_port(std::string_view portName) const
 LIBREMIDI_INLINE
 stdx::error midi_out::close_port() const
 {
-  if (auto err = m_impl->is_client_open(); err != stdx::error{})
-    return std::errc::not_connected;
+  const auto api = get_current_api();
+  const bool checked_core = api == API::COREMIDI || api == API::COREMIDI_UMP;
+  if (!checked_core)
+    if (auto err = m_impl->is_client_open(); err != stdx::error{})
+      return std::errc::not_connected;
 
   stdx::error ret = std::errc::operation_not_supported;
-  if (m_impl->is_port_open())
+  // CoreMIDI cleanup must also inspect resources after a failed open.
+  if (m_impl->is_port_open() || checked_core)
     ret = m_impl->close_port();
+
+  if (ret != stdx::error{})
+    return ret;
 
   m_impl->connected_ = false;
   m_impl->port_open_ = false;

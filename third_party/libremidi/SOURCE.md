@@ -2,9 +2,9 @@
 
 Repository: `git@github.com:rec/libremidi.git`
 
-Revision: `07c7cfb1237be1ddeaa097a81f79cc9456c087ee`
+Revision: `53a94516cc280fa63f6de12bfe279ba3c26d02b9`
 
-Imported 2026-10-13 from the fork's `master` branch. This is a commit pin,
+Imported 2026-10-14 from the fork's `master` branch. This is a commit pin,
 not the previously audited upstream v5.4.3 release archive. The fork already
 contained other changes at base `996a73c216756de2dd6d58e66245ecae4830f9ff`.
 
@@ -40,6 +40,17 @@ The fork fixes are separate commits:
   repeated timeout, rejected reopen and callback self-close. This target has
   not been compiled or run on this Mac; Windows validation is required.
 
+- [b6a0d29](https://github.com/rec/libremidi/commit/b6a0d29):
+  check CoreMIDI byte/UMP output endpoint and port disposal before C API deletion.
+  Failed disposal preserves the handle, flags and callback context; failed open
+  uses the same checked rollback. Failed output-port creation no longer disposes
+  the client ahead of its destructor. Client-level disposal errors, other output
+  backends and direct C++ destruction remain outside this check.
+- [53a9451](https://github.com/rec/libremidi/commit/53a9451):
+  initialize WinMM's output handle and all short-message DWORD bytes. The
+  Windows-only output test covers unopened/failed-open destruction and zero
+  padding for one-, two- and three-byte packets. It has not run on Windows yet.
+
 No additional local modifications are applied to the imported files. Included
 paths are `CMakeLists.txt`, `cmake/`, `include/`, `src/`, `LICENSE.md`, `README.md`,
 `tests/include_catch.hpp`, `tests/unit/`, and `tests/integration/`. Upstream
@@ -62,7 +73,7 @@ UTF-8, embedded NUL, empty values and an unpaired UTF-16 surrogate. The observer
 failure path is tested without creating MIDI clients or querying devices.
 
 The property target passes 30 assertions in four test cases. The teardown target
-passes 40 assertions in three test cases, using fake CoreMIDI clients, ports and
+passes 83 assertions in five test cases, using fake CoreMIDI clients, ports and
 endpoints. It checks failure retention, repeated explicit cleanup, a still-live
 callback after failure, successful deletion, and both failed-open rollback paths.
 The portable callback-lifetime target adds 14 assertions in three cases for

@@ -10,6 +10,8 @@ namespace
 OSStatus endpoint_status = noErr;
 OSStatus port_status = noErr;
 OSStatus connect_status = noErr;
+OSStatus output_create_status = noErr;
+MIDIObjectType object_type = kMIDIObjectType_Source;
 int endpoint_disposals{};
 int port_disposals{};
 int client_disposals{};
@@ -19,6 +21,8 @@ void* read_context{};
 void reset()
 {
   endpoint_status = port_status = connect_status = noErr;
+  output_create_status = noErr;
+  object_type = kMIDIObjectType_Source;
   endpoint_disposals = port_disposals = client_disposals = 0;
   read_callback = nullptr;
   read_context = nullptr;
@@ -77,11 +81,29 @@ extern "C" OSStatus MIDIInputPortCreate(
   *out = 30;
   return noErr;
 }
+extern "C" OSStatus MIDIOutputPortCreate(MIDIClientRef, CFStringRef, MIDIPortRef* out)
+{
+  if (output_create_status != noErr)
+    return output_create_status;
+  *out = 30;
+  return noErr;
+}
+extern "C" OSStatus MIDISourceCreate(MIDIClientRef, CFStringRef, MIDIEndpointRef* out)
+{
+  *out = 20;
+  return noErr;
+}
+extern "C" OSStatus MIDISourceCreateWithProtocol(
+    MIDIClientRef, CFStringRef, MIDIProtocolID, MIDIEndpointRef* out)
+{
+  *out = 20;
+  return noErr;
+}
 extern "C" OSStatus MIDIObjectFindByUniqueID(
     MIDIUniqueID, MIDIObjectRef* object, MIDIObjectType* type)
 {
   *object = 40;
-  *type = kMIDIObjectType_Source;
+  *type = object_type;
   return noErr;
 }
 extern "C" OSStatus MIDIPortConnectSource(MIDIPortRef, MIDIEndpointRef, void*)
@@ -184,4 +206,68 @@ TEST_CASE("C failed input open retains the callback when rollback fails", "[core
   REQUIRE(input == nullptr);
   REQUIRE(port_disposals == 1);
   REQUIRE(client_disposals == 1);
+}
+
+TEST_CASE("C output free retains failed CoreMIDI byte and UMP endpoints", "[coremidi]")
+{
+  for (auto backend : {libremidi_api::COREMIDI, libremidi_api::COREMIDI_UMP})
+  {
+    reset();
+    int calls{};
+    auto conf = input_configuration(calls);
+    libremidi_api_configuration api{};
+    libremidi_midi_api_configuration_init(&api);
+    api.api = backend;
+    libremidi_midi_out_handle* output{};
+    REQUIRE(libremidi_midi_out_new(&conf, &api, &output) == 0);
+    REQUIRE(output);
+    endpoint_status = kMIDIUnknownError;
+    REQUIRE(libremidi_midi_out_free(output) == -EIO);
+    REQUIRE(client_disposals == 0);
+    REQUIRE(libremidi_midi_out_free(output) == -EIO);
+    REQUIRE(endpoint_disposals == 2);
+    endpoint_status = noErr;
+    REQUIRE(libremidi_midi_out_free(output) == 0);
+    REQUIRE(endpoint_disposals == 3);
+    REQUIRE(client_disposals == 1);
+  }
+  REQUIRE(libremidi_midi_out_free(nullptr) == 0);
+}
+
+TEST_CASE("C output port disposal and failed-open rollback remain checked", "[coremidi]")
+{
+  for (auto backend : {libremidi_api::COREMIDI, libremidi_api::COREMIDI_UMP})
+  {
+    reset();
+    object_type = kMIDIObjectType_Destination;
+    libremidi::output_port port;
+    port.api = static_cast<libremidi::API>(backend);
+    port.port = 40;
+    int calls{};
+    auto conf = input_configuration(calls);
+    conf.virtual_port = false;
+    conf.out_port = reinterpret_cast<libremidi_midi_out_port*>(&port);
+    libremidi_api_configuration api{};
+    libremidi_midi_api_configuration_init(&api);
+    api.api = backend;
+    libremidi_midi_out_handle* output{};
+    REQUIRE(libremidi_midi_out_new(&conf, &api, &output) == 0);
+    REQUIRE(libremidi_midi_out_is_connected(output) == 1);
+    port_status = kMIDIUnknownError;
+    REQUIRE(libremidi_midi_out_free(output) == -EIO);
+    REQUIRE(libremidi_midi_out_is_connected(output) == 1);
+    REQUIRE(client_disposals == 0);
+    port_status = noErr;
+    REQUIRE(libremidi_midi_out_free(output) == 0);
+    REQUIRE(port_disposals == 2);
+    REQUIRE(client_disposals == 1);
+
+    reset();
+    object_type = kMIDIObjectType_Destination;
+    output_create_status = kMIDIUnknownError;
+    REQUIRE(libremidi_midi_out_new(&conf, &api, &output) == -EIO);
+    REQUIRE(output == nullptr);
+    REQUIRE(port_disposals == 0);
+    REQUIRE(client_disposals == 1);
+  }
 }

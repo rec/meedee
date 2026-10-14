@@ -472,26 +472,23 @@ int libremidi_midi_out_new(
   if (!ptr)
     return -EINVAL;
 
-  if (c->virtual_port)
+  try
   {
-    if (auto ret = ptr->self.open_virtual_port(c->port_name); ret != stdx::error{})
-    {
-      *out = nullptr;
-      delete ptr;
-      return -EIO;
-    }
+    auto result = c->virtual_port
+                      ? ptr->self.open_virtual_port(c->port_name)
+                      : ptr->self.open_port(
+                            *reinterpret_cast<const libremidi::output_port*>(c->out_port));
+    if (result == stdx::error{})
+      return 0;
   }
-  else
+  catch (...)
   {
-    auto port = reinterpret_cast<const libremidi::output_port*>(c->in_port);
-    if (auto ret = ptr->self.open_port(*port); ret != stdx::error{})
-    {
-      *out = nullptr;
-      delete ptr;
-      return -EIO;
-    }
+    // The caller still owns *out until checked rollback succeeds.
   }
-  return 0;
+
+  if (libremidi_midi_out_free(ptr) == 0)
+    *out = nullptr;
+  return -EIO;
 }
 
 int libremidi_midi_out_is_connected(const libremidi_midi_out_handle* out)
@@ -543,6 +540,24 @@ int libremidi_midi_out_schedule_ump(
 
 int libremidi_midi_out_free(libremidi_midi_out_handle* ptr)
 {
+  if (!ptr)
+    return 0;
+
+  try
+  {
+    const auto api = ptr->self.get_current_api();
+    // Only these output backends have checked, idempotent port disposal.
+    if (api == libremidi::API::COREMIDI || api == libremidi::API::COREMIDI_UMP)
+    {
+      if (ptr->self.close_port() != stdx::error{})
+        return -EIO;
+    }
+  }
+  catch (...)
+  {
+    return -EIO;
+  }
+
   delete ptr;
   return 0;
 }
