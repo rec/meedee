@@ -12,6 +12,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native:
+    name: Native regression checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, macos-15-intel, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Linux native prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - name: Configure device-free native tests
+        run: |
+          flags=()
+          if [[ "$RUNNER_OS" != Windows ]]; then
+            flags+=("-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer")
+            flags+=("-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined")
+          fi
+          cmake -S third_party/libremidi -B target/native-tests \
+            -DCMAKE_BUILD_TYPE=Debug -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DLIBREMIDI_TESTS=ON -DLIBREMIDI_NO_BOOST=ON \
+            -DLIBREMIDI_NO_JACK=ON -DLIBREMIDI_NO_PIPEWIRE=ON \
+            -DLIBREMIDI_NO_NETWORK=ON -DLIBREMIDI_NO_KEYBOARD=ON \
+            -DLIBREMIDI_NO_WINMIDI=ON -DLIBREMIDI_NO_WINUWP=ON \
+            -DLIBREMIDI_NO_KDMAPI=ON -DLIBREMIDI_DOWNLOAD_CPPWINRT=OFF \
+            "${flags[@]}"
+      - name: Build and run regression targets
+        run: |
+          targets=(libremidi callback_lifetime_test)
+          case "$RUNNER_OS" in
+            macOS) targets+=(coremidi_properties_test coremidi_teardown_test) ;;
+            Windows) targets+=(winmm_teardown_test) ;;
+          esac
+          cmake --build target/native-tests --config Debug --target "${targets[@]}" --parallel 2
+          ctest --test-dir target/native-tests -C Debug --output-on-failure \
+            -R '^(callback_lifetime|coremidi_properties|coremidi_teardown|winmm_teardown)_test$'
+      - name: Preserve native diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-checks-${{ matrix.os }}
+          path: |
+            target/native-tests/Testing/Temporary/
+            target/native-tests/CMakeFiles/CMakeConfigureLog.yaml
+
   check:
     strategy:
       fail-fast: false
@@ -50,9 +100,10 @@ jobs:
           else
             export PYO3_PYTHON="$GITHUB_WORKSPACE/.venv/bin/python"
           fi
-          cargo fmt --check
-          cargo clippy --locked --all-targets -- -D warnings
-          cargo test --locked
+          cargo fmt --all --check
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          # Embedded Python tests share interpreter and tracing state.
+          cargo test --locked --workspace -- --test-threads=1
       - name: Python tests
         run: |
           set +e
