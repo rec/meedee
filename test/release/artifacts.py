@@ -42,6 +42,9 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             assert metadata.get_all("Requires-Dist") is None
             assert metadata["License-Expression"] == "MIT"
             assert any(n.endswith("/licenses/LICENSE") for n in names)
+            assert any(
+                n.endswith("/licenses/third_party/libremidi/LICENSE.md") for n in names
+            )
             assert any(n.endswith("/licenses/THIRD_PARTY_NOTICES.md") for n in names)
             assert (
                 archive.read("meedee/midi.pyi")
@@ -77,6 +80,22 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "src/lib.rs",
                 "src/messages.rs",
                 "crates/meedee/Cargo.toml",
+                "crates/meedee/build.rs",
+                "crates/meedee/native/CMakeLists.txt",
+                "crates/meedee/native/bridge.h",
+                "crates/meedee/native/bridge.cpp",
+                "crates/meedee/src/transport/mod.rs",
+                "crates/meedee/src/transport/native.rs",
+                "crates/meedee/src/transport/worker.rs",
+                "crates/meedee/src/transport/ffi.rs",
+                "crates/meedee/tests/coremidi_boundary.rs",
+                "crates/meedee/tests/macos_loopback.rs",
+                "crates/meedee/tests/coremidi-fixture/Cargo.toml",
+                "crates/meedee/tests/coremidi-fixture/build.rs",
+                "crates/meedee/tests/coremidi-fixture/src/lib.rs",
+                "crates/meedee/tests/coremidi-fixture/coremidi.cpp",
+                "third_party/libremidi/include/libremidi/libremidi-c.cpp",
+                "third_party/libremidi/LICENSE.md",
                 "crates/meedee/src/lib.rs",
                 "crates/meedee/src/messages.rs",
                 "src/lifecycle.rs",

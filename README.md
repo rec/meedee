@@ -4,11 +4,9 @@ Typed Python bindings for [midir](https://github.com/Boddlnagg/midir), with raw
 MIDI bytes, native timestamps, and explicit connection ownership. Import the
 API from `meedee.midi`. There are no Python runtime dependencies.
 
-The build matrix exercises standard, GIL-enabled CPython 3.11–3.14 on macOS
-arm64/x86_64, Linux x86_64 (ALSA), and Windows x86_64 (WinMM). Build and unit
-checks do not establish native MIDI support. CPython 3.15 is also supported,
-with local build and unit validation on macOS arm64; it is not yet in the release
-CI matrix. See [validation](plan/validation.md)
+Release CI is configured for standard, GIL-enabled CPython 3.11 and 3.15 on
+macOS arm64/x86_64, Linux x86_64 (ALSA), and Windows x86_64 (WinMM). Build and unit
+checks do not establish native MIDI support. See [validation](plan/validation.md)
 for recorded results and outstanding native checks. Free-threaded Python builds
 and subinterpreters are rejected on import. PyPy, musl, and other architectures
 are outside this matrix.
@@ -26,8 +24,10 @@ uv run maturin build --release --locked --sdist --out dist
 Install a CI or locally built wheel with `uv pip install /path/to/meedee.whl`
 using an interpreter matching its CPython version and architecture. A wheel
 installation needs no Rust compiler. Source builds require Rust 1.87 or later,
-a C linker, and a supported Python interpreter. macOS requires Xcode Command
-Line Tools; Windows requires Visual Studio C++ build tools and the MSVC Rust
+CMake 3.22 or later, a C++20 compiler and C linker, and a supported Python
+interpreter. The Rust core statically builds the pinned libremidi sources; no
+libremidi installation or production build-time download is required. macOS
+requires Xcode Command Line Tools; Windows requires Visual Studio C++ build tools and the MSVC Rust
 target. Linux also requires `pkg-config` and ALSA development headers
 (`libasound2-dev` on Debian/Ubuntu, `alsa-lib-devel` on Fedora).
 
@@ -36,8 +36,67 @@ and permission to access it. Containers need the device passed through.
 Installing headers or importing a wheel does not provide a MIDI device.
 Standard wheels use the ALSA backend and no optional midir features.
 
-Cargo owns version `0.1.0`. The pinned build uses midir 0.11.0, PyO3 0.29.3,
+Cargo owns version `0.2.0`. The pinned build uses midir 0.11.0, PyO3 0.29.3,
 and maturin 1.15.0. Wheels are interpreter-specific rather than abi3.
+
+## Rust transport work in progress
+
+`crates/meedee` now provides `meedee::transport` without Python or PyO3. It uses
+libremidi for low-level byte/UMP input, output, discovery and virtual ports.
+The Python `meedee.midi` transport still uses midir while slice 2 is unfinished;
+the new Rust transport is not yet exposed through that Python API.
+
+Construction starts a logical client and observer; the OS input/output is opened
+on connect or virtual-port creation. Discovery alone is not a service health test.
+Each Rust input or output client owns one native thread. Native handles and port
+clones stay on that thread; public ports contain owned metadata and a discovery
+snapshot identity. Refreshing discovery invalidates earlier snapshots. Ports do
+not keep clients alive. An open connection owns its client, and successful
+explicit close returns the client for reuse.
+
+MIDI 1.0 is the default; select `Protocol::Ump` explicitly. A mismatched or
+uncompiled backend raises a capability error rather than selecting a fallback
+or converting protocols. Compiled backends are not proof of runtime support.
+This build enables CoreMIDI/UMP, available ALSA sequencer/raw variants and WinMM.
+Windows MIDI Services SDK integration/compilation and native Windows validation
+remain open; requesting that backend currently reports it is not compiled.
+
+Raw receive packets may contain multiple UMPs or partial SysEx. These are not
+musical `Message` objects. Absolute timestamps retain integer nanoseconds and
+per-connection clock identity; disabled capture yields `None`. Backend Absolute
+mode may use a host-clock fallback, is not UTC, and does not imply clock equality
+across connections. Reopening gives a new clock identity.
+
+Callbacks receive owned payloads and run outside Rust internal locks. They must
+return promptly and cannot invoke blocking transport operations, including on
+another client. The library admits at most 8 MiB of receive payloads per input
+by default, including callbacks in progress; admission/allocation drops are
+counted. Native buffers and data retained by application code are outside that
+budget. Callback panic retires delivery and is observable. No exception or
+unwinding panic is propagated through the C ABI; aborting panics and native
+memory corruption cannot be recovered by this mechanism.
+
+Rust operations run in-process and have no native-driver deadline. Drop retires
+input delivery and requests cleanup without joining a potentially blocked native
+thread. Failed checked cleanup retains the thread, callback context and resources
+until process exit, without an automatic retry. At most 32 native clients,
+including retained ones, are admitted per process. Rust does not launch Python.
+Checked CoreMIDI cleanup covers endpoint/port disposal; client-level disposal
+errors and other backends' output teardown remain outside that guarantee.
+Send copies the submitted data; a successful send means backend acceptance, not
+physical delivery. UMP batches are submitted one complete packet at a time, with
+accepted-prefix information on failure and no automatic resend.
+
+The low-level C API uses libremidi's default native client/connection names;
+only the virtual endpoint name is supplied here. The fork's existing ASCII
+conversion still constrains CoreMIDI endpoint names. Typed codecs and a complete
+musical transport API belong to later work.
+
+Device-free tests use a test-only CoreMIDI implementation and real packet/CF
+helpers to check both byte and UMP FFI paths, ownership, clocks and failed cleanup.
+Real CoreMIDI loopback tests remain explicit opt-ins. Neither those fixtures nor
+an unrun CI job establish driver, hardware or Windows MIDI 2.0 qualification.
+See [validation](plan/validation.md) for current evidence and remaining gates.
 
 ## Process isolation
 
@@ -365,9 +424,9 @@ uv run --frozen pytest
 uv run --frozen ruff check --select B,E,F,I meedee test
 uv run --frozen ruff format --check meedee test
 uv run --frozen ty check meedee test
-cargo fmt --check
-PYO3_PYTHON="$PWD/.venv/bin/python" cargo clippy --locked --all-targets -- -D warnings
-PYO3_PYTHON="$PWD/.venv/bin/python" cargo test --locked
+cargo fmt --all --check
+PYO3_PYTHON="$PWD/.venv/bin/python" cargo clippy --locked --workspace --all-targets -- -D warnings
+PYO3_PYTHON="$PWD/.venv/bin/python" cargo test --locked --workspace -- --test-threads=1
 ```
 
 On Windows use `.venv/Scripts/python.exe` for `PYO3_PYTHON`. maturin chooses the

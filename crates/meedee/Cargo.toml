@@ -10,3 +10,6 @@ publish = false
 
 [lib]
 path = "src/lib.rs"
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+meedee-coremidi-fixture = { path = "tests/coremidi-fixture" }

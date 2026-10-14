@@ -644,7 +644,10 @@ and wire evidence before stateful interpretation or live writes.
    Vendored CoreMIDI checked input teardown passes focused normal/sanitizer tests.
    Native transport ownership uses one dedicated Rust thread per client, as
    selected by the owner; creation, operations and teardown stay on that thread.
-   This is not yet integrated into the transport.
+   The Rust wrapper now uses this ownership model and statically builds the
+   pinned C++ source. Its byte/UMP FFI paths have device-free macOS fixture tests;
+   real CoreMIDI service access, Windows/Services and Pi qualification remain open.
+   Python transport replacement is still unfinished.
    Separate the shared core and our Python binding; implement the safe C API wrapper,
    native build integration, and replace midir throughout the transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.

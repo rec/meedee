@@ -6,10 +6,12 @@ Build-only dependencies are included for completeness. meedee's own MIT license
 is in LICENSE.
 
 Vendored libremidi sources are pinned to fork revision
-46853bd6b0e53e25d918076fca9752552fe49414. Their BSD 2-clause and inherited
+53a94516cc280fa63f6de12bfe279ba3c26d02b9. Their BSD 2-clause and inherited
 MIT/BSD license texts are retained in third_party/libremidi/LICENSE.md.
-See third_party/libremidi/SOURCE.md for provenance and the two CoreMIDI fixes.
-This source is not yet linked into the current midir-based extension.
+See third_party/libremidi/SOURCE.md for provenance and fork patches. The Rust
+transport statically links these sources. The complete upstream license text is
+included in binary distributions as licenses/third_party/libremidi/LICENSE.md.
+The Python transport still uses midir pending the rest of the replacement.
 
 block2, objc2, and objc2-encode omit license files from their crate archives.
 Their shared MIT text is retained from the upstream objc2 repository's

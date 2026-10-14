@@ -586,7 +586,8 @@ remains midir until integration and qualification are complete.
 Fork follow-up `07c7cfb1237be1ddeaa097a81f79cc9456c087ee` adds `winmm_teardown_test`, using fake WinMM
 MIDI device calls and real Windows synchronization. It is Windows-only and
 unvalidated here. No Windows compiler or runner is currently available to this
-thread. Owner input about a Windows validation route is pending. The existing
+thread. The owner confirmed that no Windows machine is currently available; native
+Windows validation remains open while Rust/macOS work continues. The existing
 release-only GitHub workflow was not changed.
 
 From a separate Windows checkout of the pinned fork, byte-backend qualification
@@ -603,3 +604,72 @@ requires the pinned Services SDK headers and C++/WinRT tooling, with build-time
 downloads disabled or pinned. Do not infer native UMP qualification from a
 successful WinMM build. Integration of the dedicated client thread, safe native
 wrapper, transport replacement and Pi cross-build are still unfinished.
+
+## Slice 2: Rust wrapper and macOS integration, 2026-10-14
+
+The Rust core statically builds the pinned libremidi source through CMake, with
+C++ exceptions contained by a private C ABI bridge. Native clients use dedicated
+owner threads, a bounded command queue and a 32-client process capacity including
+retained resources. Native handles and cloned ports do not cross Rust threads.
+Callback panic is caught, callable invocation holds no Rust internal lock, receive
+admission is bounded in bytes and lost payloads are counted. Failed input teardown
+retains the owner thread as well as resources, avoiding COM apartment exit with
+live native callbacks. This is in-process Rust I/O; Python isolation is unchanged.
+
+The device-free macOS fixture substitutes CoreMIDI endpoint APIs only in its own
+test executable, while using real Core Foundation and packet helpers. It checks
+byte and native UMP traffic in both directions, timestamp disabling, clock identity
+on reopen, unchanged connections after unrelated client drop, and callback-state
+retention on failed disposal. Its local Cargo package is a development dependency;
+no fixture symbols are linked into the real loopback executable or production
+build. `nm` shows the real executable imports `_MIDIClientCreate` from Apple.
+
+Owner-approved output fixes are published in the fork as `b6a0d29` (checked
+CoreMIDI output endpoint/port disposal and failed-open rollback) and `53a9451`
+(initialized WinMM output handle and short-message DWORD). The vendor matches
+`53a94516cc280fa63f6de12bfe279ba3c26d02b9`. CoreMIDI teardown now passes 83 assertions
+in five cases; the property and callback-lifetime targets retain their 30 and
+14 assertions. All three targets pass normally and under ASan/UBSan on this Mac.
+The new Windows-only `winmm_output_test` is included in release CI but remains
+uncompiled here. Client-level CoreMIDI disposal errors, other output backends'
+cleanup and direct C++ destruction are outside the checked teardown guarantee.
+
+The Rust core passes 12 unit tests and six device-free macOS boundary tests.
+Workspace tests pass 58 ordinary cases with five ignored cases. Embedded Python
+tests must run with `--test-threads=1`, matching their existing pytest harness:
+parallel execution crashed in CPython's tracemalloc/thread-state path during
+verification. Release CI uses serial Rust test execution. The changed Rust crate
+passes strict Clippy; the existing Python crate emits a Rust 1.99 deprecation
+warning for `AtomicU8::fetch_update`. CI retains MSRV 1.87, where the replacement
+API is unavailable. No dependency versions were changed.
+
+Python 3.11 and 3.15 each pass all 131 checks, including the three isolated Rust
+finalization cases. A CPython 3.11 wheel built from the source distribution
+passes both archive checks and all 130 installed-package checks outside the
+checkout. The archives include the C++ bridge, vendored sources/license and
+test-only CoreMIDI fixture sources needed to rebuild the Rust tests. Ruff,
+formatting, ty, pyupgrade and Cargo formatting pass.
+
+A supervised real virtual-port attempt failed at client creation with OSStatus
+268435459 (0x10000003). Apple's installed SDK identifies this as
+MACH_SEND_INVALID_DEST. The existing midir path also fails to initialize MIDI in
+this tool environment. This is evidence of unavailable service access here,
+not a successful real CoreMIDI byte/UMP validation. No physical device was used.
+
+The existing release-only workflow now includes a separate device-free C++ native
+regression matrix for macOS arm64/x86_64, Linux and Windows. Non-Windows jobs use
+ASan/UBSan; Windows runs the fake-device WinMM input and output targets. Rust checks
+include the workspace. CI has not run: no release was created and workflow
+triggers are unchanged. Windows MIDI Services is explicitly disabled until pinned
+SDK/tooling integration and native compilation can be qualified. WinMM success
+would not establish Windows UMP support.
+
+Windows discovery also needs a capability-query failure audit: the pinned
+WinMM observer/name helpers read MIDIINCAPS/MIDIOUTCAPS without checking every
+device-capability query's return value. Device disappearance during enumeration
+could leave those structures unwritten. The two output fixes above do not resolve
+this separate path; Windows compilation alone would not certify it.
+
+Remaining slice-2 work includes Python transport replacement, real macOS I/O,
+Windows/Services qualification and the selected Pi cross-build. The completion
+reminder to submit fork patches upstream remains in plan/meedee.md.

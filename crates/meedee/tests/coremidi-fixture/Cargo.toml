@@ -1,0 +1,7 @@
+[package]
+name = "meedee-coremidi-fixture"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.87"
+publish = false
+license = "MIT"
