@@ -89,8 +89,11 @@ Native receive admission bounds owned in-flight payloads by bytes. Each isolated
 receive queue has a count limit of 128 and an 8 MiB default payload limit.
 Application-retained data, packet/tuple/object overhead, OS buffers and copies
 in flight are outside the queue budgets. Raw input avoids the old unbounded
-unfinished-SysEx assembler; a future message decoder needs its own independent
-size and completion policy. Packet floods, oversized sends, discovery lists and
+unfinished-SysEx assembler. The pure byte decoder now defaults to a separate
+1 MiB retained SysEx payload cap with overflow diagnostics. Feed snapshots and
+returned message/diagnostic lists remain proportional to caller-supplied input;
+the limit is not a total-memory or processing-time budget. Packet floods,
+oversized sends, discovery lists and
 allocation/process aborts remain resource risks. Rust/native allocation failures
 are not universally recoverable Python exceptions.
 
@@ -124,6 +127,12 @@ SysEx. Sending takes byte buffers or UmpPacket and validates framing/protocol,
 not full musical semantics. Mutable buffers are copied. UMP word tuples preserve
 all 32 bits. Invalid callback signatures/deferred functions are rejected before
 opening; deferred return values are reported without execution.
+
+The optional pure byte decoder has no timestamps or automatic transport-loss
+notification. Use a separate decoder per source, reset after observed loss,
+and finish at end of stream. Its strict SysEx policy discards implicit non-F7
+termination with a diagnostic, despite the standard permitting it. Message
+encoding includes explicit statuses and is not Standard MIDI File encoding.
 
 Timestamps are exact signed nanoseconds or None. Zero is valid. Clock identity
 distinguishes connections and isolated children but does not synchronize them.

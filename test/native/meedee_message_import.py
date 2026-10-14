@@ -8,9 +8,14 @@ def main() -> None:
     with patch(
         "atexit.register", side_effect=AssertionError("cleanup was initialized")
     ):
-        from meedee import events, messages
+        from meedee import codecs, events, messages
 
         assert events.ReceivedPacket.__module__ == "meedee.events"
+        assert (
+            codecs.encode(messages.ProgramChange(channel=16, program=128))
+            == b"\xcf\x7f"
+        )
+        assert codecs.Decoder().feed(b"\xf8") == [messages.TimingClock()]
 
         assert messages.NoteOn(channel=1, note=60, velocity=100).note == 60
         assert messages.SysEx(data=memoryview(bytearray([0, 127]))).data == bytes(

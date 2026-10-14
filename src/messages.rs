@@ -4,10 +4,11 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 use meedee::messages;
+use meedee::messages::Message as RustMessage;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyInt};
+use pyo3::types::{PyBytes, PyDict, PyInt, PyTuple};
 
 #[pyclass(frozen, subclass, module = "meedee.messages")]
 struct Message;
@@ -180,7 +181,118 @@ impl SysEx {
     }
 }
 
-fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {
+macro_rules! short_messages {
+    ($($name:ident $signature:tt { $($field:ident),* };)*) => {
+        $(
+            #[pyclass(frozen, extends = Message, module = "meedee.messages")]
+            struct $name { value: messages::$name }
+
+            #[pymethods]
+            impl $name {
+                #[new]
+                #[pyo3(signature = $signature)]
+                fn new($($field: &Bound<'_, PyAny>),*) -> PyResult<PyClassInitializer<Self>> {
+                    Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                        value: messages::$name::new($(integer($field, stringify!($field))?),*)
+                            .map_err(value_error)?,
+                    }))
+                }
+                $(#[getter]
+                fn $field(&self) -> i64 { i64::from(self.value.$field()) })*
+
+                fn __repr__(&self) -> String {
+                    let fields: Vec<String> = vec![$(format!("{}={}", stringify!($field), self.value.$field())),*];
+                    format!("{}({})", stringify!($name), fields.join(", "))
+                }
+                fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+                    other.extract::<PyRef<'_, Self>>().is_ok_and(|other| self.value == other.value)
+                }
+                fn __hash__(&self) -> u64 { value_hash(&self.value) }
+
+                #[pyo3(signature = (**changes))]
+                fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
+                    // Fixed-size field arrays also handle zero-field messages without
+                    // special unchecked indexing or a second replacement code path.
+                    let mut values = [$(i64::from(self.value.$field())),*];
+                    let names: &[&str] = &[$(stringify!($field)),*];
+                    if let Some(changes) = changes {
+                        for (name, value) in changes.iter() {
+                            let name = name.extract::<String>()?;
+                            let index = names.iter().position(|field| *field == name)
+                                .ok_or_else(|| PyTypeError::new_err(format!("unknown field: {name}")))?;
+                            values[index] = integer(&value, &name)?;
+                        }
+                    }
+                    let [$($field),*] = values;
+                    Py::new(py, PyClassInitializer::from(Message).add_subclass(Self {
+                        value: messages::$name::new($($field),*).map_err(value_error)?,
+                    }))
+                }
+                #[classattr]
+                fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+                    let annotations = PyDict::new(py);
+                    $(annotations.set_item(stringify!($field), py.get_type::<PyInt>())?;)*
+                    Ok(annotations)
+                }
+                #[classattr]
+                fn __match_args__(py: Python<'_>) -> PyResult<Bound<'_, PyTuple>> {
+                    let names: &[&str] = &[$(stringify!($field)),*];
+                    PyTuple::new(py, names)
+                }
+            }
+        )*
+
+        fn register_short(module: &Bound<'_, PyModule>) -> PyResult<()> {
+            $(module.add_class::<$name>()?;)*
+            Ok(())
+        }
+
+        pub fn encode_message(message: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
+            if let Ok(message) = message.extract::<PyRef<'_, NoteOn>>() {
+                return Ok(message.value.encode());
+            }
+            if let Ok(message) = message.extract::<PyRef<'_, SysEx>>() {
+                return Ok(message.value.encode());
+            }
+            $(if let Ok(message) = message.extract::<PyRef<'_, $name>>() {
+                return Ok(message.value.encode());
+            })*
+            Err(PyTypeError::new_err("message must be a supported MIDI 1.0 Message"))
+        }
+
+        pub fn to_python(py: Python<'_>, message: messages::AnyMessage) -> PyResult<Py<PyAny>> {
+            match message {
+                messages::AnyMessage::NoteOn(value) => Ok(Py::new(py,
+                    PyClassInitializer::from(Message).add_subclass(NoteOn { value }))?.into_any()),
+                messages::AnyMessage::SysEx(value) => Ok(Py::new(py,
+                    PyClassInitializer::from(Message).add_subclass(SysEx { value }))?.into_any()),
+                $(messages::AnyMessage::$name(value) => Ok(Py::new(py,
+                    PyClassInitializer::from(Message).add_subclass($name { value }))?.into_any()),)*
+            }
+        }
+    };
+}
+
+short_messages! {
+    NoteOff (*, channel, note, velocity) { channel, note, velocity };
+    PolyPressure (*, channel, note, pressure) { channel, note, pressure };
+    ControlChange (*, channel, controller, value) { channel, controller, value };
+    ProgramChange (*, channel, program) { channel, program };
+    ChannelPressure (*, channel, pressure) { channel, pressure };
+    PitchBend (*, channel, value) { channel, value };
+    QuarterFrame (*, message_type, value) { message_type, value };
+    SongPosition (*, position) { position };
+    SongSelect (*, song) { song };
+    TuneRequest () {};
+    TimingClock () {};
+    Start () {};
+    Continue () {};
+    Stop () {};
+    ActiveSensing () {};
+    SystemReset () {};
+}
+
+pub fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {
     if !value.get_type().is(value.py().get_type::<PyInt>()) {
         return Err(PyTypeError::new_err(format!("{field} must be an int")));
     }
@@ -213,6 +325,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Message>()?;
     module.add_class::<NoteOn>()?;
     module.add_class::<SysEx>()?;
+    register_short(module)?;
     Ok(())
 }
 

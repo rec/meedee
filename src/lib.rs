@@ -8,6 +8,7 @@ mod state;
 mod callback;
 mod lifecycle;
 
+mod codecs;
 mod messages;
 mod packets;
 mod ports;
@@ -21,7 +22,13 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
     module.add_function(wrap_pyfunction!(populate_events, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_codecs, module)?)?;
     Ok(())
+}
+
+#[pyfunction]
+fn populate_codecs(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    codecs::register(module)
 }
 
 #[pyfunction]

@@ -650,16 +650,23 @@ and wire evidence before stateful interpretation or live writes.
    Python transport now uses this wrapper for both isolated and in-process I/O;
    midir and its old filtering/naming/ID-lookup API have been removed.
    Raw callbacks carry immutable ReceivedPacket values with signed nanoseconds,
-   distinct connection clocks and byte/UMP payloads. Framing/filters remain slice 3.
+   distinct connection clocks and byte/UMP payloads. Framing is in the pure
+   slice-3 codec; receive filters and typed transport remain later integration.
    Separate the shared core and our Python binding; implement the safe C API wrapper,
    native build integration, and complete native qualification throughout the
    transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.
    Gate: Rust use requires no Python; FFI ownership, shutdown, byte/UMP capability
    detection, Python 3.11/3.15 builds, and selected Pi cross-build checks pass.
-3. **MIDI 1.0 values and byte codec.** Implement base message families, validated
+3. **MIDI 1.0 values and byte codec (implemented).** Implement base message families, validated
    encoding, incremental parsing, running status, and bounded SysEx. Gate:
    immutable Rust/Python values, exact wire fixtures, malformed-input recovery.
+   The pure codec and 18 primitive message families are available in Rust/Python.
+   Signed pitch bend, ordered diagnostics/recovery and a configurable 1 MiB
+   SysEx payload limit follow the approved choices. The decoder deliberately
+   discards SysEx lacking F7 on a new status, with a diagnostic. Timestamps,
+   receive filters and typed transport integration remain later work. See
+   [the API contract](api.md) and shared wire fixtures for the precise scope.
 4. **Fine CC and RPN/NRPN.** Add compound output and source/channel stateful
    interpretation. Gate: split/reordered/missing pairs, relative updates,
    resets/loss, selector changes, and partial sends have defined tested results.

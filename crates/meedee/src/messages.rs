@@ -3,31 +3,47 @@
 use std::error::Error;
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct NoteOn {
-    channel: u8,
-    note: u8,
-    velocity: u8,
+/// Implemented by primitive MIDI messages and the heterogeneous stream enum.
+pub trait Message: fmt::Debug {
+    /// Encode one complete message, always including its status byte.
+    fn encode(&self) -> Vec<u8>;
 }
 
-impl NoteOn {
-    pub fn new(channel: i64, note: i64, velocity: i64) -> Result<Self, ValueError> {
-        Ok(Self {
-            channel: bounded(channel, "channel", 1, 16)?,
-            note: bounded(note, "note", 0, 127)?,
-            velocity: bounded(velocity, "velocity", 0, 127)?,
-        })
-    }
+macro_rules! short_messages {
+    ($($name:ident { $($field:ident: $ty:ty = $low:literal ..= $high:literal),* };)*) => {
+        $(
+            #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+            pub struct $name { $($field: $ty),* }
+            impl $name {
+                pub fn new($($field: i64),*) -> Result<Self, ValueError> {
+                    Ok(Self { $($field: bounded($field, stringify!($field), $low, $high)? as $ty),* })
+                }
+                $(pub fn $field(&self) -> $ty { self.$field })*
+            }
+        )*
+        #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+        pub enum AnyMessage { $($name($name),)* SysEx(SysEx) }
+    };
+}
 
-    pub fn channel(&self) -> u8 {
-        self.channel
-    }
-    pub fn note(&self) -> u8 {
-        self.note
-    }
-    pub fn velocity(&self) -> u8 {
-        self.velocity
-    }
+short_messages! {
+    NoteOn { channel: u8 = 1..=16, note: u8 = 0..=127, velocity: u8 = 0..=127 };
+    NoteOff { channel: u8 = 1..=16, note: u8 = 0..=127, velocity: u8 = 0..=127 };
+    PolyPressure { channel: u8 = 1..=16, note: u8 = 0..=127, pressure: u8 = 0..=127 };
+    ControlChange { channel: u8 = 1..=16, controller: u8 = 0..=127, value: u8 = 0..=127 };
+    ProgramChange { channel: u8 = 1..=16, program: u8 = 1..=128 };
+    ChannelPressure { channel: u8 = 1..=16, pressure: u8 = 0..=127 };
+    PitchBend { channel: u8 = 1..=16, value: i16 = -8192..=8191 };
+    QuarterFrame { message_type: u8 = 0..=7, value: u8 = 0..=15 };
+    SongPosition { position: u16 = 0..=16383 };
+    SongSelect { song: u8 = 0..=127 };
+    TuneRequest {};
+    TimingClock {};
+    Start {};
+    Continue {};
+    Stop {};
+    ActiveSensing {};
+    SystemReset {};
 }
 
 /// Seven-bit SysEx payload, without the F0/F7 framing bytes.
@@ -52,7 +68,7 @@ impl SysEx {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ValueError(String);
+pub struct ValueError(pub(crate) String);
 
 impl fmt::Display for ValueError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -62,11 +78,11 @@ impl fmt::Display for ValueError {
 
 impl Error for ValueError {}
 
-fn bounded(value: i64, field: &str, low: i64, high: i64) -> Result<u8, ValueError> {
+fn bounded(value: i64, field: &str, low: i64, high: i64) -> Result<i64, ValueError> {
     if !(low..=high).contains(&value) {
         return Err(ValueError(format!("{field} must be in {low}..={high}")));
     }
-    Ok(value as u8)
+    Ok(value)
 }
 
 #[cfg(test)]

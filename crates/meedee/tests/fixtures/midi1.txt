@@ -1,0 +1,42 @@
+# Independent MIDI 1.0 wire vectors. Numbers before | are public field values.
+# MIDI 1.0 Detailed Specification 4.2.1: Channel Voice, System Common,
+# System Real-Time, System Exclusive; summary table 1 for F1 bit layout.
+# Program/channel offsets and signed bend are meedee's public conventions.
+# SysEx arguments are hexadecimal payload bytes, excluding F0/F7.
+NoteOn 1 60 100 | 90 3c 64
+NoteOn 16 127 0 | 9f 7f 00
+NoteOn 1 0 127 | 90 00 7f
+NoteOff 1 60 64 | 80 3c 40
+NoteOff 16 127 127 | 8f 7f 7f
+PolyPressure 1 60 50 | a0 3c 32
+PolyPressure 16 0 127 | af 00 7f
+ControlChange 1 0 0 | b0 00 00
+ControlChange 16 7 100 | bf 07 64
+ControlChange 1 64 127 | b0 40 7f
+ControlChange 1 120 0 | b0 78 00
+ControlChange 16 127 127 | bf 7f 7f
+ProgramChange 1 1 | c0 00
+ProgramChange 16 128 | cf 7f
+ChannelPressure 1 0 | d0 00
+ChannelPressure 16 127 | df 7f
+PitchBend 1 -8192 | e0 00 00
+PitchBend 16 -1 | ef 7f 3f
+PitchBend 1 0 | e0 00 40
+PitchBend 1 1 | e0 01 40
+PitchBend 16 8191 | ef 7f 7f
+QuarterFrame 0 0 | f1 00
+QuarterFrame 7 15 | f1 7f
+SongPosition 0 | f2 00 00
+SongPosition 128 | f2 00 01
+SongPosition 16383 | f2 7f 7f
+SongSelect 0 | f3 00
+SongSelect 127 | f3 7f
+TuneRequest | f6
+TimingClock | f8
+Start | fa
+Continue | fb
+Stop | fc
+ActiveSensing | fe
+SystemReset | ff
+SysEx | f0 f7
+SysEx 7d 00 7f | f0 7d 00 7f f7

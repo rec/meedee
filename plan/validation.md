@@ -715,3 +715,41 @@ promptly; no hardware was selected. Real macOS byte/UMP I/O remains unqualified.
 Windows/Services and the selected Pi cross-build also remain open. The
 release-only trigger, Python 3.11/3.15 matrix and workflow shell syntax were
 verified locally; no release was created and CI has not run.
+
+## Slice 3 MIDI 1.0 values and byte codec, 2026-10-14
+
+The shared Rust core and Python binding now expose all 18 primitive message
+families in the documented scope. The pure byte codec preserves public
+channel/program numbering and signed pitch bend, supports arbitrary feed
+boundaries, running status and real-time interleaving, and reports ordered
+diagnostics without calling user code. Retained SysEx payload defaults to a
+configurable 1 MiB cap. Non-F7 SysEx termination is deliberately discarded with
+a diagnostic, despite the standard allowing implicit termination. Timestamps,
+transport integration, receive filters, MTC interpretation and later protocol
+families are outside this slice.
+
+Python 3.11.7 and 3.15.0 each pass 164 tests. The Rust workspace passes 60
+ordinary tests with five ignored cases, including the unchanged device-free
+native regressions; pytest separately runs the three finalization cases. Five
+new Rust codec tests cover shared independent wire vectors, every two-part feed
+split of those vectors, all 2,048 feed partitions of a representative mixed
+stream, all channel statuses with every first data value and second-byte
+boundaries, all 65,536 arbitrary byte pairs in a stateful malformed stream, and
+SysEx overflow/recovery. Python adds native value immutability, strict arguments,
+checked replacement, pattern matching, raw buffer ownership, recovery diagnostics,
+reset/finish and pure-import checks. Test-vector provenance is recorded in
+[specifications.md](specifications.md).
+
+Cargo formatting, workspace Clippy and Python Ruff, formatting, ty and pyupgrade
+pass. Clippy uses the same local exception for the existing Rust 1.99 atomic
+deprecation; the release workflow retains Rust 1.87. No dependency versions
+or native backend sources changed. A CPython 3.11 wheel builds from the source
+distribution, all 163 installed-package tests pass outside the checkout, and
+both distribution-content checks pass. The source archive
+contains the shared vectors and Rust codec tests. Release CI now includes the
+installed codec tests; its published-release-only trigger, Python 3.11/3.15
+matrix and shell syntax pass local checks. CI has not run.
+
+This slice needs no hardware access and no new native runtime flow was run.
+The real macOS I/O, Windows/Services and selected Pi qualification gaps from
+slice 2 remain open. Passing pure codec checks does not close those gates.

@@ -2,14 +2,51 @@
 
 A Rust MIDI toolkit with matching Python bindings, using vendored
 [libremidi](https://github.com/celtera/libremidi) for native transport. Python
-imports are `meedee.midi`, `meedee.events`, and `meedee.messages`; the package
-root is empty. There are no Python runtime dependencies.
+imports are `meedee.midi`, `meedee.events`, `meedee.messages` and `meedee.codecs`;
+the package root is empty. There are no Python runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
-are implemented. Musical values currently include immutable `NoteOn` and
-`SysEx`; codecs, other message families, tuning and file support are later
-slices in [the plan](plan/meedee.md). Transport sends raw packets, so it does
-not yet accept those musical values directly.
+are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
+codec are available. Tuning, fine controls, MIDI 2.0 values and file support
+are later slices in [the plan](plan/meedee.md). Transport sends raw packets;
+encode musical values explicitly before sending.
+
+## Messages and byte codecs
+
+```python
+from meedee.codecs import Decoder, encode
+from meedee.messages import NoteOn
+
+note = NoteOn(channel=1, note=60, velocity=100)
+wire = encode(note)  # b'\x90\x3c\x64'
+decoder = Decoder()
+assert decoder.feed(wire[:2]) == []
+assert decoder.feed(wire[2:]) == [note]
+assert decoder.finish() == []
+```
+
+The pure codec supports MIDI 1.0 note, pressure, CC, program, signed pitch bend,
+system common, real-time and SysEx messages. Values are immutable, keyword-only,
+hashable and support checked `replace`. Channels are 1–16, programs are 1–128,
+CC identifiers are 0–127, and PitchBend.value is -8192–8191 with center zero.
+Channel-mode messages remain primitive ControlChange values; zero-velocity
+NoteOn is preserved.
+
+`Decoder.feed()` returns messages and frozen diagnostics in completion/detection
+order, handles running status and interleaved real-time bytes, and retains
+partial messages between calls. Its configurable `sysex_limit` defaults to
+1 MiB of payload. Oversized SysEx is discarded with one diagnostic; real-time
+delivery and parsing subsequent messages continue. `finish()` reports truncated
+input and clears state. `reset()` silently clears state after known loss.
+As a conservative policy, SysEx ended by a new status instead of F7 is also
+discarded with a diagnostic, even though MIDI permits implicit termination.
+Use one decoder per source; diagnostic offsets count bytes actually fed.
+
+These are live byte-stream rules, not Standard MIDI File or UMP parsing.
+Encoding adds full status/framing bytes. No timestamps are invented or attached
+to decoded values; transport callbacks remain raw. Input snapshots and returned
+lists have memory costs beyond the retained SysEx limit. Details and remaining
+protocol boundaries are in [the API contract](plan/api.md).
 
 ## Python transport
 
@@ -54,9 +91,10 @@ Nanosecond storage does not promise nanosecond accuracy.
 
 Receive packets are raw transport chunks, including partial SysEx or multiple
 UMPs. The binding does not assemble unfinished SysEx or apply `Ignore` filters.
-Message framing and filters require the bounded codec planned for the next
-slice. `send()` accepts unsigned-byte buffers, including bytearray and
-memoryview, or `UmpPacket`; mutable and strided buffers are snapshotted. Send
+Use the pure byte codec explicitly for framing; typed transport/timestamps and
+receive filters remain later work. `send()` accepts unsigned-byte buffers,
+including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
+are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.
 Success means backend acceptance, not physical delivery. UMP batch failures
 report an accepted prefix; the failed packet may also have had effects. There

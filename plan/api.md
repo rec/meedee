@@ -1,9 +1,8 @@
 # meedee API contract and representation prototype
 
-Slice 1, 2026-10-13. This document records the approved API choices and the
-device-free prototype. It does not claim that these classes are available in
-the installed package yet. Production integration and backend replacement are
-slice 2; complete message codecs are slice 3 and later.
+Slices 1–3, updated 2026-10-14. This document records the approved API choices,
+the original device-free prototype, and the MIDI 1.0 byte codec.
+Platform qualification and higher-level protocols remain separate plan gates.
 
 Additional work beyond the prompt
 
@@ -22,6 +21,7 @@ Public definitions belong to these modules, without top-level re-exports:
 | Module | Responsibility |
 | --- | --- |
 | `meedee.messages` | `Message` and concrete musical values/commands |
+| `meedee.codecs` | Pure byte encoding and incremental decoding; no native I/O |
 | `meedee.events` | `Event`, `Timestamp`, and clock descriptors |
 | `meedee.midi` | Discovery, transport capabilities, clients, connections and transport errors |
 
@@ -98,8 +98,8 @@ and velocity values retain their protocol widths.
 
 Do not conflate a MIDI 1.0 type with its MIDI 2.0 counterpart. `NoteOn` has
 seven-bit velocity; a later `Midi2NoteOn` has its own explicit fields. The
-representation prototype intentionally implements only `NoteOn` and `SysEx`.
-The next message slice adds the remaining MIDI 1.0 inventory and actual codecs.
+representation prototype initially implemented only `NoteOn` and `SysEx`.
+Slice 3 adds the other primitive MIDI 1.0 values and byte codecs below.
 
 ### SysEx ownership
 
@@ -109,6 +109,76 @@ unsigned-byte buffers, including bytes, bytearray and suitable memoryviews.
 Mutable inputs are copied before the constructor returns. The public `data`
 property returns immutable Python bytes; its prototype getter makes a copy.
 This is measured representation behavior, not a zero-copy guarantee.
+
+### Slice 3 byte codec, 2026-10-14
+
+Approved choices: ordered messages/diagnostics with recovery, a configurable
+1 MiB SysEx default, pure byte codecs with later timestamp integration, and
+signed pitch bend centered at zero.
+
+`meedee.codecs` is pure: importing it or constructing a decoder starts no MIDI
+workers. The Rust equivalent is `meedee::codecs`, with immutable structs,
+the `Message` trait and inline `AnyMessage` variants in `meedee::messages`.
+No Python dependency is involved in Rust use.
+
+The primitive inventory is NoteOn, NoteOff, PolyPressure, ControlChange,
+ProgramChange, ChannelPressure, PitchBend, QuarterFrame, SongPosition, SongSelect,
+TuneRequest, TimingClock, Start, Continue, Stop, ActiveSensing, SystemReset and
+SysEx. Channel-mode bytes remain exact ControlChange values, including controller
+identifiers 120–127; the codec does not interpret their effects or validate a
+particular profile's controller semantics. NoteOn with zero velocity stays
+NoteOn. PitchBend.value is -8192–8191 with zero centered. SongPosition.position
+is 0–16383 MIDI beats, each six MIDI clocks; SongSelect.song remains 0–127.
+QuarterFrame exposes the raw message_type (0–7) and value nibble (0–15), without
+time-code assembly or validation of a complete time-code sequence.
+
+`encode(message)` emits owned bytes for one primitive message, with its explicit
+status and SysEx F0/F7 framing. It never introduces running-status compression.
+`Decoder(*, sysex_limit=1048576)` is mutable, with one instance per independent
+byte source. Its setting is a strict positive built-in integer in Python.
+`feed(data)` accepts one-dimensional unsigned-byte buffers, including strided
+memoryviews, snapshots them, and returns an ordered list of Message/Diagnostic
+values. Empty feeds are harmless and arbitrary feed partitions have no semantic
+effect. `Diagnostic` is frozen and exposes kind, offset and byte. Offsets count
+bytes actually fed, starting at zero, across calls; finish uses the next offset
+and byte=None. At the machine's maximum usize offset the counter saturates.
+
+Diagnostics identify unexpected data/end bytes, undefined statuses, interrupted
+or truncated short/SysEx messages, and SysEx overflow. Undefined F4/F5 clear
+running status. F9/FD are diagnosed but preserve running status, partial messages
+and SysEx, as do all defined real-time messages. SystemReset remains a wire value;
+interpreting receiver reset effects is outside this codec. Output is ordered by
+message completion or diagnostic detection, so interleaved real-time messages
+can precede the longer message that began before them. No user error callback
+executes inside the parser.
+
+The current policy for non-F7 SysEx termination is deliberately conservative:
+although the standard permits another non-real-time status to terminate SysEx,
+the decoder discards that payload, reports InterruptedSysEx and processes the
+new status normally. It cannot distinguish deliberate implicit termination from
+an interrupted device dump. It never presents such a payload as complete SysEx.
+
+The SysEx cap counts payload bytes, excluding framing and interleaved real-time
+bytes. Exceeding it releases the accumulated payload, reports once, discards
+data until F7 or another non-real-time status, and continues real-time delivery.
+It never emits a truncated oversized payload. The cap bounds retained payload,
+not allocator overhead, feed snapshots or returned lists. Divide very large
+inputs into feeds appropriate to the application's memory and responsiveness
+budget. Rust allocation failure can still abort the process; a Python allocation
+failure after consumption does not roll back decoder state or promise partial
+results. Discard/reset the decoder after such a failure.
+
+`finish()` diagnoses unfinished input once and clears all parsing/running status;
+later feeds can start another stream at the existing cumulative offset. `reset()`
+clears state without a diagnostic or synthetic message, retaining offsets. Use
+it after known transport loss or a deliberate boundary; unknown driver loss
+cannot be detected from bytes alone. This decoder is for live MIDI 1.0 bytes,
+not UMP or Standard MIDI Files.
+
+Events/timestamps, transport integration and receive filters remain separate
+from this codec. Transport callbacks continue to receive ReceivedPacket;
+timestamped typed integration belongs to slice 10. Fine CC, RPN/NRPN, tuning,
+GM profiles and file formats retain their later slices.
 
 The prototype does not interpret manufacturer IDs, enforce a complete vendor
 message schema, assemble packets or implement SysEx8. Do not use its generic

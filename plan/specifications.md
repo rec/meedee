@@ -54,3 +54,22 @@ These are acquisition gates for later features, not implemented standards.
 Recheck for approved errata or superseding revisions when each dependent slice
 starts. Full document access, precise revision identity and test-vector provenance
 must be established before encoding any of those families.
+
+## Slice 3 wire evidence, 2026-10-14
+
+The acquired MIDI 1.0 PDF still matches the recorded SHA-256. The Association's
+[specification page](https://midi.org/midi-1-0-detailed-specification) continues
+to identify the 1996 4.2.1 revision. The byte codec uses its Channel Voice,
+System Common, System Real-Time and System Exclusive sections and appendix A's
+Running Status and Undefined Status rules. The public
+[message summary, table 1](https://midi.org/summary-of-midi-1-0-messages) also
+states the F1 `0nnndddd` bit layout. QuarterFrame implements only that raw
+layout, not the separately specified MTC sequence or full-frame interpretation.
+
+Independent compact fixtures are in
+`crates/meedee/tests/fixtures/midi1.txt`, consumed by Rust and Python tests.
+They state expected wire bytes directly, including channel/program boundaries,
+signed bend conversion and preserved zero-velocity NoteOn. Parser tests cover
+running status, reserved statuses, real-time interleaving and malformed streams.
+These are meedee regression vectors derived from the cited layouts, not an
+official MIDI certification suite or copied full specification tables.
