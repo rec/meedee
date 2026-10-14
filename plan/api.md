@@ -29,12 +29,25 @@ Keep `__init__.py` empty. Rust modules mirror responsibilities, using idiomatic
 snake_case functions and typed structs. The current transport API remains in
 place during this slice and may be replaced in slice 2 without aliases.
 
-The current maturin build produces one `meedee.midi` extension whose import
-starts cleanup workers. Slice 1 therefore registers prototype classes only in
-the Rust test executable. Slice 2 must provide separately importable public
-modules from the shared core without initializing MIDI for pure value use.
-Do not ship a Python module that merely imports the current transport extension
-as a shortcut. Test the eventual wheel's imports in fresh interpreters.
+The installed binary is `meedee._core`. Public loaders register native values
+without initializing MIDI for message/event imports. Both Python transport modes
+now use the shared Rust libremidi wrapper. There are no old transport aliases.
+
+Slice 2 transport choices, approved 2026-10-14:
+
+- `meedee.midi.Input`, `Output`, immutable `Port` snapshots and connection types.
+  Constructors take keyword-only settings; discovery refresh invalidates old
+  snapshots. `backend_id` is metadata, not a unique persistent identity.
+- Remove native naming parameters except the virtual endpoint name, and remove
+  ID lookup. The pinned C API cannot honor the former and IDs cannot guarantee
+  the latter. Keep default per-client process isolation and its in-process option.
+- Callbacks take an immutable `meedee.events.ReceivedPacket`: exact optional
+  signed `timestamp_ns`, connection `clock`, and raw `packet`. Bytes remain
+  bytes; UMP uses an immutable UmpPacket with a tuple of 32-bit words.
+- Raw chunks/batches are exposed now. Message framing and Ignore filters wait
+  for the bounded codec slice; no unfinished SysEx assembly is introduced.
+- Failed opens entering Rust invalidate the client in both modes. Ordinary
+  Python validation happens first. Successful explicit close restores it.
 
 ### Construction, inspection and replacement
 

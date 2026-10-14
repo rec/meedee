@@ -21,6 +21,9 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                 "meedee/messages.py",
                 "meedee/messages.pyi",
                 "meedee/midi.py",
+                "meedee/events.py",
+                "meedee/events.pyi",
+                "meedee/_wire.py",
             } <= set(names)
             assert "meedee/py.typed" in names
             assert {
@@ -51,10 +54,7 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                 == (project / "meedee" / "midi.pyi").read_bytes()
             )
             if "manylinux" in w.name:
-                assert any(".libs/libasound" in n for n in names)
-                assert list((project / "dist").glob("alsa-lib-*.src.rpm")), (
-                    "Supply the matching ALSA source RPM alongside the Linux wheel"
-                )
+                assert not any(".libs/libasound" in n for n in names)
 
 
 def test_source_distribution_contains_build_typing_and_test_sources() -> None:
@@ -79,6 +79,12 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/_native.pyi",
                 "src/lib.rs",
                 "src/messages.rs",
+                "src/packets.rs",
+                "src/ports.rs",
+                "src/transport_tests.rs",
+                "meedee/events.py",
+                "meedee/events.pyi",
+                "meedee/_wire.py",
                 "crates/meedee/Cargo.toml",
                 "crates/meedee/build.rs",
                 "crates/meedee/native/CMakeLists.txt",

@@ -31,14 +31,14 @@ pub struct Managed<C, N> {
     pub callback: Option<Arc<Callback>>,
     opening: Mutex<bool>,
     cleanup: Arc<AtomicU8>,
-    teardown: fn(N) -> C,
+    teardown: fn(N) -> PyResult<C>,
 }
 
 impl<C, N> Managed<C, N> {
     pub fn new(
         client: Arc<Client<C>>,
         callback: Option<Arc<Callback>>,
-        teardown: fn(N) -> C,
+        teardown: fn(N) -> PyResult<C>,
     ) -> Self {
         Self {
             client,
@@ -50,10 +50,7 @@ impl<C, N> Managed<C, N> {
         }
     }
 
-    pub fn connect(
-        &self,
-        operation: impl FnOnce(C) -> Result<N, midir::ConnectError<C>>,
-    ) -> PyResult<()> {
+    pub fn connect(&self, operation: impl FnOnce(C) -> PyResult<N>) -> PyResult<()> {
         crate::callback::check_blocking_thread()?;
         // Shutdown can see registration before native connect returns.
         self.native.check_failed()?;
@@ -388,11 +385,9 @@ mod tests {
         let runtime = Runtime::start().unwrap();
         let mut failed = Vec::new();
         for _ in 0..CLEANUP_WORKERS {
-            let resource = Arc::new(Managed::new(
-                Arc::new(Client::new(37, false)),
-                None,
-                |_: i32| panic!("native teardown fault"),
-            ));
+            let resource = Arc::new(Managed::new(Arc::new(Client::new(37)), None, |_: i32| {
+                panic!("native teardown fault")
+            }));
             runtime.register(resource.clone()).unwrap();
             resource.connect(Ok).unwrap();
             runtime.enqueue(resource.clone());
@@ -400,11 +395,11 @@ mod tests {
         }
         let (finished, finishing) = mpsc::channel();
         let healthy = Arc::new(Managed::new(
-            Arc::new(Client::new(19, false)),
+            Arc::new(Client::new(19)),
             None,
             |native: (i32, mpsc::Sender<()>)| {
                 native.1.send(()).unwrap();
-                native.0
+                Ok(native.0)
             },
         ));
         runtime.register(healthy.clone()).unwrap();
@@ -429,9 +424,9 @@ mod tests {
     fn poisoned_lifecycle_retains_native_ownership_and_its_capacity_reservation() {
         let runtime = Runtime::start().unwrap();
         let resource = Arc::new(Managed::new(
-            Arc::new(Client::new(37, false)),
+            Arc::new(Client::new(37)),
             None,
-            |value: i32| value,
+            |value: i32| Ok(value),
         ));
         runtime.register(resource.clone()).unwrap();
         resource.connect(Ok).unwrap();
@@ -445,17 +440,17 @@ mod tests {
         let mut resources = Vec::new();
         for _ in 1..CONNECTION_CAPACITY {
             let next = Arc::new(Managed::new(
-                Arc::new(Client::new(19, false)),
+                Arc::new(Client::new(19)),
                 None,
-                |value: i32| value,
+                |value: i32| Ok(value),
             ));
             runtime.register(next.clone()).unwrap();
             resources.push(next);
         }
         let next = Arc::new(Managed::new(
-            Arc::new(Client::new(19, false)),
+            Arc::new(Client::new(19)),
             None,
-            |value: i32| value,
+            |value: i32| Ok(value),
         ));
         assert!(runtime.register(next).is_err());
         runtime.prepare_shutdown();
@@ -472,12 +467,12 @@ mod tests {
         let (started, starting) = mpsc::channel();
         let (release, released) = mpsc::channel();
         let blocked = Arc::new(Managed::new(
-            Arc::new(Client::new(37, false)),
+            Arc::new(Client::new(37)),
             None,
             |native: (i32, mpsc::Sender<()>, mpsc::Receiver<()>)| {
                 native.1.send(()).unwrap();
                 native.2.recv_timeout(Duration::from_secs(5)).unwrap();
-                native.0
+                Ok(native.0)
             },
         ));
         runtime.register(blocked.clone()).unwrap();
@@ -488,11 +483,11 @@ mod tests {
         starting.recv_timeout(Duration::from_secs(5)).unwrap();
         let (finished, finishing) = mpsc::channel();
         let other = Arc::new(Managed::new(
-            Arc::new(Client::new(19, false)),
+            Arc::new(Client::new(19)),
             None,
             |native: (i32, mpsc::Sender<()>)| {
                 native.1.send(()).unwrap();
-                native.0
+                Ok(native.0)
             },
         ));
         runtime.register(other.clone()).unwrap();
@@ -515,18 +510,18 @@ mod tests {
         let mut resources = Vec::new();
         for _ in 0..CONNECTION_CAPACITY {
             let resource = Arc::new(Managed::new(
-                Arc::new(Client::new(37, false)),
+                Arc::new(Client::new(37)),
                 None,
-                |native: i32| native,
+                |native: i32| Ok(native),
             ));
             runtime.register(resource.clone()).unwrap();
             resource.connect(Ok).unwrap();
             resources.push(resource);
         }
         let next = Arc::new(Managed::new(
-            Arc::new(Client::new(19, false)),
+            Arc::new(Client::new(19)),
             None,
-            |native: i32| native,
+            |native: i32| Ok(native),
         ));
         let error = runtime.register(next.clone()).unwrap_err();
         Python::initialize();
@@ -546,9 +541,9 @@ mod tests {
     fn completed_cleanup_releases_capacity_while_python_resources_remain_alive() {
         let runtime = Runtime::start().unwrap();
         let resource = Arc::new(Managed::new(
-            Arc::new(Client::new(37, false)),
+            Arc::new(Client::new(37)),
             None,
-            |native: i32| native,
+            |native: i32| Ok(native),
         ));
         runtime.register(resource.clone()).unwrap();
         resource.connect(Ok).unwrap();
@@ -562,9 +557,9 @@ mod tests {
         let mut resources = Vec::new();
         for _ in 0..CONNECTION_CAPACITY {
             let next = Arc::new(Managed::new(
-                Arc::new(Client::new(19, false)),
+                Arc::new(Client::new(19)),
                 None,
-                |native: i32| native,
+                |native: i32| Ok(native),
             ));
             runtime.register(next.clone()).unwrap();
             resources.push(next);
@@ -583,11 +578,12 @@ mod tests {
         for _ in 0..CLEANUP_WORKERS {
             let (release, released) = mpsc::channel();
             let resource = Arc::new(Managed::new(
-                Arc::new(Client::new((), false)),
+                Arc::new(Client::new(())),
                 None,
                 |native: (mpsc::Sender<()>, mpsc::Receiver<()>)| {
                     native.0.send(()).unwrap();
                     native.1.recv_timeout(Duration::from_secs(5)).unwrap();
+                    Ok(())
                 },
             ));
             runtime.register(resource.clone()).unwrap();
@@ -603,11 +599,7 @@ mod tests {
         }
         let mut pending = Vec::new();
         for _ in CLEANUP_WORKERS..CONNECTION_CAPACITY {
-            let resource = Arc::new(Managed::new(
-                Arc::new(Client::new((), false)),
-                None,
-                |()| {},
-            ));
+            let resource = Arc::new(Managed::new(Arc::new(Client::new(())), None, |()| Ok(())));
             runtime.register(resource.clone()).unwrap();
             resource.connect(Ok).unwrap();
             runtime.enqueue(resource.clone());
@@ -615,11 +607,7 @@ mod tests {
             runtime.enqueue(resource.clone());
             pending.push(resource);
         }
-        let next = Arc::new(Managed::new(
-            Arc::new(Client::new((), false)),
-            None,
-            |()| {},
-        ));
+        let next = Arc::new(Managed::new(Arc::new(Client::new(())), None, |()| Ok(())));
         let result = runtime.register(next.clone());
         for release in releases {
             release.send(()).unwrap();
@@ -632,8 +620,8 @@ mod tests {
 
     #[test]
     fn teardown_before_native_open_prevents_late_connection_creation() {
-        let client = Arc::new(Client::new(37, false));
-        let resource = Managed::new(Arc::clone(&client), None, |native: i32| native);
+        let client = Arc::new(Client::new(37));
+        let resource = Managed::new(Arc::clone(&client), None, |native: i32| Ok(native));
         resource.close().unwrap();
         assert!(resource
             .connect(|_| panic!("closed resource must not open"))
@@ -644,8 +632,8 @@ mod tests {
     #[test]
     fn teardown_waits_for_an_open_in_progress_and_restores_the_client() {
         use std::time::Duration;
-        let client = Arc::new(Client::new(37, false));
-        let resource = Managed::new(Arc::clone(&client), None, |native: i32| native);
+        let client = Arc::new(Client::new(37));
+        let resource = Managed::new(Arc::clone(&client), None, |native: i32| Ok(native));
         let (started, opening) = mpsc::channel();
         let (release, released) = mpsc::channel();
         let (closing, closing_started) = mpsc::channel();
@@ -689,11 +677,10 @@ mod tests {
             pyo3::with_embedded_python_interpreter(|py| {
                 initialize(py).unwrap();
                 for _ in 0..CLEANUP_WORKERS {
-                    let resource = Arc::new(Managed::new(
-                        Arc::new(Client::new(37, false)),
-                        None,
-                        |_: i32| panic!("finalization teardown fault"),
-                    ));
+                    let resource =
+                        Arc::new(Managed::new(Arc::new(Client::new(37)), None, |_: i32| {
+                            panic!("finalization teardown fault")
+                        }));
                     register(resource.clone()).unwrap();
                     resource.connect(Ok).unwrap();
                     resources.push(resource);
@@ -711,9 +698,9 @@ mod tests {
             pyo3::with_embedded_python_interpreter(|py| {
                 initialize(py).unwrap();
                 let resource = Arc::new(Managed::new(
-                    Arc::new(Client::new(37, false)),
+                    Arc::new(Client::new(37)),
                     None,
-                    |native: i32| native,
+                    |native: i32| Ok(native),
                 ));
                 register(resource.clone()).unwrap();
                 resource.connect(Ok).unwrap();

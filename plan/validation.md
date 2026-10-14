@@ -673,3 +673,45 @@ this separate path; Windows compilation alone would not certify it.
 Remaining slice-2 work includes Python transport replacement, real macOS I/O,
 Windows/Services qualification and the selected Pi cross-build. The completion
 reminder to submit fork patches upstream remains in plan/meedee.md.
+
+## Python transport replacement, 2026-10-14
+
+The Python binding now uses the Rust toolkit and vendored libremidi in both
+isolated and in-process modes. The midir dependency and its old transport API
+are removed. Public Input/Output clients select immutable discovery snapshots;
+callbacks receive immutable byte/UMP events with exact optional signed
+nanoseconds and connection-specific clock identity. This completes the Python
+replacement portion of slice 2, not its platform qualification gate.
+
+Python 3.11.7 and 3.15.0 each pass 137 tests. Coverage includes raw UMP/byte
+values, strict buffer ownership, zero/negative/disabled timestamps, stale and
+foreign snapshots, consumed failed opens, worker crashes/timeouts, queue
+budgets and live native drop counters, interrupted operations, allocation
+failures and shutdown draining without a live client. Controlled worker faults
+exercise the production parent/child protocol; they do not qualify OS drivers.
+
+Serial Rust workspace tests pass 55 ordinary cases: 12 core unit tests, six
+device-free CoreMIDI boundary cases and 37 binding/lifecycle tests. The latter
+include a new Python-adapter-to-C++-backend regression using the existing fake
+CoreMIDI fixture, covering byte and UMP I/O, clock metadata and client reuse.
+Five tests remain ignored in the ordinary Rust run: two real CoreMIDI checks
+and three finalization cases run separately by pytest's supervised harness.
+No production extension links the fake CoreMIDI fixture.
+
+Ruff, formatting, ty, pyupgrade and Cargo formatting pass. Workspace Clippy
+passes with warnings denied except the previously recorded Rust 1.99
+AtomicU8::fetch_update deprecation; CI retains Rust 1.87. No external dependency
+versions changed. Removed dependency notices track the pruned Cargo lockfile.
+
+A CPython 3.11 wheel rebuilt from the source distribution passes both archive
+checks. The new public loaders, private wire protocol, native Rust sources and
+existing test-only fixture are included. All 136 installed-package checks pass
+outside the checkout. Linux packaging now requires system libasound.so.2 rather than
+bundling ALSA, matching libremidi's dynamic loading behavior.
+
+The authorized, supervised real macOS virtual-port check again returned
+OSStatus 268435459 at client creation, before creating an endpoint. It returned
+promptly; no hardware was selected. Real macOS byte/UMP I/O remains unqualified.
+Windows/Services and the selected Pi cross-build also remain open. The
+release-only trigger, Python 3.11/3.15 matrix and workflow shell syntax were
+verified locally; no release was created and CI has not run.

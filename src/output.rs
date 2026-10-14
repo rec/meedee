@@ -1,165 +1,116 @@
+use crate::callback::check_blocking_thread;
+use crate::errors::{native_call, transport_error, StateError};
+use crate::lifecycle::{self, Managed, Resource};
+use crate::packets::{extract_packet, Backend, Protocol};
+use crate::ports::Port;
+use crate::state::Client;
+use meedee::transport;
+use pyo3::prelude::*;
+use pyo3::{PyTraverseError, PyVisit};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-#[cfg(unix)]
-use midir::os::unix::VirtualOutput;
-use pyo3::prelude::*;
-use pyo3::types::PyBytes;
-use pyo3::{PyTraverseError, PyVisit};
-
-use crate::callback::check_blocking_thread;
-use crate::errors::{native_call, InitError, PortInfoError};
-use crate::lifecycle::{self, Managed, Resource};
-use crate::state::Client;
-
-/// A MIDI output client that is unavailable while its connection is open.
-#[pyclass(frozen, module = "meedee.midi")]
-pub struct MidiOutput {
-    state: Arc<Client<midir::MidiOutput>>,
+#[pyclass(frozen, module = "meedee._native")]
+pub struct Output {
+    state: Arc<Client<transport::Output>>,
+    identity: String,
+    snapshot: AtomicU64,
+    protocol: Protocol,
 }
-
-/// An opaque output-port handle obtained from discovery.
-#[pyclass(frozen, module = "meedee.midi")]
-pub struct MidiOutputPort {
-    native: midir::MidiOutputPort,
-}
-
 #[pymethods]
-impl MidiOutputPort {
-    /// The backend's opaque identifier; no additional persistence guarantee.
-    fn id(&self, py: Python<'_>) -> PyResult<String> {
-        check_blocking_thread()?;
-        py.detach(|| native_call("port ID", || self.native.id()))
-    }
-
-    fn __eq__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
-        check_blocking_thread()?;
-        py.detach(|| native_call("port comparison", || self.native == other.native))
-    }
-
-    fn __ne__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
-        check_blocking_thread()?;
-        py.detach(|| native_call("port comparison", || self.native != other.native))
-    }
-
-    #[classattr]
-    const __hash__: Option<Py<PyAny>> = None;
-}
-
-/// Owns a native output connection and keeps its original Python client alive.
-#[pyclass(frozen, module = "meedee.midi")]
-pub struct MidiOutputConnection {
-    resource: Arc<Managed<midir::MidiOutput, midir::MidiOutputConnection>>,
-    client: Py<MidiOutput>,
-}
-
-#[pymethods]
-impl MidiOutput {
+impl Output {
     #[new]
-    fn new(py: Python<'_>, client_name: &str) -> PyResult<Self> {
+    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None))]
+    fn new(
+        py: Python<'_>,
+        identity: String,
+        protocol: Protocol,
+        backend: Option<Backend>,
+    ) -> PyResult<Self> {
         check_blocking_thread()?;
         let native = py
-            .detach(|| native_call("create output", || midir::MidiOutput::new(client_name)))?
-            .map_err(|error| InitError::new_err(format!("create output: {error}")))?;
+            .detach(|| {
+                native_call("create output", || {
+                    transport::Output::new(transport::OutputOptions {
+                        protocol: protocol.native(),
+                        backend: backend.map(Backend::native),
+                    })
+                })
+            })?
+            .map_err(|e| transport_error(e, "init"))?;
         Ok(Self {
-            state: Arc::new(Client::new(native, cfg!(target_os = "linux"))),
+            state: Arc::new(Client::new(native)),
+            identity,
+            snapshot: AtomicU64::new(0),
+            protocol,
         })
     }
-
-    fn ports(&self, py: Python<'_>) -> PyResult<Vec<MidiOutputPort>> {
+    fn ports(&self, py: Python<'_>) -> PyResult<Vec<Port>> {
         py.detach(|| {
             self.state.with_available(|native| {
-                Ok(native
-                    .ports()
+                let ports = native.ports().map_err(|e| transport_error(e, "ports"))?;
+                let snapshot = self.snapshot.fetch_add(1, Ordering::Relaxed) + 1;
+                Ok(ports
                     .into_iter()
-                    .map(|native| MidiOutputPort { native })
+                    .enumerate()
+                    .map(|(index, native)| {
+                        Port::new(native, &self.identity, snapshot, index, false)
+                    })
                     .collect())
             })
         })
     }
-
-    fn port_name(&self, py: Python<'_>, port: &MidiOutputPort) -> PyResult<String> {
-        py.detach(|| {
-            self.state.with_available(|native| {
-                native
-                    .port_name(&port.native)
-                    .map_err(|error| PortInfoError::new_err(format!("output port name: {error}")))
-            })
+    fn connect(slf: Py<Self>, py: Python<'_>, port: &Port) -> PyResult<Py<OutputConnection>> {
+        let port = port.native.clone();
+        OutputConnection::open(py, slf, move |native| match port {
+            Some(port) => native.connect(&port),
+            None => Err(transport::Error::Invalid(
+                "port is not a native snapshot from this client",
+            )),
         })
     }
-
-    fn find_port_by_id(&self, py: Python<'_>, id: &str) -> PyResult<Option<MidiOutputPort>> {
-        py.detach(|| {
-            self.state.with_available(|native| {
-                Ok(native
-                    .find_port_by_id(id)
-                    .map(|native| MidiOutputPort { native }))
-            })
-        })
-    }
-
-    fn connect(
-        slf: Py<Self>,
-        py: Python<'_>,
-        port: &MidiOutputPort,
-        port_name: &str,
-    ) -> PyResult<Py<MidiOutputConnection>> {
-        MidiOutputConnection::open(py, slf, |native| native.connect(&port.native, port_name))
-    }
-
-    /// Send messages to applications connected to this virtual output.
     fn create_virtual(
         slf: Py<Self>,
         py: Python<'_>,
-        port_name: &str,
-    ) -> PyResult<Py<MidiOutputConnection>> {
-        check_blocking_thread()?;
-        #[cfg(unix)]
-        {
-            MidiOutputConnection::open(py, slf, |native| native.create_virtual(port_name))
-        }
-        #[cfg(not(unix))]
-        {
-            let _ = (slf, py, port_name);
-            Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Virtual MIDI output ports are not supported on this platform",
-            ))
-        }
+        name: String,
+    ) -> PyResult<Py<OutputConnection>> {
+        OutputConnection::open(py, slf, move |native| native.create_virtual(&name))
     }
 }
-
+#[pyclass(frozen, weakref, module = "meedee._native")]
+pub struct OutputConnection {
+    resource: Arc<Managed<transport::Output, transport::OutputConnection>>,
+    client: Py<Output>,
+    protocol: Protocol,
+}
 #[pymethods]
-impl MidiOutputConnection {
-    /// Send immutable bytes unchanged, serialized with native close.
-    fn send(&self, py: Python<'_>, message: &Bound<'_, PyBytes>) -> PyResult<()> {
-        self.resource.native.send(
-            &self.resource.client,
-            py,
-            message,
-            midir::MidiOutputConnection::send,
-        )
+impl OutputConnection {
+    fn send(&self, py: Python<'_>, packet: &Bound<'_, PyAny>) -> PyResult<()> {
+        check_blocking_thread()?;
+        let packet = extract_packet(packet)?;
+        transport::validate_packet(self.protocol.native(), &packet)
+            .map_err(|e| transport_error(e, "send"))?;
+        self.resource
+            .native
+            .send(&self.resource.client, py, &packet, |native, packet| {
+                native.send(packet).map_err(|e| transport_error(e, "send"))
+            })
     }
-
-    /// Close once; restore healthy clients. Waits for concurrent close.
     fn close(&self, py: Python<'_>) -> PyResult<()> {
         check_blocking_thread()?;
         py.detach(|| self.resource.close())
     }
-
     #[getter]
-    fn closed(&self, py: Python<'_>) -> bool {
-        py.detach(|| self.resource.native.closed())
+    fn closed(&self) -> bool {
+        self.resource.native.closed()
     }
-
-    fn __enter__(slf: Py<Self>, py: Python<'_>) -> PyResult<Py<Self>> {
+    fn __enter__(slf: Py<Self>) -> PyResult<Py<Self>> {
         slf.get().resource.native.check_failed()?;
-        if py.detach(|| slf.get().resource.native.closed()) {
-            return Err(crate::errors::StateError::new_err(
-                "MIDI connection is closed",
-            ));
+        if slf.get().closed() {
+            return Err(StateError::new_err("MIDI connection is closed"));
         }
         Ok(slf)
     }
-
     fn __exit__(
         &self,
         py: Python<'_>,
@@ -169,46 +120,45 @@ impl MidiOutputConnection {
     ) -> PyResult<()> {
         self.close(py)
     }
-
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         visit.call(&self.client)
     }
-
     fn __clear__(&self) {
         lifecycle::defer(self.resource.clone());
     }
 }
-
-impl MidiOutputConnection {
+impl OutputConnection {
     fn open(
         py: Python<'_>,
-        client: Py<MidiOutput>,
-        operation: impl FnOnce(
-                midir::MidiOutput,
-            )
-                -> Result<midir::MidiOutputConnection, midir::ConnectError<midir::MidiOutput>>
+        client: Py<Output>,
+        operation: impl FnOnce(transport::Output) -> transport::Result<transport::OutputConnection>
             + Send,
     ) -> PyResult<Py<Self>> {
         check_blocking_thread()?;
-        // Allocate first: a Python allocation failure must not consume the client.
+        let protocol = client.get().protocol;
+        let resource = Arc::new(Managed::new(
+            Arc::clone(&client.get().state),
+            None,
+            |native: transport::OutputConnection| {
+                native.close().map_err(|e| transport_error(e, "close"))
+            },
+        ));
         let connection = Py::new(
             py,
             Self {
-                resource: Arc::new(Managed::new(
-                    Arc::clone(&client.get().state),
-                    None,
-                    midir::MidiOutputConnection::close,
-                )),
+                resource: Arc::clone(&resource),
                 client,
+                protocol,
             },
         )?;
-        lifecycle::register(connection.get().resource.clone())?;
-        py.detach(|| connection.get().resource.connect(operation))?;
+        lifecycle::register(resource.clone())?;
+        py.detach(|| {
+            resource.connect(|native| operation(native).map_err(|e| transport_error(e, "open")))
+        })?;
         Ok(connection)
     }
 }
-
-impl Drop for MidiOutputConnection {
+impl Drop for OutputConnection {
     fn drop(&mut self) {
         lifecycle::defer(self.resource.clone());
     }
@@ -216,44 +166,42 @@ impl Drop for MidiOutputConnection {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::path::Path;
-    use std::sync::Mutex;
-
     use super::*;
     use crate::state::Connection;
-
-    /// Records calls through the production bytes boundary and connection gate.
-    /// No MIDI backend is created or simulated.
+    use std::sync::Mutex;
     #[pyclass(frozen)]
     pub(crate) struct OutputDriver {
         connection: Connection<()>,
         client: Client<()>,
         pub(crate) messages: Mutex<Vec<Vec<u8>>>,
     }
-
     #[pymethods]
     impl OutputDriver {
-        fn send(&self, py: Python<'_>, message: &Bound<'_, PyBytes>) -> PyResult<()> {
+        fn send(&self, py: Python<'_>, packet: &Bound<'_, PyAny>) -> PyResult<()> {
+            check_blocking_thread()?;
+            let packet = extract_packet(packet)?;
+            transport::validate_packet(transport::Protocol::Midi1, &packet)
+                .map_err(|e| transport_error(e, "send"))?;
             self.connection
-                .send(&self.client, py, message, |(), bytes| {
-                    self.messages.lock().unwrap().push(bytes.to_vec());
+                .send(&self.client, py, &packet, |(), packet| {
+                    if let transport::Packet::Bytes(bytes) = packet {
+                        self.messages.lock().unwrap().push(bytes.clone());
+                    }
                     Ok(())
                 })
         }
-
         fn close(&self, py: Python<'_>) -> PyResult<()> {
             check_blocking_thread()?;
-            py.detach(|| self.connection.close(&self.client, |()| ()))
+            py.detach(|| self.connection.close(&self.client, |()| Ok(())))
         }
     }
-
     impl OutputDriver {
         pub(crate) fn new(py: Python<'_>) -> Py<Self> {
             let driver = Py::new(
                 py,
                 Self {
                     connection: Connection::new(),
-                    client: Client::new((), false),
+                    client: Client::new(()),
                     messages: Mutex::new(Vec::new()),
                 },
             )
@@ -265,34 +213,5 @@ pub(crate) mod tests {
                 .unwrap();
             driver
         }
-    }
-
-    #[test]
-    fn send_rejects_mutable_buffers_and_other_non_bytes_arguments() {
-        Python::initialize();
-        Python::attach(|py| {
-            let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("test/native");
-            PyModule::import(py, "sys")
-                .unwrap()
-                .getattr("path")
-                .unwrap()
-                .call_method1("insert", (0, path.to_str().unwrap()))
-                .unwrap();
-            let driver = OutputDriver::new(py);
-            PyModule::import(py, "meedee_callbacks")
-                .unwrap()
-                .call_method1("verify_send_boundary", (driver.bind(py),))
-                .unwrap();
-            assert_eq!(
-                *driver.get().messages.lock().unwrap(),
-                vec![vec![0x90, 60, 127]]
-            );
-            driver.get().close(py).unwrap();
-            let error = driver
-                .bind(py)
-                .call_method1("send", (PyBytes::new(py, &[0xf8]),))
-                .unwrap_err();
-            assert!(error.is_instance_of::<pyo3::exceptions::PyRuntimeError>(py));
-        });
     }
 }

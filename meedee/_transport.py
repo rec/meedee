@@ -14,11 +14,13 @@ from time import monotonic
 from typing import BinaryIO, NoReturn, cast
 
 from . import _native
+from ._wire import decode, decode_clock, payload_size
+from .events import Clock, ReceivedPacket
 
 DEFAULT_RECEIVE_BYTE_LIMIT = 8 * 1024 * 1024
 
 
-class ReceiveQueue(Queue[tuple[int, bytes]]):
+class ReceiveQueue(Queue[tuple[object, ...]]):
     """Bound queued message payloads under the queue's existing mutex."""
 
     def __init__(self, byte_limit: int) -> None:
@@ -26,29 +28,34 @@ class ReceiveQueue(Queue[tuple[int, bytes]]):
         self.byte_limit = byte_limit
         self.payload_bytes = 0
 
-    def _put(self, item: tuple[int, bytes]) -> None:
-        if self.payload_bytes + len(item[1]) > self.byte_limit:
+    def _put(self, item: tuple[object, ...]) -> None:
+        if self.payload_bytes + payload_size(item) > self.byte_limit:
             raise Full
         super()._put(item)
-        self.payload_bytes += len(item[1])
+        self.payload_bytes += payload_size(item)
 
-    def _get(self) -> tuple[int, bytes]:
+    def _get(self) -> tuple[object, ...]:
         item = super()._get()
-        self.payload_bytes -= len(item[1])
+        self.payload_bytes -= payload_size(item)
         return item
 
 
 class Delivery:
     def __init__(
         self,
-        callback: Callable[[int, bytes], object],
+        callback: Callable[[ReceivedPacket], object],
         byte_limit: int = DEFAULT_RECEIVE_BYTE_LIMIT,
     ) -> None:
         self.bridge = _native.CallbackBridge(callback)
+        self.clock: Clock | None = None
         self.messages = ReceiveQueue(byte_limit)
         self.retired = False
         self.dropped = 0
         self.worker_dropped = 0
+        with REGISTRY_LOCK:
+            if SHUTTING_DOWN:
+                raise _native.StateError("MIDI interpreter shutdown has begun")
+            DELIVERIES.add(self)
         Thread(
             target=dispatch,
             args=(weakref.ref(self), self.messages),
@@ -56,11 +63,11 @@ class Delivery:
             daemon=True,
         ).start()
 
-    def enqueue(self, timestamp: int, message: bytes, dropped: int) -> None:
+    def enqueue(self, packet: tuple[object, ...], dropped: int) -> None:
         self.worker_dropped = max(self.worker_dropped, dropped)
         if not self.retired:
             try:
-                self.messages.put_nowait((timestamp, message))
+                self.messages.put_nowait(packet)
             except Full:
                 self.dropped += 1
 
@@ -98,19 +105,24 @@ class Context:
             stdout=subprocess.PIPE,
         )
         try:
-            CONTEXTS.add(self)
+            with REGISTRY_LOCK:
+                if SHUTTING_DOWN:
+                    raise _native.StateError("MIDI interpreter shutdown has begun")
+                CONTEXTS.add(self)
             Thread(
                 target=write_requests, args=(self,), daemon=True, name="meedee requests"
             ).start()
             Thread(
                 target=read_results, args=(self,), daemon=True, name="meedee results"
             ).start()
-        except (RuntimeError, MemoryError) as error:
+        except (RuntimeError, MemoryError, _native.StateError) as error:
             self.fail("Cannot start MIDI communication threads", error)
             self.process.wait(timeout=1)
             cast(BinaryIO, self.process.stdin).close()
             cast(BinaryIO, self.process.stdout).close()
-            if isinstance(error, RuntimeError):
+            if isinstance(error, RuntimeError) and not isinstance(
+                error, _native.StateError
+            ):
                 raise _native.ResourceError(str(error)) from error
             raise
 
@@ -130,6 +142,9 @@ class Context:
             raise _native.StateError("MIDI client is busy with another operation")
         try:
             return self.exchange(operation, args, deadline)
+        except (KeyboardInterrupt, SystemExit):
+            self.fail("MIDI worker request interrupted; create a new client")
+            raise
         finally:
             self.operation.release()
 
@@ -138,7 +153,7 @@ class Context:
             raise _native.StateError(
                 f"MIDI worker failed; create a new client: {self.failure}"
             )
-        if operation in ("ports", "port_name", "ignore") and self.state != "available":
+        if operation == "ports" and self.state != "available":
             raise _native.StateError(
                 "MIDI client is unavailable while connecting, connected, or closing"
             )
@@ -184,20 +199,25 @@ class Context:
                 self.state = "closing"
                 self.exchange("close", [generation], deadline)
                 self.state = "available"
+        except (KeyboardInterrupt, SystemExit):
+            self.fail("MIDI close interrupted; create a new client")
+            raise
         finally:
             self.operation.release()
 
     def open(
         self,
         operation: str,
-        identifier: str,
+        identifier: tuple[object, ...] | None,
         name: str,
-        callback: Callable[[int, bytes], object] | None,
+        callback: Callable[[ReceivedPacket], object] | None,
+        clock_identity: str,
     ) -> Delivery | None:
         _native.check_thread()
         if not self.operation.acquire(blocking=False):
             raise _native.StateError("MIDI client is busy with another operation")
         delivery = None
+        entered = False
         try:
             if self.failure:
                 raise _native.StateError(
@@ -216,13 +236,27 @@ class Context:
                 else None
             )
             self.delivery = weakref.ref(delivery) if delivery is not None else None
-            self.exchange(
+            entered = True
+            clock_packet = self.exchange(
                 operation,
-                [identifier, name, self.generation, self.receive_byte_limit],
+                [
+                    identifier,
+                    name,
+                    self.generation,
+                    self.receive_byte_limit,
+                    clock_identity,
+                ],
                 monotonic() + self.timeout,
             )
+            if delivery is not None:
+                delivery.clock = decode_clock(cast(tuple[object, ...], clock_packet))
             self.state = "connected"
             return delivery
+        except (KeyboardInterrupt, SystemExit):
+            if delivery is not None:
+                delivery.retire()
+            self.fail("MIDI open interrupted; create a new client")
+            raise
         except (
             RuntimeError,
             TimeoutError,
@@ -235,7 +269,10 @@ class Context:
             if delivery is not None:
                 delivery.retire()
             if not self.failure:
-                self.state = "available"
+                if entered:
+                    self.fail("MIDI open did not complete; create a new client")
+                else:
+                    self.state = "available"
             raise
         finally:
             self.operation.release()
@@ -299,11 +336,11 @@ class Context:
 
 
 def dispatch(
-    reference: weakref.ReferenceType[Delivery], messages: Queue[tuple[int, bytes]]
+    reference: weakref.ReferenceType[Delivery], messages: Queue[tuple[object, ...]]
 ) -> None:
     while True:
         try:
-            timestamp, message = messages.get(timeout=0.1)
+            packet = messages.get(timeout=0.1)
         except Empty:
             delivery = reference()
             if delivery is None or delivery.retired:
@@ -313,7 +350,7 @@ def dispatch(
         delivery = reference()
         if delivery is None or delivery.retired:
             return
-        delivery.bridge.deliver(timestamp, message)
+        delivery.bridge.deliver(decode(packet))
         del delivery
 
 
@@ -342,13 +379,13 @@ def read_results(context: Context) -> None:
         while not context.stopped.is_set():
             tag, payload = cast(tuple[str, object], pickle.load(stream))
             if tag == "message":
-                generation, timestamp, message, dropped = cast(
-                    tuple[int, int, bytes, int], payload
+                generation, packet, dropped = cast(
+                    tuple[int, tuple[object, ...], int], payload
                 )
                 if generation == context.generation:
                     context.update_dropped(dropped)
                     if context.delivery is not None:
-                        offer(context.delivery, timestamp, message, dropped)
+                        offer(context.delivery, packet, dropped)
             else:
                 context.replies.put_nowait((tag, payload))
                 if tag == "error":
@@ -375,12 +412,11 @@ def read_results(context: Context) -> None:
 
 def offer(
     reference: weakref.ReferenceType[Delivery],
-    timestamp: int,
-    message: bytes,
+    packet: tuple[object, ...],
     dropped: int,
 ) -> None:
     if (delivery := reference()) is not None:
-        delivery.enqueue(timestamp, message, dropped)
+        delivery.enqueue(packet, dropped)
 
 
 def close_deferred(context: Context, generation: int) -> None:
@@ -400,13 +436,10 @@ def dispose(context: Context) -> None:
 
 def shutdown() -> None:
     global SHUTTING_DOWN
-    SHUTTING_DOWN = True
-    contexts = list(CONTEXTS)
-    deliveries = [
-        d
-        for c in contexts
-        if c.delivery is not None and (d := c.delivery()) is not None
-    ]
+    with REGISTRY_LOCK:
+        SHUTTING_DOWN = True
+        contexts = list(CONTEXTS)
+        deliveries = list(DELIVERIES)
     for d in deliveries:
         d.retire()
     deadline = monotonic() + max(
@@ -438,6 +471,7 @@ RECEIVE_CAPACITY = 128
 ERROR_TYPES: dict[str, type[Exception]] = {
     "MidiError": _native.MidiError,
     "InitError": _native.InitError,
+    "CapabilityError": _native.CapabilityError,
     "PortInfoError": _native.PortInfoError,
     "ConnectError": _native.ConnectError,
     "SendError": _native.SendError,
@@ -453,5 +487,7 @@ ERROR_TYPES: dict[str, type[Exception]] = {
     "NotImplementedError": NotImplementedError,
 }
 CONTEXTS: weakref.WeakSet[Context] = weakref.WeakSet()
+DELIVERIES: weakref.WeakSet[Delivery] = weakref.WeakSet()
+REGISTRY_LOCK = Lock()
 SHUTTING_DOWN = False
 atexit.register(shutdown)

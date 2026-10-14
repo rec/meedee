@@ -1,4 +1,4 @@
-"""Fresh-interpreter entry point; only this process opens isolated native MIDI."""
+"""Fresh-interpreter transport owner for the private, deadline-bounded pipe."""
 
 import pickle
 import sys
@@ -6,13 +6,13 @@ from queue import Empty, Full
 from threading import Event, Lock, Thread
 from typing import BinaryIO, cast
 
-# This import registers _native before Python attempts to import it.
 from . import midi
 
 # isort: split
 from . import _native
-from ._clients import validate_port_id
 from ._transport import ReceiveQueue
+from ._wire import encode, encode_clock
+from .events import ReceivedPacket
 
 
 class BusyError(RuntimeError):
@@ -37,13 +37,14 @@ class Producer:
         self.messages = ReceiveQueue(byte_limit)
         self.stopped = Event()
         self.dropped = 0
+        self.connection: _native.InputConnection | None = None
         self.thread = Thread(target=self.emit, daemon=True, name="meedee forwarding")
         self.thread.start()
 
-    def __call__(self, timestamp: int, message: bytes) -> None:
+    def __call__(self, packet: ReceivedPacket) -> None:
         if not self.stopped.is_set():
             try:
-                self.messages.put_nowait((timestamp, message))
+                self.messages.put_nowait(encode(packet))
             except Full:
                 self.dropped += 1
 
@@ -51,11 +52,14 @@ class Producer:
         try:
             while not self.stopped.is_set():
                 try:
-                    timestamp, message = self.messages.get(timeout=0.1)
+                    packet = self.messages.get(timeout=0.1)
                 except Empty:
                     continue
+                native_dropped = (
+                    0 if self.connection is None else self.connection.dropped_packets
+                )
                 self.sender.send(
-                    "message", (self.generation, timestamp, message, self.dropped)
+                    "message", (self.generation, packet, self.dropped + native_dropped)
                 )
         except (OSError, ValueError):
             self.stopped.set()
@@ -68,102 +72,91 @@ class Producer:
 class Worker:
     def __init__(self, sender: Sender) -> None:
         self.sender = sender
-        self.client: _native.MidiInput | _native.MidiOutput | None = None
-        self.connection: (
-            _native.MidiInputConnection | _native.MidiOutputConnection | None
-        ) = None
+        self.client: _native.Input | _native.Output | None = None
+        self.connection: _native.InputConnection | _native.OutputConnection | None = (
+            None
+        )
+        self.ports: list[midi.Port] = []
         self.producer: Producer | None = None
         self.generation = 0
+        self.native_dropped = 0
 
     def perform(self, operation: str, args: list[object]) -> object:
         if operation == "init":
-            direction, name = cast(tuple[str, str], tuple(args))
+            input_port, settings = cast(tuple[bool, dict[str, object]], tuple(args))
+            for k, c in (
+                ("protocol", midi.Protocol),
+                ("backend", midi.Backend),
+                ("timestamps", midi.TimestampMode),
+            ):
+                if settings.get(k) is not None:
+                    settings[k] = getattr(c, cast(str, settings[k]))
             self.client = (
-                _native.MidiInput(name)
-                if direction == "input"
-                else _native.MidiOutput(name)
+                _native.Input(**settings) if input_port else _native.Output(**settings)
             )
             return None
         assert self.client is not None
-        if operation == "close" or operation == "shutdown":
+        if operation in ("close", "shutdown"):
             if operation == "close" and args[0] != self.generation:
                 return None
             if self.producer is not None:
                 self.producer.stopped.set()
             if self.connection is not None:
                 self.connection.close()
+                if isinstance(self.connection, _native.InputConnection):
+                    self.native_dropped = self.connection.dropped_packets
                 self.connection = None
             if self.producer is not None:
                 self.producer.stop()
             return None
         if operation == "send":
             if args[1] != self.generation or not isinstance(
-                self.connection, _native.MidiOutputConnection
+                self.connection, _native.OutputConnection
             ):
                 raise BusyError("MIDI connection is closed")
-            self.connection.send(cast(bytes, args[0]))
+            data = args[0]
+            self.connection.send(
+                midi.UmpPacket(words=cast(tuple[int, ...], data))
+                if isinstance(data, tuple)
+                else cast(bytes, data)
+            )
             return None
         if self.connection is not None:
             raise BusyError("MIDI client is unavailable while connected")
         if operation == "ports":
-            return [validate_port_id(p.id()) for p in self.client.ports()]
-        if operation == "port_name":
-            if isinstance(self.client, _native.MidiInput):
-                return self.client.port_name(self.input_port(cast(str, args[0])))
-            return self.client.port_name(self.output_port(cast(str, args[0])))
-        if operation == "ignore":
-            assert isinstance(self.client, _native.MidiInput)
-            self.client.ignore(_native.Ignore(cast(int, args[0])))
-            return None
-        if operation == "connect" or operation == "virtual":
-            identifier, name, generation, byte_limit = cast(
-                tuple[str, str, int, int], tuple(args)
+            self.ports = self.client.ports()
+            return [p._wire for p in self.ports]
+        if operation in ("connect", "virtual"):
+            wire, name, generation, byte_limit, clock_identity = cast(
+                tuple[tuple[object, ...] | None, str, int, int, str], tuple(args)
             )
-            if operation == "virtual" and sys.platform == "win32":
-                raise NotImplementedError(
-                    "Virtual MIDI ports are not supported on this platform"
-                )
             self.generation = generation
-            if isinstance(self.client, _native.MidiInput):
-                self.producer = Producer(self.sender, generation, byte_limit)
-                if operation == "virtual":
-                    self.connection = self.client.create_virtual(name, self.producer)
-                else:
-                    self.connection = self.client.connect(
-                        self.input_port(identifier), name, self.producer
+            self.native_dropped = 0
+            port = None
+            if operation == "connect":
+                matches = [p for p in self.ports if p._wire == wire]
+                if len(matches) != 1:
+                    raise midi.ConnectError(
+                        "port belongs to another client "
+                        "or an expired discovery snapshot"
                     )
-            elif operation == "virtual":
-                self.connection = self.client.create_virtual(name)
-            else:
-                self.connection = self.client.connect(
-                    self.output_port(identifier), name
+                port = matches[0]
+            if isinstance(self.client, _native.Input):
+                self.producer = Producer(self.sender, generation, byte_limit)
+                self.connection = (
+                    self.client.create_virtual(name, self.producer, clock_identity)
+                    if port is None
+                    else self.client.connect(port, self.producer, clock_identity)
                 )
+                self.producer.connection = self.connection
+                return encode_clock(self.connection.clock)
+            self.connection = (
+                self.client.create_virtual(name)
+                if port is None
+                else self.client.connect(port)
+            )
             return None
         raise ValueError(f"Unknown MIDI operation: {operation}")
-
-    def input_port(self, identifier: str) -> _native.MidiInputPort:
-        assert isinstance(self.client, _native.MidiInput)
-        validate_port_id(identifier)
-        matches = [
-            p for p in self.client.ports() if validate_port_id(p.id()) == identifier
-        ]
-        if len(matches) != 1:
-            raise _native.PortInfoError(
-                "MIDI port is absent or its ID is ambiguous; rediscover ports"
-            )
-        return matches[0]
-
-    def output_port(self, identifier: str) -> _native.MidiOutputPort:
-        assert isinstance(self.client, _native.MidiOutput)
-        validate_port_id(identifier)
-        matches = [
-            p for p in self.client.ports() if validate_port_id(p.id()) == identifier
-        ]
-        if len(matches) != 1:
-            raise _native.PortInfoError(
-                "MIDI port is absent or its ID is ambiguous; rediscover ports"
-            )
-        return matches[0]
 
 
 def serve(worker: Worker, source: BinaryIO) -> None:
@@ -178,31 +171,46 @@ def serve(worker: Worker, source: BinaryIO) -> None:
             worker.sender.send(
                 "error", ("StateError", str(error), False, dropped(worker))
             )
-        except (TypeError, ValueError, NotImplementedError) as error:
-            worker.sender.send(
-                "error", (type(error).__name__, str(error), False, dropped(worker))
+        except (
+            midi.MidiError,
+            RuntimeError,
+            NotImplementedError,
+            TypeError,
+            ValueError,
+            MemoryError,
+        ) as error:
+            fatal = (
+                operation in ("connect", "virtual")
+                or isinstance(error, (midi.MidiError, RuntimeError, MemoryError))
+                and not isinstance(error, NotImplementedError)
             )
-        except (_native.MidiError, RuntimeError) as error:
-            worker.sender.send(
-                "error", (type(error).__name__, str(error), True, dropped(worker))
+            kind = (
+                "ResourceError"
+                if isinstance(error, MemoryError)
+                else type(error).__name__
             )
-            return
+            worker.sender.send("error", (kind, str(error), fatal, dropped(worker)))
+            if fatal:
+                return
         else:
             worker.sender.send(
                 "shutdown" if operation == "shutdown" else "ok",
                 (result, dropped(worker)),
             )
-        if operation == "shutdown":
-            return
+            if operation == "shutdown":
+                return
 
 
 def dropped(worker: Worker) -> int:
-    return 0 if worker.producer is None else worker.producer.dropped
+    native = (
+        worker.connection.dropped_packets
+        if isinstance(worker.connection, _native.InputConnection)
+        else worker.native_dropped
+    )
+    return native + (0 if worker.producer is None else worker.producer.dropped)
 
 
 def main() -> None:
-    # Keep the extension import explicit even though native types are private.
-    assert midi.__version__
     serve(Worker(Sender(sys.stdout.buffer)), sys.stdin.buffer)
 
 

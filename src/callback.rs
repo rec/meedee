@@ -8,7 +8,7 @@ use std::sync::{Condvar, LockResult, Mutex, MutexGuard};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyTuple};
+use pyo3::types::PyTuple;
 use pyo3::{PyTraverseError, PyVisit};
 
 use crate::errors::{failed_error, CallbackThreadError};
@@ -28,8 +28,8 @@ impl CallbackBridge {
         })
     }
 
-    fn deliver(&self, timestamp: u64, message: &Bound<'_, PyBytes>) {
-        self.callback.deliver(timestamp, message.as_bytes());
+    fn deliver(&self, packet: Py<crate::packets::ReceivedPacket>) {
+        self.callback.deliver(move |_| Ok(packet.into_any()));
     }
 
     fn retire(&self) {
@@ -95,7 +95,7 @@ impl Callback {
         })
     }
 
-    pub fn deliver(&self, timestamp: u64, message: &[u8]) {
+    pub fn deliver(&self, make_packet: impl FnOnce(Python<'_>) -> PyResult<Py<PyAny>>) {
         let _delivery = {
             let mut state = self.recover(self.state.lock());
             if !state.accepting {
@@ -144,8 +144,7 @@ impl Callback {
                     return;
                 }
             }
-            let bytes = PyBytes::new(py, message);
-            let result = callable.call1((timestamp, bytes)).and_then(|value| {
+            let result = make_packet(py).and_then(|packet| callable.call1((packet,))).and_then(|value| {
                 if value.is_none() || !value.is_instance(result_types.bind(py))? {
                     return Ok(());
                 }
@@ -286,7 +285,7 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    use pyo3::types::PyList;
+    use pyo3::types::{PyBytes, PyList};
 
     use super::*;
     use crate::lifecycle::{self, Managed, Resource};
@@ -338,8 +337,26 @@ mod tests {
     }
 
     enum Command {
-        Emit(u64, Vec<u8>, mpsc::Sender<()>),
+        Emit(i64, Vec<u8>, mpsc::Sender<()>),
         Stop,
+    }
+
+    fn deliver_packet(callback: &Callback, timestamp: i64, bytes: &[u8]) {
+        callback.deliver(|py| {
+            Ok(Py::new(
+                py,
+                crate::packets::ReceivedPacket {
+                    timestamp_ns: Some(timestamp),
+                    clock: crate::packets::Clock {
+                        identity: "callback-test".into(),
+                        backend: crate::packets::Backend::CoreMidi,
+                        mode: crate::packets::TimestampMode::Absolute,
+                    },
+                    packet: meedee::transport::Packet::Bytes(bytes.to_vec()),
+                },
+            )?
+            .into_any())
+        });
     }
 
     fn fixtures(py: Python<'_>) -> Bound<'_, PyModule> {
@@ -361,7 +378,7 @@ mod tests {
         lifecycle::initialize(py).unwrap();
         let callback = Arc::new(Callback::new(py, callable.clone().unbind()).unwrap());
         let resource = Arc::new(Managed::new(
-            Arc::new(Client::new((), false)),
+            Arc::new(Client::new(())),
             Some(Arc::clone(&callback)),
             |native: NativeThread| {
                 native.commands.send(Command::Stop).unwrap();
@@ -369,6 +386,7 @@ mod tests {
                 if let Some(stopped) = native.stopped {
                     stopped.send(()).unwrap();
                 }
+                Ok(())
             },
         ));
         let driver = Py::new(
@@ -387,7 +405,7 @@ mod tests {
                     for command in receiver {
                         match command {
                             Command::Emit(timestamp, bytes, done) => {
-                                callback.deliver(timestamp, &bytes);
+                                deliver_packet(&callback, timestamp, &bytes);
                                 let _ = done.send(());
                             }
                             Command::Stop => break,
@@ -406,7 +424,7 @@ mod tests {
 
     fn emit(
         commands: &mpsc::Sender<Command>,
-        timestamp: u64,
+        timestamp: i64,
         bytes: Vec<u8>,
     ) -> mpsc::Receiver<()> {
         let (done, receiver) = mpsc::channel();
@@ -454,15 +472,15 @@ mod tests {
             let recorder = fixtures(py).getattr("Recorder").unwrap().call0().unwrap();
             let callback = Arc::new(Callback::new(py, recorder.clone().unbind()).unwrap());
             let resource = Managed::new(
-                Arc::new(Client::new((), false)),
+                Arc::new(Client::new(())),
                 Some(Arc::clone(&callback)),
-                |()| (),
+                |()| Ok(()),
             );
             py.detach(|| {
                 resource.connect(|()| {
                     let (done, delivered) = mpsc::channel();
                     let worker = thread::spawn(move || {
-                        callback.deliver(17, &[0x90, 60, 127]);
+                        deliver_packet(&callback, 17, &[0x90, 60, 127]);
                         done.send(()).unwrap();
                     });
                     // Delivery completes while the native open still owns control.
@@ -474,7 +492,7 @@ mod tests {
             .unwrap();
             resource.retire();
             py.detach(|| resource.close()).unwrap();
-            let messages: Vec<(u64, Vec<u8>)> =
+            let messages: Vec<(i64, Vec<u8>)> =
                 recorder.getattr("messages").unwrap().extract().unwrap();
             assert_eq!(messages, vec![(17, vec![0x90, 60, 127])]);
         });
@@ -494,7 +512,7 @@ mod tests {
                 .unwrap();
             let (driver, commands) = driver(py, &recorder, None);
             let first = emit(&commands, 0, vec![0x90, 60, 127]);
-            let second = emit(&commands, u64::MAX, vec![0xf0, 0, 1, 0xf7]);
+            let second = emit(&commands, i64::MAX, vec![0xf0, 0, 1, 0xf7]);
             py.detach(move || {
                 first.recv_timeout(DEADLINE).unwrap();
                 second.recv_timeout(DEADLINE).unwrap();
@@ -505,15 +523,15 @@ mod tests {
             // Late native delivery cannot call a retired Python callable.
             let callback = Arc::clone(&driver.get().callback);
             py.detach(|| {
-                thread::spawn(move || callback.deliver(17, &[0xf8]))
+                thread::spawn(move || deliver_packet(&callback, 17, &[0xf8]))
                     .join()
                     .unwrap()
             });
-            let messages: Vec<(u64, Vec<u8>)> =
+            let messages: Vec<(i64, Vec<u8>)> =
                 recorder.getattr("messages").unwrap().extract().unwrap();
             assert_eq!(
                 messages,
-                vec![(0, vec![0x90, 60, 127]), (u64::MAX, vec![0xf0, 0, 1, 0xf7])]
+                vec![(0, vec![0x90, 60, 127]), (i64::MAX, vec![0xf0, 0, 1, 0xf7])]
             );
             let threads: Vec<u64> = recorder.getattr("threads").unwrap().extract().unwrap();
             assert_eq!(threads.len(), 2);
@@ -546,7 +564,7 @@ mod tests {
             context
                 .call_method1("__exit__", (py.None(), py.None(), py.None()))
                 .unwrap();
-            let messages: Vec<(u64, Vec<u8>)> =
+            let messages: Vec<(i64, Vec<u8>)> =
                 recorder.getattr("messages").unwrap().extract().unwrap();
             assert_eq!(messages.len(), 2);
             let reports: Vec<String> = errors.getattr("errors").unwrap().extract().unwrap();
@@ -805,8 +823,8 @@ mod tests {
                 .getattr("ConstructorRecorder")
                 .unwrap()
                 .call1((vec![
-                    py.get_type::<crate::input::MidiInput>().into_any(),
-                    py.get_type::<crate::output::MidiOutput>().into_any(),
+                    py.get_type::<crate::input::Input>().into_any(),
+                    py.get_type::<crate::output::Output>().into_any(),
                 ],))
                 .unwrap();
             let (input, commands) = driver(py, &recorder, None);
@@ -825,9 +843,9 @@ mod tests {
     fn callback_rejects_discovery_configuration_and_opening_before_native_work() {
         Python::initialize();
         Python::attach(|py| {
-            let client = Client::new(37, false);
+            let client = Client::new(37);
             let connection = crate::state::Connection::<i32>::new();
-            let resource = Managed::new(Arc::new(Client::new(19, false)), None, |value: i32| value);
+            let resource = Managed::new(Arc::new(Client::new(19)), None, |value: i32| Ok(value));
             let _callback = CallbackThread::enter();
             let discovery: PyResult<()> = client.with_available(|_| panic!("must not enumerate"));
             let configure: PyResult<()> = client.with_available(|_| panic!("must not configure"));
@@ -857,13 +875,13 @@ mod tests {
                 .unwrap();
             let callback = Arc::new(Callback::new(py, recorder.clone().unbind()).unwrap());
             let resource = Arc::new(Managed::new(
-                Arc::new(Client::new((), false)),
+                Arc::new(Client::new(())),
                 Some(Arc::clone(&callback)),
-                |()| (),
+                |()| Ok(()),
             ));
             resource.connect(Ok).unwrap();
             let active_callback = Arc::clone(&callback);
-            let active = thread::spawn(move || active_callback.deliver(1, &[0xf8]));
+            let active = thread::spawn(move || deliver_packet(&active_callback, 1, &[0xf8]));
             assert!(recorder
                 .getattr("started")
                 .unwrap()
@@ -878,11 +896,11 @@ mod tests {
             .is_err());
             let delivering = Arc::clone(&callback);
             py.detach(move || {
-                thread::spawn(move || delivering.deliver(2, &[0xfe]))
+                thread::spawn(move || deliver_packet(&delivering, 2, &[0xfe]))
                     .join()
                     .unwrap()
             });
-            let messages: Vec<(u64, Vec<u8>)> =
+            let messages: Vec<(i64, Vec<u8>)> =
                 recorder.getattr("messages").unwrap().extract().unwrap();
             assert_eq!(messages, vec![(1, vec![0xf8])]);
             resource.retire();

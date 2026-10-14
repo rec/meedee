@@ -1,187 +1,155 @@
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 
-#[cfg(unix)]
-use midir::os::unix::VirtualInput;
+use meedee::transport;
 use pyo3::prelude::*;
 use pyo3::{PyTraverseError, PyVisit};
 
 use crate::callback::{check_blocking_thread, Callback};
-use crate::errors::{native_call, InitError, PortInfoError};
-use crate::ignore::Ignore;
+use crate::errors::{native_call, transport_error, StateError};
 use crate::lifecycle::{self, Managed, Resource};
+use crate::packets::{Backend, Clock, Protocol, ReceivedPacket, TimestampMode};
+use crate::ports::Port;
 use crate::state::Client;
 
-/// A MIDI input client that is unavailable while its connection is open.
-#[pyclass(frozen, module = "meedee.midi")]
-pub struct MidiInput {
-    state: Arc<Client<midir::MidiInput>>,
-}
-
-/// An opaque input-port handle obtained from discovery.
-#[pyclass(frozen, module = "meedee.midi")]
-pub struct MidiInputPort {
-    native: midir::MidiInputPort,
+#[pyclass(frozen, module = "meedee._native")]
+pub struct Input {
+    state: Arc<Client<transport::Input>>,
+    identity: String,
+    snapshot: AtomicU64,
+    mode: TimestampMode,
 }
 
 #[pymethods]
-impl MidiInputPort {
-    /// The backend's opaque identifier; no additional persistence guarantee.
-    fn id(&self, py: Python<'_>) -> PyResult<String> {
-        check_blocking_thread()?;
-        py.detach(|| native_call("port ID", || self.native.id()))
-    }
-
-    fn __eq__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
-        check_blocking_thread()?;
-        py.detach(|| native_call("port comparison", || self.native == other.native))
-    }
-
-    fn __ne__(&self, py: Python<'_>, other: &Self) -> PyResult<bool> {
-        check_blocking_thread()?;
-        py.detach(|| native_call("port comparison", || self.native != other.native))
-    }
-
-    #[classattr]
-    const __hash__: Option<Py<PyAny>> = None;
-}
-
-#[pymethods]
-impl MidiInput {
+impl Input {
     #[new]
-    fn new(py: Python<'_>, client_name: &str) -> PyResult<Self> {
+    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None, timestamps=TimestampMode::Absolute, receive_byte_limit=8_388_608))]
+    fn new(
+        py: Python<'_>,
+        identity: String,
+        protocol: Protocol,
+        backend: Option<Backend>,
+        timestamps: TimestampMode,
+        receive_byte_limit: usize,
+    ) -> PyResult<Self> {
         check_blocking_thread()?;
         let native = py
-            .detach(|| native_call("create input", || midir::MidiInput::new(client_name)))?
-            .map_err(|error| InitError::new_err(format!("create input: {error}")))?;
+            .detach(|| {
+                native_call("create input", || {
+                    transport::Input::new(transport::InputOptions {
+                        protocol: protocol.native(),
+                        backend: backend.map(Backend::native),
+                        timestamps: timestamps.native(),
+                        receive_byte_limit,
+                    })
+                })
+            })?
+            .map_err(|e| transport_error(e, "init"))?;
         Ok(Self {
-            state: Arc::new(Client::new(native, cfg!(target_os = "linux"))),
+            state: Arc::new(Client::new(native)),
+            identity,
+            snapshot: AtomicU64::new(0),
+            mode: timestamps,
         })
     }
-
-    fn ports(&self, py: Python<'_>) -> PyResult<Vec<MidiInputPort>> {
+    fn ports(&self, py: Python<'_>) -> PyResult<Vec<Port>> {
         py.detach(|| {
             self.state.with_available(|native| {
-                Ok(native
-                    .ports()
+                let ports = native.ports().map_err(|e| transport_error(e, "ports"))?;
+                let snapshot = self.snapshot.fetch_add(1, Ordering::Relaxed) + 1;
+                Ok(ports
                     .into_iter()
-                    .map(|native| MidiInputPort { native })
+                    .enumerate()
+                    .map(|(index, native)| Port::new(native, &self.identity, snapshot, index, true))
                     .collect())
             })
         })
     }
-
-    fn port_name(&self, py: Python<'_>, port: &MidiInputPort) -> PyResult<String> {
-        py.detach(|| {
-            self.state.with_available(|native| {
-                native
-                    .port_name(&port.native)
-                    .map_err(|error| PortInfoError::new_err(format!("input port name: {error}")))
-            })
-        })
-    }
-
-    fn find_port_by_id(&self, py: Python<'_>, id: &str) -> PyResult<Option<MidiInputPort>> {
-        py.detach(|| {
-            self.state.with_available(|native| {
-                Ok(native
-                    .find_port_by_id(id)
-                    .map(|native| MidiInputPort { native }))
-            })
-        })
-    }
-
-    fn ignore(&self, py: Python<'_>, flags: &Ignore) -> PyResult<()> {
-        py.detach(|| {
-            self.state.with_available(|native| {
-                native.ignore(flags.native);
-                Ok(())
-            })
-        })
-    }
-
     fn connect(
         slf: Py<Self>,
         py: Python<'_>,
-        port: &MidiInputPort,
-        port_name: &str,
+        port: &Port,
         callback: Py<PyAny>,
-    ) -> PyResult<Py<MidiInputConnection>> {
-        MidiInputConnection::open(py, slf, callback, |native, callback| {
-            native.connect(
-                &port.native,
-                port_name,
-                move |timestamp, bytes, ()| callback.deliver(timestamp, bytes),
-                (),
-            )
-        })
+        clock_identity: String,
+    ) -> PyResult<Py<InputConnection>> {
+        let native_port = port.native.clone();
+        InputConnection::open(
+            py,
+            slf,
+            callback,
+            clock_identity,
+            move |native, callback| match native_port {
+                Some(port) => native.connect(&port, callback),
+                None => Err(transport::Error::Invalid(
+                    "port is not a native snapshot from this client",
+                )),
+            },
+        )
     }
-
-    /// Receive messages that other applications send to this virtual input.
     fn create_virtual(
         slf: Py<Self>,
         py: Python<'_>,
-        port_name: &str,
+        name: String,
         callback: Py<PyAny>,
-    ) -> PyResult<Py<MidiInputConnection>> {
-        check_blocking_thread()?;
-        #[cfg(unix)]
-        {
-            MidiInputConnection::open(py, slf, callback, |native, callback| {
-                native.create_virtual(
-                    port_name,
-                    move |timestamp, bytes, ()| callback.deliver(timestamp, bytes),
-                    (),
-                )
-            })
-        }
-        #[cfg(not(unix))]
-        {
-            let _ = (slf, py, port_name, callback);
-            Err(pyo3::exceptions::PyNotImplementedError::new_err(
-                "Virtual MIDI input ports are not supported on this platform",
-            ))
-        }
+        clock_identity: String,
+    ) -> PyResult<Py<InputConnection>> {
+        InputConnection::open(
+            py,
+            slf,
+            callback,
+            clock_identity,
+            move |native, callback| native.create_virtual(&name, callback),
+        )
     }
 }
 
-/// Owns the single GC-visible callable and its original Python client.
-#[pyclass(frozen, weakref, module = "meedee.midi")]
-pub struct MidiInputConnection {
-    resource: Arc<Managed<midir::MidiInput, midir::MidiInputConnection<()>>>,
-    client: Py<MidiInput>,
+#[pyclass(frozen, weakref, module = "meedee._native")]
+pub struct InputConnection {
+    resource: Arc<Managed<transport::Input, transport::InputConnection>>,
+    client: Py<Input>,
+    clock: OnceLock<Clock>,
+    diagnostics: OnceLock<transport::InputDiagnostics>,
 }
 
 #[pymethods]
-impl MidiInputConnection {
+impl InputConnection {
     fn close(&self, py: Python<'_>) -> PyResult<()> {
         check_blocking_thread()?;
         self.resource.retire();
         py.detach(|| self.resource.close())
     }
-
     #[getter]
-    fn closed(&self, py: Python<'_>) -> bool {
-        py.detach(|| self.resource.native.closed())
+    fn closed(&self) -> bool {
+        self.resource.native.closed()
     }
-
+    #[getter]
+    fn clock(&self) -> PyResult<Clock> {
+        self.clock
+            .get()
+            .cloned()
+            .ok_or_else(|| StateError::new_err("input is not open"))
+    }
+    #[getter]
+    fn dropped_packets(&self) -> u64 {
+        self.diagnostics
+            .get()
+            .map_or(0, transport::InputDiagnostics::dropped_packets)
+    }
     #[getter]
     fn last_message_time(&self) -> Option<f64> {
         self.resource
             .callback
             .as_ref()
-            .and_then(|callback| callback.last_message_time())
+            .and_then(|c| c.last_message_time())
     }
-
     fn __enter__(slf: Py<Self>, py: Python<'_>) -> PyResult<Py<Self>> {
         slf.get().resource.native.check_failed()?;
-        if slf.get().closed(py) {
-            return Err(crate::errors::StateError::new_err(
-                "MIDI connection is closed",
-            ));
+        if slf.get().closed() {
+            return Err(StateError::new_err("MIDI connection is closed"));
         }
+        let _ = py;
         Ok(slf)
     }
-
     fn __exit__(
         &self,
         py: Python<'_>,
@@ -191,31 +159,25 @@ impl MidiInputConnection {
     ) -> PyResult<()> {
         self.close(py)
     }
-
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         visit.call(&self.client)?;
-        self.resource
-            .callback
-            .as_ref()
-            .expect("input callback missing")
-            .traverse(visit)
+        self.resource.callback.as_ref().unwrap().traverse(visit)
     }
-
     fn __clear__(&self) {
         lifecycle::defer(self.resource.clone());
     }
 }
 
-impl MidiInputConnection {
+impl InputConnection {
     fn open(
         py: Python<'_>,
-        client: Py<MidiInput>,
+        client: Py<Input>,
         callable: Py<PyAny>,
+        identity: String,
         operation: impl FnOnce(
-                midir::MidiInput,
-                Arc<Callback>,
-            )
-                -> Result<midir::MidiInputConnection<()>, midir::ConnectError<midir::MidiInput>>
+                transport::Input,
+                Box<dyn FnMut(transport::ReceivedPacket) + Send>,
+            ) -> transport::Result<transport::InputConnection>
             + Send,
     ) -> PyResult<Py<Self>> {
         check_blocking_thread()?;
@@ -223,22 +185,67 @@ impl MidiInputConnection {
         let resource = Arc::new(Managed::new(
             Arc::clone(&client.get().state),
             Some(Arc::clone(&callback)),
-            |native: midir::MidiInputConnection<()>| native.close().0,
+            |native: transport::InputConnection| {
+                native.close().map_err(|e| transport_error(e, "close"))
+            },
         ));
+        let mode = client.get().mode;
         let connection = Py::new(
             py,
             Self {
                 resource: Arc::clone(&resource),
                 client,
+                clock: OnceLock::new(),
+                diagnostics: OnceLock::new(),
             },
         )?;
         lifecycle::register(resource.clone())?;
-        py.detach(|| resource.connect(|native| operation(native, callback)))?;
+        let callback_identity = identity.clone();
+        let result = py.detach(|| {
+            resource.connect(|native| {
+                let input = operation(
+                    native,
+                    Box::new(move |packet| {
+                        let clock = Clock {
+                            identity: callback_identity.clone(),
+                            backend: Backend::from_native(packet.clock.backend),
+                            mode,
+                        };
+                        callback.deliver(move |py| {
+                            Ok(Py::new(
+                                py,
+                                ReceivedPacket {
+                                    timestamp_ns: packet.timestamp_ns,
+                                    clock,
+                                    packet: packet.packet,
+                                },
+                            )?
+                            .into_any())
+                        });
+                    }),
+                )
+                .map_err(|e| transport_error(e, "open"))?;
+                connection
+                    .get()
+                    .clock
+                    .set(Clock {
+                        identity,
+                        backend: Backend::from_native(input.clock().backend),
+                        mode,
+                    })
+                    .ok();
+                connection.get().diagnostics.set(input.diagnostics()).ok();
+                Ok(input)
+            })
+        });
+        if result.is_err() {
+            resource.retire();
+        }
+        result?;
         Ok(connection)
     }
 }
-
-impl Drop for MidiInputConnection {
+impl Drop for InputConnection {
     fn drop(&mut self) {
         lifecycle::defer(self.resource.clone());
     }

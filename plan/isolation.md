@@ -2,8 +2,8 @@
 
 ## Agreed behavior
 
-`MidiInput(name, *, isolated=True, timeout=5.0)` and the corresponding
-`MidiOutput` constructor default to one child process per client. The ownership
+`Input(*, isolated=True, timeout=5.0)` and the corresponding
+`Output` constructor default to one child process per client. The ownership
 model allows one live connection per client; input and output ports of the same
 physical device therefore use separate processes. `isolated=False` keeps native
 MIDI in the caller's process. No automatic physical-device grouping is inferred.
@@ -18,7 +18,7 @@ hotplug detection is invented.
 
 Callbacks remain in the parent process on a dispatch thread. Both child and
 parent receive queues each hold 128 messages and have fixed capacities and drop new messages on overflow.
-The input connection exposes `dropped_messages`, including both queue stages.
+The input connection exposes `dropped_packets`, including both queue stages.
 Capacity counts messages, not bytes; exceptionally large messages still use
 memory. Native timestamps and bytes are forwarded unchanged. The existing Rust
 callback gate supplies exception reporting, callback-thread restrictions,
@@ -72,3 +72,14 @@ may change or be reused; users must deliberately rediscover after failure.
 ## Additional work beyond the prompt
 
 None.
+
+
+## libremidi cutover, 2026-10-14
+
+Both modes now call the same Rust toolkit. Input/output naming arguments, ID
+lookup and filters were removed. Discovery serializes immutable owner/generation
+snapshots and retains their original native handles in the worker; opening never
+rediscovers by backend ID. Callbacks carry raw ReceivedPacket values. The private
+pipe encodes signed timestamps, clock identity/mode/backend and byte/word data
+explicitly. Parent-assigned clock identities distinguish children and reopenings.
+All failed opens invalidate the client, including expired or foreign snapshots.

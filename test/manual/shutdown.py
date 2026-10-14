@@ -6,25 +6,26 @@ from threading import Event
 from uuid import uuid4
 
 from meedee import midi
+from meedee.events import ReceivedPacket
 
 started = Event()
 release = Event()
 
 
-def receive(timestamp: int, message: bytes) -> None:
+def receive(packet: ReceivedPacket) -> None:
     started.set()
     if not release.wait(10):
         raise RuntimeError("native shutdown test release deadline exceeded")
 
 
-def open_connections() -> tuple[midi.MidiInputConnection, midi.MidiOutputConnection]:
+def open_connections() -> tuple[midi.InputConnection, midi.OutputConnection]:
     token = f"meedee-shutdown-{uuid4().hex}"
     isolated = environ.get("MEEDEE_TEST_ISOLATED", "1") == "1"
-    source = midi.MidiInput("meedee shutdown input", isolated=isolated)
+    source = midi.Input(isolated=isolated)
     incoming = source.create_virtual(token, receive)
-    target = midi.MidiOutput("meedee shutdown output", isolated=isolated)
-    (port,) = (p for p in target.ports() if token in target.port_name(p))
-    outgoing = target.connect(port, token)
+    target = midi.Output(isolated=isolated)
+    (port,) = (p for p in target.ports() if token in p.name)
+    outgoing = target.connect(port)
     outgoing.send(b"\x90\x3c\x7f")
     if not started.wait(5):
         raise RuntimeError("native callback did not start")

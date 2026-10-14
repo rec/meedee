@@ -36,18 +36,18 @@ None.
 ## 2. Protocol baseline and backend capabilities
 
 The selected transport is libremidi, a cross-platform C++20 library with MIDI
-1.0 byte and native UMP APIs. The existing repository still uses midir until
-the transport replacement slice is implemented. The source pin and selected
-build requirements are recorded below; installed dependencies have not yet
-changed.
+1.0 byte and native UMP APIs. The Rust toolkit and Python binding now use this
+transport; native platform qualification remains a separate completion gate.
+The source pin and selected build requirements are recorded below.
 
 The owner selected bundled, statically linked sources with CMake; native OS
 backends only; MIDI 1.0 packets by default with explicit UMP selection; and
 Absolute input timestamps by default with explicit capture disabling. The Pi
 target is Zero 2 W with 64-bit Raspberry Pi OS. The selected vendored source is
-now the owner's fork at `07c7cfb1237be1ddeaa097a81f79cc9456c087ee`, including
+now the owner's fork at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`, including
 two separately committed CoreMIDI property fixes and checked input teardown
-for CoreMIDI and Windows. Windows native qualification is still outstanding. See
+for CoreMIDI and Windows, checked CoreMIDI output disposal and initialized
+WinMM output storage. Windows native qualification is still outstanding. See
 [source provenance](../third_party/libremidi/SOURCE.md). Backend integration
 and cross-platform build qualification remain unfinished.
 
@@ -647,9 +647,13 @@ and wire evidence before stateful interpretation or live writes.
    The Rust wrapper now uses this ownership model and statically builds the
    pinned C++ source. Its byte/UMP FFI paths have device-free macOS fixture tests;
    real CoreMIDI service access, Windows/Services and Pi qualification remain open.
-   Python transport replacement is still unfinished.
+   Python transport now uses this wrapper for both isolated and in-process I/O;
+   midir and its old filtering/naming/ID-lookup API have been removed.
+   Raw callbacks carry immutable ReceivedPacket values with signed nanoseconds,
+   distinct connection clocks and byte/UMP payloads. Framing/filters remain slice 3.
    Separate the shared core and our Python binding; implement the safe C API wrapper,
-   native build integration, and replace midir throughout the transport path.
+   native build integration, and complete native qualification throughout the
+   transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.
    Gate: Rust use requires no Python; FFI ownership, shutdown, byte/UMP capability
    detection, Python 3.11/3.15 builds, and selected Pi cross-build checks pass.

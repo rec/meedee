@@ -57,10 +57,9 @@ def test_binding_error_categories_keep_their_builtin_bases(
 @pytest.mark.parametrize(
     "handle",
     [
-        midi.MidiInputPort,
-        midi.MidiOutputPort,
-        midi.MidiInputConnection,
-        midi.MidiOutputConnection,
+        midi.Port,
+        midi.InputConnection,
+        midi.OutputConnection,
     ],
 )
 def test_resource_handles_cannot_be_constructed_directly(handle: type[object]) -> None:
@@ -68,9 +67,9 @@ def test_resource_handles_cannot_be_constructed_directly(handle: type[object]) -
         handle()
 
 
-@pytest.mark.parametrize("client", [midi.MidiInput, midi.MidiOutput])
-def test_client_rejects_non_string_names_before_native_initialization(
-    client: type[midi.MidiInput] | type[midi.MidiOutput],
+@pytest.mark.parametrize("client", [midi.Input, midi.Output])
+def test_client_rejects_positional_arguments_before_native_initialization(
+    client: type[midi.Input] | type[midi.Output],
 ) -> None:
     with pytest.raises(TypeError):
-        client(37)  # ty: ignore[invalid-argument-type]
+        client(37)  # ty: ignore[too-many-positional-arguments]

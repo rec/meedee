@@ -7,6 +7,11 @@ from typing import Protocol
 from unittest.mock import patch
 
 
+class ReceivedPacket(Protocol):
+    timestamp_ns: int | None
+    packet: bytes
+
+
 class Connection(Protocol):
     def close(self) -> None: ...
 
@@ -25,8 +30,9 @@ class Recorder:
         self.messages: list[tuple[int, bytes]] = []
         self.threads: list[int] = []
 
-    def __call__(self, timestamp: int, message: bytes) -> object:
-        self.messages.append((timestamp, message))
+    def __call__(self, packet: ReceivedPacket) -> object:
+        assert packet.timestamp_ns is not None
+        self.messages.append((packet.timestamp_ns, packet.packet))
         self.threads.append(get_ident())
         return 37  # The binding ignores callback return values.
 
@@ -39,29 +45,29 @@ class SendingRecorder(Recorder):
         super().__init__()
         self.output = output
 
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        super().__call__(timestamp, message)
-        self.output.send(message)
+    def __call__(self, packet: ReceivedPacket) -> None:
+        super().__call__(packet)
+        self.output.send(packet.packet)
 
 
 class ConstructorRecorder(Recorder):
-    def __init__(self, constructors: list[Callable[[str], object]]) -> None:
+    def __init__(self, constructors: list[Callable[..., object]]) -> None:
         super().__init__()
         self.constructors = constructors
         self.errors: list[str] = []
 
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        super().__call__(timestamp, message)
+    def __call__(self, packet: ReceivedPacket) -> None:
+        super().__call__(packet)
         for c in self.constructors:
             try:
-                c("callback")
+                c(identity="callback")
             except RuntimeError as e:
                 self.errors.append(str(e))
 
 
 class RaisingRecorder(Recorder):
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        super().__call__(timestamp, message)
+    def __call__(self, packet: ReceivedPacket) -> None:
+        super().__call__(packet)
         if len(self.messages) == 1:
             raise ValueError("callback failed")
 
@@ -72,8 +78,8 @@ class CloseRecorder(Recorder):
         self.targets: list[Connection] = []
         self.errors: list[str] = []
 
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        super().__call__(timestamp, message)
+    def __call__(self, packet: ReceivedPacket) -> None:
+        super().__call__(packet)
         for t in self.targets:
             try:
                 t.close()
@@ -82,8 +88,8 @@ class CloseRecorder(Recorder):
 
 
 class DroppingRecorder(CloseRecorder):
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        Recorder.__call__(self, timestamp, message)
+    def __call__(self, packet: ReceivedPacket) -> None:
+        Recorder.__call__(self, packet)
         self.targets.clear()
 
 
@@ -93,8 +99,8 @@ class BlockingRecorder(Recorder):
         self.started = Event()
         self.release = Event()
 
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        super().__call__(timestamp, message)
+    def __call__(self, packet: ReceivedPacket) -> None:
+        super().__call__(packet)
         self.started.set()
         if not self.release.wait(5):
             raise RuntimeError("test callback release deadline exceeded")

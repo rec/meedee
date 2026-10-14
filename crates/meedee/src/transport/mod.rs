@@ -216,6 +216,20 @@ pub struct OutputConnection {
     protocol: Protocol,
 }
 
+/// Receive diagnostics remain readable after a connection is closed.
+#[derive(Clone)]
+pub struct InputDiagnostics {
+    receiver: Arc<Receiver>,
+}
+impl InputDiagnostics {
+    pub fn dropped_packets(&self) -> u64 {
+        self.receiver.dropped.load(Ordering::Relaxed)
+    }
+    pub fn callback_panicked(&self) -> bool {
+        self.receiver.panicked.load(Ordering::Acquire)
+    }
+}
+
 impl Input {
     pub fn new(options: InputOptions) -> Result<Self> {
         if options.receive_byte_limit == 0 {
@@ -310,6 +324,11 @@ impl Output {
 }
 
 impl InputConnection {
+    pub fn diagnostics(&self) -> InputDiagnostics {
+        InputDiagnostics {
+            receiver: Arc::clone(&self.receiver),
+        }
+    }
     pub fn clock(&self) -> Clock {
         self.clock
     }
@@ -344,21 +363,10 @@ impl OutputConnection {
     /// Backend acceptance, not physical delivery. A multi-packet UMP send can
     /// fail after accepting a prefix; its error reports that word count. No retry.
     pub fn send(&self, packet: &Packet) -> Result<()> {
-        let owned = match (self.protocol, packet) {
-            (Protocol::Midi1, Packet::Bytes(bytes))
-                if !bytes.is_empty() && bytes.len() <= i32::MAX as usize =>
-            {
-                Packet::Bytes(native::copy(bytes)?)
-            }
-            (Protocol::Ump, Packet::Ump(words)) => {
-                validate_ump(words)?;
-                Packet::Ump(native::copy(words)?)
-            }
-            _ => {
-                return Err(Error::Invalid(
-                    "packet encoding does not match this connection, or the packet is empty",
-                ))
-            }
+        validate_packet(self.protocol, packet)?;
+        let owned = match packet {
+            Packet::Bytes(bytes) => Packet::Bytes(native::copy(bytes)?),
+            Packet::Ump(words) => Packet::Ump(native::copy(words)?),
         };
         self.worker.call(move |native| native.send(&owned))
     }
@@ -371,6 +379,21 @@ impl OutputConnection {
             worker: self.worker,
             protocol: self.protocol,
         })
+    }
+}
+
+/// Validate a raw send before consuming binding ownership or entering a driver.
+pub fn validate_packet(protocol: Protocol, packet: &Packet) -> Result<()> {
+    match (protocol, packet) {
+        (Protocol::Midi1, Packet::Bytes(bytes))
+            if !bytes.is_empty() && bytes.len() <= i32::MAX as usize =>
+        {
+            Ok(())
+        }
+        (Protocol::Ump, Packet::Ump(words)) => validate_ump(words),
+        _ => Err(Error::Invalid(
+            "packet encoding does not match this connection, or the packet is empty",
+        )),
     }
 }
 

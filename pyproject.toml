@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "meedee"
 dynamic = ["version"]
-description = "Python bindings for the midir Rust MIDI library"
+description = "Python bindings for the meedee Rust MIDI toolkit"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []

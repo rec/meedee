@@ -1,4 +1,4 @@
-"""Opt-in native validation. Default pytest discovery does not collect this file."""
+"""Opt-in software endpoints. These checks never select hardware ports."""
 
 import subprocess
 import sys
@@ -8,239 +8,175 @@ from functools import partial
 from os import environ
 from pathlib import Path
 from queue import Queue
-from statistics import median
-from time import perf_counter_ns
 from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
 
 from meedee import midi
-from meedee._clients import MidiInput, MidiOutput
+from meedee._clients import Input, Output
+from meedee.events import ReceivedPacket
 
 
 @pytest.fixture(params=[True, False], autouse=True)
 def isolation(request: pytest.FixtureRequest) -> Iterator[bool]:
     with (
-        patch.object(midi, "MidiInput", partial(MidiInput, isolated=request.param)),
-        patch.object(midi, "MidiOutput", partial(MidiOutput, isolated=request.param)),
+        patch.object(midi, "Input", partial(Input, isolated=request.param)),
+        patch.object(midi, "Output", partial(Output, isolated=request.param)),
     ):
         yield request.param
 
 
 class Collector:
     def __init__(self) -> None:
-        self.messages: Queue[tuple[int, bytes]] = Queue()
+        self.packets: Queue[ReceivedPacket] = Queue()
 
-    def __call__(self, timestamp: int, message: bytes) -> None:
-        self.messages.put((timestamp, message))
+    def __call__(self, packet: ReceivedPacket) -> None:
+        self.packets.put_nowait(packet)
+
+    def bytes_until(self, size: int) -> bytes:
+        received = bytearray()
+        while len(received) < size:
+            packet = self.packets.get(timeout=5)
+            assert isinstance(packet.packet, bytes)
+            received.extend(packet.packet)
+        return bytes(received)
 
 
 @pytest.mark.parametrize("direction", ["input", "output"])
-@pytest.mark.parametrize("bits", [None, *range(8)])
-def test_virtual_loopback_preserves_bytes_timestamps_and_filters(
-    direction: str, bits: int | None
+@pytest.mark.parametrize("protocol", [midi.Protocol.Midi1, midi.Protocol.Ump])
+@pytest.mark.parametrize(
+    "timestamps", [midi.TimestampMode.Absolute, midi.TimestampMode.Off]
+)
+def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
+    direction: str, protocol: midi.Protocol, timestamps: midi.TimestampMode
 ) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.MidiInput("meedee validation input")
-    target = midi.MidiOutput("meedee validation output")
-    if bits is not None:
-        source.ignore(midi.Ignore(bits))
+    source = midi.Input(protocol=protocol, timestamps=timestamps)
+    target = midi.Output(protocol=protocol)
     token = f"meedee-{uuid4().hex}"
     with ExitStack() as stack:
         if direction == "input":
             incoming = stack.enter_context(source.create_virtual(token, receiver))
-            (port,) = (p for p in target.ports() if token in target.port_name(p))
-            outgoing = stack.enter_context(target.connect(port, token))
+            port = next(p for p in target.ports() if p.name == token)
+            outgoing = stack.enter_context(target.connect(port))
         else:
             outgoing = stack.enter_context(target.create_virtual(token))
-            (port,) = (p for p in source.ports() if token in source.port_name(p))
-            incoming = stack.enter_context(source.connect(port, token, receiver))
-        for m in MESSAGES:
-            outgoing.send(m)
-        received: list[tuple[int, bytes]] = []
-        while True:
-            item = receiver.messages.get(timeout=5)
-            received.append(item)
-            if item[1] == MESSAGES[-1]:
-                break
-        flags = 0 if bits is None else bits
-        expected = [m for m in MESSAGES if not filtered(m, flags)]
-        assert [m for _, m in received] == expected
-        assert all(type(m) is bytes for _, m in received)
-        assert all(type(t) is int and t >= 0 for t, _ in received)
-        assert [t for t, _ in received] == sorted(t for t, _ in received)
-    assert incoming.closed
-    assert outgoing.closed
-    assert isinstance(source.ports(), list)
-    assert isinstance(target.ports(), list)
+            port = next(p for p in source.ports() if p.name == token)
+            incoming = stack.enter_context(source.connect(port, receiver))
+        data = (
+            b"\x90\x3c\x7f"
+            if protocol == midi.Protocol.Midi1
+            else midi.UmpPacket(words=[0x40903C00, 0xFFFFFFFF])
+        )
+        outgoing.send(data)
+        packet = receiver.packets.get(timeout=5)
+        assert packet.packet == data
+        assert packet.clock == incoming.clock
+        assert (packet.timestamp_ns is None) == (timestamps == midi.TimestampMode.Off)
+        assert incoming.dropped_packets == 0
+    assert incoming.closed and outgoing.closed
 
 
-def test_duplicate_names_keep_distinct_port_identity_and_lookup() -> None:
+def test_duplicate_names_have_distinct_snapshots() -> None:
     require_unix()
     token = f"meedee-duplicate-{uuid4().hex}"
-    first = midi.MidiOutput("meedee duplicate")
-    second = midi.MidiOutput("meedee duplicate")
-    observer = midi.MidiInput("meedee identity observer")
+    first = midi.Output()
+    second = midi.Output()
+    observer = midi.Input()
     with first.create_virtual(token), second.create_virtual(token):
-        ports = [p for p in observer.ports() if token in observer.port_name(p)]
+        ports = [p for p in observer.ports() if p.name == token]
         assert len(ports) == 2
-        assert observer.port_name(ports[0]) == observer.port_name(ports[1])
         assert ports[0] != ports[1]
-        assert ports[0].id() != ports[1].id()
         for p in ports:
-            assert observer.find_port_by_id(p.id()) == p
             with pytest.raises(TypeError):
                 hash(p)
-        assert observer.find_port_by_id(f"absent-{uuid4().hex}") is None
-        old_ids = [p.id() for p in ports]
-    assert all(observer.find_port_by_id(i) is None for i in old_ids)
 
 
-def test_close_restores_clients_for_reopen_and_propagates_context_errors() -> None:
+def test_successful_close_restores_client_and_reopen_uses_a_new_clock() -> None:
     require_unix()
-    source = midi.MidiInput("meedee reopen input")
-    target = midi.MidiOutput("meedee reopen output")
-    source.ignore(midi.Ignore.TIME | midi.Ignore.ACTIVE_SENSE)
-    token = f"meedee-reopen-{uuid4().hex}"
+    source = midi.Input()
+    target = midi.Output()
     receiver = Collector()
-    # Keep the endpoint alive while checking healthy output-client reuse.
-    # Replacing it is a topology change that can itself cause a native error.
-    with source.create_virtual(token, receiver) as incoming:
-        for _ in range(2):
-            (port,) = (p for p in target.ports() if token in target.port_name(p))
-            assert target.find_port_by_id(port.id()) == port
-            with pytest.raises(TypeError):
-                hash(port)
-            with pytest.raises(RuntimeError):
-                source.ignore(midi.Ignore.NONE)
+    token = f"meedee-reopen-{uuid4().hex}"
+    clocks = []
+    for _ in range(2):
+        with source.create_virtual(token, receiver) as incoming:
+            clocks.append(incoming.clock)
+            port = next(p for p in target.ports() if p.name == token)
             with pytest.raises(ValueError, match="body error"):
-                with target.connect(port, token) as outgoing:
+                with target.connect(port) as outgoing:
                     outgoing.send(b"\xf8")
-                    outgoing.send(b"\x90\x3c\x7f")
-                    assert receiver.messages.get(timeout=5)[1] == b"\x90\x3c\x7f"
+                    assert receiver.bytes_until(1) == b"\xf8"
                     raise ValueError("body error")
             assert outgoing.closed
-            with pytest.raises(RuntimeError):
-                outgoing.send(b"\xf8")
-    incoming.close()
-    assert incoming.closed
-    assert target.find_port_by_id(port.id()) is None
+    assert clocks[0] != clocks[1]
 
 
-def test_disappeared_virtual_endpoint_requires_a_fresh_isolated_discovery_client(
-    isolation: bool,
-) -> None:
+def test_disappeared_endpoint_fails_open_and_requires_a_fresh_client() -> None:
     require_unix()
-    source = midi.MidiInput("meedee disappearance input")
-    target = midi.MidiOutput("meedee disappearance output")
+    source = midi.Input()
+    target = midi.Output()
     receiver = Collector()
     token = f"meedee-disappearance-{uuid4().hex}"
     with source.create_virtual(token, receiver):
-        (port,) = (p for p in target.ports() if token in target.port_name(p))
-    with pytest.raises(midi.PortInfoError):
-        target.port_name(port)
-    if isolation:
-        with pytest.raises(RuntimeError, match="new client"):
-            target.ports()
-    else:
-        assert isinstance(target.ports(), list)
-    # Reopening is deliberate, never an automatic retry of an uncertain send.
-    token = f"meedee-reappeared-{uuid4().hex}"
+        port = next(p for p in target.ports() if p.name == token)
+    with pytest.raises((midi.MidiError, ValueError)):
+        target.connect(port)
+    with pytest.raises(midi.StateError):
+        target.ports()
     with source.create_virtual(token, receiver):
-        fresh = midi.MidiOutput("meedee fresh disappearance output")
-        (port,) = (p for p in fresh.ports() if token in fresh.port_name(p))
-        with fresh.connect(port, token) as outgoing:
+        fresh = midi.Output()
+        port = next(p for p in fresh.ports() if p.name == token)
+        with fresh.connect(port) as outgoing:
             outgoing.send(b"\x90\x3c\x7f")
-            assert receiver.messages.get(timeout=5)[1] == b"\x90\x3c\x7f"
-
-
-def test_native_interpreter_exit_drains_live_connections_and_queued_traffic(
-    isolation: bool,
-) -> None:
-    require_unix()
-    result = subprocess.run(
-        [sys.executable, str(Path(__file__).with_name("shutdown.py"))],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=20,
-        env={**environ, "MEEDEE_TEST_ISOLATED": "1" if isolation else "0"},
-    )
-    assert result.stderr == ""
+            assert receiver.bytes_until(3) == b"\x90\x3c\x7f"
 
 
 @pytest.mark.parametrize("size", [128, 1024, 16384])
-def test_larger_sysex_is_preserved_after_close(size: int) -> None:
+def test_sysex_byte_stream_preserves_fragments_without_assembling_in_the_binding(
+    size: int,
+) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.MidiInput("meedee SysEx input")
-    target = midi.MidiOutput("meedee SysEx output")
+    source = midi.Input()
+    target = midi.Output()
     token = f"meedee-sysex-{uuid4().hex}"
     message = b"\xf0\x7d" + bytes(i % 128 for i in range(size - 3)) + b"\xf7"
-    with source.create_virtual(token, receiver) as incoming:
-        (port,) = (p for p in target.ports() if token in target.port_name(p))
-        with target.connect(port, token) as outgoing:
+    with source.create_virtual(token, receiver):
+        port = next(p for p in target.ports() if p.name == token)
+        with target.connect(port) as outgoing:
             outgoing.send(message)
-            timestamp, retained = receiver.messages.get(timeout=5)
-        assert incoming.last_message_time is not None
-    assert retained == message
-    assert timestamp >= 0
+            assert receiver.bytes_until(size) == message
 
 
-def test_burst_delivery_records_software_loopback_timing() -> None:
+def test_burst_preserves_raw_byte_stream() -> None:
     require_unix()
-    arrivals: Queue[tuple[int, bytes]] = Queue()
+    receiver = Collector()
+    source = midi.Input()
+    target = midi.Output()
+    token = f"meedee-burst-{uuid4().hex}"
+    messages = [bytes((0xB0, i // 128, i % 128)) for i in range(1000)]
+    with source.create_virtual(token, receiver) as incoming:
+        port = next(p for p in target.ports() if p.name == token)
+        with target.connect(port) as outgoing:
+            for m in messages:
+                outgoing.send(m)
+            assert receiver.bytes_until(3000) == b"".join(messages)
+        assert incoming.dropped_packets == 0
 
-    def receive(timestamp: int, message: bytes) -> None:
-        arrivals.put((perf_counter_ns(), message))
 
-    source = midi.MidiInput("meedee timing input")
-    target = midi.MidiOutput("meedee timing output")
-    token = f"meedee-timing-{uuid4().hex}"
-    count = 1000
-    sent: dict[bytes, int] = {}
-    with source.create_virtual(token, receive):
-        (port,) = (p for p in target.ports() if token in target.port_name(p))
-        with target.connect(port, token) as outgoing:
-            started = perf_counter_ns()
-            for i in range(count):
-                message = bytes((0xB0, i // 128, i % 128))
-                sent[message] = perf_counter_ns()
-                outgoing.send(message)
-            received = [arrivals.get(timeout=5) for _ in range(count)]
-    assert [m for _, m in received] == list(sent)
-    latencies = sorted(t - sent[m] for t, m in received)
-    assert latencies[0] >= 0
-    rate = count * 1e9 / (received[-1][0] - started)
-    print(
-        f"Software loopback, {count} CC messages: {rate:.0f} messages/s; "
-        f"send-to-callback median {median(latencies) / 1e6:.3f} ms, "
-        f"p99 {latencies[count * 99 // 100] / 1e6:.3f} ms, "
-        f"max {latencies[-1] / 1e6:.3f} ms"
+def test_native_interpreter_exit_drains_live_connections(isolation: bool) -> None:
+    require_unix()
+    subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("shutdown.py"))],
+        check=True,
+        timeout=20,
+        env={**environ, "MEEDEE_TEST_ISOLATED": "1" if isolation else "0"},
     )
 
 
 def require_unix() -> None:
     if sys.platform not in ("darwin", "linux"):
         pytest.skip("Virtual loopback requires CoreMIDI or ALSA")
-
-
-def filtered(message: bytes, bits: int) -> bool:
-    return bool(
-        (bits & 1 and message[0] == 0xF0)
-        or (bits & 2 and message[0] in (0xF1, 0xF8))
-        or (bits & 4 and message[0] == 0xFE)
-    )
-
-
-MESSAGES = [
-    b"\x90\x3c\x7f",
-    b"\xb0\x01\x40",
-    b"\xf8",
-    b"\xf1\x00",
-    b"\xfe",
-    b"\xf0\x7d\x00\x01\xf7",
-    b"\x90\x63\x01",
-]

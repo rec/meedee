@@ -1,7 +1,6 @@
 use pyo3::prelude::*;
 
 mod errors;
-mod ignore;
 mod input;
 mod output;
 mod state;
@@ -10,12 +9,18 @@ mod callback;
 mod lifecycle;
 
 mod messages;
+mod packets;
+mod ports;
+
+#[cfg(all(test, target_os = "macos"))]
+mod transport_tests;
 
 /// One private binary. Public loaders select which definitions to register.
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_events, module)?)?;
     Ok(())
 }
 
@@ -25,15 +30,22 @@ fn populate_messages(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 #[pyfunction]
+fn populate_events(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    packets::register_events(module)
+}
+
+#[pyfunction]
 fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     lifecycle::initialize(module.py())?;
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    packets::register_transport(module)?;
     let py = module.py();
     module.add("MidiError", py.get_type::<errors::MidiError>())?;
     module.add("InitError", py.get_type::<errors::InitError>())?;
     module.add("PortInfoError", py.get_type::<errors::PortInfoError>())?;
     module.add("ConnectError", py.get_type::<errors::ConnectError>())?;
     module.add("SendError", py.get_type::<errors::SendError>())?;
+    module.add("CapabilityError", py.get_type::<errors::CapabilityError>())?;
     module.add("StateError", py.get_type::<errors::StateError>())?;
     module.add(
         "CallbackThreadError",
@@ -49,13 +61,6 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "WorkerTimeoutError",
         py.get_type::<errors::WorkerTimeoutError>(),
     )?;
-    module.add_class::<ignore::Ignore>()?;
-    module.add_class::<input::MidiInput>()?;
-    module.add_class::<input::MidiInputPort>()?;
-    module.add_class::<input::MidiInputConnection>()?;
-    module.add_class::<output::MidiOutput>()?;
-    module.add_class::<output::MidiOutputPort>()?;
-    module.add_class::<output::MidiOutputConnection>()?;
     let native = PyModule::new(py, "meedee._native")?;
     for name in [
         "MidiError",
@@ -63,36 +68,29 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "PortInfoError",
         "ConnectError",
         "SendError",
+        "CapabilityError",
         "StateError",
         "CallbackThreadError",
         "NativePanicError",
         "ResourceError",
         "WorkerError",
         "WorkerTimeoutError",
-        "Ignore",
-        "MidiInput",
-        "MidiInputPort",
-        "MidiInputConnection",
-        "MidiOutput",
-        "MidiOutputPort",
-        "MidiOutputConnection",
     ] {
         native.add(name, module.getattr(name)?)?;
     }
+    native.add_class::<input::Input>()?;
+    native.add_class::<input::InputConnection>()?;
+    native.add_class::<output::Output>()?;
+    native.add_class::<output::OutputConnection>()?;
+    module.add_class::<ports::Port>()?;
     native.add_class::<callback::CallbackBridge>()?;
     native.add_function(wrap_pyfunction!(callback::check_thread, &native)?)?;
+    native.add_function(wrap_pyfunction!(packets::prepare_send, &native)?)?;
     PyModule::import(py, "sys")?
         .getattr("modules")?
         .set_item("meedee._native", native)?;
     let clients = PyModule::import(py, "meedee._clients")?;
-    for name in [
-        "MidiInput",
-        "MidiInputPort",
-        "MidiInputConnection",
-        "MidiOutput",
-        "MidiOutputPort",
-        "MidiOutputConnection",
-    ] {
+    for name in ["Input", "Output", "InputConnection", "OutputConnection"] {
         let class = clients.getattr(name)?;
         class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;

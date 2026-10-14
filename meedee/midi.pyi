@@ -1,170 +1,124 @@
-"""Native midir bindings. Importing this module does not initialize MIDI."""
+"""Raw byte/UMP transport backed by the shared Rust toolkit."""
 
 from collections.abc import Callable
 from types import TracebackType
 from typing import ClassVar
 
+from . import events
+
 __version__: str
 
-class MidiError(Exception):
-    """A native MIDI operation failed."""
+class Protocol:
+    Midi1: ClassVar[Protocol]
+    Ump: ClassVar[Protocol]
 
-class InitError(MidiError):
-    """The MIDI backend could not initialize."""
+class Backend:
+    CoreMidi: ClassVar[Backend]
+    CoreMidiUmp: ClassVar[Backend]
+    AlsaSeq: ClassVar[Backend]
+    AlsaSeqUmp: ClassVar[Backend]
+    AlsaRaw: ClassVar[Backend]
+    AlsaRawUmp: ClassVar[Backend]
+    WinMm: ClassVar[Backend]
+    WindowsMidiServices: ClassVar[Backend]
 
-class PortInfoError(MidiError):
-    """Port information could not be retrieved."""
+class TimestampMode:
+    Absolute: ClassVar[TimestampMode]
+    Off: ClassVar[TimestampMode]
 
-class ConnectError(MidiError):
-    """Failed native opens disable isolated and ALSA clients."""
-
-class SendError(MidiError):
-    """A MIDI message could not be sent."""
-
-class StateError(RuntimeError):
-    """MIDI ownership state prevents this operation."""
-
-class CallbackThreadError(RuntimeError):
-    """A blocking MIDI operation was attempted from a callback."""
-
-class NativePanicError(RuntimeError):
-    """A recoverable native MIDI panic occurred."""
-
-class ResourceError(RuntimeError):
-    """MIDI lifecycle resources could not be allocated."""
-
-class WorkerError(RuntimeError):
-    """The MIDI worker exited or communication failed."""
-
-class WorkerTimeoutError(TimeoutError):
-    """A MIDI worker operation exceeded its deadline."""
-
-class Ignore:
-    """Immutable upstream input-filter bits. ALL combines three filters."""
-
-    NONE: ClassVar[Ignore]
-    SYSEX: ClassVar[Ignore]
-    TIME: ClassVar[Ignore]
-    ACTIVE_SENSE: ClassVar[Ignore]
-    ALL: ClassVar[Ignore]
-
-    def __init__(self, bits: int) -> None: ...
-    def __or__(self, other: Ignore) -> Ignore: ...
-    def __int__(self) -> int: ...
-    def __repr__(self) -> str: ...
+class UmpPacket:
+    def __init__(self, *, words: list[int] | tuple[int, ...]) -> None: ...
+    @property
+    def words(self) -> tuple[int, ...]: ...
     def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
 
-class MidiInputPort:
-    """An opaque, unhashable input-port handle returned by discovery."""
+def compiled_backends() -> list[Backend]: ...
 
+class MidiError(Exception): ...
+class CapabilityError(MidiError): ...
+class InitError(MidiError): ...
+class PortInfoError(MidiError): ...
+class ConnectError(MidiError): ...
+class SendError(MidiError): ...
+class StateError(RuntimeError): ...
+class CallbackThreadError(RuntimeError): ...
+class NativePanicError(RuntimeError): ...
+class ResourceError(RuntimeError): ...
+class WorkerError(RuntimeError): ...
+class WorkerTimeoutError(TimeoutError): ...
+
+class Port:
+    @property
+    def name(self) -> str: ...
+    @property
+    def backend(self) -> Backend: ...
+    @property
+    def backend_id(self) -> int: ...
+    @property
+    def _wire(self) -> tuple[str, int, int, str, str, int, bool]: ...
+    @staticmethod
+    def _from_wire(
+        owner: str,
+        snapshot: int,
+        index: int,
+        name: str,
+        backend: Backend,
+        backend_id: int,
+        input: bool,
+    ) -> Port: ...
+    def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]
 
-    def id(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
-
-class MidiOutputPort:
-    """An opaque, unhashable output-port handle returned by discovery."""
-
-    __hash__: ClassVar[None]
-
-    def id(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
-
-class MidiInput:
-    """An input client that cannot be used while its connection is open."""
-
+class Input:
     def __init__(
         self,
-        client_name: str,
         *,
+        protocol: Protocol = Protocol.Midi1,
+        backend: Backend | None = None,
+        timestamps: TimestampMode = TimestampMode.Absolute,
         isolated: bool = True,
         timeout: float = 5.0,
         receive_byte_limit: int = 8_388_608,
     ) -> None: ...
-    def ports(self) -> list[MidiInputPort]: ...
+    def ports(self) -> list[Port]: ...
     @property
-    def worker_failure(self) -> Exception | None:
-        """Known isolated-worker failure without a traceback; otherwise None."""
-        ...
-    def port_name(self, port: MidiInputPort) -> str: ...
-    def find_port_by_id(self, id: str) -> MidiInputPort | None:
-        """Missing ID returns None.
-
-        Ambiguous or unavailable CoreMIDI IDs raise PortInfoError.
-        """
-        ...
-    def ignore(self, flags: Ignore) -> None: ...
+    def worker_failure(self) -> Exception | None: ...
     def connect(
-        self,
-        port: MidiInputPort,
-        port_name: str,
-        callback: Callable[[int, bytes], object],
-    ) -> MidiInputConnection:
-        """Use a synchronous, nongenerator callback.
-
-        Deferred results report TypeError through sys.unraisablehook.
-        Callbacks may run before return; initialize their state before opening.
-        """
-        ...
+        self, port: Port, callback: Callable[[events.ReceivedPacket], object]
+    ) -> InputConnection: ...
     def create_virtual(
-        self, port_name: str, callback: Callable[[int, bytes], object]
-    ) -> MidiInputConnection:
-        """Use a synchronous, nongenerator callback.
+        self, name: str, callback: Callable[[events.ReceivedPacket], object]
+    ) -> InputConnection: ...
 
-        Deferred results report TypeError through sys.unraisablehook.
-        Callbacks may run before return; initialize their state before opening.
-        """
-        ...
-
-class MidiOutput:
-    """An output client that cannot be used while its connection is open."""
-
+class Output:
     def __init__(
-        self, client_name: str, *, isolated: bool = True, timeout: float = 5.0
+        self,
+        *,
+        protocol: Protocol = Protocol.Midi1,
+        backend: Backend | None = None,
+        isolated: bool = True,
+        timeout: float = 5.0,
     ) -> None: ...
-    def ports(self) -> list[MidiOutputPort]: ...
+    def ports(self) -> list[Port]: ...
     @property
-    def worker_failure(self) -> Exception | None:
-        """Known isolated-worker failure without a traceback; otherwise None."""
-        ...
-    def port_name(self, port: MidiOutputPort) -> str: ...
-    def find_port_by_id(self, id: str) -> MidiOutputPort | None:
-        """Missing ID returns None.
+    def worker_failure(self) -> Exception | None: ...
+    def connect(self, port: Port) -> OutputConnection: ...
+    def create_virtual(self, name: str) -> OutputConnection: ...
 
-        Ambiguous or unavailable CoreMIDI IDs raise PortInfoError.
-        """
-        ...
-    def connect(self, port: MidiOutputPort, port_name: str) -> MidiOutputConnection: ...
-    def create_virtual(self, port_name: str) -> MidiOutputConnection: ...
-
-class MidiInputConnection:
-    """Successful close restores the client; isolated native failures disable it."""
-
+class InputConnection:
     @property
-    def worker_failure(self) -> Exception | None:
-        """Known failure of this client's isolated worker; not device health."""
-        ...
+    def clock(self) -> events.Clock: ...
     @property
-    def last_message_time(self) -> float | None:
-        """Python monotonic seconds at last callback start, or None before delivery."""
-        ...
+    def dropped_packets(self) -> int: ...
     @property
-    def dropped_messages(self) -> int:
-        """Queue overflow count in isolated mode; zero in native mode."""
-        ...
+    def last_message_time(self) -> float | None: ...
     @property
-    def closed(self) -> bool:
-        """A momentary ownership snapshot; does not reserve the connection."""
-        ...
-    def close(self) -> None:
-        """Stop accepting delivery and wait for admitted callbacks and teardown."""
-        ...
-    def __enter__(self) -> MidiInputConnection:
-        """Check current state; another thread can still close the connection."""
-        ...
+    def worker_failure(self) -> Exception | None: ...
+    @property
+    def closed(self) -> bool: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> InputConnection: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
@@ -172,26 +126,14 @@ class MidiInputConnection:
         traceback: TracebackType | None,
     ) -> None: ...
 
-class MidiOutputConnection:
-    """Successful close restores the client; isolated native failures disable it."""
-
-    def send(self, message: bytes | bytearray | memoryview) -> None:
-        """Serialized with send/close; competing threads have no guaranteed order."""
-        ...
+class OutputConnection:
+    def send(self, packet: bytes | bytearray | memoryview | UmpPacket) -> None: ...
     @property
-    def worker_failure(self) -> Exception | None:
-        """Known failure of this client's isolated worker; not device health."""
-        ...
+    def worker_failure(self) -> Exception | None: ...
     @property
-    def closed(self) -> bool:
-        """A momentary ownership snapshot; does not reserve the connection."""
-        ...
-    def close(self) -> None:
-        """Wait for teardown; cannot cancel a native send already in progress."""
-        ...
-    def __enter__(self) -> MidiOutputConnection:
-        """Check current state; another thread can still close the connection."""
-        ...
+    def closed(self) -> bool: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> OutputConnection: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,

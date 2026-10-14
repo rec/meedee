@@ -42,6 +42,31 @@ create_exception!(
 );
 create_exception!(
     meedee.midi,
+    CapabilityError,
+    MidiError,
+    "The requested transport capability is unavailable."
+);
+
+pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3::PyErr {
+    use meedee::transport::Error;
+    match error {
+        Error::Capability(message) => CapabilityError::new_err(message),
+        Error::Invalid(message) => pyo3::exceptions::PyValueError::new_err(message),
+        Error::Busy | Error::Closed => StateError::new_err(error.to_string()),
+        Error::CallbackThread => CallbackThreadError::new_err(error.to_string()),
+        Error::Resource(message) => ResourceError::new_err(message),
+        Error::Worker(message) => ResourceError::new_err(message),
+        Error::Native(message) => match operation {
+            "init" => InitError::new_err(message),
+            "ports" => PortInfoError::new_err(message),
+            "open" => ConnectError::new_err(message),
+            "send" => SendError::new_err(message),
+            _ => MidiError::new_err(message),
+        },
+    }
+}
+create_exception!(
+    meedee.midi,
     PortInfoError,
     MidiError,
     "Port information could not be retrieved."

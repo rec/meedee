@@ -131,9 +131,7 @@ jobs:
           args: --release --locked --sdist -i ${{ runner.os == 'Linux' && format('python{0}', matrix.python) || 'python' }} --out dist
           manylinux: '2_28'
           before-script-linux: |
-            dnf install -y alsa-lib-devel dnf-plugins-core
-            mkdir -p dist
-            dnf download --source --destdir dist alsa-lib
+            dnf install -y alsa-lib-devel
       - name: Install and test wheel outside checkout
         run: |
           uv venv "$RUNNER_TEMP/meedee-wheel" --python '${{ matrix.python }}'
@@ -144,7 +142,7 @@ jobs:
           fi
           uv pip install --python "$wheel_python" dist/*.whl pytest
           cd "$RUNNER_TEMP"
-          "$wheel_python" -m pytest "$GITHUB_WORKSPACE/test/test_contract.py" "$GITHUB_WORKSPACE/test/test_ignore.py" "$GITHUB_WORKSPACE/test/test_isolation.py"
+          "$wheel_python" -m pytest "$GITHUB_WORKSPACE/test/test_contract.py" "$GITHUB_WORKSPACE/test/test_packets.py" "$GITHUB_WORKSPACE/test/test_isolation.py" "$GITHUB_WORKSPACE/test/test_messages.py"
       - run: uv run --frozen pytest test/release/artifacts.py -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
