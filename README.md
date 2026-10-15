@@ -4,17 +4,82 @@ A Rust MIDI toolkit with matching Python bindings, using vendored
 [libremidi](https://github.com/celtera/libremidi) for native transport. Python
 imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
 `meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`,
-`meedee.timecode` and `meedee.ump`; the package root is empty. There are no Python
+`meedee.timecode`, `meedee.ump`, `meedee.smf`, `meedee.syx`, `meedee.clip` and
+`meedee.archive`; the package root is empty. There are no Python
 runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
 codec, fine controls, RPN/NRPN commands and MIDI Tuning Standard values/codecs
 are available, along with GM sound maps and selected profile codecs/helpers.
-UMP/MIDI 2.0 values, codecs and explicit translation are available. File support
-is a later slice in [the plan](plan/meedee.md).
+UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
+SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
+explicit clock-aware playback are implemented. Remaining qualification work is
+tracked in [the plan](plan/meedee.md).
 Encode primitive messages for raw transport; use `send_command` for compound
 control, bank/program and MPE configuration commands.
+
+## Files, typed I/O and exact time
+
+```python
+from meedee import archive, events, messages, smf
+
+clock = events.Clock(identity="score", tick_numerator=1, tick_denominator=480)
+note = events.Event(
+    stream="piano",
+    timestamp=events.Timestamp(ticks=480, clock=clock),
+    message=messages.NoteOn(channel=1, note=60, velocity=100),
+)
+writer = archive.Writer("take.meedee")
+writer.write(clock)
+writer.write(archive.Stream(id="piano", label="Piano", clock_identity=clock.identity))
+writer.write(note)
+writer.finish()
+reader = archive.Reader("take.meedee")
+records = list(reader)  # Completion and every record CRC are checked.
+assert reader.complete
+reader.close()
+
+score = smf.TimedReader("song.mid", stream="score")
+origin = score.origin  # Explicit zero preserves any leading silence.
+# With an opened TypedOutputConnection:
+# output.play(score, origin=origin)
+score.close()
+```
+
+SMF supports types 0/1/2, PPQN and SMPTE timing. `smf.Reader` retains metadata,
+unknown chunks and F0/F7 file records. `smf.MergedReader` merges tracks with a
+bounded lookahead and deterministic tick/track order; Type 2 requires an explicit
+`sequence`. `smf.TimedReader` is a performance view with exact tempo conversion,
+not a metadata-preserving replacement for `Reader`. `smf.export_event` reports
+unsupported content and quantization; loss and UMP group routing require explicit
+decisions. `syx` handles concatenated SysEx dumps; `clip` handles MIDI Clip 1.0.
+File writers require `finish()`. Readers have `close()`; borrowed streams remain
+open. No codec starts MIDI workers. See [the API contract](plan/api.md).
+
+`midi.TypedInput` and `midi.TypedOutput` use the existing raw transport, including
+its default Python process isolation. Input connections provide either a callback
+or `receive(timeout=..., cancel=...)`, returning an immutable `events.Event` or
+`events.StreamDiagnostic`. Events preserve primitive messages, the completion
+packet's timestamp and their contributing packet span. Optional `EventInterpreter`,
+`EventVelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
+views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
+are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
+
+`input_connection.start_recording(path)` attaches a bounded background recorder;
+`stop_recording()` returns a report whose `complete`, `gap_records` and `failure`
+fields must be checked. By default any observed input loss or write/admission
+failure makes recording incomplete. `best_effort=True` permits explicit gap
+records, not silent loss. Capture defaults to 128 in-flight records and 8 MiB of
+payload. General file records default to a configurable 1 MiB payload limit.
+
+`output.play(source, origin=..., mappings=..., cancel=...)` runs on the caller's
+thread. It requires timestamped events and explicit mappings between unrelated
+clocks, reports lateness and stops on failure without retry. Cancellation sends
+no automatic NoteOff/reset or other cleanup. Archive records are checked while
+streaming: reading and verifying an entire capture before playback is necessary
+if no output may precede discovering a damaged or incomplete trailer. CRCs detect
+accidental corruption and do not authenticate a file.
 
 ## Messages and byte codecs
 
@@ -49,7 +114,7 @@ Use one decoder per source; diagnostic offsets count bytes actually fed.
 
 These are live byte-stream rules, not Standard MIDI File or UMP parsing.
 Encoding adds full status/framing bytes. No timestamps are invented or attached
-to decoded values; transport callbacks remain raw. Input snapshots and returned
+to decoded values; raw transport callbacks remain raw; typed adapters add event timing explicitly. Input snapshots and returned
 lists have memory costs beyond the retained SysEx limit. Details and remaining
 protocol boundaries are in [the API contract](plan/api.md).
 

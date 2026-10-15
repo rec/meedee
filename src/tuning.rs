@@ -603,3 +603,7 @@ pub(crate) fn replacement<'py>(
     }
     object.get_type().call((), Some(&values))
 }
+
+pub(crate) fn decoded_object(py: Python<'_>, value: model::Decoded) -> PyResult<Py<PyAny>> {
+    Ok(Py::new(py, Decoded { value })?.into_any())
+}

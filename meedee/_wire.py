@@ -11,6 +11,7 @@ def encode(packet: ReceivedPacket) -> tuple[object, ...]:
     return (
         packet.timestamp_ns,
         *encode_clock(packet.clock),
+        packet.sequence,
         data.words if isinstance(data, midi.UmpPacket) else data,
     )
 
@@ -33,10 +34,11 @@ def decode_clock(wire: tuple[object, ...]) -> Clock:
 
 
 def decode(wire: tuple[object, ...]) -> ReceivedPacket:
-    timestamp, identity, backend, mode, data = wire
+    timestamp, identity, backend, mode, sequence, data = wire
     clock = decode_clock((identity, backend, mode))
     return ReceivedPacket(
         timestamp_ns=cast(int | None, timestamp),
+        sequence=cast(int | None, sequence),
         clock=clock,
         packet=midi.UmpPacket(words=cast(tuple[int, ...], data))
         if isinstance(data, tuple)

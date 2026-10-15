@@ -988,3 +988,51 @@ every frame byte. The full Python 3.11 suite passes 217 tests, and Rust passes
 96 ordinary tests with five ignored cases. Focused native packet tests also
 confirm the existing raw clock contract. Final cross-version, installed-wheel
 and native virtual integration checks follow after slice 10.
+
+## Slices 8–10 file timing, typed live integration and capture/replay, 2026-10-15
+
+Implemented the approved Rust file codecs, `.meedee` archive and typed live
+adapters, exposed through focused Python modules. Exact rational file clocks,
+SMF track merging and tempo/SMPTE conversion, Clip timing and explicit export
+reports complete the selected slice 8 scope. Stream-clock links and optionally
+timed metadata finalize the unpublished archive v1 schema. Typed packet framing,
+source-scoped semantic views, bounded recording and caller-thread playback use
+the existing transport and canonical Rust codecs/engines.
+
+The final full Python suites pass **236 tests on CPython 3.11 and 3.15**.
+The Rust workspace passes **107 ordinary tests**, with five opt-in/native cases
+ignored. Checks include completion/source spans across packets, independent
+split-SysEx assembly when SMF tracks interleave, exact tempo changes and leading
+silence, independent Type 2 selection, explicit quantization and UMP group-routing
+refusal. Control/velocity/UMP observations retain contributor times across long
+gaps; MPE retains unknown state; known loss and clock changes clear views. Missing
+contributor time remains absent rather than being replaced by completion time.
+
+Fault checks cover malformed/truncated files, CRCs, verified-prefix recovery,
+unknown records, descriptor references, short writes, disk-full failures,
+recording count/byte exhaustion, a blocked writer and stop deadline, queue overflow,
+callback guards, receive close/cancellation and playback failure/cancellation.
+A controlled typed input also verifies final native-drop accounting when there
+is no following packet to reveal a sequence gap. Fake-clock checks verify absolute
+deadlines, equal-time order, lateness and completed-prefix reporting. Native driver
+acceptance is not physical delivery; cancelled playback sends no cleanup messages.
+
+Ruff, formatting, ty, pyupgrade, cargo formatting, workspace Clippy and whitespace
+checks pass. Clippy retains the existing local atomic-deprecation exception;
+Rust 1.87 qualification remains with release CI because rustup is unavailable
+here. A macOS arm64 CPython 3.11 wheel was built from the generated source
+distribution. Both distribution checks pass, including all new modules, stubs,
+Rust sources and regression tests. Reinstalling that wheel into a separate
+environment and running outside the checkout passes **235 installed-package
+tests**. The remaining cargo-build callback test passes in both checkout suites.
+The release workflow adds installed file/archive/live/view checks and still runs
+only on published releases, with Python 3.11 and 3.15. No workflow was triggered.
+
+The authorized supervised virtual-endpoint flow attempted default isolated typed
+capture/replay on macOS, but CoreMIDI client creation failed with **268435459**.
+Checked cleanup reported retention rather than releasing potentially active
+resources. No hardware endpoint was selected, and no tuning/reset message was
+sent. Successful native capture/replay, in-process loopback, physical behavior,
+Windows, the selected Pi image/sysroot and live UMP qualification remain open.
+The opt-in fixture is test/native/meedee_typed_loopback.py. Software/fault and
+packaging results do not substitute for those native/platform gates.

@@ -779,3 +779,18 @@ fn pairs(value: &Bound<'_, PyAny>, max: usize) -> PyResult<Vec<(i64, i64)>> {
         })
         .collect()
 }
+
+pub(crate) fn view_value(py: Python<'_>, value: meedee::event_views::Value) -> PyResult<Py<PyAny>> {
+    match value {
+        meedee::event_views::Value::Velocity(value) => {
+            Ok(Py::new(py, VelocityObservation { value })?.into_any())
+        }
+        meedee::event_views::Value::Mpe(value) => {
+            Ok(Py::new(py, ChannelState { value })?.into_any())
+        }
+        meedee::event_views::Value::Timecode(value) => {
+            Ok(Py::new(py, AssemblyResult { value })?.into_any())
+        }
+        _ => Err(PyTypeError::new_err("profile view value expected")),
+    }
+}

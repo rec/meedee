@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from . import messages
+from . import events, messages
 
 class Pitch:
     def __init__(self, *, semitone: int, fraction: int) -> None: ...
@@ -333,3 +333,13 @@ class ReplyTracker:
         *,
         now_ns: int,
     ) -> bool: ...
+
+class EventDecoder:
+    def __init__(self, *, group: int | None = None) -> None: ...
+    def feed(
+        self, value: events.Event | events.StreamDiagnostic
+    ) -> list[events.Observation]: ...
+    def feed_assembled(
+        self, observation: events.Observation
+    ) -> list[events.Observation]: ...
+    def reset(self) -> None: ...

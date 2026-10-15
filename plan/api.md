@@ -782,3 +782,85 @@ unmapped clocks and unresolved discontinuities require explicit caller policy.
 No automatic silencing, reset, connection close or restoration on cancellation.
 Only supervised temporary virtual CoreMIDI endpoint tests are authorized; physical
 instruments, Windows native validation and Pi qualification remain open.
+
+
+## Final slices 8–10 contracts
+
+Rust modules smf/syx/clip/archive/events/live/recording/playback/file_timing and
+source-scoped event_views contain the shared logic. Python uses the same native
+implementations through focused modules; typed transport is composition over the
+sole raw transport implementation. No implicit MIDI 2 downgrade or group collapse
+is introduced. Rust native typed callbacks are available through connect_typed
+and create_virtual_typed; Rust applications compose Decoder/Recorder/playback as
+needed without starting Python. Rust transport remains in-process.
+
+File readers close their owned handles explicitly with close(); borrowed streams
+remain open. Writers require finish, and abandonment never certifies completion.
+Blocking read/write operations release the GIL, but an application-supplied stream
+may itself execute arbitrary Python. File creation/header work remains synchronous.
+File I/O is not protected by MIDI child-process deadlines. Recording's writer uses
+a native file handle, never a Python stream. A stop timeout leaves that handle and
+thread owned until the blocked operation returns; callers must not rewrite the
+same destination while it remains active. Flush does not imply fsync or power-loss
+durability. Creating an output path truncates it using normal file-open semantics.
+
+Raw ReceivedPacket.sequence counts native packets before admission, so an observed
+sequence gap resets typed framing. Counters are checked again at stop/close to
+catch a final dropped packet with no successor. This detects known software loss,
+not driver loss. Completion timestamps remain optional signed native nanoseconds;
+zero is valid. General Timestamp has signed ticks and a rational seconds-per-tick
+Clock. Stream descriptors can link even a timestamp-disabled source to its clock.
+Archive Metadata can carry an optional stream and exact timestamp independently
+of neighboring events. Clock identities are generations, not synchronization.
+
+PacketDecoder emits events and structured diagnostics, including malformed input,
+loss, clock changes and unfinished messages. Typed callbacks use the existing
+blocking-operation guard and run outside internal locks. Receive supports polling,
+timeout, cancellation and close/failure wakeup, with at most 50 ms polling delay.
+Its count/payload admission is independent of the recorder: a slow queue consumer
+can fail while recording remains healthy. Valid queued prefix events remain
+available before that failure is raised. Source-local semantic views consume these
+events/diagnostics and reset on loss, clock change and relevant MIDI resets. Original
+events remain untouched. Unknown contributor times stay None. Quarter-frame time-code
+observations preserve the completion time; the current assembler does not expose a
+precise first-quarter contributor, so their first range/time is None. Poll-only
+expiry observations have no invented native event timestamp.
+
+A recorder is admission, not a per-call disk acknowledgment: record returns False
+after failure, and stop returns the final completion/failure report. Default mode
+stops on input loss, malformed/truncated messages, queue overflow and write failure.
+Best effort stores gap records after input loss; a clock discontinuity still stops.
+Counts and bytes include the in-flight record. Capture start defines admission of
+completed events; a source span can begin before recording was attached. Explicit
+stop detaches capture but leaves input open. Closing input stops its attached
+recording and reports incomplete cleanup; garbage collection is not success.
+
+Playback requires an explicit Timestamp origin. SMF/Clip TimedReader.origin supplies
+a file origin, preserving leading silence. To remove it, callers deliberately use
+the first event's timestamp instead. Mapping applies target seconds = source seconds
+* rate + offset; uncertainty is declared metadata, not a synchronization guarantee.
+Mappings must have distinct source domains and one consistent target, with no
+implicit chaining. Rational arithmetic is checked; conversion to host nanoseconds
+requires exactness unless allow_rounding=True, which reports quantized events.
+Equal-time input order is preserved. Regressing times, missing timestamps, gap or
+discontinuity records and unknown executable records stop replay. Cancellation cannot interrupt a blocked source iterator, synchronous file call,
+application callback or in-process driver operation. No file sorting,
+first-event alignment, automatic cleanup, retry or state restoration is supplied.
+A failed send may already have effects; PlaybackError exposes completed_events,
+report and cause, and compound causes retain their completed-prefix information.
+Streaming verification can discover an invalid trailer after earlier events were
+sent. Preverify first when that is unacceptable.
+
+SMF MergedReader/TimedReader require seekable input and default to 128 selected
+tracks and 8 MiB lookahead payload. Independent track decoders each retain at most
+the selected SysEx payload limit; that memory can multiply by selected track count.
+Raw Reader does not impose those merge limits.
+TimedReader uses exact tempo/SMPTE time and reports out-of-range signed event ticks;
+raw readers can still retain longer unsigned file tick positions. Timed performance
+views omit file metadata; preserve it separately with raw readers/archive Metadata.
+SMF export uses an explicit origin, tempo, target division and optional clock mapping;
+it returns a report without silently dropping unsupported messages. A UMP group
+requires deliberate routing/translation before export. Clip configuration is excluded
+from performance events by default; include_configuration=True explicitly includes
+supported header packets. File clock records and clip markers never become live
+sends. MIDI-CI profile negotiation remains slice 11.

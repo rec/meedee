@@ -46,10 +46,10 @@ impl Read for Stream {
                     .call_method1("read", (b.len(),))
                     .map_err(stream_error)?;
                 let buffer = PyBuffer::<u8>::get(&value).map_err(stream_error)?;
-                let bytes = buffer.to_vec(py).map_err(stream_error)?;
-                if bytes.len() > b.len() {
+                if buffer.dimensions() != 1 || buffer.len_bytes() > b.len() {
                     return Err(io::Error::other("read returned more bytes than requested"));
                 }
+                let bytes = buffer.to_vec(py).map_err(stream_error)?;
                 b[..bytes.len()].copy_from_slice(&bytes);
                 Ok(bytes.len())
             }),
@@ -61,12 +61,16 @@ impl Write for Stream {
         match self {
             Self::File(f) => f.write(b),
             Self::Python(o) => Python::attach(|py| {
-                let n = o
+                let result = o
                     .bind(py)
                     .call_method1("write", (PyBytes::new(py, b),))
-                    .map_err(stream_error)?
-                    .extract::<usize>()
                     .map_err(stream_error)?;
+                if !result.is_exact_instance_of::<pyo3::types::PyInt>() {
+                    return Err(io::Error::other(
+                        "write must return a built-in integer byte count",
+                    ));
+                }
+                let n = result.extract::<usize>().map_err(stream_error)?;
                 if n > b.len() {
                     return Err(io::Error::other("write returned an invalid byte count"));
                 }
@@ -96,11 +100,16 @@ impl Seek for Stream {
                     SeekFrom::Current(n) => (i128::from(n), 1),
                     SeekFrom::End(n) => (i128::from(n), 2),
                 };
-                o.bind(py)
+                let result = o
+                    .bind(py)
                     .call_method1("seek", (a, b))
-                    .map_err(stream_error)?
-                    .extract()
-                    .map_err(stream_error)
+                    .map_err(stream_error)?;
+                if !result.is_exact_instance_of::<pyo3::types::PyInt>() {
+                    return Err(io::Error::other(
+                        "seek must return a built-in integer position",
+                    ));
+                }
+                result.extract().map_err(stream_error)
             }),
         }
     }
@@ -146,10 +155,10 @@ fn __repr__(slf:PyRef<'_,Self>)->PyResult<String>{let py=slf.py();crate::tuning:
 pub(crate) use frozen;
 #[pyclass(frozen, module = "meedee.smf")]
 pub struct Header {
-    value: smf::Header,
+    pub(crate) value: smf::Header,
 }
 frozen!(Header;format,tracks,division,extra;{
-#[new]#[pyo3(signature=(*,format,tracks,division,extra=None))]fn new(format:&Bound<'_,PyAny>,tracks:&Bound<'_,PyAny>,division:&Bound<'_,PyAny>,extra:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:smf::Header::new(uint(format)?.try_into().map_err(|_|PyValueError::new_err("format out of range"))?,uint(tracks)?.try_into().map_err(|_|PyValueError::new_err("tracks out of range"))?,uint(division)?.try_into().map_err(|_|PyValueError::new_err("division out of range"))?,extra.map(|v|bytes(v,usize::MAX)).transpose()?.unwrap_or_default()).map_err(os_error)?})}
+#[new]#[pyo3(signature=(*,format,tracks,division,extra=None))]fn new(format:&Bound<'_,PyAny>,tracks:&Bound<'_,PyAny>,division:&Bound<'_,PyAny>,extra:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:smf::Header::new(uint(format)?.try_into().map_err(|_|PyValueError::new_err("format out of range"))?,uint(tracks)?.try_into().map_err(|_|PyValueError::new_err("tracks out of range"))?,uint(division)?.try_into().map_err(|_|PyValueError::new_err("division out of range"))?,extra.map(|v|bytes(v,usize::MAX)).transpose()?.unwrap_or_default()).map_err(|e|PyValueError::new_err(e.to_string()))?})}
 #[getter]fn format(&self)->u8{self.value.format()}#[getter]fn tracks(&self)->u16{self.value.tracks()}#[getter]fn division(&self)->u16{self.value.division()}#[getter]fn extra<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.extra())}
 });
 #[pyclass(frozen, module = "meedee.smf")]
@@ -157,7 +166,7 @@ pub struct Meta {
     value: (u8, Vec<u8>),
 }
 frozen!(Meta;kind,data;{
-#[new]#[pyo3(signature=(*,kind,data))]fn new(kind:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<Self>{let kind=uint(kind)?.try_into().map_err(|_|PyValueError::new_err("meta kind out of range"))?;let data=bytes(data,usize::MAX)?;smf::validate_meta(kind,&data,0).map_err(os_error)?;Ok(Self{value:(kind,data)})}
+#[new]#[pyo3(signature=(*,kind,data))]fn new(kind:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<Self>{let kind=uint(kind)?.try_into().map_err(|_|PyValueError::new_err("meta kind out of range"))?;let data=bytes(data,usize::MAX)?;smf::validate_meta(kind,&data,0).map_err(|e|PyValueError::new_err(e.to_string()))?;Ok(Self{value:(kind,data)})}
 #[getter]fn kind(&self)->u8{self.value.0}#[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,&self.value.1)}
 });
 #[pyclass(frozen, module = "meedee.smf")]
@@ -252,12 +261,9 @@ impl Reader {
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
-    fn __next__(&mut self) -> PyResult<Option<Event>> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .next()
-            .transpose()
+    fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<Event>> {
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.next().transpose())
             .map(|v| v.map(|value| Event { value }))
             .map_err(os_error)
     }
@@ -289,19 +295,14 @@ impl Writer {
             ),
         })
     }
-    fn write(&mut self, event: PyRef<'_, Event>) -> PyResult<()> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .write(&event.value)
-            .map_err(os_error)
+    fn write(&mut self, py: Python<'_>, event: PyRef<'_, Event>) -> PyResult<()> {
+        let event = event.value.clone();
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.write(&event)).map_err(os_error)
     }
-    fn finish(&mut self) -> PyResult<()> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .finish()
-            .map_err(os_error)?;
+    fn finish(&mut self, py: Python<'_>) -> PyResult<()> {
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.finish()).map_err(os_error)?;
         self.value = None;
         Ok(())
     }
@@ -311,7 +312,7 @@ pub fn closed() -> PyErr {
 }
 #[pyclass(name = "Reader", module = "meedee.syx")]
 struct SyxReader {
-    value: syx::Reader<Stream>,
+    value: Option<syx::Reader<Stream>>,
 }
 #[pymethods]
 impl SyxReader {
@@ -322,19 +323,21 @@ impl SyxReader {
         #[pyo3(from_py_with=limit)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: syx::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?,
+            value: Some(syx::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?),
         })
     }
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
     fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
-        self.value
-            .next()
-            .transpose()
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.next().transpose())
             .map_err(os_error)?
             .map(|v| messages::to_python(py, meedee::messages::AnyMessage::SysEx(v)))
             .transpose()
+    }
+    fn close(&mut self) {
+        self.value = None;
     }
 }
 #[pyfunction]
@@ -350,9 +353,12 @@ fn write_syx(
         let meedee::messages::AnyMessage::SysEx(v) = v else {
             return Err(PyTypeError::new_err("SYX accepts only SysEx"));
         };
-        syx::write(&mut stream, &v, payload_limit).map_err(os_error)?;
+        destination
+            .py()
+            .detach(|| syx::write(&mut stream, &v, payload_limit))
+            .map_err(os_error)?;
     }
-    stream.flush().map_err(os_error)
+    destination.py().detach(|| stream.flush()).map_err(os_error)
 }
 #[pyclass(name = "Entry", frozen, module = "meedee.clip")]
 struct ClipEntry {
@@ -375,7 +381,7 @@ impl ClipEntry {
 }
 #[pyclass(name = "Reader", module = "meedee.clip")]
 struct ClipReader {
-    value: clip::Reader<Stream>,
+    value: Option<clip::Reader<Stream>>,
 }
 #[pymethods]
 impl ClipReader {
@@ -386,18 +392,22 @@ impl ClipReader {
         #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: clip::Reader::new(Stream::input(source)?, preserve_unknown).map_err(os_error)?,
+            value: Some(
+                clip::Reader::new(Stream::input(source)?, preserve_unknown).map_err(os_error)?,
+            ),
         })
     }
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
-    fn __next__(&mut self) -> PyResult<Option<ClipEntry>> {
-        self.value
-            .next()
-            .transpose()
+    fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<ClipEntry>> {
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.next().transpose())
             .map_err(os_error)
             .map(|v| v.map(|value| ClipEntry { value }))
+    }
+    fn close(&mut self) {
+        self.value = None;
     }
 }
 #[pyclass(name = "Writer", module = "meedee.clip")]
@@ -412,19 +422,14 @@ impl ClipWriter {
             value: Some(clip::Writer::new(Stream::output(destination)?).map_err(os_error)?),
         })
     }
-    fn write(&mut self, message: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .write(&crate::ump::extract(message)?)
-            .map_err(os_error)
+    fn write(&mut self, py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<()> {
+        let message = crate::ump::extract(message)?;
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.write(&message)).map_err(os_error)
     }
-    fn finish(&mut self) -> PyResult<()> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .finish()
-            .map_err(os_error)?;
+    fn finish(&mut self, py: Python<'_>) -> PyResult<()> {
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.finish()).map_err(os_error)?;
         self.value = None;
         Ok(())
     }

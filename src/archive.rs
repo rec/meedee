@@ -8,11 +8,12 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
 #[pyclass(frozen, module = "meedee.archive")]
 pub struct Stream {
-    value: (String, String),
+    value: (String, String, Option<String>),
 }
-frozen!(Stream;id,label;{
-#[new]#[pyo3(signature=(*,id,label))]fn new(id:String,label:String)->PyResult<Self>{if id.is_empty(){return Err(pyo3::exceptions::PyValueError::new_err("empty stream identity"));}Ok(Self{value:(id,label)})}
+frozen!(Stream;id,label,clock_identity;{
+#[new]#[pyo3(signature=(*,id,label,clock_identity=None))]fn new(id:String,label:String,clock_identity:Option<String>)->PyResult<Self>{if id.is_empty(){return Err(pyo3::exceptions::PyValueError::new_err("empty stream identity"));}Ok(Self{value:(id,label,clock_identity)})}
 #[getter]fn id(&self)->&str{&self.value.0}#[getter]fn label(&self)->&str{&self.value.1}
+#[getter]fn clock_identity(&self)->Option<&str>{self.value.2.as_deref()}
 });
 #[pyclass(frozen, module = "meedee.archive")]
 pub struct Gap {
@@ -32,11 +33,18 @@ frozen!(Discontinuity;stream,reason;{
 });
 #[pyclass(frozen, module = "meedee.archive")]
 pub struct Metadata {
-    value: (String, Vec<u8>),
+    value: (
+        String,
+        Vec<u8>,
+        Option<String>,
+        Option<meedee::events::Timestamp>,
+    ),
 }
-frozen!(Metadata;key,data;{
-#[new]#[pyo3(signature=(*,key,data))]fn new(key:String,data:&Bound<'_,PyAny>)->PyResult<Self>{Ok(Self{value:(key,bytes(data,usize::MAX)?)})}
+frozen!(Metadata;key,data,stream,timestamp;{
+#[new]#[pyo3(signature=(*,key,data,stream=None,timestamp=None))]fn new(key:String,data:&Bound<'_,PyAny>,stream:Option<String>,timestamp:Option<PyRef<'_,crate::event_values::Timestamp>>)->PyResult<Self>{Ok(Self{value:(key,bytes(data,usize::MAX)?,stream,timestamp.map(|t|t.value.clone()))})}
 #[getter]fn key(&self)->&str{&self.value.0}#[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,&self.value.1)}
+#[getter]fn stream(&self)->Option<&str>{self.value.2.as_deref()}
+#[getter]fn timestamp(&self)->Option<crate::event_values::Timestamp>{self.value.3.clone().map(|value|crate::event_values::Timestamp{value})}
 });
 #[pyclass(frozen, module = "meedee.archive")]
 pub struct Opaque {
@@ -54,6 +62,7 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
         return Ok(model::Record::Stream {
             id: v.value.0.clone(),
             label: v.value.1.clone(),
+            clock_identity: v.value.2.clone(),
         });
     }
     if let Ok(v) = v.extract::<PyRef<'_, Event>>() {
@@ -76,6 +85,8 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
         return Ok(model::Record::Metadata {
             key: v.value.0.clone(),
             data: v.value.1.clone(),
+            stream: v.value.2.clone(),
+            timestamp: v.value.3.clone(),
         });
     }
     if let Ok(v) = v.extract::<PyRef<'_, Opaque>>() {
@@ -91,9 +102,17 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
 pub fn to_python(py: Python<'_>, r: model::Record) -> PyResult<Py<PyAny>> {
     match r {
         model::Record::Clock(value) => Ok(Py::new(py, Clock { value })?.into_any()),
-        model::Record::Stream { id, label } => {
-            Ok(Py::new(py, Stream { value: (id, label) })?.into_any())
-        }
+        model::Record::Stream {
+            id,
+            label,
+            clock_identity,
+        } => Ok(Py::new(
+            py,
+            Stream {
+                value: (id, label, clock_identity),
+            },
+        )?
+        .into_any()),
         model::Record::Event(value) => Ok(Py::new(py, Event { value: *value })?.into_any()),
         model::Record::Gap {
             stream,
@@ -113,9 +132,18 @@ pub fn to_python(py: Python<'_>, r: model::Record) -> PyResult<Py<PyAny>> {
             },
         )?
         .into_any()),
-        model::Record::Metadata { key, data } => {
-            Ok(Py::new(py, Metadata { value: (key, data) })?.into_any())
-        }
+        model::Record::Metadata {
+            key,
+            data,
+            stream,
+            timestamp,
+        } => Ok(Py::new(
+            py,
+            Metadata {
+                value: (key, data, stream, timestamp),
+            },
+        )?
+        .into_any()),
         model::Record::Opaque { kind, data } => Ok(Py::new(
             py,
             Opaque {
@@ -127,7 +155,9 @@ pub fn to_python(py: Python<'_>, r: model::Record) -> PyResult<Py<PyAny>> {
 }
 #[pyclass(module = "meedee.archive")]
 struct Reader {
-    value: model::Reader<IoStream>,
+    value: Option<model::Reader<IoStream>>,
+    complete: bool,
+    problem: Option<String>,
 }
 #[pymethods]
 impl Reader {
@@ -140,33 +170,42 @@ impl Reader {
         #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: model::Reader::new(
-                IoStream::input(source)?,
-                payload_limit,
-                recover,
-                preserve_unknown,
-            )
-            .map_err(os_error)?,
+            complete: false,
+            problem: None,
+            value: Some(
+                model::Reader::new(
+                    IoStream::input(source)?,
+                    payload_limit,
+                    recover,
+                    preserve_unknown,
+                )
+                .map_err(os_error)?,
+            ),
         })
     }
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
     fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
-        self.value
-            .next()
-            .transpose()
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        let result = py.detach(|| value.next().transpose());
+        self.complete = value.complete;
+        self.problem = value.problem.clone();
+        result
             .map_err(os_error)?
             .map(|v| to_python(py, v))
             .transpose()
     }
+    fn close(&mut self) {
+        self.value = None;
+    }
     #[getter]
     fn complete(&self) -> bool {
-        self.value.complete
+        self.complete
     }
     #[getter]
     fn problem(&self) -> Option<&str> {
-        self.value.problem.as_deref()
+        self.problem.as_deref()
     }
 }
 #[pyclass(module = "meedee.archive")]
@@ -188,23 +227,20 @@ impl Writer {
             ),
         })
     }
-    fn write(&mut self, record: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .write(&extract(record)?)
-            .map_err(os_error)
+    fn write(&mut self, py: Python<'_>, record: &Bound<'_, PyAny>) -> PyResult<()> {
+        let record = extract(record)?;
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.write(&record)).map_err(os_error)
     }
     #[pyo3(signature=(*,complete=true,reason=""))]
     fn finish(
         &mut self,
+        py: Python<'_>,
         #[pyo3(from_py_with=crate::ump::boolean)] complete: bool,
         reason: &str,
     ) -> PyResult<()> {
-        self.value
-            .as_mut()
-            .ok_or_else(closed)?
-            .finish(complete, reason)
+        let value = self.value.as_mut().ok_or_else(closed)?;
+        py.detach(|| value.finish(complete, reason))
             .map_err(os_error)?;
         self.value = None;
         Ok(())

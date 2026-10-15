@@ -1,10 +1,11 @@
 """Raw byte/UMP transport backed by the shared Rust toolkit."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from os import PathLike
 from types import TracebackType
 from typing import ClassVar
 
-from . import events, gm, messages, mpe
+from . import archive, events, gm, messages, mpe
 
 __version__: str
 
@@ -156,6 +157,105 @@ class OutputConnection:
     def closed(self) -> bool: ...
     def close(self) -> None: ...
     def __enter__(self) -> OutputConnection: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+class TypedInput:
+    def __init__(
+        self,
+        *,
+        protocol: Protocol = Protocol.Midi1,
+        backend: Backend | None = None,
+        timestamps: TimestampMode = TimestampMode.Absolute,
+        isolated: bool = True,
+        timeout: float = 5.0,
+        receive_byte_limit: int = 8_388_608,
+        event_limit: int = 128,
+        sysex_limit: int = 1_048_576,
+    ) -> None: ...
+    def ports(self) -> list[Port]: ...
+    def connect(
+        self,
+        port: Port,
+        callback: Callable[[events.Event | events.StreamDiagnostic], object]
+        | None = None,
+    ) -> TypedInputConnection: ...
+    def create_virtual(
+        self,
+        name: str,
+        callback: Callable[[events.Event | events.StreamDiagnostic], object]
+        | None = None,
+    ) -> TypedInputConnection: ...
+
+class TypedInputConnection:
+    @property
+    def stream(self) -> str: ...
+    @property
+    def clock(self) -> events.Clock: ...
+    @property
+    def closed(self) -> bool: ...
+    @property
+    def failure(self) -> Exception | None: ...
+    @property
+    def recording_report(self) -> archive.RecordingReport | None: ...
+    def receive(
+        self, *, timeout: float | None = None, cancel: events.Cancellation | None = None
+    ) -> events.Event | events.StreamDiagnostic | None: ...
+    def start_recording(
+        self,
+        destination: str | PathLike[str],
+        *,
+        label: str = "",
+        best_effort: bool = False,
+        payload_limit: int = 1_048_576,
+        record_limit: int = 128,
+        byte_limit: int = 8_388_608,
+    ) -> archive.Recorder: ...
+    def stop_recording(self, *, timeout: float = 5.0) -> archive.RecordingReport: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> TypedInputConnection: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+class TypedOutput:
+    def __init__(
+        self,
+        *,
+        protocol: Protocol = Protocol.Midi1,
+        backend: Backend | None = None,
+        isolated: bool = True,
+        timeout: float = 5.0,
+    ) -> None: ...
+    def ports(self) -> list[Port]: ...
+    def connect(self, port: Port) -> TypedOutputConnection: ...
+    def create_virtual(self, name: str) -> TypedOutputConnection: ...
+
+class TypedOutputConnection:
+    def play(
+        self,
+        source: Iterable[object],
+        *,
+        origin: events.Timestamp,
+        mappings: list[events.ClockMapping]
+        | tuple[events.ClockMapping, ...]
+        | None = None,
+        cancel: events.Cancellation | None = None,
+        allow_rounding: bool = False,
+    ) -> events.PlaybackReport: ...
+    def send_message(self, message: messages.Message) -> None: ...
+    def send_command(self, command: messages.Message) -> None: ...
+    @property
+    def closed(self) -> bool: ...
+    def close(self) -> None: ...
+    def __enter__(self) -> TypedOutputConnection: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,

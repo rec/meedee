@@ -164,6 +164,21 @@ impl Rational {
                 .ok_or_else(|| invalid(0, "rational overflow"))?,
         )
     }
+    pub fn checked_sub(self, rhs: Self) -> io::Result<Self> {
+        let g = gcd(self.denominator as u128, rhs.denominator as u128) as i128;
+        let a = self.denominator / g;
+        let b = rhs.denominator / g;
+        let n = self
+            .numerator
+            .checked_mul(b)
+            .and_then(|v| rhs.numerator.checked_mul(a).and_then(|r| v.checked_sub(r)))
+            .ok_or_else(|| invalid(0, "rational overflow"))?;
+        Self::new(
+            n,
+            a.checked_mul(rhs.denominator)
+                .ok_or_else(|| invalid(0, "rational overflow"))?,
+        )
+    }
     pub fn multiply(self, n: i128, d: i128) -> io::Result<Self> {
         let rhs = Self::new(n, d)?;
         let a = gcd(self.numerator.unsigned_abs(), rhs.denominator as u128) as i128;
@@ -206,4 +221,26 @@ fn gcd(mut a: u128, mut b: u128) -> u128 {
 pub fn timestamp_seconds(t: &Timestamp) -> io::Result<Rational> {
     Rational::new(i128::from(t.ticks), 1)?
         .multiply(t.clock.numerator().into(), t.clock.denominator().into())
+}
+
+/// Opaque conversion/connection generation identity. It is not a timestamp origin.
+pub(crate) fn fresh_identity(kind: &str) -> io::Result<String> {
+    use std::sync::{
+        atomic::{AtomicU64, Ordering},
+        OnceLock,
+    };
+    static NAMESPACE: OnceLock<String> = OnceLock::new();
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let namespace = NAMESPACE
+        .get_or_init(|| format!("{}:{:?}", std::process::id(), std::time::SystemTime::now()));
+    let mut n = NEXT.load(Ordering::Relaxed);
+    loop {
+        let next = n
+            .checked_add(1)
+            .ok_or_else(|| invalid(0, "clock generation space exhausted"))?;
+        match NEXT.compare_exchange_weak(n, next, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => return Ok(format!("{namespace}:{kind}:{n}")),
+            Err(current) => n = current,
+        }
+    }
 }

@@ -12,6 +12,7 @@ pub enum Record {
     Stream {
         id: String,
         label: String,
+        clock_identity: Option<String>,
     },
     Event(Box<Event>),
     Gap {
@@ -22,6 +23,8 @@ pub enum Record {
     Metadata {
         key: String,
         data: Vec<u8>,
+        stream: Option<String>,
+        timestamp: Option<Timestamp>,
     },
     Discontinuity {
         stream: String,
@@ -35,7 +38,7 @@ pub enum Record {
 #[derive(Default)]
 struct Registry {
     clocks: BTreeMap<String, Clock>,
-    streams: BTreeMap<String, String>,
+    streams: BTreeMap<String, (String, Option<String>)>,
     bytes: usize,
     records: u64,
 }
@@ -56,7 +59,11 @@ impl Registry {
                 self.bytes += n;
                 self.clocks.insert(c.identity().into(), c.clone());
             }
-            Record::Stream { id, label } => {
+            Record::Stream {
+                id,
+                label,
+                clock_identity,
+            } => {
                 if id.is_empty()
                     || self.streams.contains_key(id)
                     || self.clocks.len() + self.streams.len() >= 128
@@ -66,12 +73,19 @@ impl Registry {
                         "invalid/duplicate stream or descriptor count limit",
                     ));
                 }
-                let n = id.len() + label.len();
+                if clock_identity
+                    .as_ref()
+                    .is_some_and(|id| !self.clocks.contains_key(id))
+                {
+                    return Err(invalid(0, "stream clock is undeclared"));
+                }
+                let n = id.len() + label.len() + clock_identity.as_ref().map_or(0, |id| id.len());
                 if n > 8_388_608usize.saturating_sub(self.bytes) {
                     return Err(invalid(0, "descriptor byte limit"));
                 }
                 self.bytes += n;
-                self.streams.insert(id.clone(), label.clone());
+                self.streams
+                    .insert(id.clone(), (label.clone(), clock_identity.clone()));
             }
             Record::Event(e) => {
                 e.validate()?;
@@ -83,8 +97,44 @@ impl Registry {
                         .iter()
                         .flat_map(|s| s.first_timestamp.iter().chain(s.last_timestamp.iter())),
                 ) {
+                    if self
+                        .streams
+                        .get(&e.stream)
+                        .and_then(|s| s.1.as_ref())
+                        .is_some_and(|id| id != t.clock.identity())
+                    {
+                        return Err(invalid(0, "event clock differs from its stream descriptor"));
+                    }
                     if self.clocks.get(t.clock.identity()) != Some(&t.clock) {
                         return Err(invalid(0, "timestamp clock is undeclared or inconsistent"));
+                    }
+                }
+            }
+            Record::Metadata {
+                stream, timestamp, ..
+            } => {
+                if stream
+                    .as_ref()
+                    .is_some_and(|s| !self.streams.contains_key(s))
+                {
+                    return Err(invalid(0, "metadata stream is undeclared"));
+                }
+                if let Some(t) = timestamp {
+                    if t.clock.mode() == Some(false)
+                        || self.clocks.get(t.clock.identity()) != Some(&t.clock)
+                    {
+                        return Err(invalid(
+                            0,
+                            "metadata timestamp clock is disabled, undeclared or inconsistent",
+                        ));
+                    }
+                    if stream
+                        .as_ref()
+                        .and_then(|s| self.streams.get(s))
+                        .and_then(|s| s.1.as_ref())
+                        .is_some_and(|id| id != t.clock.identity())
+                    {
+                        return Err(invalid(0, "metadata clock differs from its stream"));
                     }
                 }
             }
@@ -200,9 +250,17 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
             });
             1
         }
-        Record::Stream { id, label } => {
+        Record::Stream {
+            id,
+            label,
+            clock_identity,
+        } => {
             string(&mut out, id)?;
             string(&mut out, label)?;
+            out.push(u8::from(clock_identity.is_some()));
+            if let Some(id) = clock_identity {
+                string(&mut out, id)?;
+            }
             2
         }
         Record::Event(e) => {
@@ -242,7 +300,17 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
             string(&mut out, reason)?;
             4
         }
-        Record::Metadata { key, data } => {
+        Record::Metadata {
+            key,
+            data,
+            stream,
+            timestamp: time,
+        } => {
+            out.push(u8::from(stream.is_some()));
+            if let Some(stream) = stream {
+                string(&mut out, stream)?;
+            }
+            timestamp(&mut out, time.as_ref())?;
             string(&mut out, key)?;
             blob(&mut out, data)?;
             5
@@ -359,10 +427,16 @@ fn decode(body: &[u8], clocks: &BTreeMap<String, Clock>, preserve: bool) -> io::
             }
             Record::Clock(c)
         }
-        2 => Record::Stream {
-            id: f.string()?,
-            label: f.string()?,
-        },
+        2 => {
+            let id = f.string()?;
+            let label = f.string()?;
+            let clock_identity = if f.flag()? { Some(f.string()?) } else { None };
+            Record::Stream {
+                id,
+                label,
+                clock_identity,
+            }
+        }
         3 => {
             let stream = f.string()?;
             let timestamp = f.timestamp(clocks)?;
@@ -430,10 +504,16 @@ fn decode(body: &[u8], clocks: &BTreeMap<String, Clock>, preserve: bool) -> io::
             lost: f.u64()?,
             reason: f.string()?,
         },
-        5 => Record::Metadata {
-            key: f.string()?,
-            data: f.blob()?,
-        },
+        5 => {
+            let stream = if f.flag()? { Some(f.string()?) } else { None };
+            let timestamp = f.timestamp(clocks)?;
+            Record::Metadata {
+                stream,
+                timestamp,
+                key: f.string()?,
+                data: f.blob()?,
+            }
+        }
         6 => Record::Discontinuity {
             stream: f.string()?,
             reason: f.string()?,
@@ -503,7 +583,11 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
                 + if c.backend().is_some() { 4 } else { 0 }
                 + 1
         }
-        Record::Stream { id, label } => 10 + id.len() + label.len(),
+        Record::Stream {
+            id,
+            label,
+            clock_identity,
+        } => 11 + id.len() + label.len() + clock_identity.as_ref().map_or(0, |id| 4 + id.len()),
         Record::Event(e) => {
             let p = match &e.message {
                 Payload::Midi1(m::AnyMessage::SysEx(v)) => v.data().len() + 2,
@@ -522,7 +606,17 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
         }
         Record::Gap { stream, reason, .. } => 18 + stream.len() + reason.len(),
         Record::Discontinuity { stream, reason } => 10 + stream.len() + reason.len(),
-        Record::Metadata { key, data } => 10 + key.len() + data.len(),
+        Record::Metadata {
+            key,
+            data,
+            stream,
+            timestamp,
+        } => {
+            11 + key.len()
+                + data.len()
+                + stream.as_ref().map_or(0, |s| 4 + s.len())
+                + timestamp_size(timestamp.as_ref())
+        }
         Record::Opaque { data, .. } => 2 + data.len(),
     };
     Ok(n)

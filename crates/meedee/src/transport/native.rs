@@ -20,6 +20,7 @@ pub(super) struct Receiver {
     pub retired: AtomicBool,
     pub panicked: AtomicBool,
     pub dropped: AtomicU64,
+    sequence: AtomicU64,
     limit: usize,
     used: AtomicUsize,
 }
@@ -38,11 +39,29 @@ impl Receiver {
             retired: AtomicBool::new(false),
             panicked: AtomicBool::new(false),
             dropped: AtomicU64::new(0),
+            sequence: AtomicU64::new(0),
             limit,
             used: AtomicUsize::new(0),
         }
     }
 
+    fn next_sequence(&self) -> Option<u64> {
+        let mut n = self.sequence.load(Ordering::Relaxed);
+        loop {
+            let Some(next) = n.checked_add(1) else {
+                self.retired.store(true, Ordering::SeqCst);
+                self.dropped.fetch_add(1, Ordering::Relaxed);
+                return None;
+            };
+            match self
+                .sequence
+                .compare_exchange_weak(n, next, Ordering::Relaxed, Ordering::Relaxed)
+            {
+                Ok(_) => return Some(n),
+                Err(current) => n = current,
+            }
+        }
+    }
     fn admit(&self, size: usize) -> Option<Payload<'_>> {
         let mut used = self.used.load(Ordering::Relaxed);
         loop {
@@ -66,8 +85,9 @@ impl Receiver {
         }
     }
 
-    fn deliver(&self, timestamp: i64, packet: Packet) {
+    fn deliver(&self, sequence: u64, timestamp: i64, packet: Packet) {
         if self.retired.load(Ordering::SeqCst) {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
             return;
         }
         let mut slot = self.handler.lock().unwrap_or_else(|p| p.into_inner());
@@ -75,6 +95,7 @@ impl Receiver {
             slot = self.changed.wait(slot).unwrap_or_else(|p| p.into_inner());
         }
         if self.retired.load(Ordering::SeqCst) {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
             return;
         }
         let Some(mut handler) = slot.take() else {
@@ -86,6 +107,7 @@ impl Receiver {
         let _scope = CallbackScope::enter();
         let result = catch_unwind(AssertUnwindSafe(|| {
             handler(ReceivedPacket {
+                sequence,
                 timestamp_ns: (self.clock.mode == TimestampMode::Absolute).then_some(timestamp),
                 clock: self.clock,
                 packet,
@@ -555,6 +577,9 @@ unsafe extern "C" fn on_bytes(ctx: *mut c_void, timestamp: i64, bytes: *const u8
     if receiver.retired.load(Ordering::SeqCst) {
         return;
     }
+    let Some(sequence) = receiver.next_sequence() else {
+        return;
+    };
     if size > receiver.limit || size > isize::MAX as usize || (size != 0 && bytes.is_null()) {
         receiver.dropped.fetch_add(1, Ordering::Relaxed);
         return;
@@ -571,7 +596,7 @@ unsafe extern "C" fn on_bytes(ctx: *mut c_void, timestamp: i64, bytes: *const u8
         return;
     };
     match copy(data) {
-        Ok(data) => receiver.deliver(timestamp, Packet::Bytes(data)),
+        Ok(data) => receiver.deliver(sequence, timestamp, Packet::Bytes(data)),
         Err(_) => {
             receiver.dropped.fetch_add(1, Ordering::Relaxed);
         }
@@ -584,6 +609,9 @@ unsafe extern "C" fn on_words(ctx: *mut c_void, timestamp: i64, words: *const u3
     if receiver.retired.load(Ordering::SeqCst) {
         return;
     }
+    let Some(sequence) = receiver.next_sequence() else {
+        return;
+    };
     if size > receiver.limit / 4 || size > isize::MAX as usize / 4 || (size != 0 && words.is_null())
     {
         receiver.dropped.fetch_add(1, Ordering::Relaxed);
@@ -600,7 +628,7 @@ unsafe extern "C" fn on_words(ctx: *mut c_void, timestamp: i64, words: *const u3
         return;
     };
     match copy(data) {
-        Ok(data) => receiver.deliver(timestamp, Packet::Ump(data)),
+        Ok(data) => receiver.deliver(sequence, timestamp, Packet::Ump(data)),
         Err(_) => {
             receiver.dropped.fetch_add(1, Ordering::Relaxed);
         }
@@ -657,9 +685,11 @@ mod tests {
         let first = receiver_channel.recv().unwrap();
         assert_eq!(first.packet, Packet::Bytes(vec![0x90, 60, 100]));
         assert_eq!(first.timestamp_ns, Some(0));
+        assert_eq!(first.sequence, 0);
         let second = receiver_channel.recv().unwrap();
         assert_eq!(second.packet, Packet::Ump(vec![0x40903c00, 0xc0000000]));
         assert_eq!(second.timestamp_ns, Some(i64::MAX));
+        assert_eq!(second.sequence, 1);
         assert_eq!(first.clock, receiver.clock);
     }
 

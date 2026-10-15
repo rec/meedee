@@ -283,6 +283,7 @@ impl<W: Write + Seek> Writer<W> {
         if limit == 0 || header.extra.len() > limit {
             return Err(invalid(0, "invalid payload limit/header size"));
         }
+        inner.stream_position()?;
         inner.write_all(b"MThd")?;
         inner.write_all(
             &(6u32
@@ -424,4 +425,179 @@ pub fn vlq(mut n: u32) -> Vec<u8> {
     }
     b.reverse();
     b
+}
+
+#[derive(Clone)]
+struct TrackState {
+    position: u64,
+    end: u64,
+    tick: u64,
+    running: Option<u8>,
+    ended: bool,
+}
+/// Seek-based performance ordering, one bounded lookahead record per selected track.
+/// Non-track chunks remain available through Reader, not this performance view.
+pub struct MergedReader<R> {
+    reader: Reader<R>,
+    pub header: Header,
+    base: u64,
+    tracks: Vec<TrackState>,
+    pending: Vec<Option<Event>>,
+    heap: std::collections::BinaryHeap<std::cmp::Reverse<(u64, usize)>>,
+    refill: Option<usize>,
+    used: usize,
+    byte_limit: usize,
+    failed: bool,
+}
+impl<R: Read + Seek> MergedReader<R> {
+    pub fn new(
+        mut inner: R,
+        limit: usize,
+        track_limit: usize,
+        byte_limit: usize,
+        sequence: Option<u16>,
+    ) -> io::Result<Self> {
+        if track_limit == 0 || byte_limit == 0 {
+            return Err(invalid(0, "merge limits must be positive"));
+        }
+        let base = inner.stream_position()?;
+        let file_end = inner.seek(SeekFrom::End(0))?;
+        inner.seek(SeekFrom::Start(base))?;
+        let mut reader = Reader::new(inner, limit)?;
+        let header = reader.header.clone();
+        if usize::from(header.tracks) > track_limit {
+            return Err(invalid(0, "track merge limit"));
+        }
+        if header.format == 2 {
+            if sequence.is_none_or(|n| n >= header.tracks) {
+                return Err(invalid(
+                    0,
+                    "type 2 requires an explicit valid sequence index",
+                ));
+            }
+        } else if sequence.is_some() {
+            return Err(invalid(0, "sequence selection applies only to type 2"));
+        }
+        let mut tracks = vec![];
+        while let Some(first) = reader.source.optional_byte()? {
+            let t = reader.source.array::<3>()?;
+            let id = [first, t[0], t[1], t[2]];
+            let n = u32::from_be_bytes(reader.source.array()?) as u64;
+            let end = reader
+                .source
+                .offset
+                .checked_add(n)
+                .ok_or_else(|| invalid(reader.source.offset, "chunk length overflow"))?;
+            if end > file_end - base {
+                return Err(invalid(reader.source.offset, "chunk extends beyond input"));
+            }
+            if id == *b"MTrk" {
+                if tracks.len() >= usize::from(header.tracks) {
+                    return Err(invalid(reader.source.offset, "extra track"));
+                }
+                tracks.push(TrackState {
+                    position: reader.source.offset,
+                    end,
+                    tick: 0,
+                    running: None,
+                    ended: false,
+                });
+            } else if id == *b"MThd" {
+                return Err(invalid(reader.source.offset, "duplicate header"));
+            }
+            reader.source.inner.seek(SeekFrom::Start(base + end))?;
+            reader.source.offset = end;
+        }
+        if tracks.len() != usize::from(header.tracks) {
+            return Err(invalid(reader.source.offset, "missing tracks"));
+        }
+        let pending = vec![None; tracks.len()];
+        let mut result = Self {
+            reader,
+            header,
+            base,
+            tracks,
+            pending,
+            heap: std::collections::BinaryHeap::new(),
+            refill: None,
+            used: 0,
+            byte_limit,
+            failed: false,
+        };
+        for i in 0..result.tracks.len() {
+            if sequence.is_none_or(|n| usize::from(n) == i) {
+                result.fill(i)?;
+            }
+        }
+        Ok(result)
+    }
+    fn fill(&mut self, i: usize) -> io::Result<()> {
+        let state = &self.tracks[i];
+        if state.ended {
+            return Ok(());
+        }
+        self.reader
+            .source
+            .inner
+            .seek(SeekFrom::Start(self.base + state.position))?;
+        self.reader.source.offset = state.position;
+        self.reader.end = state.end;
+        self.reader.tick = state.tick;
+        self.reader.running = state.running;
+        self.reader.track = i as u16 + 1;
+        self.reader.ended = false;
+        let event = self
+            .reader
+            .read_event()?
+            .ok_or_else(|| invalid(state.position, "missing track event"))?;
+        if self.reader.ended && self.reader.source.offset != state.end {
+            return Err(invalid(self.reader.source.offset, "data after EndOfTrack"));
+        }
+        self.tracks[i] = TrackState {
+            position: self.reader.source.offset,
+            end: self.reader.end,
+            tick: self.reader.tick,
+            running: self.reader.running,
+            ended: self.reader.ended,
+        };
+        let n = record_size(&event.record);
+        if n > self.byte_limit.saturating_sub(self.used) {
+            return Err(invalid(
+                self.reader.source.offset,
+                "track lookahead byte limit",
+            ));
+        }
+        self.used += n;
+        self.heap.push(std::cmp::Reverse((event.tick, i)));
+        self.pending[i] = Some(event);
+        Ok(())
+    }
+}
+impl<R: Read + Seek> Iterator for MergedReader<R> {
+    type Item = io::Result<Event>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.failed {
+            return None;
+        }
+        if let Some(i) = self.refill.take() {
+            if let Err(e) = self.fill(i) {
+                self.failed = true;
+                return Some(Err(e));
+            }
+        }
+        let std::cmp::Reverse((_, i)) = self.heap.pop()?;
+        let event = self.pending[i].take().expect("heap indexes pending event");
+        self.used -= record_size(&event.record);
+        self.refill = Some(i);
+        Some(Ok(event))
+    }
+}
+fn record_size(r: &Record) -> usize {
+    match r {
+        Record::Message(AnyMessage::SysEx(v)) => v.data().len() + 2,
+        Record::Message(v) => v.encode().len(),
+        Record::Meta { data, .. } | Record::SysEx { data, .. } | Record::Chunk { data, .. } => {
+            data.len()
+        }
+    }
 }

@@ -28,6 +28,18 @@ impl Decoder {
         }
     }
     pub fn feed(&mut self, words: &[u32]) -> Vec<DecodeOutput> {
+        self.feed_spanned(words)
+            .into_iter()
+            .map(|(v, _, _)| v)
+            .collect()
+    }
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+    pub fn pending_start(&self) -> Option<usize> {
+        (!self.pending.is_empty()).then_some(self.start)
+    }
+    pub fn feed_spanned(&mut self, words: &[u32]) -> Vec<(DecodeOutput, usize, usize)> {
         let mut out = Vec::new();
         for &w in words {
             if self.pending.is_empty() {
@@ -36,13 +48,14 @@ impl Decoder {
             self.pending.push(w);
             self.offset = self.offset.saturating_add(1);
             if self.pending.len() == word_count(self.pending[0]) {
-                out.push(match decode(&self.pending, self.preserve_unknown) {
+                let item = match decode(&self.pending, self.preserve_unknown) {
                     Ok(v) => DecodeOutput::Message(v),
                     Err(e) => DecodeOutput::Diagnostic(DecodeDiagnostic {
                         word_offset: self.start,
                         reason: e.to_string(),
                     }),
-                });
+                };
+                out.push((item, self.start, self.offset - 1));
                 self.pending.clear();
             }
         }
@@ -119,6 +132,7 @@ struct Key {
 }
 #[derive(Clone, Debug)]
 struct Pending {
+    first_index: usize,
     data: Vec<u8>,
     packets: usize,
     discard: bool,
@@ -130,6 +144,9 @@ pub struct Assembler {
     max_streams: usize,
     pending: BTreeMap<Key, Pending>,
     bytes: usize,
+    next_index: usize,
+    current_index: usize,
+    completed_start: Option<usize>,
 }
 impl Assembler {
     pub fn new(
@@ -146,6 +163,9 @@ impl Assembler {
             max_streams,
             pending: BTreeMap::new(),
             bytes: 0,
+            next_index: 0,
+            current_index: 0,
+            completed_start: None,
         })
     }
     pub fn retained_bytes(&self) -> usize {
@@ -164,6 +184,32 @@ impl Assembler {
         vec![AssemblyItem::Diagnostic(AssemblyDiagnostic::Truncated); count]
     }
     pub fn feed(&mut self, value: &UmpMessage) -> Vec<AssemblyItem> {
+        self.feed_spanned(value)
+            .into_iter()
+            .map(|(v, _, _)| v)
+            .collect()
+    }
+    pub fn feed_spanned(&mut self, value: &UmpMessage) -> Vec<(AssemblyItem, usize, usize)> {
+        let index = self.next_index;
+        self.current_index = index;
+        self.next_index = self.next_index.saturating_add(1);
+        self.completed_start = None;
+        let out = self.accept(value);
+        out.into_iter()
+            .map(|v| {
+                let start = if matches!(v, AssemblyItem::Data(_)) {
+                    self.completed_start.unwrap_or(index)
+                } else {
+                    index
+                };
+                (v, start, index)
+            })
+            .collect()
+    }
+    pub(crate) fn retained_indexes(&self) -> Vec<usize> {
+        self.pending.values().map(|p| p.first_index).collect()
+    }
+    fn accept(&mut self, value: &UmpMessage) -> Vec<AssemblyItem> {
         let words = value.encode_words();
         let mt = words[0] >> 28;
         let group = if matches!(mt, 1..=5 | 13) {
@@ -276,6 +322,7 @@ impl Assembler {
             self.pending.insert(
                 key.clone(),
                 Pending {
+                    first_index: self.current_index,
                     data: Vec::new(),
                     packets: 0,
                     discard: false,
@@ -332,6 +379,7 @@ impl Assembler {
                 if invalid {
                     out.push(AssemblyItem::Diagnostic(AssemblyDiagnostic::MalformedText));
                 } else {
+                    self.completed_start = Some(pending.first_index);
                     out.push(AssemblyItem::Data(AssembledData {
                         kind: key.kind,
                         group: key.group,
