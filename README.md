@@ -9,7 +9,8 @@ imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
 runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
-are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
+are implemented but native platform qualification remains open. Immutable
+MIDI 1.0 messages and a bounded incremental byte
 codec, fine controls, RPN/NRPN commands and MIDI Tuning Standard values/codecs
 are available, along with GM sound maps and selected profile codecs/helpers.
 UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
@@ -448,6 +449,12 @@ Release CI remains triggered only by a published release, testing Python 3.11
 and 3.15 on Linux, macOS arm64/Intel and Windows. It includes native regression
 checks, Rust/Python checks, source/wheel builds and installed-package tests.
 Configured jobs are not evidence of a passing release run.
+
+The opt-in [qualification procedure](plan/qualification.md) provides bounded
+synthetic workloads and supervised test-owned virtual-port measurements in Rust
+and Python. Mac software baselines do not establish Pi performance, physical
+device behavior or live MIDI 2.0 support. See the
+[feature matrix and evidence](plan/validation.md#slice-12-qualification-2026-10-15).
 
 ```sh
 uv run --frozen pytest

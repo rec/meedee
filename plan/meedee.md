@@ -779,9 +779,16 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
     deferred. See ci.md/specifications.md/validation.md. Actual native UMP evidence
     on chosen platforms is still required before advertising live MIDI 2.0 support;
     unsupported deployments remain explicit.
-12. **Pi and cross-platform qualification.** Run selected board workloads and
-    desktop checks, record resource budgets and native gaps, and review partial
-    versus complete feature claims before an explicitly authorized release.
+12. **Qualification tools and Mac software baseline delivered; native/board gates
+    open (2026-10-15).** Opt-in bounded workloads compare Rust and Python codecs,
+    exercise four-stream recording saturation, and supervise Rust/Python native
+    virtual-endpoint attempts separately. See qualification.md for reproducible
+    Linux/Windows/Pi procedures and validation.md for measurements and the feature
+    matrix. No Pi/Linux/Windows host is available. CoreMIDI client creation still
+    fails in all three native modes; actual latency and isolated-worker resource
+    totals remain unmeasured. Select the Pi image/environment, run target workloads
+    and agree budgets from those results before claiming complete qualification
+    or making a separately authorized release. CI remains release-only.
 
 A release can be staged, but its feature matrix must state what works as values,
 codecs, files, and live transport. The custom format must not be frozen with

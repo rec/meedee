@@ -1,0 +1,181 @@
+# Slice 12: qualification procedure and evidence
+
+Additional work beyond the prompt
+
+None.
+
+## Status and boundaries
+
+The owner authorized bounded synthetic workloads, temporary files and exclusively
+test-owned virtual endpoints on the available Mac. No Pi, Linux or Windows host
+is available. Measure a baseline before agreeing acceptance budgets. The selected
+board remains **Pi Zero 2 W with 64-bit Raspberry Pi OS**; the OS release/image,
+libc, Python installation, MIDI endpoint and build sysroot are still unselected.
+Do not substitute an original Pi Zero or claim board qualification from an arm64
+build. No release, hardware probe, tuning/reset transmission, OS service restart,
+system installation or workflow trigger is authorized by this procedure.
+
+The tools deliberately have no new runtime dependencies or command parser. They
+use the existing pytest runner and standalone Rust examples. Default pytest does
+not collect the measurement files. CI remains published-release-only with Python
+3.11/3.15; these opt-in native workloads are not added to unattended CI.
+
+## Reproduce a software baseline
+
+Start from a complete checkout. Record its commit, dirty status and the build
+profile alongside all output. Run on external power, note CPU model, RAM, free
+disk space, storage medium, OS image/build, libc, Rust/C++/CMake/Python versions,
+power/thermal settings and background load. On the Pi also record kernel/ALSA
+versions, device permissions and thermal/throttling state. Do not update the OS
+or tools merely to obtain a result. A missing prerequisite is an open gate.
+
+Use the prerequisites in README.md. Linux builds need ALSA development headers
+and pkg-config; Linux execution needs libasound.so.2. MIDI sequencer I/O needs
+access to /dev/snd/seq. Build inside an MSVC developer environment on Windows.
+All commands below use bash, including Windows Git Bash with the MSVC environment
+already configured. On a small board, start with one build job and observe memory
+and free space. Do not install a swap file or change system settings implicitly.
+
+```bash
+mkdir -p target/qualification
+export CARGO_HOME="$PWD/target/cargo-home"
+export CARGO_BUILD_JOBS=1
+uv sync --frozen --python 3.11
+export PYO3_PYTHON="$PWD/.venv/bin/python"
+# On Windows use: export PYO3_PYTHON="$PWD/.venv/Scripts/python.exe"
+git rev-parse HEAD > target/qualification/revision.txt
+git status --short > target/qualification/worktree.txt
+rustc -vV > target/qualification/rust.txt
+cmake --version > target/qualification/cmake.txt
+cargo build --locked --release -p meedee --examples
+# On Windows the executable has an .exe suffix.
+target/release/examples/qualification > target/qualification/rust.jsonl
+uv run --frozen pytest -q -s test/qualification/measure.py -k 'not native' \
+  --junitxml=target/qualification/python.xml > target/qualification/python.log 2>&1
+```
+
+Repeat the Python measurements with 3.15 in a separate environment, using
+`UV_PROJECT_ENVIRONMENT=target/qualification-python315` and
+`uv run --frozen --python 3.15 ...`. Record which interpreter/build each output
+belongs to. First-run costs are retained; the seven batch samples are not a
+claim of statistical significance or comparable warm/cold CPU state. Repeat on
+an otherwise idle target before setting a budget. Do not compare debug and
+release builds as language overhead.
+
+For release measurements, build the wheel from the sdist with the existing
+release workflow procedure, install it plus pytest into a separate environment,
+and run the absolute path to measure.py from outside the checkout using that
+environment's Python. This avoids editable-build ambiguity. Keep the wheel's
+name, size and build log. Run test/release/artifacts.py after the build. Run the
+ordinary installed-package suites listed in .github/workflows/ci.yml, too;
+performance measurements are not a substitute for those regressions.
+Run the source Python suites and linked Cargo tests sequentially: the callback
+regression rebuilds Cargo artifacts and concurrent interpreter builds can replace
+the PyO3 libraries needed by another run's rustdoc step.
+
+## Workloads and interpretation
+
+| Workload | Fixed input | Measurements / checks |
+| --- | --- | --- |
+| Fresh Python process | Seven selected public modules, no clients | Import wall/CPU time, process peak RSS on Unix |
+| Dense CC | 2,048 complete CCs per batch, seven batches | Valid decoded count, batch durations, operation rate |
+| NRPN | 2,048 explicit 14-bit commands per batch, seven batches | Six-message selection/data/null expansion, encoding, operation rate |
+| Long SysEx | 1 KiB, 64 KiB, 1 MiB payloads; 1 KiB feed chunks; seven batches | Complete delivery, batch durations, payload bytes/second |
+| Tuning dump | 128 MTS bulk dumps per batch, seven batches | Pure encoding/explicit decoding only; never transmitted |
+| UMP Clip | 2,048 MIDI 2 note events plus clock framing | Streaming read count, file size, seven read durations |
+| Four-stream archive | 2,048 interleaved exact-time events | Seven write/read cycles, verified completion, file size |
+| Recording, paced | Four recorders, 100 events each, 10 ms sleep per round | Admission, completion and failure reports; actual elapsed time |
+| Recording, burst | Four recorders, 2,048 attempts each, no pacing | Saturation behavior and explicit incomplete reports, not a required zero-loss rate |
+| Native MIDI 1 | 256 serial CC send/receive transactions | Open time, host round-trip samples, median/p95/max, recording fidelity for Python |
+
+Rates include the validation performed in each workload. SysEx rates count
+payload bytes, CC rates count messages and NRPN rates count compound commands.
+These are batch throughput measurements, not per-message latency distributions.
+Python validates entire decoded values where Rust checks item kinds/counts, so
+these are practical path baselines, not equivalent-work language benchmarks.
+The Clip benchmark excludes file creation; the archive benchmark includes it.
+File tests exercise filesystem cache and do not fsync; they make no power-loss
+or sustained physical-disk throughput claim. The paced workload is sleep-driven,
+not a precisely maintained 100 Hz clock. Verify its actual elapsed time.
+
+Unix process peak RSS includes native allocations and interpreter/test-runner
+costs and is a lifetime high-water mark, not an incremental allocation estimate.
+The fresh import runs separately from pytest. CPU measurements exclude child
+processes. Windows RSS is explicitly null; use an OS process profiler rather
+than interpreting that as zero. Native idle reports cover only the parent, so
+they cannot quantify the cost of isolated workers. The Rust example reports
+wall time only. Use OS profiling on the actual target to obtain current/peak
+RSS, idle CPU, process/thread/handle counts and child-inclusive totals for each
+mode. Those measurements remain open here; do not infer them from payload limits
+or subtract two process high-water marks. OS process inspection is denied in
+this tool environment.
+
+## Native runs are a separate gate
+
+Only run after the target owner authorizes test-owned virtual endpoints:
+
+```bash
+uv run --frozen pytest -q -s test/qualification/measure.py -k native \
+  --junitxml=target/qualification/native.xml > target/qualification/native.log 2>&1
+```
+
+Each Python mode and the Rust example runs in a separate supervised process with
+a 30 second deadline. On POSIX the supervisor kills its own process group on a
+stall; Windows uses taskkill for that child's tree. Never launch native.py or
+qualification_transport directly when backend liveness is unknown. Build the
+Rust example first: a missing executable is a reported skip, not a pass.
+
+Names are unique to each run, and discovery must match exactly one test-created
+virtual destination. No pre-existing destination is selected. Only CC 7 values
+are sent. Python checks captured events and the archive trailer. One outstanding
+transaction at a time avoids interpreting queue buildup as one-way latency.
+Host perf-counter durations are independent of backend timestamp clock origins;
+there is no cross-clock subtraction or physical-wire latency claim.
+
+WinMM does not supply virtual endpoint creation, so the portable virtual test
+cannot qualify that backend without an independently arranged loopback route.
+Do not silently choose a hardware endpoint or install a virtual driver. Agree a
+Windows endpoint and test separately when a Windows host is available. Likewise,
+ALSA raw is not qualified by sequencer loopback. Native UMP uses the separately
+opt-in existing test/native/meedee_ci_loopback.py fixture and needs outer
+supervision; MIDI 1 measurements alone do not qualify live MIDI 2.
+
+Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
+crash, unresponsive hardware or musical state after uncertain sends. Those need
+named equipment, explicit authorization and a test-specific recovery procedure.
+
+## Pi and desktop build gates
+
+Prefer an initial native Linux arm64 build on the actual chosen OS. Until the
+image and ABI are selected there is no reproducible Pi cross-build command.
+Cross-compiling requires a matching Linux aarch64 C++ toolchain/sysroot, ALSA
+headers/libraries/pkg-config configuration and Python target ABI as well as
+Rust's aarch64-unknown-linux-gnu target. The build explicitly requires
+CMAKE_TOOLCHAIN_FILE across targets. A Rust target flag alone is insufficient;
+macOS host libraries must never enter the target link. A native arm64 Linux build
+or successful cross-link is still not a Pi runtime or performance result.
+
+For each available desktop, run the source and installed-wheel checks from the
+release workflow without publishing a release. Include the vendored device-free
+native regression targets and sanitizer settings exactly as configured there.
+Record compiler, OS/architecture, Python endpoint versions, test totals, wheel
+from-sdist result, license/provenance content, external dynamic dependencies and
+all skips. Keep Windows SDK integration, WinMM capability-query risks and Rust
+1.87 validation distinct from compilation with a newer compiler. See issues.md.
+
+## Acceptance review and remaining gates
+
+After real Pi baseline measurements, agree application budgets for idle and peak
+memory, idle CPU, endpoint/process/thread/handle counts, expected streams and
+message rates, maximum payload, recording duration/storage and round-trip tail
+latency. Rerun at the agreed normal workload and an explicit overload workload.
+Check loss counters and capture completeness; an incomplete burst is evidence
+of saturation handling, not successful recording of the offered rate. A larger
+queue cannot be assumed to improve sustained throughput or latency.
+
+Publish separate claims for immutable values/codecs, file fidelity, pure state
+machines, native transport and specific hardware/OS versions. The feature matrix
+and local baseline in validation.md record what is presently demonstrated.
+Qualification is partial until the outstanding native/platform/resource gates
+have evidence. The archive schema and release/publication decision remain
+explicit review gates. No performance acceptance threshold has been invented.
