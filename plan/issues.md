@@ -72,8 +72,13 @@ Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
 The process-lifetime CoreMIDI keeper passes deterministic concurrency/reopen
-tests; repeated open/close and full-width MIDI 2 delivery still need native
-validation against the new keeper build.
+tests and five native virtual-only qualification cases. Native repeated reopen
+remains unqualified: the final run failed during output-port discovery with
+`PortInfoError: could not read CoreMIDI port unique ID`, before completing any
+protocol/mode combination. The failing endpoint, cycle and OS status were not
+recorded, so the cause is unresolved. Full-width MIDI 2 CC delivery in that
+fixture also remains unverified. See `qualification-macos-final.jsonl` and
+`validation.md` for the successful cases and the preserved failure.
 
 ## R2. Resource admission is bounded only in specified places
 

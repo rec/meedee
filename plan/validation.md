@@ -1342,3 +1342,32 @@ pass outside the checkout, including the five new admission cases. Ruff, formatt
 ty and pyupgrade pass. The Rust/C++ implementation is unchanged from the keeper
 commit's successful 113-test Rust and four-target sanitized native checks.
 CI remains published-release-only with Python 3.11 and 3.15; no workflow was run.
+
+## Final native keeper/worker-cap follow-up, 2026-10-15
+
+The owner ran the six supervised native cases in ordinary Terminal against the
+keeper and worker-cap build. The result was **five passed, one failed, four
+deselected in 4.18 seconds**. Raw per-case output, including the failure and
+parent resource samples, is preserved in `qualification-macos-final.jsonl`
+(12 JSONL records), separately from the earlier baseline.
+
+The passing cases cover Rust MIDI 1 loopback, Python MIDI 1 loopback in both
+process modes, typed capture/replay/receive cancellation in both modes, and
+native UMP SysEx7 MIDI-CI discovery/reply between test-owned peers. Each of the
+three basic loopbacks delivered 256 messages. These results validate those paths
+with the keeper present; they do not exercise admission at the 32-worker cap.
+
+The repeated-reopen case failed in `sender.ports()` with
+`PortInfoError: could not read CoreMIDI port unique ID`. No completed
+protocol/mode combination was printed. The log does not identify the endpoint,
+cycle or OS status. The checked property helper rejects the failed read, so
+this result does not demonstrate use of an uninitialized ID. It also does not
+establish whether a disappearing endpoint, the test lifecycle or another
+CoreMIDI condition caused the failure. Repeated reopen and this fixture's exact
+full-width MIDI 2 CC delivery remain open; the failure must not be converted to
+a passing result by suppressing discovery errors or adding an unexplained retry.
+
+No implementation changed in this follow-up. JSON records were parsed and
+their case statuses checked; documentation passed `git diff --check`. Python
+suites were not rerun for this documentation/evidence-only update. Windows,
+Linux/Pi, physical fault recovery and workload budgets remain open.
