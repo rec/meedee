@@ -34,7 +34,9 @@ def executable(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="CoreMIDI is macOS-only")
-@pytest.mark.parametrize("mode", ["late", "early", "serviced"])
+@pytest.mark.parametrize(
+    "mode", ["late", "early", "serviced", "notified", "notified_serviced"]
+)
 def test_direct_endpoint_replacement(executable: Path, mode: str) -> None:
     child = subprocess.Popen(
         [str(executable), mode],

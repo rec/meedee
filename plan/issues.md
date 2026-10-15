@@ -82,8 +82,11 @@ after creating its new virtual input. The other five cases are not required to
 trigger it. The next run reported object `158564417`, OSStatus `-50` (`paramErr`)
 at the same stage. That code does not identify whether the endpoint was stale,
 which lifecycle operation invalidated it, or why discovery returned it. A direct
-SDK endpoint-replacement probe is prepared to separate wrapper behavior from
-CoreMIDI client creation order and run-loop servicing; native results are pending.
+SDK probe reproduced stale endpoint enumeration without either wrapper: in
+cycles 2 and 3 the consumer could still enumerate the disposed cycle-1 endpoint.
+Early client creation did not fix it; 50 ms run-loop servicing was inconsistent.
+The next diagnostic compares notification registration, with native results
+pending. No discovery errors are suppressed and reopen remains unqualified.
 Full-width MIDI 2 CC delivery in that fixture also remains unverified.
 See `qualification-macos-final.jsonl` and
 `validation.md` for the successful cases and the preserved failure.

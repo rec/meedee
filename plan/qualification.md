@@ -175,7 +175,7 @@ For the repeated-reopen discovery failure, use the separate direct SDK probe:
 uv run --frozen pytest -q -s test/qualification/reopen.py
 ```
 
-This compiles a standalone C++ executable and runs three independent cases.
+This compiles a standalone C++ executable and runs five independent cases.
 Each uses a producer process and a consumer process, with three create/dispose
 cycles of test-owned virtual MIDI 1 destinations. No MIDI is sent and no hardware
 connections are opened. The producer maintains a keeper and replaces its ordinary
@@ -192,6 +192,13 @@ failed property read or missing/duplicate test-owned ID fails the case; all thre
 cycles still produce diagnostic output. Compilation has a 30-second limit and
 each case has a 10-second outer deadline with process-group cleanup on timeout.
 Keep these results separate from the meedee transport qualification.
+
+The first three modes reproduced stale enumeration in ordinary Terminal.
+`notified` and `notified_serviced` add a static notification callback to the early
+consumer keeper, using zero and 50 ms run-loop servicing respectively. The
+callback logs only notification IDs and retains no application context. Select
+these two follow-up cases with `-k notified`. This tests notification registration
+without changing the production keeper's callback-free contract.
 
 Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
 crash, unresponsive hardware or musical state after uncertain sends. Those need

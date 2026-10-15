@@ -1446,3 +1446,32 @@ avoiding a forked copy of initialized Apple runtime state. The ordinary suite
 passes all 252 tests in 25.18 seconds. Ruff checking/formatting, ty and pyupgrade
 pass for the new Python harness. The preserved JSON parses and
 `git diff --check` passes. No dependencies or CI triggers changed.
+
+### Direct SDK results: stale disposed endpoints
+
+The owner ran all three initial direct SDK modes: **three failed in 1.73
+seconds**. Extracted native output is preserved in
+`qualification-macos-direct-reopen.txt`, without pytest tracebacks. All producer
+create/dispose calls reported success. Each first cycle discovered its test-owned
+endpoint with a valid unique ID. After replacement, however, the consumer could
+still enumerate the disposed first endpoint and its ID query returned `-50`.
+
+In `late`, the producer created endpoints 204484673, 204484679 and 204484683,
+but the consumer enumerated 204484673 on all three cycles. `early` behaved the
+same way with first endpoint 204484691 despite keeper creation before discovery.
+`serviced` still returned disposed endpoint 204484705 in cycle 2 after producer
+creation of 204484711; cycle 3 finally discovered the new endpoint 204484715.
+Neither early creation alone nor the tested 50 ms run-loop wait gives a reliable
+fix. This establishes stale enumeration with direct SDK calls under the tested
+callback-free client usage, independently of either wrapper. It does not prove
+the underlying cause or establish a safe production workaround.
+
+The probe now has two additional diagnostic modes. Both register a static
+notification callback before discovery, without an application context. One
+retains zero-duration run-loop servicing; the other uses 50 ms. Notification IDs
+are logged, and all existing query/match failures still fail the case. These
+modes compile cleanly with warnings treated as errors; their runtime results
+remain pending. Production keeper behavior, discovery policy and CI are unchanged.
+
+The ordinary suite passes all 252 tests in 18.75 seconds. Ruff checking/formatting,
+ty and pyupgrade pass for the changed Python harness; `git diff --check` passes.

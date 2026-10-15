@@ -19,6 +19,11 @@ struct Reply
   SInt32 unique_id{};
 };
 
+void notification(const MIDINotification* message, void*)
+{
+  std::printf("notification=%d\n", message->messageID);
+}
+
 void require(bool condition, const char* operation)
 {
   if (!condition)
@@ -85,9 +90,12 @@ int main(int argc, char** argv)
 {
   if (argc == 2 && std::strcmp(argv[1], "--producer") == 0)
     producer(STDIN_FILENO, STDOUT_FILENO);
-  require(argc == 2, "expected late, early or serviced mode");
-  const bool early = std::strcmp(argv[1], "early") == 0;
-  const bool serviced = std::strcmp(argv[1], "serviced") == 0;
+  require(argc == 2, "expected a discovery probe mode");
+  const bool notified = std::strcmp(argv[1], "notified") == 0
+                        || std::strcmp(argv[1], "notified_serviced") == 0;
+  const bool early = notified || std::strcmp(argv[1], "early") == 0;
+  const bool serviced = std::strcmp(argv[1], "serviced") == 0
+                        || std::strcmp(argv[1], "notified_serviced") == 0;
   require(early || serviced || std::strcmp(argv[1], "late") == 0, "unknown mode");
   std::setbuf(stdout, nullptr);
   int commands[2], replies[2];
@@ -111,7 +119,9 @@ int main(int argc, char** argv)
   close(replies[1]);
   MIDIClientRef keeper{};
   if (early)
-    require(MIDIClientCreate(CFSTR("meedee-churn-keeper"), nullptr, nullptr, &keeper) == noErr,
+    require(MIDIClientCreate(
+                CFSTR("meedee-churn-keeper"), notified ? notification : nullptr, nullptr, &keeper)
+                == noErr,
             "create early consumer keeper");
   bool valid = true;
   for (int cycle = 1; cycle <= 3; ++cycle)
