@@ -680,6 +680,14 @@ and wire evidence before stateful interpretation or live writes.
 5. **MTS.** Implement tuning values and the selected standard message families.
    Gate: normative vectors, quantization reporting, checksums/sentinels, and
    request/reply state pass before any authorized instrument operation.
+   **Implemented 2026-10-15.** The pure Rust/Python tuning module provides exact
+   pitch/table/scale values, NoChange, all selected original/banked and
+   scale/octave SysEx forms, explicit interpretation, quantization error and
+   legacy checksum status. Caller-driven unicast request tracking has deadlines,
+   cancellation and exact device/bank/program matching. It performs no I/O;
+   identical late/unsolicited replies remain indistinguishable without a wire
+   transaction ID. See api.md/specifications.md for the approved details and
+   validation.md for evidence. No physical tuning operation is qualified here.
 6. **General MIDI and other MIDI 1.0 profiles.** Add GM1/GM2 maps/mode messages,
    bank/program helpers, and selected universal/MPE/time-code features. Gate:
    one Rust table source, exact numbering, explicit mode effects, no auto-reset.

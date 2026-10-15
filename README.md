@@ -2,14 +2,15 @@
 
 A Rust MIDI toolkit with matching Python bindings, using vendored
 [libremidi](https://github.com/celtera/libremidi) for native transport. Python
-imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`
-and `meedee.controls`; the package root is empty. There are no Python runtime
-dependencies.
+imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
+`meedee.controls` and `meedee.tuning`; the package root is empty. There are no
+Python runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
-codec, fine controls and RPN/NRPN commands are available. Tuning, MIDI 2.0 values
-and file support are later slices in [the plan](plan/meedee.md). Encode primitive
+codec, fine controls, RPN/NRPN commands and MIDI Tuning Standard values/codecs
+are available. MIDI 2.0 values and file support are later slices in
+[the plan](plan/meedee.md). Encode primitive
 messages for raw transport; use `send_command` for compound CC commands.
 
 ## Messages and byte codecs
@@ -48,6 +49,40 @@ Encoding adds full status/framing bytes. No timestamps are invented or attached
 to decoded values; transport callbacks remain raw. Input snapshots and returned
 lists have memory costs beyond the retained SysEx limit. Details and remaining
 protocol boundaries are in [the API contract](plan/api.md).
+
+## MIDI Tuning Standard
+
+```python
+from meedee import codecs, messages, tuning
+
+conversion = tuning.Pitch.from_frequency(frequency_hz=441.123456)
+change = tuning.SingleNoteChange(
+    device_id=1,
+    program=0,
+    changes=[tuning.NoteTuning(note=69, pitch=conversion.pitch)],
+)
+wire = codecs.encode(change)
+decoded = tuning.decode(messages.SysEx(data=wire[1:-1]))
+assert decoded is not None
+assert decoded.message == change
+# Inspect conversion.error_cents before explicitly sending wire to an instrument.
+```
+
+The pure tuning module supports original/banked dump requests, key-based tables,
+single-note changes and both scale/octave resolutions. Values and messages are
+frozen, with exact integer protocol storage, explicit NoChange, checked
+replacement and quantization error reports. Hz/cents inputs are rounded only to
+the chosen encoding's resolution. Channels are 1–16; tuning banks/programs are
+0–127. Every message requires a device ID; 127 explicitly requests broadcast.
+
+The byte decoder keeps returning raw SysEx; `tuning.decode` performs explicit
+interpretation. Original-bulk checksum mismatches are reported and accepted for
+legacy interoperability; later formats require a correct checksum. `ReplyTracker`
+offers caller-driven unicast correlation, deadlines and cancellation without
+opening ports or sending requests. MTS has no transaction ID, so identical late
+or unsolicited dumps cannot be distinguished. A successful send does not prove
+an instrument accepted or applied the tuning. See [the API contract](plan/api.md)
+for units, names, checksum behavior and request tracking.
 
 ## Fine controls and parameters
 

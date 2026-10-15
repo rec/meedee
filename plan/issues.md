@@ -1,6 +1,6 @@
 # Open issues and failure review
 
-Updated for the libremidi Python transport replacement, 2026-10-14. These are
+Updated through MTS slice 5, 2026-10-15. These are
 remaining risks, deliberate API limitations and validation gaps. Resolved midir
 binding findings are removed. The historical upstream report remains in
 [midir-suggestions.md](midir-suggestions.md); it is not an audit of libremidi.
@@ -101,6 +101,11 @@ many application-created interpreters and retained observation lists still cost
 memory. Built-in commands expand to at most six messages, but their native
 duration remains driver-dependent.
 
+MTS values have fixed limits (128 table entries, 127 single-note updates, 12
+scale offsets) and snapshot bounded built-in list/tuple inputs. Application-held
+values and many independent trackers still consume memory. Request trackers
+hold no growing reply registry and perform no background work.
+
 Known drop counters cover native admission and queue overflow, not driver loss,
 user-code exceptions or packets lost with a crashing child. CPU/GIL contention
 and slow error hooks can delay unrelated Python work. No hard real-time or
@@ -147,6 +152,19 @@ active or partially changed. In-process failed connections retain ownership unti
 teardown, even while rejecting sends. The optional interpreter cannot repair
 unknown loss and deliberately declines single-half edits to a completed parameter
 selection. Callers retain raw messages and reset source state after known loss.
+
+MTS interpretation is explicit; the byte decoder continues to return SysEx.
+Original bulk-dump checksum mismatches are accepted with status because the
+standard documents differing manufacturer implementations. Later dump formats
+require valid checksums. Re-encoding an original dump normalizes its checksum;
+retain raw SysEx when exact received bytes matter. Frequency/cents conveniences
+quantize to the selected wire resolution and report signed error.
+
+Tuning reply trackers require caller-driven monotonic time and polling/observation
+to notice expiry. MTS has no transaction ID, so identical late or unsolicited
+dumps cannot be distinguished from a reply. Correlation does not establish
+physical instrument support or successful retuning; those operations remain
+unqualified. No automatic request, resend, bank selection or reset is performed.
 
 Timestamps are exact signed nanoseconds or None. Zero is valid. Clock identity
 distinguishes connections and isolated children but does not synchronize them.

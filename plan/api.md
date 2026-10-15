@@ -179,7 +179,7 @@ not UMP or Standard MIDI Files.
 Events/timestamps, transport integration and receive filters remain separate
 from this codec. Transport callbacks continue to receive ReceivedPacket;
 timestamped typed integration belongs to slice 10. Fine CC and RPN/NRPN are
-provided by slice 4 below; tuning, GM profiles and files retain later slices.
+provided by slice 4 below and tuning by slice 5; GM profiles and files retain later slices.
 
 ### Slice 4 compound commands and observations, approved 2026-10-14
 
@@ -359,3 +359,81 @@ are available; do not add timing thresholds to unit tests.
   policy before its API slice; prototype types do not guess these choices.
 
 Normative baselines and acquisition evidence are in [specifications.md](specifications.md).
+
+### Slice 5 MIDI Tuning Standard, approved 2026-10-15
+
+`meedee.tuning` is a pure loader for Rust-owned frozen values and typed messages;
+importing it starts no MIDI runtime. `Pitch(semitone, fraction)` stores the exact
+21-bit MTS frequency representation: semitone 0–127 and fraction 0–16383 in
+1/16384-semitone units. The all-127 triplet is a separate `NoChange()` value,
+not a pitch. `TuningTable(values)` has exactly 128 Pitch/NoChange entries indexed
+by MIDI note 0–127. `NoteTuning(note, pitch)` identifies an individual update.
+Collections accept bounded built-in lists/tuples, copy into Rust ownership,
+and return immutable tuples. Repeated single-note entries retain wire order.
+
+`Pitch.from_frequency(frequency_hz=...)` uses Hz; `Pitch.from_cents(note=...,
+cents=...)` uses a cents offset from an equal-tempered MIDI note (A4 = 440 Hz).
+Each returns a frozen `PitchConversion` with `pitch` and `error_cents`, defined
+as represented minus requested pitch. There is no rounding to integer Hz or
+integer cents: nearest/ties-to-even quantization occurs only when converting
+to the finite protocol representation. Exact constructors never quantize.
+Nonfinite and out-of-range requests are rejected, never clamped.
+
+`ScaleOffsets(resolution, values)` has 12 signed integer offsets C through B.
+Resolution 7 uses whole cents (-64 through 63); resolution 14 uses units of
+100/8192 cents (-8192 through 8191). Its positive limit is therefore just below
+100 cents. `ScaleOffsets.from_cents(resolution=..., cents=...)` returns a frozen
+`ScaleConversion` with `offsets` and 12 signed `error_cents`, using the same
+rounding/range policy. Changing resolution with `replace` does not rescale units.
+
+Typed Message subclasses are `BulkDumpRequest`, `BankedDumpRequest`, `BulkDump`,
+`KeyBasedDump`, `ScaleOctaveDump`, `SingleNoteChange`, `BankedNoteChange` and
+`ScaleOctaveChange`. Constructors require keyword arguments. Device ID is always
+explicit, 0–127; 127 deliberately addresses all devices. Tuning bank/program
+identifiers remain 0–127, distinct from the 1–128 ProgramChange API. Dump names
+accept up to 16 ASCII characters, right-padded with spaces; received 16-byte
+names retain all characters, including padding/NUL. Original single-note changes
+are real-time; banked changes and channel scale/octave changes require explicit
+`realtime: bool`. Scale resolution is carried by ScaleOffsets. Channel lists use
+1–16 and are canonicalized to ascending order; duplicate channels are rejected.
+Zero changes or an empty channel mask represent no-op wire messages. A single
+message contains at most 127 note entries; no implicit splitting occurs.
+
+All these messages implement Rust PrimitiveMessage and Python Message, and work
+with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
+there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
+ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
+containing `message` and `checksum`, or None for unrelated/unsupported forms;
+recognized malformed forms raise ValueError. Unknown forms remain available as
+raw SysEx. The control interpreter ignores typed MTS primitives, as it does raw
+SysEx; MTS does not synthesize RPN control observations.
+
+Checksums have three observable states: NotPresent, Matches and LegacyMismatch.
+Original bulk dumps accept mismatches because the specification documents
+incompatible manufacturer conventions. Encoding uses XOR of all payload bytes,
+excluding F0/F7 and the checksum. Later dump formats strictly require that XOR
+checksum. Re-encoding a legacy mismatch generates the chosen checksum rather
+than preserving the received checksum byte. Lengths, seven-bit payloads and
+reserved scale channel bits are validated for recognized forms.
+
+`ReplyTracker(request=..., now_ns=..., timeout_ns=...)` tracks one unicast dump
+request, without sending, opening ports, sleeping or starting threads. Callers
+supply monotonic unsigned 64-bit nanoseconds from one clock and a positive
+bounded timeout. `observe(typed_message, now_ns=...)` returns True only for a
+matching timely reply and leaves every message with the caller. An original
+request matches an original bulk reply; a banked request can match a key-based
+or scale/octave reply. Device, program and bank must match exactly. `poll` at or
+past the deadline yields TimedOut, and `cancel` yields Cancelled while pending;
+Completed/TimedOut/Cancelled are terminal. Backwards time and overflowing
+deadlines are rejected. Poll/observe must be driven by the caller for expiry to
+be noticed. Passing an already decoded dump deliberately accepts its reported
+legacy checksum status; callers can enforce a stricter policy before observing.
+
+MTS contains no transaction ID. Identical unsolicited or late replies cannot be
+distinguished, even after recreating a tracker. Use separate tracking per source,
+avoid overlapping identical requests, and retain the raw input and checksum
+status when that matters. A reply is a dump, not acknowledgment that a preceding
+retuning succeeded. Physical tuning and device support are not established by
+these pure-codec tests. RPN fine/coarse tuning, MIDI 2.0 pitch and MPE remain
+separate mechanisms; existing RpnSet can explicitly select MTS tuning programs
+and banks without adding an automatic selection operation here.

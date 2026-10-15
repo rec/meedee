@@ -1,0 +1,16 @@
+# Independently stated MTS vectors. Updated Specification, pages 2, 4-8.
+# Z12 = twelve 40 bytes; Z24 = twelve 40 00 pairs.
+# NAME = sixteen 20 bytes; TABLE = 128 no-change triplets.
+BulkDumpRequest|f0 7e 01 08 00 02 f7
+BankedDumpRequest|f0 7e 01 08 03 03 02 f7
+BulkDump|f0 7e 01 08 01 02 NAME TABLE 74 f7
+KeyBasedDump|f0 7e 01 08 04 03 02 NAME TABLE 72 f7
+ScaleOctaveDump7|f0 7e 01 08 05 03 02 NAME Z12 73 f7
+ScaleOctaveDump14|f0 7e 01 08 06 03 02 NAME Z24 70 f7
+SingleNoteChange|f0 7f 01 08 02 02 01 45 45 00 00 f7
+BankedNoteChangeTrue|f0 7f 01 08 07 03 02 01 45 45 00 00 f7
+BankedNoteChangeFalse|f0 7e 01 08 07 03 02 01 45 45 00 00 f7
+ScaleOctaveChange7True|f0 7f 01 08 08 02 01 01 Z12 f7
+ScaleOctaveChange7False|f0 7e 01 08 08 02 01 01 Z12 f7
+ScaleOctaveChange14True|f0 7f 01 08 09 02 01 01 Z24 f7
+ScaleOctaveChange14False|f0 7e 01 08 09 02 01 01 Z24 f7

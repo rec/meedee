@@ -805,3 +805,46 @@ serialization and software fixtures do not prove atomicity against other
 applications, physical delivery, parameter-specific units or native-driver
 liveness. Selection release and exact progress cannot be guaranteed after a
 failed/unknown operation; no recovery send is attempted automatically.
+
+## Slice 5 MIDI Tuning Standard, 2026-10-15
+
+The pure Rust/Python tuning module implements exact pitches, explicit NoChange,
+128-note tables, signed scale/octave offsets, original/banked dump requests and
+replies, original real-time single-note changes, banked real/non-real-time note
+changes and both real/non-real-time scale/octave resolutions. MTS interpretation
+is explicit after the ordinary byte decoder produces SysEx. Exact constructors
+never quantize; Hz/cents conversions report the signed error from nearest,
+ties-to-even wire quantization. No clamp or implicit device broadcast is added.
+The approved API and legacy-checksum policy are recorded in [api.md](api.md).
+
+Python 3.11.7 and 3.15.0 each pass 189 tests. The Rust workspace passes 74
+ordinary tests with five ignored cases; pytest separately runs the three
+finalization cases. Five new pure Rust tests and six Python tests exercise
+independent shared wire vectors covering every implemented family and real-time
+alternative. They cover all recognized truncated lengths, extra data, legacy
+checksum status versus strict modern checksums, pitch and scale endpoints,
+no-change preservation, exact frequency round trips, rounding ties/error,
+nonfinite/out-of-range rejection, immutable snapshots, checked replacement,
+channel bitmap order/reserved bits and explicit decoding. The import fixture
+forbids cleanup initialization while importing and using tuning values/codecs.
+
+Caller-driven reply tests cover device/bank/program matching, both original and
+banked request types, unicast-only tracking, unrelated replies, exact-deadline
+expiry, terminal state, cancellation, backwards time and deadline overflow.
+No transaction-ID or acknowledgment semantics are invented. Identical late or
+unsolicited dumps remain indistinguishable; callers retain their traffic and
+choose how to handle legacy-checksum status.
+
+Cargo formatting, workspace Clippy, Ruff, formatting, ty and pyupgrade pass.
+Clippy retains the existing local Rust 1.99 atomic-deprecation exception; the
+release workflow retains Rust 1.87. No dependencies or native backend sources
+changed. A CPython 3.11 wheel built from the source distribution passes all
+188 installed-package tests outside the checkout and both archive checks. The
+archives include the new modules, typing and shared fixture/test sources.
+Release CI includes the installed tuning tests; its trigger remains published
+releases only and its Python endpoints remain 3.11/3.15. No CI run was triggered.
+
+No instrument operation or new native-service flow was run. Windows/Services,
+real macOS I/O, physical failure scenarios and selected Pi qualification remain
+open. Codec/state-machine evidence does not qualify device tuning behavior or
+change the transport's delivery, native-driver or liveness guarantees.

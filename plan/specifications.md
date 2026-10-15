@@ -94,3 +94,35 @@ receive rule is an explicitly approved conservative deviation: devices allowed
 to edit only one selector half will not receive inferred parameter observations.
 Physical instrument responses and cross-platform native qualification remain
 separate from wire layout/state-machine validation.
+
+## Slice 5 MTS evidence, 2026-10-15
+
+The acquired eight-page Updated Specification remains the baseline listed above.
+Pages 1–3 define absolute pitches, no-change, original bulk dumps/requests and
+real-time single-note changes. Pages 4–6 define banked requests, key-based dumps,
+banked real-time/non-real-time note changes and scale/octave dumps. Pages 6–8
+define both scale/octave resolutions and channel bitmap order/reserved bits.
+These are MIDI 1.0 SysEx encodings, not MIDI 2.0 per-note-pitch semantics.
+
+`crates/meedee/tests/fixtures/tuning.txt` states independent compact vectors for
+all implemented families and real-time alternatives, consumed by Rust/Python.
+The fixed checksum bytes are independently stated rather than computed with the
+implementation under test. Tests cover exact pitches, sentinels, signed scale
+limits, rounding/error, every recognized truncated length, extra data, checksum
+policy and request matching/expiry/cancellation. Additional boundary checks
+preserve channel masks, names, repeated-note order and no-op forms. These are
+regression vectors derived from layouts, not manufacturer interoperability or
+MIDI certification results.
+
+Page 6 explicitly documents inconsistent original-bulk checksum implementations
+and permits receivers to ignore that checksum. The approved API exposes a legacy
+mismatch instead of discarding the dump; encoding uses the all-payload XOR rule,
+and later dump checksums are required. The specification includes typographical
+inconsistencies: its 00 00 01 frequency example does not agree with the defined
+1/16384-semitone units, a banked-request diagram omits the device byte despite
+its field description, and fourteen-bit scale positive endpoints are rounded to
+100 cents in prose. The implementation follows the stated field layouts and
+resolution, including the actual +8191 * 100/8192-cent upper bound. Zero count/
+zero channel masks are preserved as no-ops; no additional reserved-value rule
+is invented. RPN tuning selection does not alter the approved 0–127 tuning
+bank/program identifiers in the SysEx API.

@@ -11,7 +11,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyTuple};
 
 #[pyclass(frozen, subclass, module = "meedee.messages")]
-struct Message;
+pub(crate) struct Message;
 
 #[pymethods]
 impl Message {
@@ -118,8 +118,8 @@ impl NoteOn {
 }
 
 #[pyclass(frozen, extends = Message, module = "meedee.messages")]
-struct SysEx {
-    value: messages::SysEx,
+pub(crate) struct SysEx {
+    pub(crate) value: messages::SysEx,
 }
 
 #[pymethods]
@@ -264,7 +264,7 @@ macro_rules! short_messages {
             $(if let Ok(message) = message.extract::<PyRef<'_, $name>>() {
                 return Ok(message.value.encode());
             })*
-            Err(PyTypeError::new_err("message must be a supported MIDI 1.0 Message"))
+            crate::tuning::encode_message(message)
         }
 
         pub fn to_python(py: Python<'_>, message: messages::AnyMessage) -> PyResult<Py<PyAny>> {
@@ -285,6 +285,7 @@ macro_rules! short_messages {
             }
             if message.is_instance_of::<SystemReset>() { return Ok(InputMessage::SystemReset); }
             if message.is_instance_of::<NoteOn>() || message.is_instance_of::<SysEx>()
+                || crate::tuning::is_message(message)
                 $(|| message.is_instance_of::<$name>())* {
                 return Ok(InputMessage::Other);
             }
