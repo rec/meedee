@@ -35,11 +35,13 @@ MIDIObjectGetStringProperty(MIDIObjectRef, CFStringRef, CFStringRef* out_value)
 TEST_CASE("CoreMIDI integer properties preserve successful values", "[coremidi]")
 {
   property_status = noErr;
+  OSStatus status = kMIDIObjectNotFound;
   for (const SInt32 value : {0, 1, -1, std::numeric_limits<SInt32>::min(),
                             std::numeric_limits<SInt32>::max()})
   {
     property_value = value;
-    REQUIRE(libremidi::get_int_property(0, kMIDIPropertyUniqueID) == value);
+    REQUIRE(libremidi::get_int_property(0, kMIDIPropertyUniqueID, status) == value);
+    REQUIRE(status == noErr);
   }
 }
 
@@ -47,7 +49,9 @@ TEST_CASE("CoreMIDI failed property reads produce no port ID", "[coremidi]")
 {
   property_status = kMIDIObjectNotFound;
   property_value = 123; // The failing getter deliberately does not write this.
-  REQUIRE_FALSE(libremidi::get_int_property(0, kMIDIPropertyUniqueID).has_value());
+  OSStatus status = noErr;
+  REQUIRE_FALSE(libremidi::get_int_property(42, kMIDIPropertyUniqueID, status).has_value());
+  REQUIRE(status == kMIDIObjectNotFound);
 
   int errors{};
   std::string last_error;
@@ -58,10 +62,11 @@ TEST_CASE("CoreMIDI failed property reads produce no port ID", "[coremidi]")
             last_error = text;
           }},
       libremidi::coremidi_observer_configuration{}};
-  REQUIRE_FALSE(observer.to_port_info<true>(0).has_value());
-  REQUIRE_FALSE(observer.to_port_info<false>(0).has_value());
+  REQUIRE_FALSE(observer.to_port_info<true>(42).has_value());
+  REQUIRE_FALSE(observer.to_port_info<false>(42).has_value());
   REQUIRE(errors == 2);
-  REQUIRE(last_error == "could not read CoreMIDI port unique ID");
+  REQUIRE(last_error == "could not read CoreMIDI port unique ID (object=42, OSStatus="
+                            + std::to_string(kMIDIObjectNotFound) + ")");
 }
 
 TEST_CASE("CoreMIDI names preserve complete UTF-8 data", "[coremidi]")

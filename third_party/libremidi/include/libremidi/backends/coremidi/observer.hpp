@@ -74,10 +74,13 @@ public:
   auto to_port_info(MIDIObjectRef obj) const noexcept
       -> std::optional<std::conditional_t<Input, input_port, output_port>>
   {
-    const auto unique_id = get_int_property(obj, kMIDIPropertyUniqueID);
+    OSStatus status{};
+    const auto unique_id = get_int_property(obj, kMIDIPropertyUniqueID, status);
     if (!unique_id)
     {
-      libremidi_handle_error(configuration, "could not read CoreMIDI port unique ID");
+      libremidi_handle_error(
+          configuration, "could not read CoreMIDI port unique ID (object="
+                             + std::to_string(obj) + ", OSStatus=" + std::to_string(status) + ")");
       return std::nullopt;
     }
 

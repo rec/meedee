@@ -1391,3 +1391,31 @@ pending in ordinary Terminal.
 The ordinary Python suite passes all 252 tests after the diagnostic-only fixture
 change. Ruff checking/formatting, ty and pyupgrade pass; the preserved JSON
 records parse and `git diff --check` passes. No production code changed.
+
+### Reopen diagnostic result and native error details
+
+The instrumented fixture failed again: **one failed, nine deselected in 1.03
+seconds**. Its two JSON records are preserved in
+`qualification-macos-reopen-diagnostic.jsonl`. The markers establish that MIDI 1
+with isolation enabled completed cycle 1, including exact delivery and connection
+close. Cycle 2 created its virtual input, then failed while discovering output
+ports. This corrects the earlier uncertainty about whether any message was sent;
+the first cycle did send and receive successfully. No later mode was exercised.
+
+The failure occurs after endpoint replacement, but the log does not establish
+which endpoint's property query failed or why. The libremidi fork now includes
+the failing object handle and exact OSStatus in this diagnostic. The existing
+checked integer-property helper carries the original status to the observer;
+failed reads still produce no ID. The existing fake-native regression checks
+successful status reporting, unchanged-output failure, and the object/status
+reported for both port directions. All three affected CoreMIDI regression
+targets pass with address/undefined-behavior sanitizers. The fork commit is
+`faf5b3bf724b2de162a8bdacf2f57b2687d9a790`, imported without local differences.
+
+This diagnostic change introduces no retries, error suppression or change to
+discovery policy. Native execution of the more informative build is pending;
+reopen qualification remains open.
+
+The rebuilt editable Python package passes all 252 ordinary tests in 25.17
+seconds. The preserved JSON records parse, the imported files match the fork,
+and `git diff --check` passes. No Python source or dependency versions changed.
