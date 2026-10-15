@@ -1,0 +1,32 @@
+# Independent M2-104-UM 1.1.2 appendix F/sections 7.1-7.9 vectors.
+Noop|00000000
+JrClock|0010ffff
+JrTimestamp|00200000
+DeltaClockstampTicksPerQuarter|003003c0
+DeltaClockstamp|004fffff
+Midi2NoteOn|4f9f7f03 ffffffff
+Midi2NoteOff|40803c00 00000000
+Midi2PolyPressure|40a03c00 ffffffff
+Midi2ChannelPressure|40d00000 ffffffff
+Midi2PitchBend|40e00000 80000000
+Midi2ControlChange|41b20700 80000000
+Midi2RelativeRegisteredController|40407f7f ffffffff
+Midi2RelativeAssignableController|40507f7f 80000000
+Midi2RegisteredController|40207f7f ffffffff
+Midi2AssignableController|40307f7f ffffffff
+Midi2RegisteredPerNoteController|40003c03 ffffffff
+Midi2AssignablePerNoteController|40103cff ffffffff
+Midi2PerNoteManagement|40f03c03 00000000
+Midi2PerNotePitchBend|40603c00 80000000
+Midi2ProgramChange|4fcf0001 7f007903
+Midi1Packet|2f9f7f7f
+System|10f80000
+SysEx7Packet|30037d01 02000000
+SysEx8Packet|5f03ff00 ff000000 00000000 00000000
+Abort|5f3fff00 00000000 00000000 00000000
+MixedDataSet|50810010 00010001 007d0001 00010002
+FlexData|d0100000 02faf080 00000000 00000000
+TimeSignature|d0100001 04020800 00000000 00000000
+EndpointDiscovery|f0000101 0000001f 00000000 00000000
+EndpointInfo|f0010101 82000303 00000000 00000000
+StartOfClip|f0200000 00000000 00000000 00000000

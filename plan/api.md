@@ -536,8 +536,8 @@ silently normalized. No request/reply wait or capability discovery is started.
 `mpe.ZoneConfiguration(manager_channel, members)` accepts manager 1 or 16 and
 0–15 members. It expands into a seven-bit RPN6 set plus the standard RPN-null
 release. Zero disables that zone only; it does not necessarily leave MPE mode.
-There is no automatic second-zone command, bend-range setup, voice allocation
-or expression tracking. The receiver applies MPE's last-configuration-wins
+ZoneConfiguration performs no automatic second-zone command, bend-range setup,
+voice allocation or expression tracking; separate engines are described below. The receiver applies MPE's last-configuration-wins
 rule to overlapping zones; the library maintains no shared zone registry.
 
 `timecode.FrameRate` preserves the four MTC rate codes Fps24, Fps25,
@@ -545,9 +545,9 @@ DropFrame30 and Fps30. FullFrame(device_id, rate, hours, minutes, seconds, frame
 requires explicit broadcast device_id=127 per the full-message specification;
 hours are 0–23, minutes/seconds 0–59, frames 0–23/24/29 according to rate.
 The drop-frame code is preserved as a wire label, without a frame-count/time-line
-conversion or a claim that skipped SMPTE labels are validated. There is no
-quarter-frame assembly, two-frame latency correction, phase inference or
-clock locking. Full-frame input does not imply that time is running.
+conversion or a claim that skipped SMPTE labels are validated. FullFrame itself supplies no
+quarter-frame assembly, latency compensation or clock locking; Position and
+Assembler below provide separate explicit interpretation. Full-frame input does not imply that time is running.
 
 `gm.decode`, `universal.decode` and `timecode.decode` explicitly interpret a
 complete SysEx, returning their typed primitive or None for unrelated/unsupported
@@ -560,10 +560,10 @@ ModeMessage or the individual mode types as interpreter input. A caller selects
 which addressed mode changes are relevant to that source, or calls reset after
 known mode changes/loss; sending a value does not implicitly feed an interpreter.
 
-Approved deferrals are GM2 controller-destination routing, key-based instrument
+Originally deferred from slice 6 were GM2 controller-destination routing, key-based instrument
 controls and global effect-parameter SysEx; MPE voice allocation/expression
 tracking; quarter-frame MTC assembly/clock locking and high-resolution velocity
-prefix interpretation. Generic raw messages remain available for these forms.
+prefix interpretation. Slice 6.5 below implements these codecs/state engines.
 This selected coverage does not claim full GM2 message support, synthesis,
 manufacturer extensions, device conformance or physical/native qualification.
 
@@ -626,3 +626,107 @@ Observations distinguish encoded and direction-compensated positions. FullFrame
 relocates without acquiring lock. No extrapolation, wall clock, scheduling or
 physical synchronization guarantee is supplied. Public reset retains the
 monotonic caller-clock requirement.
+
+## Slice 7 UMP/MIDI 2.0 contract
+
+The pure `meedee.ump` namespace exposes frozen native Message subclasses backed
+by Rust values. It does not import transport, initialize workers, perform I/O or
+attach host timestamps. `encode` returns an immutable tuple of 32-bit words;
+`decode` requires exactly one UMP. Decoder.feed accepts word lists/tuples and
+returns ordered typed values or frozen diagnostics with cumulative word offsets.
+It retains at most three unfinished words, recovers at declared packet lengths,
+and reports truncation on finish. Reset discards pending state, retaining offsets.
+
+All scalar constructors are keyword-only and strictly reject coercion/bools for
+integer fields. Groups/channels are 1–16 and programs 1–128; wire conversion is
+internal. Pitch bend and per-note bend are signed -2^31 through 2^31-1, centered
+at zero. Relative controllers are signed two's-complement integers. Velocity and
+attribute data retain 16 bits; pressure and absolute controllers retain 32 bits.
+Attribute types 0–3 are represented; type 0 requires zero attribute data. Reserved
+registered per-note controller IDs are rejected by typed values for this baseline.
+Per-note management flags use protocol bits (1=detach, 2=reset). Program options
+use bit 0=bank valid; without it both bank bytes must be zero. A MIDI 2 NoteOn
+velocity of zero is a sounding-note event, unlike MIDI 1 NoteOn zero.
+
+| Packet family | Representation and scope |
+| --- | --- |
+| Utility | Noop, JrClock, JrTimestamp, DeltaClockstampTicksPerQuarter, DeltaClockstamp; no Group field |
+| System/MIDI 1.0 channel | Midi1Packet(group, message) reuses immutable MIDI 1 values; SysEx uses separate packetization |
+| MIDI 2.0 channel | Explicit Midi2NoteOn/Off, PolyPressure, ChannelPressure, ControlChange, ProgramChange, PitchBend, Registered/AssignableController, relative controllers, registered/assignable per-note controllers, per-note bend/management |
+| Data64 | SysEx7Packet: format 0/1/2/3 = Complete/Start/Continue/End, at most six seven-bit bytes |
+| Data128 | SysEx8Packet: format, stream ID 0–255, up to thirteen payload bytes; explicit aborted End; MixedDataSet header/payload packets retain their fourteen bytes |
+| Flex Data | Group, optional channel, format, status bank/status and three data words; tempo/time-signature/metronome/key-signature factories and bounded UTF-8 packetization |
+| Stream | Groupless format/status and fourteen bytes; endpoint/function-block/configuration/identity/clip factories plus endpoint/product/block text packetization |
+| Opaque | Exact words of any structurally complete UMP, including assigned 96-bit reserved types; no interpretation or transmission guarantee |
+
+Typed decoding checks lengths, known statuses, reserved fields, ranges, padding
+and addressing. Default rejection is strict. `preserve_unknown=True` returns
+OpaquePacket for complete layouts rejected by the typed decoder, including
+malformed/reserved fields; it does not certify their validity. Framing truncation
+is still a diagnostic. MIDI 2 CC values replaced by unified messages can be
+preserved, without pretending the MIDI 2 receiver will apply their MIDI 1 meaning.
+`bytes_to_words`/`words_to_bytes` require byteorder="big" or "little"; the codec
+never silently selects host or transport byte order. JR clock/timestamp units
+are 1/31250 second with 16-bit wrapping, separate from host clock metadata.
+
+Assembler has configurable positive message_limit (default 1 MiB), total_limit
+(default 8 MiB of retained payload) and max_streams (default 64). One instance
+belongs to one independent source. Keys keep SysEx7 groups, SysEx8 group/stream
+IDs and text addressing separate. Completed function-block names expose a
+separate function_block field; stream_id identifies only SysEx8 streams.
+Overflow discards the unfinished payload,
+releases its allocation and retains bounded discard state until its end. Abort,
+interruption, unexpected continuation and finish produce diagnostics. Incomplete
+or discarded payloads are never returned as completed data. SysEx7 permits
+realtime/groupless interleaving; Flex continuations enforce matching headers and
+permitted realtime/JR clock interleaving. Flex text is at most 32 UMPs/384 bytes;
+endpoint names at most 98 bytes, product IDs 42 ASCII bytes, block names 91 bytes.
+Complete text validates UTF-8, absence of a BOM and terminal zero padding, even
+when code points span packets. Melisma remains an empty lyric payload with its
+status, not an invented syllable. Dates/language tags/chord synthesis semantics
+remain caller interpretation; packet layouts and content are preserved.
+
+Budgets count payload length, not allocator capacity, object overhead, returned
+results or application-held values. The fixed framing buffer and bounded active
+registry do not impose a hard process memory/CPU guarantee. Feed results/copies
+are proportional to supplied input. There is no background timeout or discovery
+registry; callers must reset after known packet loss or source/clock changes.
+MDS header/payload support is packet-level, not a dataset transfer/assembly engine.
+
+`Capabilities(midi1, midi2, sysex8_streams)` records explicit declarations. Its
+supports(value) returns a protocol/stream compatibility fact, or None when these
+declarations do not establish support for a family. It does not infer health,
+synthesis behavior, group topology, live platform support or capability replies.
+No discovery, MIDI-CI or profile transaction runs implicitly. Encode is a pure
+operation, and does not require or assert a physical receiver's capability.
+
+### Translation policy
+
+`to_midi2(MIDI1_message, group=...)` and `to_midi1(UMP_message, allow_loss=False)`
+return immutable reports: status, reason, routing group, converted and a fresh
+list of messages. Min-Center-Max scaling follows M2-115-U 1.0.2, with truncating
+downscaling; native integer values remain exact until conversion is requested.
+Quantized reports contain no output without explicit allow_loss=True. That
+permission permits numerical precision loss, not dropping attributes, guessing
+context or inventing alternate profile/MPE mappings.
+
+| Case | Report / output |
+| --- | --- |
+| MIDI 1 notes/pressure/bend and ordinary CC | Exact standard upscaling; every seven-bit velocity and fourteen-bit bend round trips |
+| MIDI 1 NoteOn zero | Explicitly reported semantic normalization to MIDI 2 NoteOff, release velocity 0x8000 |
+| MIDI 2 plain notes/pressure/bend/ordinary CC | Exact if representable; otherwise Quantized and requires permission |
+| MIDI 2 NoteOn whose seven-bit result would be zero | Quantized to minimum sounding velocity 1 when permitted, preserving note-on meaning |
+| Program/bank | MIDI 1 program-only explicitly retains the receiver bank; MIDI 2 bank-valid yields MSB, LSB, ProgramChange in order |
+| Registered/assignable controller to MIDI 1 | Four primitive selector/data-entry messages with parameter-specific coarse fields where defined; RPN-null has no data-entry target and is Unsupported |
+| MIDI 1 bank/parameter/velocity-prefix sequences or increment/decrement intent | ContextRequired; no source state, selector timing, bank inheritance or paired velocity is guessed |
+| Note attributes/per-note MIDI 2 expression | ProfileDependent; no implicit attribute removal or alternate translation |
+| Complete SysEx7 / MIDI 1 SysEx | Exact framing/packetization; fragmented SysEx7 must first be assembled |
+| SysEx8, MDS, relative controllers, Flex/stream/utility/opaque | Unsupported for stateless non-UMP MIDI 1 conversion |
+
+This is an explicit conservative stateless translator, not a complete default
+translation engine for arbitrary stateful MIDI 1 streams. MIDI 1 fine CC halves
+are individually preserved rather than automatically merged. RPN/NRPN output
+lists use the standard four-message sequence, without implicit RPN-null cleanup;
+selection may remain active. Lists are values, not atomic live operations and
+provide no send-progress or delivery acknowledgment. Typed/timed sending and
+source integration remain slice 10; profile negotiation remains slice 11.

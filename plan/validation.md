@@ -921,3 +921,39 @@ encoding. MPE tracker expression and sustain start unknown (`None`), and reset
 clears that knowledge. Member snapshots report observed manager sustain; counts
 cover only observed notes. The allocator keeps its explicit local output state.
 Focused Rust and Python profile-engine tests cover these contracts.
+
+## Slice 7: UMP and MIDI 2.0 core, 2026-10-15
+
+The pure Rust/Python UMP module implements the packet/value families, explicit
+translation and bounded source-local engines described in api.md. The baseline
+and independent word fixtures are recorded in specifications.md. No dependency,
+native backend or transport runtime changed. No additional work beyond the prompt.
+
+Final Python 3.11.7 and 3.15.0 suites each pass 210 tests. The Rust workspace
+passes 88 ordinary tests with five ignored cases; pytest separately exercises
+the three interpreter-finalization cases. Six added Rust and six Python tests
+cover 31 shared vectors, immutable native values, reserved/malformed fields,
+explicit byte order, incremental partitions, opaque preservation, SysEx7/8
+interleaving/abort, assembly resource limits, UTF-8 across packet boundaries,
+protocol text limits, capability declarations and translation reports. Rust
+checks every seven-bit velocity and fourteen-bit pitch-bend round trip, plus
+4,096 deterministic packet layouts and bounded assembly invariants. MPE tests
+include the final approved unknown-observation/reset policy.
+
+Ruff, formatting, ty, pyupgrade, cargo formatting, workspace Clippy and whitespace
+checks pass. Clippy retains the pre-existing local atomic-deprecation exception.
+A macOS arm64 CPython 3.11 wheel was built from the newly generated source
+distribution. Both archive checks pass, including new Rust sources, shared
+fixtures, Python modules and stubs. Reinstalling that wheel into the isolated
+wheel environment and testing outside the checkout passes all 209 applicable
+installed-package tests. The source-only cargo-build callback test is exercised
+in the full checkout suites. Release CI adds the installed UMP test module; it
+still runs only for published releases, testing Python 3.11 and 3.15. No release
+or CI run was triggered.
+
+These are software/unit and packaging checks, not live MIDI 2.0 qualification.
+Windows native validation, the selected Pi build/sysroot and physical UMP device
+behavior remain open. MDS support is packet-level; translation deliberately
+requires missing source/profile context rather than pretending to implement a
+complete stateful default translator. Typed/timed transport integration and
+MIDI-CI remain later slices.

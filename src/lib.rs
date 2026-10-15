@@ -15,6 +15,7 @@ mod packets;
 mod ports;
 mod profiles;
 mod tuning;
+mod ump;
 
 #[cfg(all(test, target_os = "macos"))]
 mod transport_tests;
@@ -32,6 +33,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_universal, module)?)?;
     module.add_function(wrap_pyfunction!(populate_mpe, module)?)?;
     module.add_function(wrap_pyfunction!(populate_timecode, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_ump, module)?)?;
     Ok(())
 }
 
@@ -144,4 +146,9 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     error.setattr("__module__", "meedee.midi")?;
     module.add("CompoundSendError", error)?;
     Ok(())
+}
+
+#[pyfunction]
+fn populate_ump(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    ump::register(module)
 }

@@ -8,5 +8,6 @@ pub mod mpe;
 pub mod timecode;
 pub mod transport;
 pub mod tuning;
+pub mod ump;
 pub mod universal;
 pub mod velocity;
