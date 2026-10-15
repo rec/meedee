@@ -85,50 +85,136 @@ impl UmpPacket {
 #[pyclass(frozen, skip_from_py_object, module = "meedee.events")]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Clock {
-    #[pyo3(get)]
-    pub identity: String,
-    #[pyo3(get)]
-    pub backend: Backend,
-    #[pyo3(get)]
-    pub mode: TimestampMode,
+    pub value: meedee::events::Clock,
 }
-
+impl Clock {
+    pub fn native(identity: String, backend: Backend, mode: TimestampMode) -> Self {
+        Self {
+            value: meedee::events::Clock::new(
+                identity,
+                1,
+                1_000_000_000,
+                if mode == TimestampMode::Off {
+                    "disabled"
+                } else {
+                    "backend_absolute"
+                }
+                .into(),
+                None,
+            )
+            .expect("native clock identity and unit")
+            .with_transport(backend.native() as i32, mode != TimestampMode::Off),
+        }
+    }
+}
 #[pymethods]
 impl Clock {
     #[new]
-    #[pyo3(signature = (*, identity, backend, mode))]
-    fn new(identity: String, backend: Backend, mode: TimestampMode) -> PyResult<Self> {
-        if identity.is_empty() {
-            return Err(PyValueError::new_err("clock identity must not be empty"));
+    #[pyo3(signature=(*,identity,backend=None,mode=None,tick_numerator=1,tick_denominator=1_000_000_000,origin=None,resolution_ticks=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        identity: String,
+        backend: Option<Backend>,
+        mode: Option<TimestampMode>,
+        #[pyo3(from_py_with=crate::files::uint)] tick_numerator: u64,
+        #[pyo3(from_py_with=crate::files::uint)] tick_denominator: u64,
+        origin: Option<String>,
+        resolution_ticks: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        if backend.is_some() != mode.is_some() {
+            return Err(PyValueError::new_err(
+                "backend and mode must both be supplied or both omitted",
+            ));
         }
-        Ok(Self {
+        let origin = origin.unwrap_or_else(|| {
+            if mode == Some(TimestampMode::Off) {
+                "disabled"
+            } else if backend.is_some() {
+                "backend_absolute"
+            } else {
+                "unspecified"
+            }
+            .into()
+        });
+        let mut value = meedee::events::Clock::new(
             identity,
-            backend,
-            mode,
+            tick_numerator,
+            tick_denominator,
+            origin,
+            resolution_ticks.map(crate::files::uint).transpose()?,
+        )
+        .map_err(crate::files::os_error)?;
+        if let (Some(b), Some(m)) = (backend, mode) {
+            value = value.with_transport(b.native() as i32, m != TimestampMode::Off);
+        }
+        Ok(Self { value })
+    }
+    #[getter]
+    fn identity(&self) -> &str {
+        self.value.identity()
+    }
+    #[getter]
+    fn backend(&self) -> PyResult<Option<Backend>> {
+        self.value
+            .backend()
+            .map(|b| match b {
+                1 => Ok(Backend::CoreMidi),
+                2 => Ok(Backend::AlsaSeq),
+                3 => Ok(Backend::AlsaRaw),
+                5 => Ok(Backend::WinMm),
+                4096 => Ok(Backend::AlsaRawUmp),
+                4097 => Ok(Backend::AlsaSeqUmp),
+                4098 => Ok(Backend::CoreMidiUmp),
+                4099 => Ok(Backend::WindowsMidiServices),
+                _ => Err(PyValueError::new_err("unknown saved native backend")),
+            })
+            .transpose()
+    }
+    #[getter]
+    fn mode(&self) -> Option<TimestampMode> {
+        self.value.mode().map(|m| {
+            if m {
+                TimestampMode::Absolute
+            } else {
+                TimestampMode::Off
+            }
         })
     }
     #[getter]
-    fn tick_numerator(&self) -> u32 {
-        1
+    fn tick_numerator(&self) -> u64 {
+        self.value.numerator()
     }
     #[getter]
-    fn tick_denominator(&self) -> u32 {
-        1_000_000_000
+    fn tick_denominator(&self) -> u64 {
+        self.value.denominator()
+    }
+    #[getter]
+    fn origin(&self) -> &str {
+        self.value.origin()
+    }
+    #[getter]
+    fn resolution_ticks(&self) -> Option<u64> {
+        self.value.resolution_ticks()
     }
     #[getter]
     fn resolution_ns(&self) -> Option<u64> {
-        None
+        let n = u128::from(self.value.resolution_ticks()?)
+            .checked_mul(u128::from(self.value.numerator()))?
+            .checked_mul(1_000_000_000)?;
+        let d = u128::from(self.value.denominator());
+        if n % d == 0 {
+            (n / d).try_into().ok()
+        } else {
+            None
+        }
     }
     fn __repr__(&self) -> String {
-        format!(
-            "Clock(identity={:?}, backend=Backend.{:?}, mode=TimestampMode.{:?})",
-            self.identity, self.backend, self.mode
-        )
+        format!("Clock(identity={:?}, tick_numerator={}, tick_denominator={}, origin={:?}, resolution_ticks={:?})",self.value.identity(),self.value.numerator(),self.value.denominator(),self.value.origin(),self.value.resolution_ticks())
     }
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
         other
             .extract::<PyRef<'_, Self>>()
-            .is_ok_and(|other| *self == *other)
+            .is_ok_and(|v| self.value == v.value)
     }
     fn __hash__(&self) -> u64 {
         value_hash(self)
@@ -165,7 +251,13 @@ impl ReceivedPacket {
                 PyValueError::new_err("timestamp_ns must fit a signed 64-bit integer")
             })?)
         };
-        if clock.mode == TimestampMode::Off && timestamp_ns.is_some() {
+        if clock.value.numerator() != 1
+            || clock.value.denominator() != 1_000_000_000
+            || clock.value.backend().is_none()
+        {
+            return Err(PyValueError::new_err("ReceivedPacket requires a native nanosecond clock; use Timestamp for general clocks"));
+        }
+        if clock.value.mode() == Some(false) && timestamp_ns.is_some() {
             return Err(PyValueError::new_err("disabled timestamps must be None"));
         }
         Ok(Self {

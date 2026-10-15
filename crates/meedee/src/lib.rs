@@ -12,7 +12,9 @@ pub mod ump;
 pub mod universal;
 pub mod velocity;
 
+pub mod archive;
 pub mod clip;
+pub mod events;
 pub mod file_io;
 pub mod smf;
 pub mod syx;

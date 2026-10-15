@@ -971,3 +971,20 @@ independent Type 2 tracks, short writes and injected disk-full errors. No native
 MIDI flow was run. Exact clock/export integration, archive support and live
 integration follow in this same authorized effort; this foundation alone does
 not mark all slice 8 export gates complete.
+
+## Slice 9 archive and shared exact event values, 2026-10-15
+
+The v1 schema is documented in archive-format.md. Its Rust implementation and
+native Python values preserve rational clock units, optional signed ticks,
+source spans, stream order, primitive MIDI/UMP and all nine compound commands.
+Normal reading checks CRCs and completion; explicit recovery exposes only a
+verified prefix with an incomplete report. Readers bound record allocation and
+descriptor retention. File operations do not start MIDI workers.
+
+Three Rust tests and three Python tests cover independent CRC/header/trailer
+values, negative boundary ticks, absent timestamps, all command IDs, opaque
+records, descriptor references, disk/completion failure states and truncation at
+every frame byte. The full Python 3.11 suite passes 217 tests, and Rust passes
+96 ordinary tests with five ignored cases. Focused native packet tests also
+confirm the existing raw clock contract. Final cross-version, installed-wheel
+and native virtual integration checks follow after slice 10.
