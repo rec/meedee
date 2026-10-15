@@ -2,8 +2,8 @@
 
 import sys
 
-from . import _core
+from . import _core, messages, ump
 
 _core.populate_events(sys.modules[__name__])
 
-del sys, _core
+del sys, _core, messages, ump

@@ -143,6 +143,7 @@ fn __repr__(slf:PyRef<'_,Self>)->PyResult<String>{let py=slf.py();crate::tuning:
 #[classattr]fn __match_args__(py:Python<'_>)->PyResult<Bound<'_,PyTuple>>{let f:&[&str]=&[$(stringify!($field)),*];PyTuple::new(py,f)}
 }};}
 
+pub(crate) use frozen;
 #[pyclass(frozen, module = "meedee.smf")]
 pub struct Header {
     value: smf::Header,

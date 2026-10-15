@@ -497,14 +497,12 @@ normalizes wire encoding or preserves an original packet representation.
 
 ## 12. Custom precision-preserving event format
 
-### Proposal: one canonical binary format first
+### Selected version 1: one canonical binary format
 
-Use a versioned binary event stream, provisionally `.mrp`, as the canonical
-custom format. This favors compact storage and streaming on the Pi. Do not
-implement an independently evolving binary format and text format at once.
-A human-readable export can be selected later if it uses the same record schema.
-This satisfies the requested binary-or-text choice; the owner can choose text
-instead before the format slice begins.
+The owner selected a versioned binary `.meedee` archive, implemented in slice 9.
+The exact schema, CRC-32 and completion/recovery rules are in
+[archive-format.md](archive-format.md). This favors compact streaming on the Pi.
+There is one canonical format; no separate evolving text format is implemented.
 
 Its version-1 schema must contain only information needed for lossless event
 storage:
@@ -757,9 +755,12 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
    justified Rust codec; implement SYX and selected standardized UMP formats.
    Gate: streaming/resource checks, unknown metadata, exact semantic round trips,
    and explicit precision/unsupported-content export reports.
-9. **Custom event format.** Freeze the minimal version-1 schema and implement
-   incremental read/write. Gate: exact clock/tick round trips, unknown records,
-   equal-time order, absent time, truncation, overflow, and full-disk failures.
+9. **Custom event format (implemented 2026-10-15).** The `.meedee` v1 schema
+   provides incremental CRC-checked records, exact rational clocks/signed ticks,
+   optional timestamps, semantic commands, stream order and opaque preservation.
+   Normal reading requires completion; explicit recovery returns a verified
+   incomplete prefix. See archive-format.md and validation.md. Bounded threaded
+   capture and final fault/packaging qualification follow in slice 10.
 10. **High-level live input/output and timed capture/playback.** Integrate typed
     events, semantic views, capabilities, bounded recording, receive/callback
     lifecycle, and clock-aware replay. Gate: fake transport/clock checks first,

@@ -347,11 +347,11 @@ mod tests {
                 py,
                 crate::packets::ReceivedPacket {
                     timestamp_ns: Some(timestamp),
-                    clock: crate::packets::Clock {
-                        identity: "callback-test".into(),
-                        backend: crate::packets::Backend::CoreMidi,
-                        mode: crate::packets::TimestampMode::Absolute,
-                    },
+                    clock: crate::packets::Clock::native(
+                        "callback-test".into(),
+                        crate::packets::Backend::CoreMidi,
+                        crate::packets::TimestampMode::Absolute,
+                    ),
                     packet: meedee::transport::Packet::Bytes(bytes.to_vec()),
                 },
             )?

@@ -8,8 +8,10 @@ mod state;
 mod callback;
 mod lifecycle;
 
+mod archive;
 mod codecs;
 mod controls;
+mod event_values;
 mod files;
 mod messages;
 mod packets;
@@ -38,6 +40,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_smf, module)?)?;
     module.add_function(wrap_pyfunction!(populate_syx, module)?)?;
     module.add_function(wrap_pyfunction!(populate_clip, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_archive, module)?)?;
     Ok(())
 }
 
@@ -81,7 +84,8 @@ fn populate_messages(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 fn populate_events(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    packets::register_events(module)
+    packets::register_events(module)?;
+    event_values::register(module)
 }
 
 #[pyfunction]
@@ -168,4 +172,9 @@ fn populate_syx(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_clip(module: &Bound<'_, PyModule>) -> PyResult<()> {
     files::register_clip(module)
+}
+
+#[pyfunction]
+fn populate_archive(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    archive::register(module)
 }

@@ -206,11 +206,11 @@ impl InputConnection {
                 let input = operation(
                     native,
                     Box::new(move |packet| {
-                        let clock = Clock {
-                            identity: callback_identity.clone(),
-                            backend: Backend::from_native(packet.clock.backend),
+                        let clock = Clock::native(
+                            callback_identity.clone(),
+                            Backend::from_native(packet.clock.backend),
                             mode,
-                        };
+                        );
                         callback.deliver(move |py| {
                             Ok(Py::new(
                                 py,
@@ -228,11 +228,11 @@ impl InputConnection {
                 connection
                     .get()
                     .clock
-                    .set(Clock {
+                    .set(Clock::native(
                         identity,
-                        backend: Backend::from_native(input.clock().backend),
+                        Backend::from_native(input.clock().backend),
                         mode,
-                    })
+                    ))
                     .ok();
                 connection.get().diagnostics.set(input.diagnostics()).ok();
                 Ok(input)
