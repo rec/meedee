@@ -3,6 +3,9 @@
 #include <libremidi/backends/winmm/helpers.hpp>
 #include <libremidi/detail/observer.hpp>
 
+#include <algorithm>
+#include <atomic>
+#include <optional>
 #include <thread>
 
 NAMESPACE_LIBREMIDI
@@ -44,6 +47,20 @@ public:
   }
 
 protected:
+  void report_capability_error(const char* direction, std::size_t index, MMRESULT result) const noexcept
+  {
+    // Polling and explicit enumeration may fail concurrently. Suppress nested
+    // error delivery without sharing error_handler's non-atomic recursion flag.
+    if (reporting_error.test_and_set(std::memory_order_acquire))
+      return;
+    error_handler{}.error_impl(
+        configuration.on_error,
+        "could not read WinMM " + std::string(direction) + " port " + std::to_string(index)
+            + " capabilities: " + std::to_string(result),
+        source_location::current());
+    reporting_error.clear(std::memory_order_release);
+  }
+
   template <bool Notify>
   void check_new_ports()
   {
@@ -95,16 +112,18 @@ protected:
     }
   }
 
-  input_port to_in_port_info(std::size_t index) const noexcept
+  std::optional<input_port> to_in_port_info(std::size_t index) const noexcept
   {
-    MIDIINCAPS deviceCaps;
-    midiInGetDevCaps(index, &deviceCaps, sizeof(MIDIINCAPS));
+    MIDIINCAPS deviceCaps{};
+    const auto result = midiInGetDevCaps(index, &deviceCaps, sizeof(deviceCaps));
+    if (result != MMSYSERR_NOERROR)
+    {
+      report_capability_error("input", index, result);
+      return std::nullopt;
+    }
 
     auto rawName = ConvertToUTF8(deviceCaps.szPname);
-    auto portName = rawName;
-    MakeUniqueInPortName(portName, index);
-
-    return {
+    return input_port{
         {.api = libremidi::API::WINDOWS_MM,
          .client = 0,
          .device
@@ -113,19 +132,21 @@ protected:
          .manufacturer = "",
          .device_name = "",
          .port_name = rawName,
-         .display_name = portName}};
+         .display_name = rawName}};
   }
 
-  output_port to_out_port_info(std::size_t index) const noexcept
+  std::optional<output_port> to_out_port_info(std::size_t index) const noexcept
   {
-    MIDIOUTCAPS deviceCaps;
-    midiOutGetDevCaps(index, &deviceCaps, sizeof(MIDIOUTCAPS));
+    MIDIOUTCAPS deviceCaps{};
+    const auto result = midiOutGetDevCaps(index, &deviceCaps, sizeof(deviceCaps));
+    if (result != MMSYSERR_NOERROR)
+    {
+      report_capability_error("output", index, result);
+      return std::nullopt;
+    }
 
     auto rawName = ConvertToUTF8(deviceCaps.szPname);
-    auto portName = rawName;
-    MakeUniqueOutPortName(portName, index);
-
-    return {
+    return output_port{
         {.api = libremidi::API::WINDOWS_MM,
          .client = 0,
          .device
@@ -134,7 +155,7 @@ protected:
          .manufacturer = "",
          .device_name = "",
          .port_name = rawName,
-         .display_name = portName}};
+         .display_name = rawName}};
   }
 
   template <bool Input>
@@ -143,20 +164,23 @@ protected:
   {
     std::vector<std::conditional_t<Input, input_port, output_port>> portList;
 
-    if constexpr (Input)
+    const std::size_t nDevices = Input ? midiInGetNumDevs() : midiOutGetNumDevs();
+    for (std::size_t i = 0; i < nDevices; ++i)
     {
-      std::size_t nDevices = midiInGetNumDevs();
-      for (std::size_t i = 0; i < nDevices; ++i)
+      auto port = [&] {
+        if constexpr (Input)
+          return to_in_port_info(i);
+        else
+          return to_out_port_info(i);
+      }();
+      if (port)
       {
-        portList.push_back(to_in_port_info(i));
-      }
-    }
-    else
-    {
-      std::size_t nDevices = midiOutGetNumDevs();
-      for (std::size_t i = 0; i < nDevices; ++i)
-      {
-        portList.push_back(to_out_port_info(i));
+        // Use only this enumeration's successful snapshots. Re-querying earlier
+        // devices for duplicate names introduces another disappearance race.
+        const auto ordinal
+            = std::ranges::count(portList, port->port_name, &port_information::port_name) + 1;
+        port->display_name += " " + std::to_string(ordinal);
+        portList.push_back(std::move(*port));
       }
     }
     return portList;
@@ -167,6 +191,9 @@ protected:
 
   std::vector<input_port> inputPortList;
   std::vector<output_port> outputPortList;
+
+private:
+  mutable std::atomic_flag reporting_error = ATOMIC_FLAG_INIT;
 };
 }
 

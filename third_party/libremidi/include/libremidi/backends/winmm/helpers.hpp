@@ -35,40 +35,4 @@ inline std::string ConvertToUTF8(const TCHAR* str)
   return u8str;
 }
 
-// Next functions add the portNumber to the name so that
-// the device's names are sure to be listed with individual names
-// even when they have the same brand name
-inline void MakeUniqueInPortName(std::string& deviceName, std::size_t portNumber)
-{
-  int x = 1;
-  for (std::size_t i = 0; i < portNumber; i++)
-  {
-    MIDIINCAPS deviceCaps;
-    midiInGetDevCaps(i, &deviceCaps, sizeof(MIDIINCAPS));
-    auto stringName = ConvertToUTF8(deviceCaps.szPname);
-    if (deviceName == stringName)
-    {
-      x++;
-    }
-  }
-  deviceName += " ";
-  deviceName += std::to_string(x);
-}
-
-inline void MakeUniqueOutPortName(std::string& deviceName, std::size_t portNumber)
-{
-  int x = 1;
-  for (std::size_t i = 0; i < portNumber; i++)
-  {
-    MIDIOUTCAPS deviceCaps;
-    midiOutGetDevCaps(i, &deviceCaps, sizeof(MIDIOUTCAPS));
-    auto stringName = ConvertToUTF8(deviceCaps.szPname);
-    if (deviceName == stringName)
-    {
-      x++;
-    }
-  }
-  deviceName += " ";
-  deviceName += std::to_string(x);
-}
 }

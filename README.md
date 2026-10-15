@@ -9,7 +9,7 @@ imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
 runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
-are implemented but native platform qualification remains open. Immutable
+are implemented but native platform qualification remains incomplete. Immutable
 MIDI 1.0 messages and a bounded incremental byte
 codec, fine controls, RPN/NRPN commands and MIDI Tuning Standard values/codecs
 are available, along with GM sound maps and selected profile codecs/helpers.
@@ -304,12 +304,13 @@ dataset transfer/assembly is not provided.
 Translation is explicit and stateless. It reports exact, quantized, unsupported,
 profile-dependent and context-required cases. Bank/RPN/velocity-prefix input
 sequences require source context and are not guessed. Returned primitive lists
-are not atomic live sends; typed/timed transport integration remains slice 10.
+are not atomic live sends; typed output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
 negotiation runs automatically. Raw output still takes meedee.midi.UmpPacket;
-construct it explicitly from the encoded words. Native UMP qualification remains
-open and live MIDI 2.0 device compatibility is not claimed.
+construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
+has passed between test-owned virtual peers. Other native backends and physical
+MIDI 2.0 device compatibility remain unqualified.
 
 ## Python transport
 
@@ -439,11 +440,13 @@ bundle ALSA. ALSA sequencer I/O also requires an accessible `/dev/snd/seq`.
 Native OS backends are selected; optional JACK, PipeWire, network and keyboard
 backends are disabled. CoreMIDI/UMP, available ALSA variants and WinMM are built.
 Windows MIDI Services remains disabled pending pinned SDK/tooling integration
-and native qualification. Windows discovery has a separate capability-query
-failure risk recorded in [validation](plan/validation.md). Real Mac I/O,
-Windows and Pi qualification remain open; device-free fixtures do not certify
-hardware behavior. The latest real CoreMIDI attempt failed because service
-access was unavailable in the tool environment.
+and native qualification. WinMM discovery checks capability-query failures;
+its new regression targets still require Windows validation. Mac MIDI 1 virtual
+loopbacks pass in Rust and both Python modes, along with typed capture/replay/
+cancellation and a CoreMIDI UMP SysEx7 discovery/reply exchange. These passed in
+the owner's Terminal; a direct Apple API probe isolates the agent's first-call
+failure to its execution context. Physical hardware, fault recovery, Windows
+and Pi qualification remain open. See [validation](plan/validation.md).
 
 Release CI remains triggered only by a published release, testing Python 3.11
 and 3.15 on Linux, macOS arm64/Intel and Windows. It includes native regression
@@ -454,7 +457,7 @@ The opt-in [qualification procedure](plan/qualification.md) provides bounded
 synthetic workloads and supervised test-owned virtual-port measurements in Rust
 and Python. Mac software baselines do not establish Pi performance, physical
 device behavior or live MIDI 2.0 support. See the
-[feature matrix and evidence](plan/validation.md#slice-12-qualification-2026-10-15).
+[feature matrix and evidence](plan/validation.md).
 
 ```sh
 uv run --frozen pytest

@@ -77,6 +77,16 @@ add_test(NAME rawio_test COMMAND rawio_test)
 add_test(NAME observer_filters_test COMMAND observer_filters_test)
 
 if(LIBREMIDI_HAS_WINMM)
+  foreach(discovery_target winmm_discovery_test winmm_discovery_ansi_test)
+    add_executable(${discovery_target} tests/unit/winmm_discovery.cpp)
+    target_include_directories(${discovery_target} PRIVATE "${PROJECT_SOURCE_DIR}/include")
+    target_compile_features(${discovery_target} PRIVATE cxx_std_20)
+    target_compile_definitions(${discovery_target} PRIVATE LIBREMIDI_NO_BOOST LIBREMIDI_NO_BOOST_VARIANT2)
+    target_link_libraries(${discovery_target} PRIVATE Catch2::Catch2WithMain winmm)
+    add_test(NAME ${discovery_target} COMMAND ${discovery_target})
+    set_tests_properties(${discovery_target} PROPERTIES TIMEOUT 20)
+  endforeach()
+  target_compile_definitions(winmm_discovery_test PRIVATE UNICODE=1 _UNICODE=1)
   add_executable(winmm_teardown_test tests/unit/winmm_teardown.cpp)
   # Compile the backend with test-only call substitution, without linking the
   # production backend's different inline definition into the same executable.

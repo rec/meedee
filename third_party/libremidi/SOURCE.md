@@ -2,9 +2,10 @@
 
 Repository: `git@github.com:rec/libremidi.git`
 
-Revision: `53a94516cc280fa63f6de12bfe279ba3c26d02b9`
+Revision: `b6c7dfe699eb9f46ebf14ba8336e12d2f6579205`
 
-Imported 2026-10-14 from the fork's `master` branch. This is a commit pin,
+Imported 2026-10-15 from the fork's `codex/checked-winmm-discovery` branch, based
+on `master` at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`. This is a commit pin,
 not the previously audited upstream v5.4.3 release archive. The fork already
 contained other changes at base `996a73c216756de2dd6d58e66245ecae4830f9ff`.
 
@@ -50,6 +51,19 @@ The fork fixes are separate commits:
   initialize WinMM's output handle and all short-message DWORD bytes. The
   Windows-only output test covers unopened/failed-open destruction and zero
   padding for one-, two- and three-byte packets. It has not run on Windows yet.
+
+- [b6c7dfe](https://github.com/rec/libremidi/commit/b6c7dfe699eb9f46ebf14ba8336e12d2f6579205):
+  check WinMM capability-query results before reading any returned metadata,
+  report failed queries and omit affected ports. Duplicate names are counted
+  from successful snapshots, eliminating repeated native queries. An atomic
+  reporting guard suppresses reentrant/concurrent error hooks without waiting
+  on user code or sharing a non-atomic recursion flag. The ANSI and Unicode
+  `winmm_discovery` regression targets cover failed queries with untouched
+  outputs, successful metadata, duplicate names, recovery and error-hook
+  reentrancy/concurrency. They still require Windows compilation/execution.
+  Microsoft's [input](https://learn.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-midiingetdevcapsa)
+  and [output](https://learn.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-midioutgetdevcapsw)
+  contracts require checking the returned error code.
 
 No additional local modifications are applied to the imported files. Included
 paths are `CMakeLists.txt`, `cmake/`, `include/`, `src/`, `LICENSE.md`, `README.md`,
@@ -98,6 +112,6 @@ ctest --test-dir target/libremidi-properties \
 ```
 
 The existing upstream test configuration obtains Catch2 when tests are enabled.
-Production build integration must disable tests and avoid unpinned build-time
-downloads. Native backend replacement and packaging integration are still the
-remaining work of meedee slice 2; source vendoring alone does not replace midir.
+Production builds disable tests and avoid test-dependency downloads. The Rust
+and Python transport replacement is implemented; native platform qualification
+remains separate from source vendoring and software regression checks.
