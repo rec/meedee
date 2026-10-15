@@ -12,11 +12,16 @@ mod archive;
 mod codecs;
 mod controls;
 mod event_values;
+mod event_views;
+mod file_timing;
 mod files;
+mod live;
 mod messages;
 mod packets;
+mod playback;
 mod ports;
 mod profiles;
+mod recording;
 mod tuning;
 mod ump;
 
@@ -54,22 +59,26 @@ fn populate_universal(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 #[pyfunction]
 fn populate_mpe(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    profiles::register_mpe(module)
+    profiles::register_mpe(module)?;
+    event_views::register_mpe(module)
 }
 #[pyfunction]
 fn populate_timecode(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    profiles::register_timecode(module)
+    profiles::register_timecode(module)?;
+    event_views::register_timecode(module)
 }
 
 #[pyfunction]
 fn populate_tuning(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    tuning::register(module)
+    tuning::register(module)?;
+    event_views::register_tuning(module)
 }
 
 #[pyfunction]
 fn populate_controls(module: &Bound<'_, PyModule>) -> PyResult<()> {
     controls::register(module)?;
-    profiles::register_control_engines(module)
+    profiles::register_control_engines(module)?;
+    event_views::register_controls(module)
 }
 
 #[pyfunction]
@@ -85,7 +94,10 @@ fn populate_messages(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_events(module: &Bound<'_, PyModule>) -> PyResult<()> {
     packets::register_events(module)?;
-    event_values::register(module)
+    event_values::register(module)?;
+    live::register(module)?;
+    playback::register(module)?;
+    event_views::register_events(module)
 }
 
 #[pyfunction]
@@ -140,6 +152,9 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native.add_class::<callback::CallbackBridge>()?;
     native.add_function(wrap_pyfunction!(callback::check_thread, &native)?)?;
     native.add_function(wrap_pyfunction!(packets::prepare_send, &native)?)?;
+    native.add_function(wrap_pyfunction!(live::prepare_message, &native)?)?;
+    native.add_function(wrap_pyfunction!(live::live_size, &native)?)?;
+    playback::register_native(&native)?;
     native.add_function(wrap_pyfunction!(codecs::prepare_command, &native)?)?;
     PyModule::import(py, "sys")?
         .getattr("modules")?
@@ -147,6 +162,17 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let clients = PyModule::import(py, "meedee._clients")?;
     for name in ["Input", "Output", "InputConnection", "OutputConnection"] {
         let class = clients.getattr(name)?;
+        class.setattr("__module__", "meedee.midi")?;
+        module.add(name, class)?;
+    }
+    let typed = PyModule::import(py, "meedee._typed")?;
+    for name in [
+        "TypedInput",
+        "TypedOutput",
+        "TypedInputConnection",
+        "TypedOutputConnection",
+    ] {
+        let class = typed.getattr(name)?;
         class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;
     }
@@ -158,12 +184,14 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 fn populate_ump(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    ump::register(module)
+    ump::register(module)?;
+    event_views::register_ump(module)
 }
 
 #[pyfunction]
 fn populate_smf(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    files::register_smf(module)
+    files::register_smf(module)?;
+    file_timing::register_smf(module)
 }
 #[pyfunction]
 fn populate_syx(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -171,10 +199,12 @@ fn populate_syx(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 #[pyfunction]
 fn populate_clip(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    files::register_clip(module)
+    files::register_clip(module)?;
+    file_timing::register_clip(module)
 }
 
 #[pyfunction]
 fn populate_archive(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    archive::register(module)
+    archive::register(module)?;
+    recording::register(module)
 }

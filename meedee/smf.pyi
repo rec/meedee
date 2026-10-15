@@ -4,7 +4,8 @@ from collections.abc import Iterator
 from os import PathLike
 from typing import BinaryIO
 
-from . import messages
+from . import events, messages, ump
+from .events import Rational
 
 class Header:
     def __init__(
@@ -87,3 +88,61 @@ class Writer:
     ) -> None: ...
     def write(self, event: Event) -> None: ...
     def finish(self) -> None: ...
+
+class MergedReader:
+    def __init__(
+        self,
+        source: str | PathLike[str] | BinaryIO,
+        *,
+        sequence: int | None = None,
+        payload_limit: int = 1_048_576,
+        track_limit: int = 128,
+        buffer_limit: int = 8_388_608,
+    ) -> None: ...
+    @property
+    def header(self) -> Header: ...
+    def __iter__(self) -> Iterator[Event]: ...
+    def __next__(self) -> Event: ...
+    def close(self) -> None: ...
+
+class TimedReader:
+    def __init__(
+        self,
+        source: str | PathLike[str] | BinaryIO,
+        *,
+        stream: str,
+        sequence: int | None = None,
+        payload_limit: int = 1_048_576,
+        track_limit: int = 128,
+        buffer_limit: int = 8_388_608,
+    ) -> None: ...
+    @property
+    def header(self) -> Header: ...
+    @property
+    def clock(self) -> events.Clock: ...
+    @property
+    def origin(self) -> events.Timestamp: ...
+    def __iter__(self) -> Iterator[events.Event | events.StreamDiagnostic]: ...
+    def __next__(self) -> events.Event | events.StreamDiagnostic: ...
+    def close(self) -> None: ...
+
+class ExportReport:
+    @property
+    def status(self) -> ump.TranslationStatus: ...
+    @property
+    def reason(self) -> str: ...
+    @property
+    def rounding_error_ticks(self) -> Rational: ...
+    @property
+    def events(self) -> list[Event]: ...
+
+def export_event(
+    event: events.Event,
+    *,
+    header: Header,
+    origin: events.Timestamp,
+    track: int = 0,
+    tempo: int = 500_000,
+    mapping: events.ClockMapping | None = None,
+    allow_loss: bool = False,
+) -> ExportReport: ...

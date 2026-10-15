@@ -9,12 +9,16 @@ def main() -> None:
         "atexit.register", side_effect=AssertionError("cleanup was initialized")
     ):
         from meedee import (
+            archive,
+            clip,
             codecs,
             controls,
             events,
             gm,
             messages,
             mpe,
+            smf,
+            syx,
             timecode,
             tuning,
             ump,
@@ -72,6 +76,14 @@ def main() -> None:
         assert ump.Assembler().active_streams == 0
         bend = ump.decode((0x40E00000, 0x80000000))
         assert isinstance(bend, ump.Midi2PitchBend) and bend.value == 0
+
+        assert smf.Header(format=0, tracks=1, division=480).division == 480
+        assert syx.Reader.__module__ == "meedee.syx"
+        assert clip.Reader.__module__ == "meedee.clip"
+        clock = events.Clock(identity="file", tick_numerator=1, tick_denominator=480)
+        assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
+        view = controls.EventInterpreter()
+        assert view.feed(events.Event(stream="s", message=messages.TimingClock())) == []
 
         assert "meedee.midi" not in sys.modules
         assert "meedee._native" not in sys.modules

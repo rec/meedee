@@ -9,7 +9,7 @@ use pyo3::IntoPyObjectExt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 #[path = "profile_engines.rs"]
-mod engines;
+pub(crate) mod engines;
 
 macro_rules! classes {
     ($namespace:literal; $($name:ident { $($field:ident : $read:ident => $write:ident : $annotation:ty),* };)*) => {$(

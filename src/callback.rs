@@ -1,7 +1,7 @@
 //! Direct native-thread delivery with a GC-visible callable and a drain gate.
 
 use std::cell::Cell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Condvar, LockResult, Mutex, MutexGuard};
 
 #[cfg(test)]
@@ -32,6 +32,10 @@ impl CallbackBridge {
         self.callback.deliver(move |_| Ok(packet.into_any()));
     }
 
+    fn deliver_typed(&self, packet: Py<PyAny>) {
+        self.callback.deliver(move |_| Ok(packet));
+    }
+
     fn retire(&self) {
         self.callback.retire();
     }
@@ -40,6 +44,10 @@ impl CallbackBridge {
         py.detach(|| self.callback.drain())
     }
 
+    #[getter]
+    fn discarded_packets(&self) -> u64 {
+        self.callback.discarded()
+    }
     #[getter]
     fn last_message_time(&self) -> Option<f64> {
         self.callback.last_message_time()
@@ -64,6 +72,7 @@ pub struct Callback {
     state: Mutex<DispatchState>,
     drained: Condvar,
     failed: AtomicBool,
+    discarded: AtomicU64,
 }
 
 impl Callback {
@@ -92,13 +101,19 @@ impl Callback {
             }),
             drained: Condvar::new(),
             failed: AtomicBool::new(false),
+            discarded: AtomicU64::new(0),
         })
+    }
+
+    pub fn discarded(&self) -> u64 {
+        self.discarded.load(Ordering::Relaxed)
     }
 
     pub fn deliver(&self, make_packet: impl FnOnce(Python<'_>) -> PyResult<Py<PyAny>>) {
         let _delivery = {
             let mut state = self.recover(self.state.lock());
             if !state.accepting {
+                self.discarded.fetch_add(1, Ordering::Relaxed);
                 return;
             }
             state.active += 1;
@@ -346,6 +361,7 @@ mod tests {
             Ok(Py::new(
                 py,
                 crate::packets::ReceivedPacket {
+                    sequence: None,
                     timestamp_ns: Some(timestamp),
                     clock: crate::packets::Clock::native(
                         "callback-test".into(),

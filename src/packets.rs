@@ -143,7 +143,7 @@ impl Clock {
             origin,
             resolution_ticks.map(crate::files::uint).transpose()?,
         )
-        .map_err(crate::files::os_error)?;
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
         if let (Some(b), Some(m)) = (backend, mode) {
             value = value.with_transport(b.native() as i32, m != TimestampMode::Off);
         }
@@ -225,6 +225,8 @@ impl Clock {
 #[derive(Clone)]
 pub struct ReceivedPacket {
     #[pyo3(get)]
+    pub sequence: Option<u64>,
+    #[pyo3(get)]
     pub timestamp_ns: Option<i64>,
     pub clock: Clock,
     pub packet: transport::Packet,
@@ -233,11 +235,12 @@ pub struct ReceivedPacket {
 #[pymethods]
 impl ReceivedPacket {
     #[new]
-    #[pyo3(signature = (*, timestamp_ns, clock, packet))]
+    #[pyo3(signature = (*, timestamp_ns, clock, packet, sequence=None))]
     fn new(
         timestamp_ns: &Bound<'_, PyAny>,
         clock: PyRef<'_, Clock>,
         packet: &Bound<'_, PyAny>,
+        sequence: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let timestamp_ns = if timestamp_ns.is_none() {
             None
@@ -262,6 +265,7 @@ impl ReceivedPacket {
         }
         Ok(Self {
             timestamp_ns,
+            sequence: sequence.map(crate::files::uint).transpose()?,
             clock: clock.clone(),
             packet: extract_packet(packet)?,
         })
@@ -294,7 +298,8 @@ impl ReceivedPacket {
     }
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
         other.extract::<PyRef<'_, Self>>().is_ok_and(|other| {
-            self.timestamp_ns == other.timestamp_ns
+            self.sequence == other.sequence
+                && self.timestamp_ns == other.timestamp_ns
                 && self.clock == other.clock
                 && self.packet == other.packet
         })
@@ -302,6 +307,7 @@ impl ReceivedPacket {
     fn __hash__(&self) -> u64 {
         let mut hash = DefaultHasher::new();
         self.timestamp_ns.hash(&mut hash);
+        self.sequence.hash(&mut hash);
         self.clock.hash(&mut hash);
         match &self.packet {
             transport::Packet::Bytes(b) => {

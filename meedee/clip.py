@@ -2,8 +2,8 @@
 
 import sys
 
-from . import _core, messages, ump
+from . import _core, events, messages, ump
 
 _core.populate_clip(sys.modules[__name__])
 
-del sys, _core, messages, ump
+del sys, _core, events, messages, ump

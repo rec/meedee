@@ -31,7 +31,7 @@ def values() -> list[object]:
     ]
     return [
         clock,
-        archive.Stream(id="source", label="keys"),
+        archive.Stream(id="source", label="keys", clock_identity=clock.identity),
         events.Event(
             stream="source",
             timestamp=time,
@@ -43,7 +43,9 @@ def values() -> list[object]:
             message=ump.Midi2PitchBend(group=16, channel=16, value=2**31 - 1),
         ),
         *[events.Event(stream="source", message=c) for c in commands],
-        archive.Metadata(key="tempo", data=b"\x07\xa1\x20"),
+        archive.Metadata(
+            key="tempo", data=b"\x07\xa1\x20", stream="source", timestamp=time
+        ),
         archive.Gap(stream="source", lost=2, reason="queue overflow"),
         archive.Discontinuity(stream="source", reason="clock reset"),
         archive.Opaque(kind=100, data=b"\x00\xff"),
@@ -120,7 +122,7 @@ def test_clock_units_and_checked_values_are_distinct_from_raw_nanoseconds() -> N
     with pytest.raises(AttributeError):
         time.ticks = 0  # ty: ignore[invalid-assignment]
     half = events.Rational(numerator=3, denominator=2)
-    with pytest.raises(OSError, match="rounding"):
+    with pytest.raises(ValueError, match="rounding"):
         half.round()
     assert half.round(allow_rounding=True) == (
         2,

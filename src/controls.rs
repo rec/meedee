@@ -93,7 +93,10 @@ impl Interpreter {
     }
 }
 
-fn to_python(py: Python<'_>, observations: Vec<controls::Observation>) -> PyResult<Vec<Py<PyAny>>> {
+pub(crate) fn to_python(
+    py: Python<'_>,
+    observations: Vec<controls::Observation>,
+) -> PyResult<Vec<Py<PyAny>>> {
     observations
         .into_iter()
         .map(|observation| match observation {

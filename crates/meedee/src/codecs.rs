@@ -49,6 +49,7 @@ pub enum DecodeItem {
 pub struct Decoder {
     sysex_limit: usize,
     offset: usize,
+    message_start: usize,
     running: Option<u8>,
     pending: Option<u8>,
     data: [u8; 2],
@@ -66,6 +67,7 @@ impl Decoder {
         Ok(Self {
             sysex_limit,
             offset: 0,
+            message_start: 0,
             running: None,
             pending: None,
             data: [0; 2],
@@ -82,12 +84,46 @@ impl Decoder {
     /// a longer message that began earlier. Chunk boundaries have no semantics.
     /// Returned storage is proportional to this feed's input, not the SysEx cap.
     pub fn feed(&mut self, bytes: &[u8]) -> Vec<DecodeItem> {
-        let mut output = Vec::new();
+        self.feed_spanned(bytes)
+            .into_iter()
+            .map(|(v, _, _)| v)
+            .collect()
+    }
+    /// Absolute byte offsets for contributing bytes, inclusive. Realtime messages
+    /// have their own span and do not consume the pending message's start.
+    pub fn feed_spanned(&mut self, bytes: &[u8]) -> Vec<(DecodeItem, usize, usize)> {
+        let mut result = Vec::new();
+        let mut items = Vec::new();
         for &byte in bytes {
-            self.accept(byte, &mut output);
+            if byte < 128
+                && self.pending.is_none()
+                && !matches!(self.sysex, SysExState::Collecting(_))
+                || (128..248).contains(&byte) && byte != 247
+            {
+                self.message_start = self.offset;
+            }
+            self.accept(byte, &mut items);
+            for item in items.drain(..) {
+                let start = if byte >= 248 || matches!(item, DecodeItem::Diagnostic(_)) {
+                    self.offset
+                } else {
+                    self.message_start
+                };
+                result.push((item, start, self.offset));
+            }
             self.offset = self.offset.saturating_add(1);
         }
-        output
+        result
+    }
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+    pub fn pending_start(&self) -> Option<usize> {
+        if self.pending.is_some() || matches!(self.sysex, SysExState::Collecting(_)) {
+            Some(self.message_start)
+        } else {
+            None
+        }
     }
 
     /// Signal end of stream, diagnose unfinished messages and clear running

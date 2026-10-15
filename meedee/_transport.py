@@ -11,7 +11,7 @@ from collections.abc import Callable
 from queue import Empty, Full, Queue
 from threading import Event, Lock, Thread
 from time import monotonic
-from typing import BinaryIO, NoReturn, cast
+from typing import BinaryIO, NoReturn, TypeVar, cast
 
 from . import _native
 from ._errors import CompoundSendError
@@ -21,23 +21,40 @@ from .events import Clock, ReceivedPacket
 DEFAULT_RECEIVE_BYTE_LIMIT = 8 * 1024 * 1024
 
 
-class ReceiveQueue(Queue[tuple[object, ...]]):
+T = TypeVar("T")
+
+
+class ReceiveQueue(Queue[T]):
     """Bound queued message payloads under the queue's existing mutex."""
 
-    def __init__(self, byte_limit: int) -> None:
-        super().__init__(RECEIVE_CAPACITY)
+    def __init__(
+        self,
+        byte_limit: int,
+        *,
+        capacity: int | None = None,
+        size_of: Callable[[T], int] | None = None,
+    ) -> None:
+        super().__init__(RECEIVE_CAPACITY if capacity is None else capacity)
+        self.size_of = size_of
         self.byte_limit = byte_limit
         self.payload_bytes = 0
 
-    def _put(self, item: tuple[object, ...]) -> None:
-        if self.payload_bytes + payload_size(item) > self.byte_limit:
+    def size(self, item: T) -> int:
+        return (
+            payload_size(cast(tuple[object, ...], item))
+            if self.size_of is None
+            else self.size_of(item)
+        )
+
+    def _put(self, item: T) -> None:
+        if self.payload_bytes + self.size(item) > self.byte_limit:
             raise Full
         super()._put(item)
-        self.payload_bytes += payload_size(item)
+        self.payload_bytes += self.size(item)
 
-    def _get(self) -> tuple[object, ...]:
+    def _get(self) -> T:
         item = super()._get()
-        self.payload_bytes -= payload_size(item)
+        self.payload_bytes -= self.size(item)
         return item
 
 
@@ -49,7 +66,7 @@ class Delivery:
     ) -> None:
         self.bridge = _native.CallbackBridge(callback)
         self.clock: Clock | None = None
-        self.messages = ReceiveQueue(byte_limit)
+        self.messages = ReceiveQueue[tuple[object, ...]](byte_limit)
         self.retired = False
         self.dropped = 0
         self.worker_dropped = 0
@@ -57,12 +74,13 @@ class Delivery:
             if SHUTTING_DOWN:
                 raise _native.StateError("MIDI interpreter shutdown has begun")
             DELIVERIES.add(self)
-        Thread(
+        self.thread = Thread(
             target=dispatch,
             args=(weakref.ref(self), self.messages),
             name="meedee callback",
             daemon=True,
-        ).start()
+        )
+        self.thread.start()
 
     def enqueue(self, packet: tuple[object, ...], dropped: int) -> None:
         self.worker_dropped = max(self.worker_dropped, dropped)
@@ -75,6 +93,16 @@ class Delivery:
     def retire(self) -> None:
         self.retired = True
         self.bridge.retire()
+        while True:
+            try:
+                self.messages.get_nowait()
+            except Empty:
+                break
+            self.dropped += 1
+
+    def drain(self) -> None:
+        self.bridge.drain()
+        self.thread.join()
 
     def __del__(self) -> None:
         if hasattr(self, "bridge"):
@@ -358,7 +386,10 @@ def dispatch(
             del delivery
             continue
         delivery = reference()
-        if delivery is None or delivery.retired:
+        if delivery is None:
+            return
+        if delivery.retired:
+            delivery.dropped += 1
             return
         delivery.bridge.deliver(decode(packet))
         del delivery

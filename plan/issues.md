@@ -1,6 +1,6 @@
 # Open issues and failure review
 
-Updated through UMP/MIDI 2.0 core in slice 7, 2026-10-15. These are
+Updated through file/live integration in slices 8–10, 2026-10-15. These are
 remaining risks, deliberate API limitations and validation gaps. Resolved midir
 binding findings are removed. The historical upstream report remains in
 [midir-suggestions.md](midir-suggestions.md); it is not an audit of libremidi.
@@ -112,9 +112,15 @@ and slow error hooks can delay unrelated Python work. No hard real-time or
 throughput guarantee is made. Blocking disk/network operations in callbacks or
 error hooks can become MIDI liveness failures.
 
-The transport owns no recording files or network protocol. Disk exhaustion
-primarily affects builds, installation and application logging. OS-provided
-network-MIDI endpoints retain their own network failure behavior.
+File codecs and recording now own files. Payload, descriptor and merge-lookahead
+limits bound specified working data, not total files, application-held objects,
+filesystem buffers or CPU time. A blocked filesystem can retain a recording thread
+and handle after a bounded stop times out; there is no safe forced thread kill.
+Disk-full/short-write/flush failures report incomplete output, but successful flush
+is not fsync or power-loss durability. Output paths use ordinary truncating opens.
+Capture budgets include queued/in-flight records; many recordings have no global
+thread/disk quota. No library network protocol is introduced. OS network-MIDI
+endpoints retain their own failure behavior.
 
 ## A1. Raw transport and ownership can surprise Python users
 
@@ -166,7 +172,7 @@ dumps cannot be distinguished from a reply. Correlation does not establish
 physical instrument support or successful retuning; those operations remain
 unqualified. No automatic request, resend, bank selection or reset is performed.
 
-Timestamps are exact signed nanoseconds or None. Zero is valid. Clock identity
+Raw transport timestamps are exact signed nanoseconds or None. Zero is valid. Clock identity
 distinguishes connections and isolated children but does not synchronize them.
 Absolute backend time is not UTC, may have a host fallback and has unknown
 resolution. `last_message_time` is a separate Python monotonic observation.
@@ -207,3 +213,32 @@ and parameter sequences can leave selection active. JR ticks, stream offsets
 and host timestamps remain different clock domains. MDS transfer and semantic
 text interpretation are outside the packet codec; typed/timed live integration,
 MIDI-CI and native platform validation remain later work.
+
+
+## F1. File completion, clocks and performance views require explicit policy
+
+**Deliberate boundaries and remaining qualification.** A streaming archive reader
+can yield valid records before discovering a corrupt/incomplete trailer. Playback
+from such a reader can therefore send an earlier prefix before failing. Preverify
+when that is unacceptable. CRC-32 detects accidental corruption, not authenticity;
+archives never execute Python code. Recovery returns only a verified prefix and
+does not prove a complete musical capture. Best-effort files can be structurally
+complete while containing gap records; inspect gap_records and the actual records.
+
+File semantic round trips do not reproduce original running-status bytes. SMF/Clip
+TimedReader is a performance view, omitting metadata/configuration as documented;
+raw readers are required for faithful file editing. Exact rational clock arithmetic
+is bounded to checked integer widths, and long files may exceed the signed typed
+timestamp range while raw file ticks remain readable. Merged SMF input must be
+seekable, and Type 2 requires an explicit independent sequence. Split-SysEx state is
+independent per selected track, so its payload budget multiplies by active track
+count; lower the payload/track limits on constrained targets. MIDI Clip profile
+negotiation/semantic qualification remains with MIDI-CI in slice 11.
+
+No clock mapping establishes physical synchronization. Timestamps can be absent,
+driver fallback time, inaccurate, discontinuous or only completion time. Packet
+spans cannot reconstruct individual-byte timing. Quarter-frame time-code event
+views lack precise first-quarter contributor timing and expose None. Native
+capture/replay validation remains open because test-client creation returned
+268435459. Fake-device/clock and file fault tests do not qualify real scheduling,
+physical instruments, OS service crashes or target Pi resource behavior.

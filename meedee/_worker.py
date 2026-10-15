@@ -47,6 +47,8 @@ class Producer:
                 self.messages.put_nowait(encode(packet))
             except Full:
                 self.dropped += 1
+        else:
+            self.dropped += 1
 
     def emit(self) -> None:
         try:
@@ -67,6 +69,12 @@ class Producer:
     def stop(self) -> None:
         self.stopped.set()
         self.thread.join()
+        while True:
+            try:
+                self.messages.get_nowait()
+            except Empty:
+                break
+            self.dropped += 1
 
 
 class Worker:

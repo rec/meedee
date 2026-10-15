@@ -200,6 +200,8 @@ pub enum Packet {
 /// This is not UTC. No equivalence across connections or backends is asserted.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReceivedPacket {
+    /// Admission order, including packets subsequently dropped by a bounded stage.
+    pub sequence: u64,
     pub timestamp_ns: Option<i64>,
     pub clock: Clock,
     pub packet: Packet,
@@ -287,6 +289,76 @@ impl Input {
         callback: impl FnMut(ReceivedPacket) + Send + 'static,
     ) -> Result<InputConnection> {
         self.open(None, name, callback)
+    }
+
+    pub fn connect_typed(
+        self,
+        port: &Port,
+        stream: String,
+        sysex_limit: usize,
+        callback: impl FnMut(crate::live::Item) + Send + 'static,
+    ) -> Result<InputConnection> {
+        self.open_typed(Some(port.clone()), "", stream, sysex_limit, callback)
+    }
+    pub fn create_virtual_typed(
+        self,
+        name: &str,
+        stream: String,
+        sysex_limit: usize,
+        callback: impl FnMut(crate::live::Item) + Send + 'static,
+    ) -> Result<InputConnection> {
+        self.open_typed(None, name, stream, sysex_limit, callback)
+    }
+    fn open_typed(
+        self,
+        port: Option<Port>,
+        name: &str,
+        stream: String,
+        limit: usize,
+        mut callback: impl FnMut(crate::live::Item) + Send + 'static,
+    ) -> Result<InputConnection> {
+        let mut decoder =
+            crate::live::Decoder::new(stream.clone(), self.clock.backend.protocol(), limit)
+                .map_err(|_| {
+                    Error::Invalid("source must be nonempty and decoder limit positive")
+                })?;
+        let enabled = self.clock.mode == TimestampMode::Absolute;
+        let clock = crate::events::Clock::new(
+            crate::events::fresh_identity("native")
+                .map_err(|_| Error::Resource("clock identity space exhausted"))?,
+            1,
+            1_000_000_000,
+            if enabled {
+                "backend_absolute"
+            } else {
+                "disabled"
+            }
+            .into(),
+            None,
+        )
+        .expect("validated native clock")
+        .with_transport(self.clock.backend as i32, enabled);
+        self.open(port, name, move |packet| {
+            match decoder.feed(
+                &packet.packet,
+                &clock,
+                packet.timestamp_ns,
+                Some(packet.sequence),
+            ) {
+                Ok(items) => {
+                    for item in items {
+                        callback(item);
+                    }
+                }
+                Err(e) => callback(crate::live::Item::Diagnostic(crate::live::Diagnostic {
+                    stream: stream.clone(),
+                    packet: packet.sequence,
+                    kind: crate::live::DiagnosticKind::Malformed,
+                    lost: 0,
+                    reason: e.to_string(),
+                })),
+            }
+        })
     }
 
     fn open(

@@ -217,7 +217,11 @@ class InputConnection:
         if self._native is not None:
             return self._native.dropped_packets
         assert self._delivery is not None
-        return self._delivery.dropped + self._delivery.worker_dropped
+        return (
+            self._delivery.dropped
+            + self._delivery.worker_dropped
+            + self._delivery.bridge.discarded_packets
+        )
 
     @property
     def worker_failure(self) -> Exception | None:
@@ -242,7 +246,7 @@ class InputConnection:
                 self._client._context.close(self._generation)
                 self._closed = True
             finally:
-                self._delivery.bridge.drain()
+                self._delivery.drain()
 
     def __enter__(self) -> InputConnection:
         if self._native is not None:
@@ -257,7 +261,7 @@ class InputConnection:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        close_context(self, exc_value)
+        close_context(self.close, exc_value)
 
     def __del__(self) -> None:
         if (delivery := getattr(self, "_delivery", None)) is not None:
@@ -366,7 +370,7 @@ class OutputConnection:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        close_context(self, exc_value)
+        close_context(self.close, exc_value)
 
     def __del__(self) -> None:
         if hasattr(self, "_client") and self._native is None and not self._closed:
@@ -396,11 +400,9 @@ def wire_settings(settings: dict[str, object]) -> dict[str, object]:
     }
 
 
-def close_context(
-    connection: InputConnection | OutputConnection, body_error: BaseException | None
-) -> None:
+def close_context(close: Callable[[], None], body_error: BaseException | None) -> None:
     try:
-        connection.close()
+        close()
     except BaseException as close_error:
         if body_error is None:
             raise
@@ -429,7 +431,7 @@ def validate_settings(
 
 
 def validate_open(
-    name: str = "", callback: Callable[[ReceivedPacket], object] | None = None
+    name: str = "", callback: Callable[..., object] | None = None
 ) -> None:
     _native.check_thread()
     if not isinstance(name, str):

@@ -414,7 +414,10 @@ impl Assembler {
         self.value.reset();
     }
 }
-fn assembly_outputs(py: Python<'_>, values: Vec<model::AssemblyItem>) -> PyResult<Vec<Py<PyAny>>> {
+pub(crate) fn assembly_outputs(
+    py: Python<'_>,
+    values: Vec<model::AssemblyItem>,
+) -> PyResult<Vec<Py<PyAny>>> {
     values
         .into_iter()
         .map(|v| match v {

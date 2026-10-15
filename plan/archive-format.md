@@ -26,10 +26,10 @@ present. Lengths are checked against the configurable payload limit (default
 | ID | Fields after kind |
 | --- | --- |
 | 1 Clock | identity string; tick numerator u64; tick denominator u64; origin string; optional resolution in ticks u64; optional backend i32; mode byte: 0 unspecified, 1 disabled, 2 backend absolute |
-| 2 Stream | identity string; descriptive label string |
+| 2 Stream | identity string; descriptive label string; optional clock identity string |
 | 3 Event | stream identity string; optional Timestamp; optional SourceSpan; message representation byte; remaining bytes are its payload |
 | 4 Gap | stream string; observed lost count u64; reason string |
-| 5 Metadata | key string; data blob |
+| 5 Metadata | optional stream identity string; optional Timestamp; key string; data blob |
 | 6 Discontinuity | stream string; reason string |
 | 65535 Completion | preceding frame count u64; complete boolean; reason string |
 
@@ -46,7 +46,11 @@ known resolution is a positive integer tick count. Native backend and mode
 are both supplied or both absent. Saved native backend IDs match the pinned
 transport IDs; descriptors are archival metadata, never instructions to open
 ports. Clock and stream descriptors precede referencing records. Duplicate IDs
-are rejected. The initial implementation admits at most 128 descriptors and
+are rejected. A stream clock association must name an already declared clock;
+its timed events/metadata must use that descriptor. The association remains
+meaningful when timestamp capture is off. Metadata may be global, stream-scoped,
+timed or explicitly untimed; a tempo change therefore need not borrow the time
+of an adjacent musical event. The initial implementation admits at most 128 descriptors and
 8 MiB total descriptor string bytes, independent of the per-record limit.
 A long-running capture that exhausts these bounds must start another archive.
 

@@ -18,6 +18,7 @@ fn records() -> Vec<Record> {
         Record::Stream {
             id: "source".into(),
             label: "keys".into(),
+            clock_identity: None,
         },
         Record::Event(Box::new(Event {
             stream: "source".into(),

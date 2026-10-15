@@ -126,6 +126,19 @@ impl Interpreter {
         self.clear(None, self.next_index)
     }
 
+    pub(crate) fn retained_indexes(&self) -> Vec<usize> {
+        self.channels
+            .iter()
+            .flat_map(|c| {
+                c.coarse
+                    .iter()
+                    .copied()
+                    .chain([c.selector_msb, c.selector_lsb, c.data])
+            })
+            .flatten()
+            .map(|v| v.index)
+            .collect()
+    }
     fn clear(&mut self, channel: Option<u8>, index: usize) -> Vec<Observation> {
         if let Some(channel) = channel {
             self.channels[usize::from(channel - 1)] = Channel::default();

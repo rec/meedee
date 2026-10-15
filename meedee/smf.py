@@ -2,8 +2,8 @@
 
 import sys
 
-from . import _core, messages
+from . import _core, events, messages
 
 _core.populate_smf(sys.modules[__name__])
 
-del sys, _core, messages
+del sys, _core, events, messages

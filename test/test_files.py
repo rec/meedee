@@ -12,15 +12,24 @@ SMF = bytes.fromhex(
 
 
 def test_smf_fidelity_tracks_and_borrowed_stream_ownership() -> None:
+    with pytest.raises(ValueError):
+        smf.Header(format=0, tracks=2, division=480)
+    with pytest.raises(ValueError):
+        smf.Meta(kind=81, data=b"\x00")
     stream = BytesIO(SMF)
     reader = smf.Reader(stream)
     records = list(reader)
-    assert reader.header.division == 480
+    header = reader.header
+    assert header.division == 480
+    reader.close()
+    assert not stream.closed
+    with pytest.raises(ValueError, match="closed"):
+        next(reader)
     assert [e.tick for e in records] == [0, 0, 480, 480]
     assert records[1].record == messages.NoteOn(channel=1, note=60, velocity=100)
     assert records[0].record == smf.Meta(kind=81, data=b"\x07\xa1\x20")
     output = BytesIO()
-    writer = smf.Writer(output, header=reader.header)
+    writer = smf.Writer(output, header=header)
     for e in records:
         writer.write(e)
     writer.finish()

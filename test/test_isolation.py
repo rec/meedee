@@ -1093,3 +1093,70 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
         connection.send_command(command)
         assert not connection.closed
         connection.close()
+
+
+def test_typed_queue_reports_overflow_and_retains_primitive_events(
+    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meedee.events import Event
+
+    monkeypatch.setenv("MEEDEE_TEST_MODE", "twice")
+    source = midi.TypedInput(timeout=1, event_limit=1)
+    with source.connect(source.ports()[0]) as connection:
+        deadline = monotonic() + 2
+        while connection.failure is None and monotonic() < deadline:
+            sleep(0.01)
+        assert isinstance(connection.failure, midi.ResourceError)
+        value = connection.receive(timeout=0)
+        assert isinstance(value, Event)
+        assert isinstance(value.message, messages.NoteOn)
+        with pytest.raises(midi.ResourceError, match="overflow"):
+            connection.receive(timeout=0)
+
+
+def test_typed_receive_wakes_on_cancellation_and_close(
+    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meedee.events import Cancellation
+
+    monkeypatch.setenv("MEEDEE_TEST_MODE", "input")
+    source = midi.TypedInput(timeout=1)
+    connection = source.connect(source.ports()[0])
+    cancel = Cancellation()
+    errors: Queue[BaseException] = Queue()
+
+    def receive() -> None:
+        try:
+            connection.receive(cancel=cancel)
+        except (InterruptedError, midi.StateError) as error:
+            errors.put(error)
+
+    thread = Thread(target=receive)
+    thread.start()
+    cancel.cancel()
+    thread.join(2)
+    assert not thread.is_alive() and isinstance(errors.get_nowait(), InterruptedError)
+    cancel = Cancellation()
+    thread = Thread(target=receive)
+    thread.start()
+    connection.close()
+    thread.join(2)
+    assert not thread.is_alive() and isinstance(errors.get_nowait(), midi.StateError)
+
+
+def test_typed_callback_retains_the_blocking_operation_guard(
+    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meedee import events
+
+    monkeypatch.setenv("MEEDEE_TEST_MODE", "early")
+    called = Event()
+
+    def callback(value: events.Event | events.StreamDiagnostic) -> None:
+        with pytest.raises(midi.CallbackThreadError):
+            midi.TypedOutput(timeout=1)
+        called.set()
+
+    source = midi.TypedInput(timeout=1)
+    with source.connect(source.ports()[0], callback):
+        assert called.wait(2)

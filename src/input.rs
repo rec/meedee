@@ -134,6 +134,7 @@ impl InputConnection {
         self.diagnostics
             .get()
             .map_or(0, transport::InputDiagnostics::dropped_packets)
+            .saturating_add(self.resource.callback.as_ref().map_or(0, |c| c.discarded()))
     }
     #[getter]
     fn last_message_time(&self) -> Option<f64> {
@@ -215,6 +216,7 @@ impl InputConnection {
                             Ok(Py::new(
                                 py,
                                 ReceivedPacket {
+                                    sequence: Some(packet.sequence),
                                     timestamp_ns: packet.timestamp_ns,
                                     clock,
                                     packet: packet.packet,

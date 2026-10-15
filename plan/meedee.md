@@ -466,10 +466,9 @@ sample-accurate or hard-real-time execution from timestamp precision alone.
 ## 11. Standard file interoperability
 
 Provide Rust-owned read/write APIs for Standard MIDI Files and SysEx dumps.
-Evaluate libremidi's existing C++ SMF reader/writer against the requirements
-below before writing a duplicate codec. Reuse it through a narrow bridge if it
-meets the semantics and resource limits; otherwise document the concrete gaps
-that require a Rust codec. The transport C API does not itself expose those
+The pinned C++ reader requires whole-file storage and does not support SMPTE
+timing, so the approved implementation uses bounded Rust codecs rather than
+extending the fork. The transport C API does not itself expose those
 C++ file classes. Our Python binding exposes the Rust file API in either case.
 See libremidi's [reader](https://github.com/celtera/libremidi/blob/master/include/libremidi/reader.hpp)
 and [writer](https://github.com/celtera/libremidi/blob/master/include/libremidi/writer.hpp).
@@ -712,7 +711,7 @@ Complete the features deferred from slice 6 before moving to UMP and file format
 the core pure Rust with matching immutable Python values and caller-driven
 state machines. Reuse the existing focused modules, explicit SysEx decoding and
 compound-command sending where their semantics fit. This slice opens no ports
-and starts no background scheduling; live integration remains in slice 10.
+and starts no background scheduling; live adapters are provided in slice 10.
 
 - Add GM2 controller-destination routing, key-based instrument-control and
   global effect-parameter SysEx values/codecs. Review their normative layouts,
@@ -736,7 +735,7 @@ pass shared Rust/Python wire fixtures, immutable-value checks, bounded-state and
 malformed/reordered/lost-input tests, plus deterministic fake-clock tests. File
 slices must explicitly account for these families and report unsupported export
 semantics. Passing this slice does not establish full GM2 synthesizer conformance
-or qualify instrument behavior. Slice 10 integrates the engines with live typed
+or qualify instrument behavior. Slice 10 provides adapters for the engines with live typed
 events and timing; slice 12 qualifies their selected platform/resource workloads.
 
 7. **UMP and MIDI 2.0 core (implemented 2026-10-15).** The pure meedee.ump
@@ -748,23 +747,29 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
    guessing; it is not a complete stateful default translator. MDS support is
    packet-level, without a dataset transfer engine. Text codecs preserve content
    rather than interpreting lyrics/date/language semantics. Native UMP device
-   qualification and automatic typed transport integration remain slices 11/10.
+   qualification remains slice 11; typed event integration is implemented in slice 10.
    Gate evidence and precise coverage are in api.md, specifications.md and
    validation.md; model/codec support does not claim live MIDI 2.0 compatibility.
-8. **Standard files.** Evaluate/reuse libremidi's SMF codecs or implement the
-   justified Rust codec; implement SYX and selected standardized UMP formats.
-   Gate: streaming/resource checks, unknown metadata, exact semantic round trips,
-   and explicit precision/unsupported-content export reports.
+8. **Standard files (implemented 2026-10-15).** Rust streaming SMF 0/1/2,
+   PPQN/SMPTE, SYX and MIDI Clip 1.0 codecs, bounded deterministic track merge,
+   exact file timing and explicit unsupported/quantized SMF export reports.
+   Raw records preserve unknown metadata/chunks and F0/F7 meaning. Performance
+   views omit metadata explicitly; other containers are excluded. See api.md,
+   specifications.md and validation.md for scope and evidence.
 9. **Custom event format (implemented 2026-10-15).** The `.meedee` v1 schema
    provides incremental CRC-checked records, exact rational clocks/signed ticks,
-   optional timestamps, semantic commands, stream order and opaque preservation.
-   Normal reading requires completion; explicit recovery returns a verified
-   incomplete prefix. See archive-format.md and validation.md. Bounded threaded
-   capture and final fault/packaging qualification follow in slice 10.
-10. **High-level live input/output and timed capture/playback.** Integrate typed
-    events, semantic views, capabilities, bounded recording, receive/callback
-    lifecycle, and clock-aware replay. Gate: fake transport/clock checks first,
-    then authorized native tests without new driver-safety claims.
+   optional timestamps, stream-clock links, timed metadata, semantic commands,
+   stream order and opaque preservation. Normal reading requires completion;
+   explicit recovery returns a verified incomplete prefix. See archive-format.md.
+10. **High-level live I/O and capture/playback (implemented; native qualification
+    open, 2026-10-15).** Typed wrappers share the raw transport. Source-local
+    framing and semantic views preserve completion/contributor timing and reset
+    on known loss. Bounded recording reports incomplete captures; caller-thread
+    playback uses explicit origins/mappings, monotonic deadlines and cancellation.
+    Fake transport/clock, resource/fault and packaging evidence is recorded in
+    validation.md. Authorized CoreMIDI virtual testing was attempted but client
+    creation failed with 268435459, leaving successful native capture/replay open.
+    Windows and Pi qualification remain open. No physical instruments were used.
 11. **MIDI-CI and native MIDI 2.0 qualification.** Implement the selected bounded
     capability/profile/property exchanges and qualify libremidi's native UMP
     backends. Gate: actual native UMP evidence on chosen platforms before

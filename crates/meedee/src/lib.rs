@@ -14,7 +14,12 @@ pub mod velocity;
 
 pub mod archive;
 pub mod clip;
+pub mod event_views;
 pub mod events;
 pub mod file_io;
+pub mod file_timing;
+pub mod live;
+pub mod playback;
+pub mod recording;
 pub mod smf;
 pub mod syx;

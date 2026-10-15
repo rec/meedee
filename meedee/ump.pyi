@@ -2,6 +2,7 @@
 
 from enum import Enum
 
+from . import events
 from .messages import Message
 
 class Noop(Message):
@@ -560,3 +561,16 @@ def function_block_info(
 ) -> StreamMessage: ...
 def start_of_clip() -> StreamMessage: ...
 def end_of_clip() -> StreamMessage: ...
+
+class EventAssembler:
+    def __init__(
+        self,
+        *,
+        message_limit: int = 1_048_576,
+        total_limit: int = 8_388_608,
+        max_streams: int = 64,
+    ) -> None: ...
+    def feed(
+        self, value: events.Event | events.StreamDiagnostic
+    ) -> list[events.Observation]: ...
+    def reset(self) -> None: ...
