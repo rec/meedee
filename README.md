@@ -3,15 +3,16 @@
 A Rust MIDI toolkit with matching Python bindings, using vendored
 [libremidi](https://github.com/celtera/libremidi) for native transport. Python
 imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
-`meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`
-and `meedee.timecode`; the package root is empty. There are no Python runtime
-dependencies.
+`meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`,
+`meedee.timecode` and `meedee.ump`; the package root is empty. There are no Python
+runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
 codec, fine controls, RPN/NRPN commands and MIDI Tuning Standard values/codecs
 are available, along with GM sound maps and selected profile codecs/helpers.
-MIDI 2.0 values and file support are later slices in [the plan](plan/meedee.md).
+UMP/MIDI 2.0 values, codecs and explicit translation are available. File support
+is a later slice in [the plan](plan/meedee.md).
 Encode primitive messages for raw transport; use `send_command` for compound
 control, bank/program and MPE configuration commands.
 
@@ -186,6 +187,49 @@ Reset All Controllers invalidate the applicable local state automatically.
 There are no timers, guessed device defaults, timestamps or source registry.
 Rust exposes the same values and state machine; its common Message marker has
 PrimitiveMessage and Command subtraits for encoding and expansion.
+
+## UMP and MIDI 2.0
+
+```python
+from meedee import ump
+
+note = ump.Midi2NoteOn(
+    group=1, channel=1, note=60, velocity=50_000,
+    attribute_type=0, attribute_data=0,
+)
+words = ump.encode(note)  # Immutable tuple of 32-bit words.
+assert ump.decode(words) == note
+report = ump.to_midi1(note)
+assert report.status == ump.TranslationStatus.Quantized
+assert not report.converted  # Explicit allow_loss=True is needed for output.
+```
+
+This pure module includes groupless utility/stream packets, grouped MIDI 1.0,
+all MIDI 2.0 channel-voice families, SysEx7/8 packetization and bounded assembly,
+Mixed Data Set packets, Flex Data and endpoint/function-block message codecs.
+Groups/channels use 1–16 and programs 1–128; native-width values remain integers.
+The incremental Decoder reports malformed packets and recovers at their declared
+word boundaries. Optional OpaquePacket preservation retains complete rejected or
+unknown layouts without claiming semantic validity or safe device transmission.
+Byte conversion requires an explicit byte order. JR ticks are not host nanoseconds.
+
+Assembler defaults to 1 MiB per message, 8 MiB total retained payload and 64
+active streams. It reports interruption, abort, overflow and truncation without
+returning partial SysEx/text as complete. Flex and endpoint text also obey their
+smaller protocol limits. Retain raw packets, use one engine per independent
+source and reset after known loss. Text assembly validates UTF-8 and padding;
+it does not interpret lyrics, dates or language tags. MDS packets are preserved;
+dataset transfer/assembly is not provided.
+
+Translation is explicit and stateless. It reports exact, quantized, unsupported,
+profile-dependent and context-required cases. Bank/RPN/velocity-prefix input
+sequences require source context and are not guessed. Returned primitive lists
+are not atomic live sends; typed/timed transport integration remains slice 10.
+Declared Capabilities can reject incompatible protocol/stream use; None means
+those declarations do not establish support. No capability discovery or profile
+negotiation runs automatically. Raw output still takes meedee.midi.UmpPacket;
+construct it explicitly from the encoded words. Native UMP qualification remains
+open and live MIDI 2.0 device compatibility is not claimed.
 
 ## Python transport
 

@@ -741,9 +741,18 @@ semantics. Passing this slice does not establish full GM2 synthesizer conformanc
 or qualify instrument behavior. Slice 10 integrates the engines with live typed
 events and timing; slice 12 qualifies their selected platform/resource workloads.
 
-7. **UMP and MIDI 2.0 core.** Implement packet/value families and explicit
-   translation. Gate: shared codec fixtures, preserved wide values, SysEx7/8
-   segmentation, capability checks, and explicit live-qualification status.
+7. **UMP and MIDI 2.0 core (implemented 2026-10-15).** The pure meedee.ump
+   module provides native immutable values and word codecs for utility, system,
+   MIDI 1.0/2.0 channel, SysEx7/8, MDS, Flex Data and stream packet families.
+   Bounded incremental framing/assembly, explicit byte order, opaque preservation,
+   declared-capability checks and explicit translation reports are available.
+   Translation declines missing selector/bank/prefix/profile context rather than
+   guessing; it is not a complete stateful default translator. MDS support is
+   packet-level, without a dataset transfer engine. Text codecs preserve content
+   rather than interpreting lyrics/date/language semantics. Native UMP device
+   qualification and automatic typed transport integration remain slices 11/10.
+   Gate evidence and precise coverage are in api.md, specifications.md and
+   validation.md; model/codec support does not claim live MIDI 2.0 compatibility.
 8. **Standard files.** Evaluate/reuse libremidi's SMF codecs or implement the
    justified Rust codec; implement SYX and selected standardized UMP formats.
    Gate: streaming/resource checks, unknown metadata, exact semantic round trips,

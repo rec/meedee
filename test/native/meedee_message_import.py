@@ -17,6 +17,7 @@ def main() -> None:
             mpe,
             timecode,
             tuning,
+            ump,
             universal,
         )
 
@@ -66,6 +67,11 @@ def main() -> None:
         )
         assert not timecode.Assembler(timeout_ns=100).locked
         assert controls.VelocityInterpreter().feed(messages.TimingClock()) is None
+
+        assert ump.encode(ump.JrClock(ticks=65535)) == (0x0010FFFF,)
+        assert ump.Assembler().active_streams == 0
+        bend = ump.decode((0x40E00000, 0x80000000))
+        assert isinstance(bend, ump.Midi2PitchBend) and bend.value == 0
 
         assert "meedee.midi" not in sys.modules
         assert "meedee._native" not in sys.modules

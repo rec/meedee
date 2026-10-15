@@ -1,6 +1,6 @@
 # Open issues and failure review
 
-Updated through profile engines in slice 6.5, 2026-10-15. These are
+Updated through UMP/MIDI 2.0 core in slice 7, 2026-10-15. These are
 remaining risks, deliberate API limitations and validation gaps. Resolved midir
 binding findings are removed. The historical upstream report remains in
 [midir-suggestions.md](midir-suggestions.md); it is not an audit of libremidi.
@@ -190,3 +190,20 @@ Profile codecs and state engines cannot infer device capabilities, release envel
 or physical synchronization. MPE zone reconfiguration and known transport loss must
 be fed explicitly. Quarter-frame sequence lock requires caller polling to detect
 silence; neither it nor prefix tracking can detect unknown dropped input.
+
+UMP values/codecs do not establish live MIDI 2.0 support or negotiate protocols.
+Opaque preservation also retains rejected complete layouts, without certifying
+validity or safe transmission. Declared capabilities can leave support unknown.
+Reset payload assembly after known framing/transport loss; a missing fragment
+cannot always be detected from otherwise valid continuation packets. Default
+1 MiB message/8 MiB aggregate/64-stream limits bound retained payload, not Python
+inputs, returned lists, allocator capacity or application-held objects. Native
+allocator exhaustion and CPU contention remain possible.
+
+Stateless translation declines missing source/profile context. Quantized output
+requires explicit permission; it does not permit semantic attribute stripping.
+Translated primitive lists are not atomic sends, do not report physical delivery,
+and parameter sequences can leave selection active. JR ticks, stream offsets
+and host timestamps remain different clock domains. MDS transfer and semantic
+text interpretation are outside the packet codec; typed/timed live integration,
+MIDI-CI and native platform validation remain later work.

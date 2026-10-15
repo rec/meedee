@@ -197,3 +197,41 @@ envelopes. The allocator's explicit no-sharing/no-stealing policy is narrower
 than a complete Mode 3 sender. MTC sequence evidence is checked against its
 quarter-frame implementation section; the approved two-cycle acquisition rule
 is deliberately stricter than the minimum complete eight-message sequence.
+
+## Slice 7 UMP/MIDI 2.0 evidence, 2026-10-15
+
+Reviewed the recorded M2-104-UM 1.1.2 baseline, including sections 2.1, 7.1–7.9
+and appendices A, D and F. The Association's
+[current download page](https://midi.org/universal-midi-packet-ump-and-midi-2-0-protocol-specification)
+continues to identify that revision. Packet diagrams were visually reviewed where
+text extraction omits bit positions, notably Flex format/address fields and the
+endpoint capability bits. The codec is independently implemented in Rust; it does
+not call vendored cmidi2 message builders or import their representation rules.
+
+Also acquired and reviewed [MIDI 2.0 Bit Scaling and Resolution](https://midi.org/midi-2-0-bit-scaling-and-resolution),
+M2-115-U 1.0.2, draft 2023-12-18/published 2023-12-19. It is authoritative for
+Min-Center-Max scaling and truncating downscaling relative to the UMP appendix.
+
+```text
+bit-scaling.pdf 839e75ba465ab178486c263ce8ae57d9f0cdad25adf19828cc7d6ddfe32e7ef2
+```
+
+The 31 compact independent vectors in `crates/meedee/tests/fixtures/ump.txt`
+cover all implemented packet families, upper-bound addressing/wide fields,
+groupless utility/stream headers, native signed fields, bank options, SysEx8
+byte counts/abort, MDS headers, Flex setup fields and endpoint discovery/info.
+Rust and Python consume those expected words. Additional tests exercise arbitrary
+word-feed partitions, malformed/unknown packet recovery, explicit byte order,
+bounded group/stream assembly, text code points spanning packets, protocol text
+limits, partial data rejection, reset/truncation, capabilities and translation.
+All seven-bit note velocities and fourteen-bit bends are tested for exact
+standard-upscale/downscale round trips. Deterministic rejected-layout tests
+preserve 4,096 structurally complete word packets through the opaque path.
+These are regression checks, not an official conformance or device test suite.
+
+MDS is packet-level support, not a dataset transfer engine. Flex/stream text
+codecs validate framing/UTF-8/padding, without interpreting ISO dates, language
+tags or lyric state. No complete stateful MIDI 1 default translator is claimed:
+selector, bank, velocity-prefix and parameter-step context is explicitly declined.
+Unknown/rejected complete layouts can be recorded as opaque without asserting
+they are valid messages. Native UMP/platform qualification remains separate.
