@@ -1371,3 +1371,23 @@ No implementation changed in this follow-up. JSON records were parsed and
 their case statuses checked; documentation passed `git diff --check`. Python
 suites were not rerun for this documentation/evidence-only update. Windows,
 Linux/Pi, physical fault recovery and workload budgets remain open.
+
+### Standalone reopen follow-up
+
+The owner reran only `native and reopen`, with unbuffered Python output. It
+failed again with the same unique-ID discovery error: **one failed, nine
+deselected in 1.14 seconds**. The two raw JSON records are preserved in
+`qualification-macos-reopen.jsonl`. This shows the other five native cases are
+not necessary to trigger the failure. It does not rule out system state left
+by previous processes, and still does not identify the failing cycle or endpoint.
+
+The reopen fixture now prints flushed progress markers before virtual creation,
+discovery and connection, after delivery, and after close. Each marker identifies
+the protocol, isolation mode, cycle and test-owned endpoint name. Discovery
+errors still propagate without retries or suppression; sends and endpoint
+selection are unchanged. Native execution of this diagnostic version remains
+pending in ordinary Terminal.
+
+The ordinary Python suite passes all 252 tests after the diagnostic-only fixture
+change. Ruff checking/formatting, ty and pyupgrade pass; the preserved JSON
+records parse and `git diff --check` passes. No production code changed.

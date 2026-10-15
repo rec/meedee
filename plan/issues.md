@@ -76,7 +76,9 @@ tests and five native virtual-only qualification cases. Native repeated reopen
 remains unqualified: the final run failed during output-port discovery with
 `PortInfoError: could not read CoreMIDI port unique ID`, before completing any
 protocol/mode combination. The failing endpoint, cycle and OS status were not
-recorded, so the cause is unresolved. Full-width MIDI 2 CC delivery in that
+recorded, so the cause is unresolved. Running only the reopen case reproduced
+the same failure; the other five cases are not required to trigger it.
+Full-width MIDI 2 CC delivery in that
 fixture also remains unverified. See `qualification-macos-final.jsonl` and
 `validation.md` for the successful cases and the preserved failure.
 

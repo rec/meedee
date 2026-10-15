@@ -10,11 +10,15 @@ def main() -> None:
         for isolated in (True, False):
             source = midi.TypedInput(protocol=protocol, isolated=isolated)
             sender = midi.TypedOutput(protocol=protocol, isolated=isolated)
-            for _ in range(3):
+            for cycle in range(1, 4):
                 name = f"meedee-reopen-{uuid4().hex}"
+                context = f"{protocol}, isolated={isolated}, cycle={cycle}, name={name}"
+                print(f"creating virtual input: {context}", flush=True)
                 with source.create_virtual(name) as receiver:
+                    print(f"discovering output ports: {context}", flush=True)
                     matches = [p for p in sender.ports() if p.name == name]
-                    assert len(matches) == 1
+                    assert len(matches) == 1, (context, matches)
+                    print(f"connecting output: {context}", flush=True)
                     with sender.connect(matches[0]) as output:
                         value = (
                             messages.ControlChange(channel=16, controller=7, value=127)
@@ -31,7 +35,12 @@ def main() -> None:
                         assert isinstance(received, events.Event), received
                         assert received.message == value
                         assert received.timestamp is not None
+                        print(
+                            f"delivery passed; closing connections: {context}",
+                            flush=True,
+                        )
                 assert receiver.closed and output.closed
+                print(f"connections closed: {context}", flush=True)
             print(
                 f"three open/send/close cycles passed: {protocol}, isolated={isolated}"
             )
