@@ -32,17 +32,19 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
     let zone = mpe::ZoneConfiguration::new(1, 2).unwrap();
     let mut a = mpe::Allocator::new(zone.clone());
     let v = a.allocate(60, 100).unwrap();
-    assert_eq!(v.channel, 2);
+    assert_eq!(v.channel(), 2);
     assert_eq!(codecs::encode(&v.note_on()), [145, 60, 100]);
     a.allocate(61, 100).unwrap();
     assert!(a.allocate(62, 100).is_err());
     a.set_sustain(true);
-    a.release(v.id, 64).unwrap();
+    a.release(v.id(), 64).unwrap();
     assert!(a.allocate(62, 100).is_err());
     a.set_sustain(false);
-    assert_eq!(a.allocate(62, 100).unwrap().channel, 2);
-    assert!(a.release(v.id, 64).is_err());
+    assert_eq!(a.allocate(62, 100).unwrap().channel(), 2);
+    assert!(a.release(v.id(), 64).is_err());
     let mut t = mpe::Tracker::new(zone);
+    assert_eq!(t.snapshot(2).unwrap().pitch_bend, None);
+    assert_eq!(t.snapshot(2).unwrap().sustain, None);
     for note in [60, 60, 64] {
         t.feed(&AnyMessage::NoteOn(NoteOn::new(2, note, 100).unwrap()))
             .unwrap();
@@ -56,6 +58,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
         ControlChange::new(1, 123, 0).unwrap(),
     ))
     .unwrap();
+    assert_eq!(t.snapshot(2).unwrap().sustain, Some(true));
     assert_eq!(t.snapshot(2).unwrap().notes[0].sustained, 2);
     t.feed(&AnyMessage::ControlChange(
         ControlChange::new(1, 64, 0).unwrap(),
@@ -119,8 +122,8 @@ fn timecode_sequence_lock_requires_continuity_and_expires_without_extrapolation(
             now += 1;
             if i == 7 {
                 let o = r.observation.unwrap();
-                assert_eq!(o.encoded.frames, frame as u8);
-                assert_eq!(o.compensated.frames, frame as u8 + 2);
+                assert_eq!(o.encoded.frames(), frame as u8);
+                assert_eq!(o.compensated.frames(), frame as u8 + 2);
                 assert_eq!(o.locked, frame == 2);
             }
         }
@@ -131,7 +134,7 @@ fn timecode_sequence_lock_requires_continuity_and_expires_without_extrapolation(
     assert!(a.poll(114).is_err());
     let p = Position::new(FrameRate::DropFrame30, 0, 0, 59, 29).unwrap();
     let q = p.advance(1);
-    assert_eq!((q.minutes, q.seconds, q.frames), (1, 0, 2));
+    assert_eq!((q.minutes(), q.seconds(), q.frames()), (1, 0, 2));
     assert_eq!(q.advance(-1), p);
     assert!(Position::new(FrameRate::DropFrame30, 0, 1, 0, 1).is_err());
     let start = Position::new(FrameRate::Fps24, 0, 0, 0, 0).unwrap();

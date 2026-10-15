@@ -595,12 +595,15 @@ One `mpe.Tracker` observes an explicit zone of an independent source. Configure
 clears state; callers manage interacting zones and feed configuration changes
 explicitly. Fixed channel/note counters retain repeated pitches and distinguish
 held and sustained counts, with checked count exhaustion. Channel expression is
-reported separately; `ambiguous` flags several currently held notes instead of
+reported separately; `ambiguous` flags several currently held member notes instead of
 inventing attribution. Member expression does not attach to sustained release
 tails. Manager expression remains separate rather than applying an invented
 synthesis-combination formula. Member-channel damper messages are ignored;
 manager sustain/mode controls update affected member state. Channel snapshots
-are frozen; returned note lists are copies. Reset is required after known loss.
+are frozen; returned note lists are copies. Unobserved pitch bend, pressure,
+timbre and manager sustain are `None`, including after reset. Member snapshots
+report the manager pedal knowledge. Counts describe only observed held and known
+pedal-sustained notes. Reset is required after known loss.
 Release-envelope duration and physical sounding-note state cannot be inferred.
 
 `controls.VelocityInterpreter` implements CA-031 per source/channel. A prefix

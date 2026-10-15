@@ -914,3 +914,10 @@ These are unit/software checks. No hardware, native-service flow or CI release
 was run. MPE synthesis/zone interoperability, physical synchronization and native
 platform qualification remain open. A full MPE transmitter's automatic channel
 sharing and release-envelope behavior are not claimed by the selected allocator.
+
+Final slice 6.5 review also closes construction holes in Rust Voice and Position:
+private validated fields expose getters, preventing unchecked states from reaching
+encoding. MPE tracker expression and sustain start unknown (`None`), and reset
+clears that knowledge. Member snapshots report observed manager sustain; counts
+cover only observed notes. The allocator keeps its explicit local output state.
+Focused Rust and Python profile-engine tests cover these contracts.

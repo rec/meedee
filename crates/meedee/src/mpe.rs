@@ -38,12 +38,24 @@ impl Command for ZoneConfiguration {
 /// An allocation token is local to one allocator. No MIDI is sent automatically.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Voice {
-    pub id: u64,
-    pub channel: u8,
-    pub note: u8,
-    pub velocity: u8,
+    id: u64,
+    channel: u8,
+    note: u8,
+    velocity: u8,
 }
 impl Voice {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+    pub fn channel(&self) -> u8 {
+        self.channel
+    }
+    pub fn note(&self) -> u8 {
+        self.note
+    }
+    pub fn velocity(&self) -> u8 {
+        self.velocity
+    }
     pub fn note_on(&self) -> crate::messages::NoteOn {
         crate::messages::NoteOn::new(self.channel.into(), self.note.into(), self.velocity.into())
             .expect("validated voice")
@@ -149,30 +161,30 @@ pub struct NoteState {
 pub struct ChannelState {
     pub channel: u8,
     pub notes: Vec<NoteState>,
-    pub pitch_bend: i16,
-    pub pressure: u8,
-    pub timbre: u8,
-    pub sustain: bool,
+    pub pitch_bend: Option<i16>,
+    pub pressure: Option<u8>,
+    pub timbre: Option<u8>,
+    pub sustain: Option<bool>,
     pub ambiguous: bool,
 }
 #[derive(Clone, Debug)]
 struct Channel {
     held: [u16; 128],
     sustained: [u16; 128],
-    bend: i16,
-    pressure: u8,
-    timbre: u8,
-    sustain: bool,
+    bend: Option<i16>,
+    pressure: Option<u8>,
+    timbre: Option<u8>,
+    sustain: Option<bool>,
 }
 impl Default for Channel {
     fn default() -> Self {
         Self {
             held: [0; 128],
             sustained: [0; 128],
-            bend: 0,
-            pressure: 0,
-            timbre: 64,
-            sustain: false,
+            bend: None,
+            pressure: None,
+            timbre: None,
+            sustain: None,
         }
     }
 }
@@ -216,8 +228,14 @@ impl Tracker {
             pitch_bend: c.bend,
             pressure: c.pressure,
             timbre: c.timbre,
-            sustain: c.sustain,
-            ambiguous: active > 1,
+            sustain: if channel == i64::from(self.zone.manager_channel)
+                || member_channels(&self.zone).contains(&(channel as u8))
+            {
+                self.channels[usize::from(self.zone.manager_channel - 1)].sustain
+            } else {
+                None
+            },
+            ambiguous: active > 1 && member_channels(&self.zone).contains(&(channel as u8)),
         })
     }
     /// Returns changed channel snapshots. Repeated pitches retain counts; no
@@ -247,7 +265,7 @@ impl Tracker {
             return Ok(Vec::new());
         }
         let manager_sustain = self.channels[usize::from(self.zone.manager_channel - 1)].sustain;
-        let manager_sustain = manager_sustain && !manager;
+        let manager_sustain = manager_sustain == Some(true) && !manager;
         let c = &mut self.channels[usize::from(channel - 1)];
         match message {
             NoteOn(v) if v.velocity() != 0 => {
@@ -263,33 +281,33 @@ impl Tracker {
             }
             NoteOn(v) => release_note(c, v.note(), manager_sustain),
             NoteOff(v) => release_note(c, v.note(), manager_sustain),
-            PitchBend(v) => c.bend = v.value(),
-            ChannelPressure(v) => c.pressure = v.pressure(),
+            PitchBend(v) => c.bend = Some(v.value()),
+            ChannelPressure(v) => c.pressure = Some(v.pressure()),
             ControlChange(v) => match v.controller() {
                 64 => {
-                    c.sustain = v.value() >= 64;
-                    if !c.sustain && !manager_sustain {
+                    c.sustain = Some(v.value() >= 64);
+                    if c.sustain != Some(true) && !manager_sustain {
                         c.sustained.fill(0);
                     }
                 }
-                74 => c.timbre = v.value(),
+                74 => c.timbre = Some(v.value()),
                 120 => {
                     c.held.fill(0);
                     c.sustained.fill(0);
                 }
                 123..=127 => {
                     for n in 0..128 {
-                        if c.sustain || manager_sustain {
+                        if c.sustain == Some(true) || manager_sustain {
                             c.sustained[n] += c.held[n];
                         }
                         c.held[n] = 0;
                     }
                 }
                 121 => {
-                    c.bend = 0;
-                    c.pressure = 0;
-                    c.timbre = 64;
-                    c.sustain = false;
+                    c.bend = None;
+                    c.pressure = None;
+                    c.timbre = None;
+                    c.sustain = None;
                     if !manager_sustain {
                         c.sustained.fill(0);
                     }
@@ -312,15 +330,15 @@ impl Tracker {
                                 c.sustained.fill(0);
                             }
                             121 => {
-                                c.bend = 0;
-                                c.pressure = 0;
-                                c.timbre = 64;
-                                c.sustain = false;
+                                c.bend = None;
+                                c.pressure = None;
+                                c.timbre = None;
+                                c.sustain = None;
                                 c.sustained.fill(0);
                             }
                             123..=127 => {
                                 for n in 0..128 {
-                                    if sustain_now {
+                                    if sustain_now == Some(true) {
                                         c.sustained[n] += c.held[n];
                                     }
                                     c.held[n] = 0;
@@ -340,7 +358,7 @@ fn release_note(c: &mut Channel, note: u8, manager_sustain: bool) {
     let n = usize::from(note);
     if c.held[n] > 0 {
         c.held[n] -= 1;
-        if c.sustain || manager_sustain {
+        if c.sustain == Some(true) || manager_sustain {
             c.sustained[n] += 1;
         }
     }

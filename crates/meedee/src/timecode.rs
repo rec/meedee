@@ -129,13 +129,28 @@ pub fn decode(message: &SysEx) -> Result<Option<FullFrame>, ValueError> {
 /// A validated SMPTE label, including skipped drop-frame labels.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Position {
-    pub rate: FrameRate,
-    pub hours: u8,
-    pub minutes: u8,
-    pub seconds: u8,
-    pub frames: u8,
+    rate: FrameRate,
+    hours: u8,
+    minutes: u8,
+    seconds: u8,
+    frames: u8,
 }
 impl Position {
+    pub fn rate(&self) -> FrameRate {
+        self.rate
+    }
+    pub fn hours(&self) -> u8 {
+        self.hours
+    }
+    pub fn minutes(&self) -> u8 {
+        self.minutes
+    }
+    pub fn seconds(&self) -> u8 {
+        self.seconds
+    }
+    pub fn frames(&self) -> u8 {
+        self.frames
+    }
     pub fn new(
         rate: FrameRate,
         hours: i64,

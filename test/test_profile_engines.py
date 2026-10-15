@@ -138,6 +138,16 @@ def test_mpe_tracker_keeps_overlap_and_sustain_separate_from_member_expression()
     None
 ):
     tracker = mpe.Tracker(zone=mpe.ZoneConfiguration(manager_channel=1, members=2))
+    initial = tracker.snapshot(channel=2)
+    assert (
+        initial.pitch_bend
+        is initial.pressure
+        is initial.timbre
+        is initial.sustain
+        is None
+    )
+    tracker.feed(messages.ControlChange(channel=2, controller=64, value=127))
+    assert tracker.snapshot(channel=2).sustain is None
     for n in (60, 64, 60):
         tracker.feed(messages.NoteOn(channel=2, note=n, velocity=100))
     state = tracker.feed(messages.PitchBend(channel=2, value=300))[0]
@@ -146,12 +156,16 @@ def test_mpe_tracker_keeps_overlap_and_sustain_separate_from_member_expression()
     tracker.feed(messages.ControlChange(channel=1, controller=64, value=127))
     tracker.feed(messages.NoteOff(channel=2, note=60, velocity=64))
     state = tracker.snapshot(channel=2)
+    assert state.sustain is True
     assert [(n.held, n.sustained) for n in state.notes] == [(1, 1), (1, 0)]
     tracker.feed(messages.ControlChange(channel=2, controller=123, value=0))
     state = tracker.snapshot(channel=2)
     assert not state.ambiguous and all(n.held == 0 for n in state.notes)
     tracker.feed(messages.ControlChange(channel=1, controller=64, value=0))
     assert tracker.snapshot(channel=2).notes == []
+    tracker.feed(messages.ControlChange(channel=1, controller=121, value=0))
+    state = tracker.snapshot(channel=2)
+    assert state.pitch_bend is state.pressure is state.timbre is state.sustain is None
     tracker.configure(zone=mpe.ZoneConfiguration(manager_channel=16, members=1))
     assert tracker.feed(messages.NoteOn(channel=2, note=60, velocity=100)) == []
     assert tracker.feed(messages.NoteOn(channel=15, note=60, velocity=100))[0].notes

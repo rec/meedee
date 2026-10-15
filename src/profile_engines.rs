@@ -306,19 +306,19 @@ struct Voice {
 frozen!(Voice;id,channel,note,velocity;{
     #[getter]
     fn id(&self) -> u64 {
-        self.value.id
+        self.value.id()
     }
     #[getter]
     fn channel(&self) -> u8 {
-        self.value.channel
+        self.value.channel()
     }
     #[getter]
     fn note(&self) -> u8 {
-        self.value.note
+        self.value.note()
     }
     #[getter]
     fn velocity(&self) -> u8 {
-        self.value.velocity
+        self.value.velocity()
     }
     #[getter]
     fn note_on(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -419,19 +419,19 @@ frozen!(ChannelState;channel,notes,pitch_bend,pressure,timbre,sustain,ambiguous;
             .collect()
     }
     #[getter]
-    fn pitch_bend(&self) -> i16 {
+    fn pitch_bend(&self) -> Option<i16> {
         self.value.pitch_bend
     }
     #[getter]
-    fn pressure(&self) -> u8 {
+    fn pressure(&self) -> Option<u8> {
         self.value.pressure
     }
     #[getter]
-    fn timbre(&self) -> u8 {
+    fn timbre(&self) -> Option<u8> {
         self.value.timbre
     }
     #[getter]
-    fn sustain(&self) -> bool {
+    fn sustain(&self) -> Option<bool> {
         self.value.sustain
     }
     #[getter]
@@ -569,23 +569,23 @@ frozen!(Position;rate,hours,minutes,seconds,frames;{
     }
     #[getter]
     fn rate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        timecode::rate_object(py, self.value.rate)
+        timecode::rate_object(py, self.value.rate())
     }
     #[getter]
     fn hours(&self) -> u8 {
-        self.value.hours
+        self.value.hours()
     }
     #[getter]
     fn minutes(&self) -> u8 {
-        self.value.minutes
+        self.value.minutes()
     }
     #[getter]
     fn seconds(&self) -> u8 {
-        self.value.seconds
+        self.value.seconds()
     }
     #[getter]
     fn frames(&self) -> u8 {
-        self.value.frames
+        self.value.frames()
     }
     #[pyo3(signature=(*,frames))]
     fn advance(&self, frames: &Bound<'_, PyAny>) -> PyResult<Self> {
