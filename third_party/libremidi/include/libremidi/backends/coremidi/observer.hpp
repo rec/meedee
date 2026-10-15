@@ -33,6 +33,13 @@ public:
     if (!configuration.has_callbacks())
       return;
 
+    if (const auto result = ensure_coremidi_client_keeper(); result != noErr)
+    {
+      libremidi_handle_error(
+          this->configuration, "error creating CoreMIDI client keeper: " + std::to_string(result));
+      return;
+    }
+
     auto result = MIDIClientCreate(
         toCFString(configuration.client_name).get(),
         +[](const MIDINotification* message, void* ctx) {
@@ -222,7 +229,11 @@ public:
     }
   }
 
-  ~observer_core() { MIDIClientDispose(this->client); }
+  ~observer_core()
+  {
+    if (this->client)
+      MIDIClientDispose(this->client);
+  }
 
 private:
   MIDIClientRef client{};

@@ -448,6 +448,13 @@ the owner's Terminal; a direct Apple API probe isolates the agent's first-call
 failure to its execution context. Physical hardware, fault recovery, Windows
 and Pi qualification remain open. See [validation](plan/validation.md).
 
+CoreMIDI retains one additional callback-free native client per MIDI-using
+process until process exit, avoiding Apple's last-client disposal/reopen hazard.
+Ports and ordinary clients still close normally. Pure message/file imports do
+not create it. This is not recovery from a crashed/restarted MIDI service;
+default isolation permits replacing the affected child, while in-process use
+may require restarting the application. Observer disposal failures remain open.
+
 Release CI remains triggered only by a published release, testing Python 3.11
 and 3.15 on Linux, macOS arm64/Intel and Windows. It includes native regression
 checks, Rust/Python checks, source/wheel builds and installed-package tests.

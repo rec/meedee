@@ -2,7 +2,7 @@
 
 Repository: `git@github.com:rec/libremidi.git`
 
-Revision: `b6c7dfe699eb9f46ebf14ba8336e12d2f6579205`
+Revision: `189334fdac4292605f6eecf650efbc06f857fe2a`
 
 Imported 2026-10-15 from the fork's `codex/checked-winmm-discovery` branch, based
 on `master` at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`. This is a commit pin,
@@ -64,6 +64,21 @@ The fork fixes are separate commits:
   Microsoft's [input](https://learn.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-midiingetdevcapsa)
   and [output](https://learn.microsoft.com/en-us/windows/win32/api/mmeapi/nf-mmeapi-midioutgetdevcapsw)
   contracts require checking the returned error code.
+
+- [189334f](https://github.com/rec/libremidi/commit/189334fdac4292605f6eecf650efbc06f857fe2a):
+  retain one private callback-free CoreMIDI keeper client for process lifetime,
+  before creating owned MIDI 1/UMP or notification clients. This follows
+  [Apple's last-client disposal warning](https://developer.apple.com/documentation/coremidi/midiclientdispose%28_%3A%29).
+  Mutex-protected initialization retries a failed keeper creation on a later
+  request; a failed ordinary creation does not discard a successful keeper.
+  Normal clients/ports still close, borrowed contexts remain caller-owned,
+  and uncreated zero clients are not disposed. The small keeper state has no
+  static destructor or application callback context. Its client is reclaimed by
+  OS process cleanup, not counted as an application connection. There is one
+  extra native client per meedee MIDI-using process; other loaded MIDI libraries
+  may have their own clients. It does not recover a keeper after server failure.
+  The sanitized coremidi_keeper_test covers creation failure/retry, concurrent
+  MIDI 1/UMP creation and reopening, observers and borrowed-context ownership.
 
 No additional local modifications are applied to the imported files. Included
 paths are `CMakeLists.txt`, `cmake/`, `include/`, `src/`, `LICENSE.md`, `README.md`,

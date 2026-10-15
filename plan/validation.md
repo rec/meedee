@@ -1265,3 +1265,45 @@ including the newly shipped access probe and WinMM discovery test source.
 Reinstalling that finished wheel and testing outside the checkout passes 246
 installed-package tests. Windows native compilation remains an explicit open
 gate; Mac sanitizer and packaging checks do not replace it.
+
+## Bounded CoreMIDI client keeper
+
+The owner approved one private callback-free CoreMIDI client per MIDI-using
+process, retained until process exit. Fork commit 189334f initializes it under
+a mutex before owned input/output or notification-client creation. Pure codecs
+and file operations do not initialize it; borrowed contexts remain caller-owned.
+Normal ports and ordinary clients are still disposed. A failed keeper creation
+returns its OS error without using the unwritten output; a later request can
+retry. A failed ordinary creation does not discard the keeper. Failed creation
+no longer disposes a zero client. No application callback or observer pointer
+is attached to the keeper. A bounded intentionally retained state object avoids
+static-destruction races with still-running owner threads.
+
+This avoids normal last-client disposal; it is not MIDI-server health detection
+or recovery after a service crash/restart. Initial keeper creation is serialized
+within a process and can block like other native calls. Default isolated clients
+remain in separate processes. Account for one additional native client and small
+synchronization state per MIDI-using process, outside application connection
+counts. Observer disposal failures remain a separate open lifetime risk.
+
+All four selected C++ regression executables pass with address/undefined-behavior
+sanitizers. The new fake-native keeper test models permanent creation failure
+after the last client is disposed. It checks a failed first keeper attempt,
+concurrent MIDI 1/UMP creation/destruction, subsequent reopen, ordinary creation
+failure, notification-client cleanup, caller-owned contexts and absence of
+keeper callbacks/disposal. Its single case uses eight threads and preserves
+exactly one live private client after the ordinary clients close. No OS client
+is created by these injected tests.
+
+The opt-in supervised reopen fixture repeats three open/send/close cycles on the
+same clients for each protocol and Python mode, verifying native timestamps and
+exact MIDI 2 CC value 0xFEDCBA98 on group/channel 16. The prior successful native
+runs predate this keeper import; a run of the new build is a separate gate.
+
+For the keeper import, both full Python suites pass 247 tests, and the Rust
+workspace passes 113 ordinary tests with five opt-in cases ignored. Static checks,
+Cargo formatting and workspace Clippy pass with the existing local deprecation
+exception. A fresh wheel builds from the sdist, both artifact checks pass, and
+246 installed-package tests pass outside the checkout. The release workflow
+includes the keeper regression target without changing its trigger or Python
+matrix. Native repeated-reopen validation remains explicitly pending.

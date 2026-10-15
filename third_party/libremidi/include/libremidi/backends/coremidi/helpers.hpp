@@ -9,6 +9,7 @@
 #include <CoreServices/CoreServices.h>
 
 #include <cmath>
+#include <mutex>
 #include <optional>
 
 #include <bit>
@@ -242,6 +243,28 @@ locate_object(auto& self, const port_information& info, MIDIObjectType requested
   return object;
 }
 
+// Apple warns that disposing a process's last client can prevent subsequent
+// client creation. Keep one callback-free client until OS process cleanup.
+// Leaking this bounded state also avoids static destruction racing owner threads.
+inline OSStatus ensure_coremidi_client_keeper()
+{
+  struct keeper_state
+  {
+    std::mutex mutex;
+    MIDIClientRef client{};
+  };
+  static auto* state = new keeper_state;
+  std::lock_guard lock{state->mutex};
+  if (state->client)
+    return noErr;
+  MIDIClientRef candidate{};
+  const auto result = MIDIClientCreate(
+      CFSTR("libremidi client keeper"), nullptr, nullptr, &candidate);
+  if (result == noErr)
+    state->client = candidate;
+  return result;
+}
+
 // A structure to hold variables related to the CoreMIDI API
 // implementation.
 struct coremidi_data
@@ -259,6 +282,8 @@ struct coremidi_data
     }
     else
     {
+      if (const auto result = ensure_coremidi_client_keeper(); result != noErr)
+        return result;
       // Set up our client.
       return MIDIClientCreate(
           toCFString(configuration.client_name).get(), nullptr, nullptr, &client);
@@ -268,7 +293,7 @@ struct coremidi_data
   void close_client(auto& self)
   {
     self.client_open_ = std::errc::not_connected;
-    if (!self.configuration.context)
+    if (self.client && !self.configuration.context)
       MIDIClientDispose(self.client);
   }
 
