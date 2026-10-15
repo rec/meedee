@@ -37,8 +37,8 @@ scoped and do not copy full copyrighted tables or specification text into code.
 
 - SMF, high-resolution velocity prefix, and further selected universal
   SysEx addenda: acquire and record the particular revisions before their codecs.
-- MIDI-CI base, profiles and property exchange: acquire the selected current
-  normative revisions before defining transaction formats or negotiation.
+- MIDI-CI profiles and property exchange: acquire the selected current normative
+  revisions before their transaction rules. The base revision is acquired below.
 - Standard UMP file/container formats: acquire their own specifications;
   M2-104-UM packet support alone is not a file-format specification.
 
@@ -258,3 +258,26 @@ The compact independent SMF and Clip vectors in `tests/files.rs` and
 `test_files.py` state expected bytes directly. PDFs remain in ignored local
 scratch storage and are not redistributed. File parsing never executes embedded
 configuration, escape bytes, profiles or tuning messages.
+
+
+## Slice 11 management baseline, 2026-10-15
+
+The public [MIDI-CI specification page](https://midi.org/midi-ci-specification)
+provides M2-101-UM 1.2.1, draft 2025-12-15, published 2025-12-18. Its current
+Download link is Drive file 1ByIlKQOPFTnYWNMnKM93OBVI2U9yAXvT. The earlier
+Download link on that same page still points to 1.2; the actual PDF title/version
+was checked rather than assuming both links were equivalent.
+
+```text
+ci.pdf  f3c3c63d768f049a387c79998081da284a1baf8605ca10d246e9a52258056e6f
+```
+
+Reviewed base sections 3–5: addressing, reserved MUID range, discovery deadlines,
+legacy/future format handling, management messages and collision recovery.
+crates/meedee/tests/fixtures/ci.txt contains independently specified vectors for
+tables 5/6/8/9/11/12/13/15, shared by Rust/Python. The UMP 1.1.2 Function Block
+number range (section Function Block Info Notification) supplies the 0..31 bound.
+No document is redistributed. The owner has no full Profiles 1.1 or Property
+Exchange 1.2 documents and explicitly deferred those dependent features. Their
+rules, resource schemas, compression/JSON behavior and conformance are not guessed
+from the overview pages or the base document's wire tables.

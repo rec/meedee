@@ -211,8 +211,9 @@ requires explicit permission; it does not permit semantic attribute stripping.
 Translated primitive lists are not atomic sends, do not report physical delivery,
 and parameter sequences can leave selection active. JR ticks, stream offsets
 and host timestamps remain different clock domains. MDS transfer and semantic
-text interpretation are outside the packet codec; typed/timed live integration,
-MIDI-CI and native platform validation remain later work.
+text interpretation are outside the packet codec. Typed/timed live integration
+and MIDI-CI management are implemented; Profiles, Property Exchange and native
+platform validation remain open.
 
 
 ## F1. File completion, clocks and performance views require explicit policy
@@ -233,7 +234,7 @@ timestamp range while raw file ticks remain readable. Merged SMF input must be
 seekable, and Type 2 requires an explicit independent sequence. Split-SysEx state is
 independent per selected track, so its payload budget multiplies by active track
 count; lower the payload/track limits on constrained targets. MIDI Clip profile
-negotiation/semantic qualification remains with MIDI-CI in slice 11.
+negotiation/semantic qualification remains deferred pending specification access.
 
 No clock mapping establishes physical synchronization. Timestamps can be absent,
 driver fallback time, inaccurate, discontinuous or only completion time. Packet
@@ -242,3 +243,21 @@ views lack precise first-quarter contributor timing and expose None. Native
 capture/replay validation remains open because test-client creation returned
 268435459. Fake-device/clock and file fault tests do not qualify real scheduling,
 physical instruments, OS service crashes or target Pi resource behavior.
+
+
+## C1. MIDI-CI management cannot establish device health or trusted identity
+
+**Deliberate limitations.** Only management is implemented. Profiles/Property
+Exchange are deferred by the owner pending normative documents; optional-category
+support is not advertised. Sessions need explicit routing, caller-randomized MUIDs,
+caller-driven time/send-result/input handling and polling. Early replies use
+bounded provisional storage; overflow is reported rather than silently consuming
+unlimited memory. Applications must inspect all updates, including send results.
+
+MUID/identity/path checks are not authentication. Identical peers can make collisions
+undetectable, and matching late replies cannot always be distinguished from current
+ones. Product Instance IDs do not authorize automatic reconnect or restoration.
+Timeouts establish unanswered requests, not offline devices. Local collision/loss
+requires a fresh randomized MUID and explicit restart; no notes, profiles or physical
+state are restored. Previously returned actions must be retired after reset. Native
+UMP backend qualification remains open independently of codec/session tests.

@@ -5,7 +5,7 @@ A Rust MIDI toolkit with matching Python bindings, using vendored
 imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
 `meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`,
 `meedee.timecode`, `meedee.ump`, `meedee.smf`, `meedee.syx`, `meedee.clip` and
-`meedee.archive`; the package root is empty. There are no Python
+`meedee.archive` and `meedee.ci`; the package root is empty. There are no Python
 runtime dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
@@ -80,6 +80,20 @@ no automatic NoteOff/reset or other cleanup. Archive records are checked while
 streaming: reading and verifying an entire capture before playback is necessary
 if no output may precede discovering a damaged or incomplete trailer. CRCs detect
 accidental corruption and do not authenticate a file.
+
+## MIDI-CI management
+
+`meedee.ci` provides immutable MIDI-CI 1.2.1 Discovery/Reply, Endpoint Inquiry/Reply,
+InvalidateMuid and ACK/NAK values, encoded with `codecs.encode`. Interpretation
+is explicit through `ci.decode(SysEx)`; raw input still supplies primitive SysEx.
+`ci.Session` is a caller-driven management state machine with explicit random
+local MUIDs, routes, send-result reporting, integer-time deadlines and restart.
+It sends nothing and starts no threads. Read [the CI contract](plan/ci.md) before
+wiring actions to transport, including provisional replies and send-result reporting.
+
+Profiles and Property Exchange are deferred pending full specification access.
+Sessions advertise zero optional-category bits. These codecs are not proof of
+native UMP availability, peer responsiveness or successful device configuration.
 
 ## Messages and byte codecs
 

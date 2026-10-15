@@ -10,6 +10,7 @@ def main() -> None:
     ):
         from meedee import (
             archive,
+            ci,
             clip,
             codecs,
             controls,
@@ -77,6 +78,8 @@ def main() -> None:
         bend = ump.decode((0x40E00000, 0x80000000))
         assert isinstance(bend, ump.Midi2PitchBend) and bend.value == 0
 
+        assert ci.Header(source_muid=1, destination_muid=2).version == 2
+        assert ci.Address.channel(channel=16).channel_number == 16
         assert smf.Header(format=0, tracks=1, division=480).division == 480
         assert syx.Reader.__module__ == "meedee.syx"
         assert clip.Reader.__module__ == "meedee.clip"

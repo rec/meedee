@@ -770,10 +770,15 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
     validation.md. Authorized CoreMIDI virtual testing was attempted but client
     creation failed with 268435459, leaving successful native capture/replay open.
     Windows and Pi qualification remain open. No physical instruments were used.
-11. **MIDI-CI and native MIDI 2.0 qualification.** Implement the selected bounded
-    capability/profile/property exchanges and qualify libremidi's native UMP
-    backends. Gate: actual native UMP evidence on chosen platforms before
-    advertising live MIDI 2.0 support; unsupported deployments remain explicit.
+11. **MIDI-CI management implemented; broader exchanges and native qualification
+    open (2026-10-15).** The accessible 1.2.1 base supports management codecs and
+    bounded caller-driven discovery/endpoint/invalidation/ACK/NAK sessions in
+    Rust/Python. The owner deferred Profiles and Property Exchange because their
+    normative documents are unavailable; no optional-category support or unused
+    JSON/compression dependencies are added. Process Inquiry engines also remain
+    deferred. See ci.md/specifications.md/validation.md. Actual native UMP evidence
+    on chosen platforms is still required before advertising live MIDI 2.0 support;
+    unsupported deployments remain explicit.
 12. **Pi and cross-platform qualification.** Run selected board workloads and
     desktop checks, record resource budgets and native gaps, and review partial
     versus complete feature claims before an explicitly authorized release.

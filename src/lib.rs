@@ -9,6 +9,7 @@ mod callback;
 mod lifecycle;
 
 mod archive;
+mod ci;
 mod codecs;
 mod controls;
 mod event_values;
@@ -32,6 +33,7 @@ mod transport_tests;
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_ci, module)?)?;
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
     module.add_function(wrap_pyfunction!(populate_events, module)?)?;
     module.add_function(wrap_pyfunction!(populate_codecs, module)?)?;
@@ -207,4 +209,9 @@ fn populate_clip(module: &Bound<'_, PyModule>) -> PyResult<()> {
 fn populate_archive(module: &Bound<'_, PyModule>) -> PyResult<()> {
     archive::register(module)?;
     recording::register(module)
+}
+
+#[pyfunction]
+fn populate_ci(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    ci::register(module)
 }

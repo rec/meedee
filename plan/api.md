@@ -864,3 +864,19 @@ requires deliberate routing/translation before export. Clip configuration is exc
 from performance events by default; include_configuration=True explicitly includes
 supported header packets. File clock records and clip markers never become live
 sends. MIDI-CI profile negotiation remains slice 11.
+
+
+## Slice 11 management scope
+
+meedee.ci adds frozen management Message values and an explicit decode(SysEx),
+plus a pure caller-driven Session backed by Rust ci/ci_session. Raw receive,
+codec, Event and archive behavior stays primitive. Callers supply randomized
+MUIDs and explicit routes; channels/groups remain 1–16. Format 1/2 management,
+reserved identifiers, compatible future extensions and bounded management
+transactions are covered. Session optional-category declarations are zero.
+
+Profiles, Property Exchange and their JSON/compression dependencies are deferred
+by the owner because their normative documents are unavailable. Process Inquiry
+engines remain deferred. See ci.md for constructors, action/send-result ordering,
+explicit deadlines/restart, text encoding, correlation limitations and resource
+budgets. Native UMP qualification is separate from this software capability.

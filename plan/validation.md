@@ -1036,3 +1036,48 @@ sent. Successful native capture/replay, in-process loopback, physical behavior,
 Windows, the selected Pi image/sysroot and live UMP qualification remain open.
 The opt-in fixture is test/native/meedee_typed_loopback.py. Software/fault and
 packaging results do not substitute for those native/platform gates.
+
+## Slice 11 MIDI-CI management, 2026-10-15
+
+The owner selected the pure caller-driven API, explicit local identities/routes,
+bounded transactions and conservative recovery, then deferred Profiles and
+Property Exchange because their full normative documents are unavailable. The
+accessible MIDI-CI 1.2.1 base supports management only: Discovery/Reply, Endpoint
+Inquiry/Reply, Invalidate MUID and ACK/NAK. Rust ci/ci_session and Python meedee.ci
+share the implementation. Session declarations advertise zero optional-category
+bits. No JSON/compression dependencies or unimplemented property/profile stubs
+are added. See ci.md and specifications.md for the contract and document hash.
+
+The full suites pass **247 tests on Python 3.11 and 3.15**. Rust passes **113
+ordinary tests**, with five opt-in/native tests ignored. Eleven Python cases and
+six Rust tests exercise independent shared vectors, legacy/current/future
+formats, truncation at each byte boundary, reserved MUIDs/addresses, extension
+preservation and broadcast size limits. Sessions cover explicit route/group and
+time checks, output-path echo, send uncertainty, deadlines, admission limits,
+known-loss restart and collision invalidation even at capacity. Early replies
+are retained provisionally within count/byte limits, applied only after reported
+send acceptance, and discarded on failure or invalidation. Regressions cover
+malformed self-addressed messages and late replies recreating invalidated peers.
+Pure-import checks confirm that importing CI does not initialize MIDI workers.
+
+Ruff, formatting, ty, pyupgrade, cargo formatting, workspace Clippy and whitespace
+checks pass. Clippy uses the existing local atomic-deprecation exception. The
+release workflow adds installed CI tests and retains its published-release-only
+trigger and Python 3.11/3.15 matrix. No release or workflow was triggered.
+
+The supervised opt-in fixture test/native/meedee_ci_loopback.py attempted a
+native UMP SysEx7 discovery/reply exchange between two exclusively test-owned
+virtual endpoints, using randomized test MUIDs and zero optional capabilities.
+CoreMIDI rejected creation of the first UMP client with **268435459**. Checked
+cleanup reported retained native resources until process exit; the supervisor
+returned without a hang. No hardware endpoint was selected or sent messages.
+Successful native UMP exchange, Windows/Pi qualification, physical device behavior
+and full MIDI-CI profile/property conformance remain open. This is management
+software coverage, not a claim of complete slice 11 or live MIDI 2.0 qualification.
+
+Packaging builds a macOS arm64 CPython 3.11 wheel from the generated source
+distribution. Both archive-content checks pass, including the CI loader/stub,
+Rust modules, shared vectors and native fixture. Reinstalling the wheel into a
+separate environment and testing outside the checkout passes **246 installed
+package tests**. The source-only cargo-build callback test is covered by the
+checkout suites. The new management code adds no runtime/build dependencies.

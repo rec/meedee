@@ -265,6 +265,7 @@ macro_rules! short_messages {
                 return Ok(message.value.encode());
             })*
             if let Some(bytes) = crate::profiles::encode_message(message) { return Ok(bytes); }
+            if let Some(bytes) = crate::ci::encode_message(message) { return Ok(bytes); }
             crate::tuning::encode_message(message)
         }
 
