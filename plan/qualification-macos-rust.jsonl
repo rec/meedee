@@ -1,0 +1,5 @@
+{"measurement":"rust_cc_decode","operations_per_batch":2048,"batch_wall_ns":[88292, 41334, 35750, 33542, 33459, 33666, 33583],"operations_per_second":47846315.07279075}
+{"measurement":"rust_nrpn_expand_encode","operations_per_batch":2048,"batch_wall_ns":[642292, 641750, 675167, 667041, 632417, 652333, 670583],"operations_per_second":3129049.501013078}
+{"measurement":"rust_sysex_1024_bytes","operations_per_batch":1024,"batch_wall_ns":[4333, 4041, 3458, 3375, 3417, 3375, 3375],"operations_per_second":282493891.38488215}
+{"measurement":"rust_sysex_65536_bytes","operations_per_batch":65536,"batch_wall_ns":[185375, 175583, 173250, 178042, 178542, 174958, 172958],"operations_per_second":370347168.1784569}
+{"measurement":"rust_sysex_1048576_bytes","operations_per_batch":1048576,"batch_wall_ns":[2795125, 2873292, 2931791, 2979334, 2964791, 2975000, 2817583],"operations_per_second":360921587.12756646}

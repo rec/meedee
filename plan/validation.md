@@ -1081,3 +1081,100 @@ Rust modules, shared vectors and native fixture. Reinstalling the wheel into a
 separate environment and testing outside the checkout passes **246 installed
 package tests**. The source-only cargo-build callback test is covered by the
 checkout suites. The new management code adds no runtime/build dependencies.
+
+## Slice 12 qualification, 2026-10-15
+
+Delivered opt-in qualification tools and a Mac software baseline. This is partial
+qualification, not certification of all targets. The owner has no Pi available,
+selected baseline-first budgeting and authorized bounded synthetic/test-owned
+virtual workloads on this Mac. The reproducible procedure, workload sizes,
+interpretation limits and Linux/Windows/Pi handoff are in qualification.md.
+No toolchain/dependency versions, CI triggers or public APIs were changed.
+
+| Capability | Software evidence | Native/platform qualification |
+| --- | --- | --- |
+| Immutable MIDI 1, controls/NRPN, MTS, selected GM/universal/MPE/time-code | Shared Rust/Python codecs and state-machine regressions; bounded synthetic workloads | Physical instrument behavior and fault recovery open |
+| UMP/MIDI 2 messages, explicit conversion and assembly | Pure codecs, stream/recovery tests and MIDI Clip file workload | CoreMIDI UMP exchange blocked; Linux UMP unrun; Windows MIDI Services disabled |
+| SMF/SYX/Clip and exact-time archive | Streaming/fault/clock tests; from-sdist wheel and installed-package checks | Archive schema remains unpublished; durability is not established by cached I/O |
+| Typed capture/playback | Fake transport, cancellation/fault tests; four-recording software workload | Real libremidi loopback still unqualified |
+| MIDI-CI | Implemented management subset, bounded sessions and shared vectors | Profiles/Property Exchange deferred; Process Inquiry engines deferred; no claim of complete CI |
+| macOS arm64 | Source/package tests and sanitized device-free C++ regressions | CoreMIDI client creation fails with 268435459 in this tool environment |
+| Linux x86/arm64, Pi Zero 2 W | Procedures and release-only CI configuration | No target run here; Pi OS/image/sysroot and endpoint selection still open |
+| Windows and macOS Intel | Existing release-only CI configuration and target-specific fixtures | No target run here; Windows capability-query risk and SDK integration remain open |
+
+The Rust release example and opt-in Python suite cover dense CC, NRPN expansion,
+1 KiB/64 KiB/1 MiB SysEx, MTS bulk interpretation, UMP Clip reads, four-stream
+archive write/read and four concurrent bounded recorders. Seven batch samples
+are retained per throughput workload. Correct values/counts/completion are
+checked; the benchmark results do not establish acceptance budgets. Python and
+Rust checks perform different amounts of validation, so their operation rates
+are not a controlled comparison of language overhead.
+
+All three supervised native MIDI 1 attempts (Rust, Python in-process, Python
+isolated) failed before endpoint creation with **268435459**. All exited promptly;
+none timed out or sent to hardware. Failed cleanup reported conservative retained
+resources until process exit. Native latency, successful idle-worker resource
+use and child-inclusive memory/CPU/thread/handle totals therefore remain open.
+The supervisor deliberately reports these as failed qualification tests rather
+than converting unavailable native evidence to a pass.
+
+Unix RSS measurement uses process lifetime high-water marks and includes native
+allocations, but excludes children. Fresh import is measured in a separate
+interpreter. Windows RSS is absent, not zero. OS process inspection is denied
+here, so there are no measured process/thread/handle totals or whole-tree idle
+budgets. Source-build size and performance must not be extrapolated to the Pi.
+The synthetic recorder burst explicitly exercises queue exhaustion and marks
+captures incomplete; that offered burst rate is not a supported capture rate.
+
+The ordinary source suites pass **247 tests on each of CPython 3.11 and 3.15**.
+Linked Rust tests pass **113 ordinary tests**, with five opt-in/native tests
+ignored. All **three** selected C++ regression executables pass with address and
+undefined-behavior sanitizers. Cargo formatting, workspace Clippy (the existing
+local Rust 1.99 atomic-deprecation exception), Ruff, ty and pyupgrade checks pass.
+An initial concurrent source Python/Cargo run replaced a PyO3 artifact before
+rustdoc consumed it; the sequential rerun passes including doctests. Qualification
+instructions require sequential source/build tests. Rust 1.87 remains unverified
+locally, and configured release CI is not a substitute for an observed run.
+
+### Recorded Mac baseline
+
+Measured on macOS 14.5 arm64, Rust 1.99.0, Apple Clang 15.0.0 and CMake 4.4.4.
+The measured release wheel uses CPython 3.11.7 and was built from the source
+distribution. The source base is 5665214 plus the accompanying slice 12
+qualification tools; production library code is unchanged. Runs are short and
+host CPU model, power/thermal state and background load were not controlled.
+These are observations, not throughput promises or Pi budgets. Raw batch samples
+are preserved in qualification-macos-python311.jsonl and
+qualification-macos-rust.jsonl. Cold first batches are included.
+
+| Observation | Result |
+| --- | --- |
+| Selected public-module import, fresh Python process | 35.85 ms wall, 33.99 ms CPU; 27.3 MiB process peak RSS |
+| Python CC decode | 11.84 million messages/second across seven 2,048-message batches |
+| Rust CC decode | 47.85 million messages/second across seven 2,048-message batches |
+| Python / Rust NRPN expansion and encoding | 0.700 / 3.129 million compound commands/second |
+| Python 1 MiB SysEx, 1 KiB chunks | 3.17 ms median batch; 328.3 million payload bytes/second |
+| Rust 1 MiB SysEx, 1 KiB chunks | 360.9 million payload bytes/second |
+| Python MTS bulk interpretation | 382,259 dumps/second; seven 128-dump batches |
+| Python MIDI Clip read | 316,478 note events/second; 24,632-byte file |
+| Python four-stream archive write/read | 113,670 events/second; 94,488-byte file |
+| Four paced recorders | All 400 events admitted and verified written; four complete captures; 1.28 seconds elapsed |
+| Four unpaced recorders | 570 of 8,192 attempts admitted and verified written; four incomplete captures reporting queue/payload exhaustion |
+| Parent pytest process lifetime peak RSS | 63.1 MiB including runner and workloads; not library-only memory |
+| Wheel / unpacked extension / Rust measurement executable | 1,514,101 / 5,090,304 / 500,016 bytes |
+
+The fresh wheel passes **246 installed-package tests** outside the checkout;
+the source-only Cargo callback test is covered by the source suites. Both
+artifact-content checks pass, including distribution of the qualification tools.
+All **four** pure measurement tests pass against that installed wheel. The same
+four opt-in tests pass with the CPython 3.15 source environment, including verified
+paced capture and explicit burst incompleteness. Those additional figures remain
+in target/qualification-python315.log and are not mixed into the release-wheel
+baseline above. The installed macOS extension links system C++/CoreMIDI/CoreAudio/
+CoreFoundation/iconv/libSystem libraries, with no separate libremidi dylib.
+
+No issue was closed merely by measuring or documenting it. Physical recovery,
+backend safety gaps, full resource profiling, Linux/Windows/Pi runs, native UMP
+and successful CoreMIDI transport remain open in issues.md. No release or CI run
+was created, and the workflow remains unchanged: published releases only,
+Python 3.11 and 3.15.
