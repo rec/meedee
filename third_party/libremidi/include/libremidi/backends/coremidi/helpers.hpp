@@ -47,10 +47,11 @@ LIBREMIDI_STATIC std::string get_string_property(MIDIObjectRef object, CFStringR
 }
 
 LIBREMIDI_STATIC std::optional<int32_t>
-get_int_property(MIDIObjectRef object, CFStringRef property) noexcept
+get_int_property(MIDIObjectRef object, CFStringRef property, OSStatus& status) noexcept
 {
   SInt32 res{};
-  if (MIDIObjectGetIntegerProperty(object, property, &res) != noErr)
+  status = MIDIObjectGetIntegerProperty(object, property, &res);
+  if (status != noErr)
     return std::nullopt;
   return res;
 }

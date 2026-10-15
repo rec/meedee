@@ -72,8 +72,18 @@ Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
 The process-lifetime CoreMIDI keeper passes deterministic concurrency/reopen
-tests; repeated open/close and full-width MIDI 2 delivery still need native
-validation against the new keeper build.
+tests and five native virtual-only qualification cases. Native repeated reopen
+remains unqualified: the final run failed during output-port discovery with
+`PortInfoError: could not read CoreMIDI port unique ID`, before completing any
+protocol/mode combination. The failing endpoint, cycle and OS status were not
+recorded in the original run. A subsequent instrumented standalone run delivered
+and closed the first MIDI 1 isolated cycle, then failed at discovery in cycle 2
+after creating its new virtual input. The other five cases are not required to
+trigger it. The failing endpoint and OS status remain unknown; the fork now
+reports both the object handle and OS status for the next native run.
+Full-width MIDI 2 CC delivery in that fixture also remains unverified.
+See `qualification-macos-final.jsonl` and
+`validation.md` for the successful cases and the preserved failure.
 
 ## R2. Resource admission is bounded only in specified places
 
@@ -84,8 +94,9 @@ has a native owner thread; each isolated client also has a Python child and
 communication threads, and each isolated input has forwarding/dispatch threads.
 CoreMIDI also retains one callback-free keeper client per MIDI-using process
 until process exit, including isolated children; this is outside connection counts.
-There is no global quota across isolated children. Many idle clients can still
-consume substantial memory, threads, handles and scheduling time on a Pi.
+Per-parent count limits do not impose a machine-wide memory budget across
+independent applications. Many idle clients can still consume substantial memory,
+threads, handles and scheduling time on a Pi.
 
 Native receive admission bounds owned in-flight payloads by bytes. Each isolated
 receive queue has a count limit of 128 and an 8 MiB default payload limit.
@@ -137,6 +148,9 @@ cleanup; immediate client reuse can fail until cleanup completes. Keeping the
 client variable alone does not keep its connection open. Connections hold their
 clients and expose callback edges to Python's collector, but GC timing is not a
 lifetime guarantee. Port snapshots hold metadata without keeping clients alive.
+Even a closed connection retains its reusable client. Closing that connection
+does not free the client's isolated-worker slot; retaining many such objects
+can exhaust the per-parent cap until those references and workers retire.
 
 Receive callbacks take one immutable ReceivedPacket containing raw byte chunks
 or UMP batches, not complete musical Message objects. A chunk can contain partial

@@ -50,6 +50,19 @@ Slice 2 transport choices, approved 2026-10-14:
 - Failed opens entering Rust invalidate the client in both modes. Ordinary
   Python validation happens first. Successful explicit close restores it.
 
+Resource follow-up approved 2026-10-15: each parent Python process admits at most
+32 live isolated workers, separately from native-client and connection counts.
+Each isolated Input/Output constructor consumes one slot, including discovery-only
+clients. Starts in progress and retiring processes count until exit is confirmed;
+admission raises ResourceError before spawning at capacity. Failed starts release
+their reservations. This is a count limit, not a machine-wide memory/Pi budget.
+Closing a connection restores its reusable client and does not terminate that
+client's worker. Connections retain their clients; drop those references when
+the client is no longer needed, and allow asynchronous retirement to complete.
+CoreMIDI retains one additional callback-free keeper client per MIDI-using process
+until process exit; ordinary ports/clients still close. It does not detect or
+recover a MIDI-server restart, and does not initialize during pure codec/file use.
+
 ### Construction, inspection and replacement
 
 Python constructors are keyword-only. Integer fields require built-in `int`

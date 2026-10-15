@@ -2,7 +2,7 @@
 
 Repository: `git@github.com:rec/libremidi.git`
 
-Revision: `189334fdac4292605f6eecf650efbc06f857fe2a`
+Revision: `faf5b3bf724b2de162a8bdacf2f57b2687d9a790`
 
 Imported 2026-10-15 from the fork's `codex/checked-winmm-discovery` branch, based
 on `master` at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`. This is a commit pin,
@@ -10,6 +10,11 @@ not the previously audited upstream v5.4.3 release archive. The fork already
 contained other changes at base `996a73c216756de2dd6d58e66245ecae4830f9ff`.
 
 The fork fixes are separate commits:
+
+- [faf5b3b](https://github.com/rec/libremidi/commit/faf5b3bf724b2de162a8bdacf2f57b2687d9a790):
+  preserve the failing CoreMIDI integer-property query's OSStatus and report it
+  with the object handle during discovery. Failed reads still return no port;
+  no retries, skipped errors or changed discovery policy are introduced.
 
 - [69e060e61b2d4962f283a9838f3307edb050a9bd](https://github.com/rec/libremidi/commit/69e060e61b2d4962f283a9838f3307edb050a9bd):
   reject failed integer-property queries; report a discovery error and omit

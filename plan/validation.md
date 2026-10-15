@@ -1307,3 +1307,115 @@ exception. A fresh wheel builds from the sdist, both artifact checks pass, and
 246 installed-package tests pass outside the checkout. The release workflow
 includes the keeper regression target without changing its trigger or Python
 matrix. Native repeated-reopen validation remains explicitly pending.
+
+## Per-parent isolated-worker admission
+
+The owner approved a cap of 32 live isolated MIDI workers per parent Python
+process, including discovery-only clients and children still retiring. A fixed
+32-slot table retains process handles; a parallel fixed reservation table covers
+starts in progress. Reservations are made under the existing registry lock, but
+Popen executes outside it. Other admissions and shutdown do not wait behind a
+blocked process creation while holding that registry lock. Publishing a child
+uses an already allocated slot, so it requires no set entry/list growth after
+process creation. Failed Popen calls release the reservation in finally.
+
+A slot is reusable only when poll confirms its previous child has exited; neither
+weak-reference disappearance, connection close nor a kill request releases it.
+A failed communication-thread setup still counts its created child until exit
+is confirmed. Overflow raises the existing ResourceError before another spawn.
+The limit is independent of native-client/connection counts and of other parent
+processes; it is not a total-memory, CPU or safe-Pi-workload guarantee. CoreMIDI's
+private process-lifetime keeper remains an additional resource in each child.
+Retaining closed connections can retain their reusable clients/workers, so
+applications must release those references when finished.
+
+Five focused cases pass: discovery-only clients fill capacity, retirement keeps
+its slot until exit confirmation, a confirmed exit admits a replacement, startup
+OSError/MemoryError/KeyboardInterrupt release reservations, and an in-progress
+spawn reserves capacity without blocking another admission on the registry lock.
+These use the existing controlled worker fixture and no OS MIDI. Both final
+source suites pass **252 tests** on CPython 3.11 and 3.15.
+
+The final worker-budget wheel builds from the sdist; both artifact checks pass.
+After installation into a separate environment, **251 installed-package tests**
+pass outside the checkout, including the five new admission cases. Ruff, formatting,
+ty and pyupgrade pass. The Rust/C++ implementation is unchanged from the keeper
+commit's successful 113-test Rust and four-target sanitized native checks.
+CI remains published-release-only with Python 3.11 and 3.15; no workflow was run.
+
+## Final native keeper/worker-cap follow-up, 2026-10-15
+
+The owner ran the six supervised native cases in ordinary Terminal against the
+keeper and worker-cap build. The result was **five passed, one failed, four
+deselected in 4.18 seconds**. Raw per-case output, including the failure and
+parent resource samples, is preserved in `qualification-macos-final.jsonl`
+(12 JSONL records), separately from the earlier baseline.
+
+The passing cases cover Rust MIDI 1 loopback, Python MIDI 1 loopback in both
+process modes, typed capture/replay/receive cancellation in both modes, and
+native UMP SysEx7 MIDI-CI discovery/reply between test-owned peers. Each of the
+three basic loopbacks delivered 256 messages. These results validate those paths
+with the keeper present; they do not exercise admission at the 32-worker cap.
+
+The repeated-reopen case failed in `sender.ports()` with
+`PortInfoError: could not read CoreMIDI port unique ID`. No completed
+protocol/mode combination was printed. The log does not identify the endpoint,
+cycle or OS status. The checked property helper rejects the failed read, so
+this result does not demonstrate use of an uninitialized ID. It also does not
+establish whether a disappearing endpoint, the test lifecycle or another
+CoreMIDI condition caused the failure. Repeated reopen and this fixture's exact
+full-width MIDI 2 CC delivery remain open; the failure must not be converted to
+a passing result by suppressing discovery errors or adding an unexplained retry.
+
+No implementation changed in this follow-up. JSON records were parsed and
+their case statuses checked; documentation passed `git diff --check`. Python
+suites were not rerun for this documentation/evidence-only update. Windows,
+Linux/Pi, physical fault recovery and workload budgets remain open.
+
+### Standalone reopen follow-up
+
+The owner reran only `native and reopen`, with unbuffered Python output. It
+failed again with the same unique-ID discovery error: **one failed, nine
+deselected in 1.14 seconds**. The two raw JSON records are preserved in
+`qualification-macos-reopen.jsonl`. This shows the other five native cases are
+not necessary to trigger the failure. It does not rule out system state left
+by previous processes, and still does not identify the failing cycle or endpoint.
+
+The reopen fixture now prints flushed progress markers before virtual creation,
+discovery and connection, after delivery, and after close. Each marker identifies
+the protocol, isolation mode, cycle and test-owned endpoint name. Discovery
+errors still propagate without retries or suppression; sends and endpoint
+selection are unchanged. Native execution of this diagnostic version remains
+pending in ordinary Terminal.
+
+The ordinary Python suite passes all 252 tests after the diagnostic-only fixture
+change. Ruff checking/formatting, ty and pyupgrade pass; the preserved JSON
+records parse and `git diff --check` passes. No production code changed.
+
+### Reopen diagnostic result and native error details
+
+The instrumented fixture failed again: **one failed, nine deselected in 1.03
+seconds**. Its two JSON records are preserved in
+`qualification-macos-reopen-diagnostic.jsonl`. The markers establish that MIDI 1
+with isolation enabled completed cycle 1, including exact delivery and connection
+close. Cycle 2 created its virtual input, then failed while discovering output
+ports. This corrects the earlier uncertainty about whether any message was sent;
+the first cycle did send and receive successfully. No later mode was exercised.
+
+The failure occurs after endpoint replacement, but the log does not establish
+which endpoint's property query failed or why. The libremidi fork now includes
+the failing object handle and exact OSStatus in this diagnostic. The existing
+checked integer-property helper carries the original status to the observer;
+failed reads still produce no ID. The existing fake-native regression checks
+successful status reporting, unchanged-output failure, and the object/status
+reported for both port directions. All three affected CoreMIDI regression
+targets pass with address/undefined-behavior sanitizers. The fork commit is
+`faf5b3bf724b2de162a8bdacf2f57b2687d9a790`, imported without local differences.
+
+This diagnostic change introduces no retries, error suppression or change to
+discovery policy. Native execution of the more informative build is pending;
+reopen qualification remains open.
+
+The rebuilt editable Python package passes all 252 ordinary tests in 25.17
+seconds. The preserved JSON records parse, the imported files match the fork,
+and `git diff --check` passes. No Python source or dependency versions changed.

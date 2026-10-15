@@ -52,6 +52,83 @@ def workers(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[Popen[bytes]]]:
         c.wait(timeout=3)
 
 
+def test_worker_cap_counts_discovery_clients_until_exit_is_confirmed(
+    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("meedee._transport.MAX_WORKERS", 2)
+    first = input_client("input", timeout=1)
+    second = output_client("healthy", timeout=1)
+    assert first.ports() and second.ports()
+    with pytest.raises(midi.ResourceError, match="worker limit"):
+        input_client("input", timeout=1)
+    assert len(workers) == 2
+
+    child = workers[0]
+    poll = child.poll
+    confirmed = Event()
+    monkeypatch.setattr(child, "poll", lambda: poll() if confirmed.is_set() else None)
+    del first
+    gc.collect()
+    child.wait(timeout=3)
+    # Even after the client disappears, admission needs confirmed process exit.
+    with pytest.raises(midi.ResourceError, match="worker limit"):
+        input_client("input", timeout=1)
+    confirmed.set()
+    replacement = input_client("input", timeout=1)
+    assert replacement.ports() and second.ports()
+    assert len(workers) == 3
+    monkeypatch.setattr(child, "poll", poll)
+
+
+@pytest.mark.parametrize("kind", [OSError, MemoryError, KeyboardInterrupt])
+def test_failed_worker_start_releases_its_reservation(
+    kind: type[BaseException],
+    workers: list[Popen[bytes]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("meedee._transport.MAX_WORKERS", 1)
+    with patch("meedee._transport.subprocess.Popen", side_effect=kind("start failed")):
+        with pytest.raises(kind):
+            input_client("input", timeout=1)
+    recovered = input_client("input", timeout=1)
+    assert recovered.ports() and len(workers) == 1
+
+
+def test_worker_cap_reserves_in_progress_starts_without_blocking_admission(
+    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meedee import _transport
+
+    monkeypatch.setattr(_transport, "MAX_WORKERS", 1)
+    entered = Event()
+    release = Event()
+    created: Queue[midi.Input] = Queue()
+    launch = _transport.subprocess.Popen
+
+    def delayed(command: list[str], stdin: int, stdout: int) -> Popen[bytes]:
+        entered.set()
+        assert release.wait(3)
+        return launch(command, stdin=stdin, stdout=stdout)
+
+    def create() -> None:
+        created.put(input_client("input", timeout=1))
+
+    monkeypatch.setattr(_transport.subprocess, "Popen", delayed)
+    thread = Thread(target=create)
+    thread.start()
+    try:
+        assert entered.wait(3)
+        with pytest.raises(midi.ResourceError, match="worker limit"):
+            output_client("healthy", timeout=1)
+        assert not workers
+    finally:
+        release.set()
+        thread.join(3)
+    assert not thread.is_alive()
+    assert created.get(timeout=1).ports()
+    assert len(workers) == 1
+
+
 def test_defaults_select_isolation_and_five_second_deadlines() -> None:
     for c in (midi.Input, midi.Output):
         parameters = inspect.signature(c).parameters
