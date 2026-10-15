@@ -128,11 +128,7 @@ class Context:
         self.generation = 0
         self.worker_dropped = 0
         self.disposing = False
-        self.process: subprocess.Popen[bytes] = subprocess.Popen(
-            [sys.executable, "-m", "meedee._worker"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-        )
+        self.process = start_worker()
         try:
             with REGISTRY_LOCK:
                 if SHUTTING_DOWN:
@@ -373,6 +369,38 @@ class Context:
                 self.fail("Cannot start MIDI worker disposal")
 
 
+def start_worker() -> subprocess.Popen[bytes]:
+    """Reserve startup and retain retiring processes until exit is confirmed."""
+    with REGISTRY_LOCK:
+        if SHUTTING_DOWN:
+            raise _native.StateError("MIDI interpreter shutdown has begun")
+        for slot in range(MAX_WORKERS):
+            process = WORKERS[slot]
+            if not STARTING_WORKERS[slot] and (
+                process is None or process.poll() is not None
+            ):
+                STARTING_WORKERS[slot] = True
+                break
+        else:
+            raise _native.ResourceError(
+                f"Isolated MIDI worker limit reached ({MAX_WORKERS} per parent process)"
+            )
+    process = None
+    try:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "meedee._worker"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        return process
+    finally:
+        with REGISTRY_LOCK:
+            # The slot already exists: publishing a child needs no new set entry
+            # or list growth after the OS process has been created.
+            WORKERS[slot] = process
+            STARTING_WORKERS[slot] = False
+
+
 def dispatch(
     reference: weakref.ReferenceType[Delivery], messages: Queue[tuple[object, ...]]
 ) -> None:
@@ -530,6 +558,9 @@ ERROR_TYPES: dict[str, type[Exception]] = {
     "NotImplementedError": NotImplementedError,
 }
 CONTEXTS: weakref.WeakSet[Context] = weakref.WeakSet()
+MAX_WORKERS = 32
+STARTING_WORKERS: list[bool] = [False] * MAX_WORKERS
+WORKERS: list[subprocess.Popen[bytes] | None] = [None] * MAX_WORKERS
 DELIVERIES: weakref.WeakSet[Delivery] = weakref.WeakSet()
 REGISTRY_LOCK = Lock()
 SHUTTING_DOWN = False

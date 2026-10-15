@@ -84,8 +84,9 @@ has a native owner thread; each isolated client also has a Python child and
 communication threads, and each isolated input has forwarding/dispatch threads.
 CoreMIDI also retains one callback-free keeper client per MIDI-using process
 until process exit, including isolated children; this is outside connection counts.
-There is no global quota across isolated children. Many idle clients can still
-consume substantial memory, threads, handles and scheduling time on a Pi.
+Per-parent count limits do not impose a machine-wide memory budget across
+independent applications. Many idle clients can still consume substantial memory,
+threads, handles and scheduling time on a Pi.
 
 Native receive admission bounds owned in-flight payloads by bytes. Each isolated
 receive queue has a count limit of 128 and an 8 MiB default payload limit.
@@ -137,6 +138,9 @@ cleanup; immediate client reuse can fail until cleanup completes. Keeping the
 client variable alone does not keep its connection open. Connections hold their
 clients and expose callback edges to Python's collector, but GC timing is not a
 lifetime guarantee. Port snapshots hold metadata without keeping clients alive.
+Even a closed connection retains its reusable client. Closing that connection
+does not free the client's isolated-worker slot; retaining many such objects
+can exhaust the per-parent cap until those references and workers retire.
 
 Receive callbacks take one immutable ReceivedPacket containing raw byte chunks
 or UMP batches, not complete musical Message objects. A chunk can contain partial

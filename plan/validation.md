@@ -1307,3 +1307,38 @@ exception. A fresh wheel builds from the sdist, both artifact checks pass, and
 246 installed-package tests pass outside the checkout. The release workflow
 includes the keeper regression target without changing its trigger or Python
 matrix. Native repeated-reopen validation remains explicitly pending.
+
+## Per-parent isolated-worker admission
+
+The owner approved a cap of 32 live isolated MIDI workers per parent Python
+process, including discovery-only clients and children still retiring. A fixed
+32-slot table retains process handles; a parallel fixed reservation table covers
+starts in progress. Reservations are made under the existing registry lock, but
+Popen executes outside it. Other admissions and shutdown do not wait behind a
+blocked process creation while holding that registry lock. Publishing a child
+uses an already allocated slot, so it requires no set entry/list growth after
+process creation. Failed Popen calls release the reservation in finally.
+
+A slot is reusable only when poll confirms its previous child has exited; neither
+weak-reference disappearance, connection close nor a kill request releases it.
+A failed communication-thread setup still counts its created child until exit
+is confirmed. Overflow raises the existing ResourceError before another spawn.
+The limit is independent of native-client/connection counts and of other parent
+processes; it is not a total-memory, CPU or safe-Pi-workload guarantee. CoreMIDI's
+private process-lifetime keeper remains an additional resource in each child.
+Retaining closed connections can retain their reusable clients/workers, so
+applications must release those references when finished.
+
+Five focused cases pass: discovery-only clients fill capacity, retirement keeps
+its slot until exit confirmation, a confirmed exit admits a replacement, startup
+OSError/MemoryError/KeyboardInterrupt release reservations, and an in-progress
+spawn reserves capacity without blocking another admission on the registry lock.
+These use the existing controlled worker fixture and no OS MIDI. Both final
+source suites pass **252 tests** on CPython 3.11 and 3.15.
+
+The final worker-budget wheel builds from the sdist; both artifact checks pass.
+After installation into a separate environment, **251 installed-package tests**
+pass outside the checkout, including the five new admission cases. Ruff, formatting,
+ty and pyupgrade pass. The Rust/C++ implementation is unchanged from the keeper
+commit's successful 113-test Rust and four-target sanitized native checks.
+CI remains published-release-only with Python 3.11 and 3.15; no workflow was run.

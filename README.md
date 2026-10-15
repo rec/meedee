@@ -391,6 +391,17 @@ transport in-process with fewer resources and no native-operation deadline.
 Both modes use a dedicated native owner thread per client for creation,
 operations and teardown; Windows COM initialization stays on that thread.
 
+A parent Python process admits at most 32 live isolated workers. Each Input or
+Output client uses one slot, even when used only for discovery; an input/output
+pair uses two. Starts in progress and retiring children count until process exit
+is confirmed. At the limit construction raises ResourceError before starting
+another child. Startup failures release their reservation. These counts are
+separate from native-client/connection limits and are not a machine-wide memory
+budget or a guarantee that 32 workers fit on a Pi.
+Closing a connection preserves its reusable client and worker. Release unneeded
+clients and references from their connections when finished; asynchronous worker
+cleanup may keep a slot occupied briefly afterward.
+
 Callbacks must be synchronous and return promptly. Deferred results are reported
 through `sys.unraisablehook`, without executing them; later delivery continues.
 Callback exceptions are reported the same way. Blocking MIDI operations are
