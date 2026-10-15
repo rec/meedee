@@ -59,7 +59,8 @@ fn populate_tuning(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 fn populate_controls(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    controls::register(module)
+    controls::register(module)?;
+    profiles::register_control_engines(module)
 }
 
 #[pyfunction]

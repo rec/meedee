@@ -335,3 +335,9 @@ opt-ins and require target-host authorization. No unit test selects hardware.
 meedee is MIT licensed. See [third-party notices](THIRD_PARTY_NOTICES.md) and
 [vendored provenance](third_party/libremidi/SOURCE.md). Publication is a separate
 decision after the remaining qualification gates.
+
+Slice 6.5 adds bounded GM2 routing/key/global-parameter SysEx, a pure MPE allocator
+and overlap-aware tracker, one-shot high-resolution velocity interpretation, and
+caller-driven quarter-frame time-code assembly. These operate without ports or
+background clocks. See [the API policies](plan/api.md) for explicit source/reset,
+allocation, sustain, entry limits and sequence-lock behavior.

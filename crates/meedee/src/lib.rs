@@ -9,3 +9,4 @@ pub mod timecode;
 pub mod transport;
 pub mod tuning;
 pub mod universal;
+pub mod velocity;

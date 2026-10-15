@@ -268,6 +268,13 @@ macro_rules! short_messages {
             crate::tuning::encode_message(message)
         }
 
+        pub(crate) fn extract_primitive(message: &Bound<'_, PyAny>) -> PyResult<messages::AnyMessage> {
+            if let Ok(value) = message.extract::<PyRef<'_, NoteOn>>() {return Ok(messages::AnyMessage::NoteOn(value.value.clone()));}
+            if let Ok(value) = message.extract::<PyRef<'_, SysEx>>() {return Ok(messages::AnyMessage::SysEx(value.value.clone()));}
+            $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {return Ok(messages::AnyMessage::$name(value.value.clone()));})*
+            Err(PyTypeError::new_err("expected a primitive MIDI 1.0 message"))
+        }
+
         pub fn to_python(py: Python<'_>, message: messages::AnyMessage) -> PyResult<Py<PyAny>> {
             match message {
                 messages::AnyMessage::NoteOn(value) => Ok(Py::new(py,

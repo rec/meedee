@@ -887,3 +887,30 @@ capability guarantees are not claimed.
 A CPython 3.11 wheel rebuilt from the source distribution passes all 197
 installed-package tests outside the checkout. Both distribution archive checks
 pass, including the four new module/stub pairs, Rust tables and profile fixtures.
+
+## Slice 6.5 profile codecs and state engines, 2026-10-15
+
+Implemented the approved bounded generic GM2-related SysEx codecs, explicit
+no-stealing MPE allocation, overlap-aware per-zone tracking, CA-031 velocity
+interpretation and caller-driven MTC sequence assembly. Rust owns the behavior;
+Python exposes frozen native values/observations. Source/zone/reset ownership,
+resource limits, sustained allocations and sequence-lock policies are documented
+in api.md. No native transport, dependency or backend source changed.
+
+Python 3.11.7 and 3.15.0 each pass 204 tests. The Rust workspace passes 82
+ordinary tests with five ignored cases; pytest separately runs the three
+finalization cases. Four added Rust tests and six Python tests cover independent
+SysEx vectors, mixed byte orders, unknown IDs, malformed lengths, resource limits,
+checked replacement, sustain/exhaustion, repeated-note ambiguity, resets,
+channel-scoped one-shot prefixes, forward/reverse sequence continuity, deadlines,
+relocation, malformed nibbles, skipped drop-frame labels and day rollover.
+The pure-import fixture also constructs the new engines while cleanup/runtime
+initialization is forbidden. Ruff, formatting, ty, pyupgrade, cargo formatting,
+workspace Clippy and whitespace checks pass, retaining the existing local atomic
+deprecation exception. Installed profile-engine tests are added to release CI;
+the published-release-only trigger and endpoint versions are unchanged.
+
+These are unit/software checks. No hardware, native-service flow or CI release
+was run. MPE synthesis/zone interoperability, physical synchronization and native
+platform qualification remain open. A full MPE transmitter's automatic channel
+sharing and release-envelope behavior are not claimed by the selected allocator.

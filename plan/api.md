@@ -566,3 +566,60 @@ tracking; quarter-frame MTC assembly/clock locking and high-resolution velocity
 prefix interpretation. Generic raw messages remain available for these forms.
 This selected coverage does not claim full GM2 message support, synthesis,
 manufacturer extensions, device conformance or physical/native qualification.
+
+## Slice 6.5 approved API and interpretation policies
+
+`gm.ControllerDestination` (source 1=channel pressure, 2=poly pressure, 3=CC),
+`gm.KeyBasedControl` and `gm.GlobalParameterControl` are frozen Message values.
+They encode with the existing byte encoder and decode explicitly through
+`gm.decode`. Entry order, duplicates and valid unknown IDs remain intact.
+Controller-source and key-controller exclusions follow CA-022/023. Constructors
+and decoding default to 1,024 entries, adjustable with strict `max_entries`;
+checked replacement retains that resource policy. It does not affect wire/value
+identity. Slot paths have at most 127 14-bit components. Global parameter IDs
+are tuples of MSB-first seven-bit bytes, values tuples of LSB-first bytes; declared
+widths are 1–127 bytes, preserving wide values without integer overflow. Named
+reverb/chorus parameter helpers use GM2 slots 257/258. Raw values are not claims
+of device support or manufacturer response.
+
+One `mpe.Allocator` owns one explicit zone. It returns Voice tokens and NoteOn
+values, chooses the lowest free member channel and rejects exhaustion. Release
+returns NoteOff; sustain changes return manager-channel CC64. Released voices
+remain reserved while sustain is held, a conservative allocation policy. There
+is no implicit stealing, sending, expression reset or release-envelope estimate.
+Tokens belong to that allocator; reset forgets state without sending silence and
+does not reuse token numbers. An allocator is not a full MPE Mode 3 transmitter
+which automatically shares occupied channels under exhaustion.
+
+One `mpe.Tracker` observes an explicit zone of an independent source. Configure
+clears state; callers manage interacting zones and feed configuration changes
+explicitly. Fixed channel/note counters retain repeated pitches and distinguish
+held and sustained counts, with checked count exhaustion. Channel expression is
+reported separately; `ambiguous` flags several currently held notes instead of
+inventing attribution. Member expression does not attach to sustained release
+tails. Manager expression remains separate rather than applying an invented
+synthesis-combination formula. Member-channel damper messages are ignored;
+manager sustain/mode controls update affected member state. Channel snapshots
+are frozen; returned note lists are copies. Reset is required after known loss.
+Release-envelope duration and physical sounding-note state cannot be inferred.
+
+`controls.VelocityInterpreter` implements CA-031 per source/channel. A prefix
+survives intervening non-note messages, is replaced by a later prefix and is
+consumed once by the next NoteOn/Off on that channel. Observations preserve
+seven-bit coarse values when no prefix was received and fourteen-bit values
+when paired. Zero-velocity NoteOn remains a note-off observation, ignores its
+prefix and records its original form. Explicit reset, SystemReset and channel
+Reset All Controllers invalidate pending context. Raw messages remain caller-owned.
+
+`timecode.Position` validates SMPTE labels, including skipped drop-frame labels;
+`advance(frames=...)` wraps at 24 hours in either direction. FullFrame remains a
+wire value; the assembler validates its label before relocation. `Assembler`
+requires an explicit positive `timeout_ns`, monotonic integer `now_ns`, and
+caller-driven feed/poll. It returns frozen results with observations/diagnostics.
+One cycle publishes a position; a second cycle advancing exactly two frames in
+the same direction/rate acquires sequence lock. Gaps, malformed nibbles,
+direction/rate/position discontinuities and silence deadlines invalidate lock.
+Observations distinguish encoded and direction-compensated positions. FullFrame
+relocates without acquiring lock. No extrapolation, wall clock, scheduling or
+physical synchronization guarantee is supplied. Public reset retains the
+monotonic caller-clock requirement.
