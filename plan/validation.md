@@ -1419,3 +1419,59 @@ reopen qualification remains open.
 The rebuilt editable Python package passes all 252 ordinary tests in 25.17
 seconds. The preserved JSON records parse, the imported files match the fork,
 and `git diff --check` passes. No Python source or dependency versions changed.
+
+### Native status and wrapper-independent reproduction
+
+The owner reran the diagnostic build. The failure again followed successful
+delivery/close in the first isolated MIDI 1 cycle, during discovery in cycle 2.
+The exact diagnostic was `object=158564417, OSStatus=-50`. The result was **one
+failed, nine deselected in 1.27 seconds**; both raw JSON records are preserved in
+`qualification-macos-reopen-status.jsonl`. The installed Apple SDK defines
+`paramErr = -50` in CarbonCore's `MacErrors.h`. This is not proof of a particular
+lifetime or run-loop failure.
+
+`test/native/coremidi_reopen.cpp` and `test/qualification/reopen.py` now provide
+a direct SDK comparison, independent of Rust, libremidi and Python transport.
+Three fresh producer/consumer process pairs compare lazy client creation, early
+client creation and positive-duration run-loop servicing. Each replaces only
+its own virtual endpoints and ordinary clients while retaining private keepers.
+No MIDI is sent. Handles and checked unique-ID query results are logged for all
+three replacement cycles, including failures, without logging hardware names.
+The harness bounds each pair and kills its process group on timeout. The native
+probe compiles with `-Wall -Wextra -Werror`; runtime evidence remains pending in
+ordinary Terminal. No production behavior was changed in this follow-up.
+
+The producer is launched through `posix_spawn` into a fresh executable image,
+avoiding a forked copy of initialized Apple runtime state. The ordinary suite
+passes all 252 tests in 25.18 seconds. Ruff checking/formatting, ty and pyupgrade
+pass for the new Python harness. The preserved JSON parses and
+`git diff --check` passes. No dependencies or CI triggers changed.
+
+### Direct SDK results: stale disposed endpoints
+
+The owner ran all three initial direct SDK modes: **three failed in 1.73
+seconds**. Extracted native output is preserved in
+`qualification-macos-direct-reopen.txt`, without pytest tracebacks. All producer
+create/dispose calls reported success. Each first cycle discovered its test-owned
+endpoint with a valid unique ID. After replacement, however, the consumer could
+still enumerate the disposed first endpoint and its ID query returned `-50`.
+
+In `late`, the producer created endpoints 204484673, 204484679 and 204484683,
+but the consumer enumerated 204484673 on all three cycles. `early` behaved the
+same way with first endpoint 204484691 despite keeper creation before discovery.
+`serviced` still returned disposed endpoint 204484705 in cycle 2 after producer
+creation of 204484711; cycle 3 finally discovered the new endpoint 204484715.
+Neither early creation alone nor the tested 50 ms run-loop wait gives a reliable
+fix. This establishes stale enumeration with direct SDK calls under the tested
+callback-free client usage, independently of either wrapper. It does not prove
+the underlying cause or establish a safe production workaround.
+
+The probe now has two additional diagnostic modes. Both register a static
+notification callback before discovery, without an application context. One
+retains zero-duration run-loop servicing; the other uses 50 ms. Notification IDs
+are logged, and all existing query/match failures still fail the case. These
+modes compile cleanly with warnings treated as errors; their runtime results
+remain pending. Production keeper behavior, discovery policy and CI are unchanged.
+
+The ordinary suite passes all 252 tests in 18.75 seconds. Ruff checking/formatting,
+ty and pyupgrade pass for the changed Python harness; `git diff --check` passes.

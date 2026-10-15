@@ -1,0 +1,69 @@
+mode=late
+mode=late cycle=1
+producer command=c status=0 endpoint=204484673 unique_id=-213892994
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484673 status=0 unique_id=-213892994
+test-owned matches=1
+producer command=x status=0 endpoint=0 unique_id=0
+mode=late cycle=2
+producer command=c status=0 endpoint=204484679 unique_id=466557317
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484673 status=-50 unique_id=0
+test-owned matches=0
+producer command=x status=0 endpoint=0 unique_id=0
+mode=late cycle=3
+producer command=c status=0 endpoint=204484683 unique_id=692164966
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484673 status=-50 unique_id=0
+test-owned matches=0
+producer command=x status=0 endpoint=0 unique_id=0
+
+mode=early
+mode=early cycle=1
+producer command=c status=0 endpoint=204484691 unique_id=-578782553
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484691 status=0 unique_id=-578782553
+test-owned matches=1
+producer command=x status=0 endpoint=0 unique_id=0
+mode=early cycle=2
+producer command=c status=0 endpoint=204484695 unique_id=-63965091
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484691 status=-50 unique_id=0
+test-owned matches=0
+producer command=x status=0 endpoint=0 unique_id=0
+mode=early cycle=3
+producer command=c status=0 endpoint=204484699 unique_id=-1541892607
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484691 status=-50 unique_id=0
+test-owned matches=0
+producer command=x status=0 endpoint=0 unique_id=0
+
+mode=serviced
+mode=serviced cycle=1
+producer command=c status=0 endpoint=204484705 unique_id=-1044965816
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484705 status=0 unique_id=-1044965816
+test-owned matches=1
+producer command=x status=0 endpoint=0 unique_id=0
+mode=serviced cycle=2
+producer command=c status=0 endpoint=204484711 unique_id=542671616
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484705 status=-50 unique_id=0
+test-owned matches=0
+producer command=x status=0 endpoint=0 unique_id=0
+mode=serviced cycle=3
+producer command=c status=0 endpoint=204484715 unique_id=-1277579368
+runloop=3 destinations=2
+index=0 endpoint=204484622 status=0 unique_id=-1788209693
+index=1 endpoint=204484715 status=0 unique_id=-1277579368
+test-owned matches=1
+producer command=x status=0 endpoint=0 unique_id=0
+
