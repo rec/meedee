@@ -169,3 +169,31 @@ key-based instrument-control and global effect-parameter SysEx are explicitly
 deferred. Full GM2 message coverage is not claimed. GM2 On's 100 ms settling
 requirement is exposed as metadata; no automatic sleep/reset is performed.
 GM1 developer guidance does not establish a universally safe initialization delay.
+
+## Slice 6.5 profile engines, 2026-10-15
+
+Reviewed the standalone CA-022 (1999-02-28), CA-023 (1999-02-28), CA-024
+(1999-03-05) and CA-031 addenda from the Association's
+[MIDI 1.0 addenda downloads](https://midi.org/midi-1-0-addenda), in addition to
+the already recorded GM2, MPE 1.1 and MTC baselines. The acquired CA-031 PDF
+identifies the approval number but advertises no numbered revision/date.
+
+```text
+controller-destination.pdf d8bfacb16e64b4b381767519f5d6d9749e15c051733e445a5104ff23318c8f88
+key-controls.pdf           8cd97ed56adb3058526ddbf11d4a80fb37c38f58da705d79a7270e833051c380
+global-parameters.pdf      df26b1877c1a6085c274dc43769da6ceca995a85ec584c49622062768863e2f8
+velocity-prefix.pdf        3ba9538f5b45240483adc91b4e5e6f99245ef77864ea3df34d12ad32f01853a4
+```
+
+CA-024 distinguishes MSB-first parameter identifiers from LSB-first parameter
+values. CA-023 excludes bank/data-entry/parameter selectors and channel modes,
+while redefining 120/121 for key tuning. CA-031 consumes one prefix per matching
+channel note event, permits intervening messages and excludes zero-velocity
+NoteOn from fine-velocity interpretation. Compact independent vectors in
+`crates/meedee/tests/fixtures/profile-engines.txt` are checked in both languages.
+MPE sections 2.2/2.3 and appendix A distinguish member expression on Active Notes
+from manager expression on Sounding Notes; a pure tracker cannot infer release
+envelopes. The allocator's explicit no-sharing/no-stealing policy is narrower
+than a complete Mode 3 sender. MTC sequence evidence is checked against its
+quarter-frame implementation section; the approved two-cycle acquisition rule
+is deliberately stricter than the minimum complete eight-message sequence.

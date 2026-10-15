@@ -8,6 +8,8 @@ use pyo3::types::{PyDict, PyInt, PyString, PyTuple};
 use pyo3::IntoPyObjectExt;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+#[path = "profile_engines.rs"]
+mod engines;
 
 macro_rules! classes {
     ($namespace:literal; $($name:ident { $($field:ident : $read:ident => $write:ident : $annotation:ty),* };)*) => {$(
@@ -147,16 +149,23 @@ mod gm {
             .map(|value| Percussion { value }))
     }
     #[pyfunction]
-    fn decode(py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<Option<Py<PyAny>>> {
+    #[pyo3(signature=(message,*,max_entries=1024))]
+    fn decode(
+        py: Python<'_>,
+        message: &Bound<'_, PyAny>,
+        #[pyo3(from_py_with=engines::limit)] max_entries: usize,
+    ) -> PyResult<Option<Py<PyAny>>> {
         let raw = message.extract::<PyRef<'_, crate::messages::SysEx>>()?;
-        model::decode(&raw.value)
-            .map_err(value_error)?
-            .map(|message| match message {
-                model::ModeMessage::Gm1On(value) => object(py, Gm1On { value }),
-                model::ModeMessage::GmOff(value) => object(py, GmOff { value }),
-                model::ModeMessage::Gm2On(value) => object(py, Gm2On { value }),
-            })
-            .transpose()
+        let mode = model::decode(&raw.value).map_err(value_error)?;
+        if mode.is_none() {
+            return engines::decode_gm(py, &raw.value, max_entries);
+        }
+        mode.map(|message| match message {
+            model::ModeMessage::Gm1On(value) => object(py, Gm1On { value }),
+            model::ModeMessage::GmOff(value) => object(py, GmOff { value }),
+            model::ModeMessage::Gm2On(value) => object(py, Gm2On { value }),
+        })
+        .transpose()
     }
     pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module.add_class::<BankProgramSelect>()?;
@@ -243,7 +252,7 @@ mod timecode {
         DropFrame30,
         Fps30,
     }
-    fn rate(value: &Bound<'_, PyAny>) -> PyResult<model::FrameRate> {
+    pub(super) fn rate(value: &Bound<'_, PyAny>) -> PyResult<model::FrameRate> {
         Ok(match value.extract::<FrameRate>()? {
             FrameRate::Fps24 => model::FrameRate::Fps24,
             FrameRate::Fps25 => model::FrameRate::Fps25,
@@ -251,7 +260,10 @@ mod timecode {
             FrameRate::Fps30 => model::FrameRate::Fps30,
         })
     }
-    fn rate_object(py: Python<'_>, value: model::FrameRate) -> PyResult<Bound<'_, PyAny>> {
+    pub(super) fn rate_object(
+        py: Python<'_>,
+        value: model::FrameRate,
+    ) -> PyResult<Bound<'_, PyAny>> {
         Ok(Py::new(
             py,
             match value {
@@ -282,16 +294,19 @@ mod timecode {
 }
 
 pub fn register_gm(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    gm::register(module)
+    gm::register(module)?;
+    engines::register_gm(module)
 }
 pub fn register_mpe(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    mpe::register(module)
+    mpe::register(module)?;
+    engines::register_mpe(module)
 }
 pub fn register_universal(module: &Bound<'_, PyModule>) -> PyResult<()> {
     universal::register(module)
 }
 pub fn register_timecode(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    timecode::register(module)
+    timecode::register(module)?;
+    engines::register_timecode(module)
 }
 
 pub fn changes_mode(message: &Bound<'_, PyAny>) -> bool {
@@ -301,8 +316,8 @@ pub fn changes_mode(message: &Bound<'_, PyAny>) -> bool {
 }
 macro_rules! primitives {
     ($($module:ident :: $name:ident),*)=>{
-        pub fn encode_message(message:&Bound<'_,PyAny>)->Option<Vec<u8>> {$(if let Ok(value)=message.extract::<PyRef<'_,$module::$name>>() {return Some(value.value.encode());})*None}
-        pub fn is_message(message:&Bound<'_,PyAny>)->bool {false $(||message.is_instance_of::<$module::$name>())*}
+        pub fn encode_message(message:&Bound<'_,PyAny>)->Option<Vec<u8>> {$(if let Ok(value)=message.extract::<PyRef<'_,$module::$name>>() {return Some(value.value.encode());})*engines::encode_message(message)}
+        pub fn is_message(message:&Bound<'_,PyAny>)->bool {engines::is_message(message) $(||message.is_instance_of::<$module::$name>())*}
     };
 }
 primitives!(
@@ -398,4 +413,8 @@ fn hash(value: &impl Hash) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
+}
+
+pub(crate) fn register_control_engines(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    engines::register_controls(module)
 }

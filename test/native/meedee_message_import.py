@@ -54,6 +54,19 @@ def main() -> None:
         assert messages.SysEx(data=memoryview(bytearray([0, 127]))).data == bytes(
             [0, 127]
         )
+        assert (
+            gm.KeyBasedControl(device_id=1, channel=10, note=36, entries=[]).entries
+            == ()
+        )
+        assert (
+            mpe.Allocator(zone=mpe.ZoneConfiguration(manager_channel=1, members=1))
+            .allocate(note=60, velocity=100)
+            .channel
+            == 2
+        )
+        assert not timecode.Assembler(timeout_ns=100).locked
+        assert controls.VelocityInterpreter().feed(messages.TimingClock()) is None
+
         assert "meedee.midi" not in sys.modules
         assert "meedee._native" not in sys.modules
         assert "meedee._clients" not in sys.modules

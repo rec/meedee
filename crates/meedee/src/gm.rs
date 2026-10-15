@@ -1,6 +1,13 @@
 //! General MIDI profiles. Opening a port never selects a mode or bank.
 use crate::messages::{AnyMessage, Command, ControlChange, Message, ProgramChange, ValueError};
 
+#[path = "gm_extensions.rs"]
+mod extensions;
+pub use extensions::{
+    chorus_parameter, decode_extended, reverb_parameter, ControllerDestination, ExtendedMessage,
+    GlobalParameterControl, KeyBasedControl,
+};
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BankProgramSelect {
     channel: u8,
