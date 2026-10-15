@@ -71,13 +71,9 @@ The selected Pi image/sysroot and cross-build remain open.
 Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
-CoreMIDI client lifetime also needs a decision. Apple documents that disposing
-the last client can stop the server when no other clients exist and prevent
-subsequent client creation by that application. libremidi's current destructors
-explicitly dispose clients. A shared or retained client changes ownership and
-resource accounting and must preserve observer notification contexts. This is
-distinct from the first-call access failure reproduced by the standalone probe.
-See [Apple's disposal contract](https://developer.apple.com/documentation/coremidi/midiclientdispose%28_%3A%29).
+The process-lifetime CoreMIDI keeper passes deterministic concurrency/reopen
+tests; repeated open/close and full-width MIDI 2 delivery still need native
+validation against the new keeper build.
 
 ## R2. Resource admission is bounded only in specified places
 
@@ -86,6 +82,8 @@ admits 32 native clients per process, including retained owner threads. The
 Python registry admits 32 connections with four cleanup workers. Each client
 has a native owner thread; each isolated client also has a Python child and
 communication threads, and each isolated input has forwarding/dispatch threads.
+CoreMIDI also retains one callback-free keeper client per MIDI-using process
+until process exit, including isolated children; this is outside connection counts.
 There is no global quota across isolated children. Many idle clients can still
 consume substantial memory, threads, handles and scheduling time on a Pi.
 

@@ -148,6 +148,13 @@ test/native/meedee_ci_loopback.py; MIDI 1 measurements alone do not qualify live
 MIDI 2. A successful CoreMIDI UMP loopback does not qualify other backends or
 physical MIDI 2 equipment.
 
+The `reopen` supervisor case repeats three virtual open/send/close cycles on
+each of the same Input/Output clients, in both Python modes and MIDI protocols.
+It also checks exact delivery of a full-width MIDI 2 CC on group/channel 16.
+One callback-free keeper client remains in each MIDI-using process until exit;
+include this intentional extra client in resource accounting. The keeper avoids
+last-client disposal during normal operation, not recovery after a server crash.
+
 If CoreMIDI client creation fails, compare with a wrapper-independent probe in
 an ordinary Terminal session:
 

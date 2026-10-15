@@ -104,6 +104,8 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "test/qualification/startup.py",
                 "test/qualification/access.py",
                 "test/native/coremidi_access.cpp",
+                "test/native/meedee_reopen.py",
+                "third_party/libremidi/tests/unit/coremidi_keeper.cpp",
                 "third_party/libremidi/tests/unit/winmm_discovery.cpp",
                 "LICENSE",
                 "THIRD_PARTY_NOTICES.md",
