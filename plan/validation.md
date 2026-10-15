@@ -957,3 +957,17 @@ behavior remain open. MDS support is packet-level; translation deliberately
 requires missing source/profile context rather than pretending to implement a
 complete stateful default translator. Typed/timed transport integration and
 MIDI-CI remain later slices.
+
+## Standard-file codec foundation for slices 8–10, 2026-10-15
+
+The streaming SMF/SYX/Clip Rust codecs and Python stream adapters pass five new
+Rust tests and four Python tests. The full Python 3.11 suite passes 214 tests;
+the Rust workspace passes 93 ordinary tests with five ignored cases. Ruff,
+formatting, ty, pyupgrade, cargo formatting, workspace Clippy (the existing local
+atomic-deprecation exception) and whitespace checks pass. Coverage includes
+independent byte vectors, running status, extended/unknown records, SMPTE
+headers, truncation at every byte boundary, payload limits, F0/F7 fragments,
+independent Type 2 tracks, short writes and injected disk-full errors. No native
+MIDI flow was run. Exact clock/export integration, archive support and live
+integration follow in this same authorized effort; this foundation alone does
+not mark all slice 8 export gates complete.

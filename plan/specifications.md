@@ -235,3 +235,26 @@ tags or lyric state. No complete stateful MIDI 1 default translator is claimed:
 selector, bank, velocity-prefix and parameter-step context is explicitly declined.
 Unknown/rejected complete layouts can be recorded as opaque without asserting
 they are valid messages. Native UMP/platform qualification remains separate.
+
+## Slice 8 file codec evidence, 2026-10-15
+
+- RP-001 v1.0 Standard MIDI Files, document 96-1-4, obtained from the
+  [official SMF specification page](https://midi.org/standard-midi-files-specification).
+  SHA-256: `fdb65bd58cd92981273468954b46fe7e915b1f8b5697f55eaec0d475895762b8`.
+  Chunk/header, track grammar, running status, metadata and division sections
+  govern the codec. In particular, extra known-meta bytes must be ignored by
+  interpretation and retained by our record model, rather than rejected.
+- M2-116-U v1.0 MIDI Clip File Specification, 11-May-2023, obtained from the
+  [official Clip specification page](https://midi.org/midi-clip-file-specification-smf-midi-2-0).
+  SHA-256: `d182685b7d2f09667e112f6bb587ae7f0679c08dda39d163c61cbf181036da4b`.
+  Sections 3–7 govern big-endian UMP framing, DCS/DCTPQ, configuration and
+  sequence start/end markers. This is `.midi2`, not the separate Container format.
+- The pinned libremidi reader requires a full input buffer and stores all tracks;
+  `reader.cpp` explicitly leaves SMPTE division unsupported. Its writer stores
+  tracks and builds each encoded track in memory. These concrete gaps justify
+  the approved Rust streaming implementation instead of another C++ bridge.
+
+The compact independent SMF and Clip vectors in `tests/files.rs` and
+`test_files.py` state expected bytes directly. PDFs remain in ignored local
+scratch storage and are not redistributed. File parsing never executes embedded
+configuration, escape bytes, profiles or tuning messages.

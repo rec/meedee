@@ -10,6 +10,7 @@ mod lifecycle;
 
 mod codecs;
 mod controls;
+mod files;
 mod messages;
 mod packets;
 mod ports;
@@ -34,6 +35,9 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_mpe, module)?)?;
     module.add_function(wrap_pyfunction!(populate_timecode, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ump, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_smf, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_syx, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_clip, module)?)?;
     Ok(())
 }
 
@@ -151,4 +155,17 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_ump(module: &Bound<'_, PyModule>) -> PyResult<()> {
     ump::register(module)
+}
+
+#[pyfunction]
+fn populate_smf(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    files::register_smf(module)
+}
+#[pyfunction]
+fn populate_syx(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    files::register_syx(module)
+}
+#[pyfunction]
+fn populate_clip(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    files::register_clip(module)
 }

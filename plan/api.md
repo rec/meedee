@@ -730,3 +730,55 @@ lists use the standard four-message sequence, without implicit RPN-null cleanup;
 selection may remain active. Lists are values, not atomic live operations and
 provide no send-progress or delivery acknowledgment. Typed/timed sending and
 source integration remain slice 10; profile negotiation remains slice 11.
+
+## Slices 8–10 approved policies, 2026-10-15
+
+Rust-owned codecs live in smf/syx/clip/archive, with Python modules of the same
+names. Shared event/time values live in events. SMF types 0/1/2, PPQN/SMPTE,
+SYX and MIDI Clip 1.0 are selected; other containers are out of scope. Type 2
+sequences are independent. File writes preserve meaning/order, not byte-exact
+running-status compression. Unknown metadata/chunks and F0/F7 fragments remain
+file records rather than executable live messages. No implicit lossy export.
+
+The standard file codecs stream one record at a time. SMF Reader.header exposes
+format, track count, raw validated 16-bit division and header-extension bytes.
+Each smf.Event has a zero-based file track index, absolute integer tick and
+record. Record is a primitive channel Message, Meta, SysExFragment or
+UnknownChunk. Unknown chunks are preserved at track boundaries. EndOfTrack is
+explicit. Writers require contiguous tracks, nondecreasing ticks within tracks,
+a valid terminal EndOfTrack and an explicit finish(). SMF output requires a
+seekable destination to patch track lengths; it never buffers a complete track.
+Writers may normalize running status. Known metadata may retain extension bytes.
+
+SYX is a sequence of F0/payload/F7 dumps, rejecting other statuses and unfinished
+dumps. Clip preserves individual UMP packets including clock and configuration
+records; Entry.tick is the cumulative DCS position when known. Timing/configuration
+records are storage, not instructions to send automatically. Readers/writers
+check the initial zero DCS/DCTPQ and sequence start/end framing. Semantic profile
+negotiation remains later work. Other MIDI containers are not claimed.
+
+All file payload limits default to 1 MiB and are configurable; file length is not
+capped. Python paths and binary streams are accepted, and borrowed streams stay
+open. File codec finish flushes successful output; garbage collection does not
+assert successful completion. File operations surface I/O and malformed-data
+errors, including read byte positions. A failed writer cannot be resumed.
+
+The custom `.meedee` archive is binary, versioned and length-prefixed, with
+per-record CRC-32 and an explicit completion trailer. Normal reading requires
+completion; recovery is explicit and returns only verified complete records.
+Native clock values and absent timestamps remain exact, with rational units and
+stable record IDs. Unknown records may be retained opaquely without execution.
+
+TypedInput/TypedOutput wrap the existing transport, preserving raw access and
+isolation. Input selects callbacks or a bounded receive queue at connection time.
+Events use completion-packet time with first/last contributing packet spans;
+primitive messages remain evidence and semantic observations remain separate.
+Recording uses one bounded writer thread (128 records and 8 MiB payload by
+default), stops incomplete on observed loss/overflow/write failure, and offers
+explicit best-effort gap recording for input loss. Playback runs on the caller's
+thread with monotonic deadlines/cancellation, sends late events immediately with
+lateness reporting and stops on send failure without retry. Missing times,
+unmapped clocks and unresolved discontinuities require explicit caller policy.
+No automatic silencing, reset, connection close or restoration on cancellation.
+Only supervised temporary virtual CoreMIDI endpoint tests are authorized; physical
+instruments, Windows native validation and Pi qualification remain open.

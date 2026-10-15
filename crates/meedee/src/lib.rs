@@ -11,3 +11,8 @@ pub mod tuning;
 pub mod ump;
 pub mod universal;
 pub mod velocity;
+
+pub mod clip;
+pub mod file_io;
+pub mod smf;
+pub mod syx;

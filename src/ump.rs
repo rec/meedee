@@ -38,12 +38,12 @@ macro_rules! scalar {
             $(#[getter]fn $field(&self)->$ty{self.value.$field()})*
             #[classattr]fn __annotations__(py:Python<'_>)->PyResult<Bound<'_,PyDict>>{let d=PyDict::new(py);$(d.set_item(stringify!($field),py.get_type::<PyInt>())?;)*Ok(d)}
         });)*
-        fn extract(value:&Bound<'_,PyAny>)->PyResult<model::UmpMessage>{
+        pub(crate) fn extract(value:&Bound<'_,PyAny>)->PyResult<model::UmpMessage>{
             if let Ok(v)=value.extract::<PyRef<'_,Noop>>(){return Ok(model::UmpMessage::Noop(v.value.clone()));}
             $(if let Ok(v)=value.extract::<PyRef<'_,$name>>(){return Ok(model::UmpMessage::$name(v.value.clone()));})*
             extract_packet(value)
         }
-        fn to_python(py:Python<'_>,value:model::UmpMessage)->PyResult<Py<PyAny>>{match value{
+        pub(crate) fn to_python(py:Python<'_>,value:model::UmpMessage)->PyResult<Py<PyAny>>{match value{
             model::UmpMessage::Noop(value)=>object(py,Noop{value}),
             $(model::UmpMessage::$name(value)=>object(py,$name{value}),)*
             model::UmpMessage::Midi1(value)=>object(py,Midi1Packet{value}),
@@ -558,7 +558,7 @@ fn optional_int(v: &Bound<'_, PyAny>) -> PyResult<Option<i64>> {
         Ok(Some(int(v)?))
     }
 }
-fn boolean(v: &Bound<'_, PyAny>) -> PyResult<bool> {
+pub(crate) fn boolean(v: &Bound<'_, PyAny>) -> PyResult<bool> {
     if !v.is_exact_instance_of::<PyBool>() {
         return Err(PyTypeError::new_err("expected bool"));
     }

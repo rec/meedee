@@ -416,7 +416,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 fn value_error(error: meedee::messages::ValueError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
-fn hash(value: &impl Hash) -> u64 {
+pub(crate) fn hash(value: &impl Hash) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
