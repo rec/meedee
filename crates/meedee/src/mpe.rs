@@ -1,4 +1,4 @@
-//! MPE 1.1 zone configuration only. No voice allocator or receive-state inference.
+//! Pure MPE zone configuration, explicit allocation and bounded channel tracking.
 use crate::messages::{AnyMessage, Command, Message, RpnSet, ValueError};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

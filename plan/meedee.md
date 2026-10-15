@@ -702,14 +702,15 @@ and wire evidence before stateful interpretation or live writes.
    **Completed in slice 6.5:** GM2 controller-destination routing, key-based
    instrument-control and global effect-parameter SysEx; MPE voice allocation/
    expression tracking; quarter-frame MTC assembly/clock locking and
-   high-resolution velocity-prefix interpretation. These do not establish GM2 synthesizer conformance.
+   high-resolution velocity-prefix interpretation. These do not establish GM2
+   synthesizer conformance.
 
 **6.5. Remaining MIDI 1.0 profile codecs and interpretation engines.**
 **Implemented 2026-10-15.** See api.md for the approved allocation, ambiguity,
 resource, velocity-prefix and sequence-lock policies. Qualification is still
 separate from codecs/state-machine support.
- Complete
-the features deferred from slice 6 before moving to UMP and file formats. Keep
+
+Complete the features deferred from slice 6 before moving to UMP and file formats. Keep
 the core pure Rust with matching immutable Python values and caller-driven
 state machines. Reuse the existing focused modules, explicit SysEx decoding and
 compound-command sending where their semantics fit. This slice opens no ports

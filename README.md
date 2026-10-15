@@ -121,21 +121,29 @@ selection can change a channel's melodic/rhythm role, including channel 10.
 
 `meedee.universal` provides identity request/reply, master volume and signed
 master fine/coarse tuning. `meedee.timecode` provides full-frame MTC values with
-an explicit rate code and broadcast device ID 127, without assembling quarter
-frames or converting time lines. Their `decode(SysEx)` functions interpret
+an explicit rate code and broadcast device ID 127, plus explicit quarter-frame
+assembly and SMPTE position arithmetic. Their `decode(SysEx)` functions interpret
 complete messages explicitly; the byte decoder continues to return raw SysEx.
-MPE support configures one zone at a time; it does not allocate voices, configure
-bend ranges or infer expressive per-note state. Named RPN helpers keep pitch-bend
+MPE support configures one zone at a time and offers explicit allocation and
+overlap-aware tracking; it does not configure bend ranges or infer release tails.
+Named RPN helpers keep pitch-bend
 cents, fine-tuning units and GM2 modulation-depth units distinct. Channel-mode
 helpers construct ordinary CC values. All Notes Off can leave sustained sound;
 it has a different purpose from All Sound Off.
 
 Feed a relevant typed GM mode message to the control interpreter, or reset it
 explicitly, to invalidate cached context. Constructing/sending a value has no
-automatic connection to that pure interpreter. Full GM2 controller-destination,
-key-based instrument-control and global effect-parameter SysEx remain deferred.
+automatic connection to that pure interpreter. Bounded GM2 controller-destination,
+key-based instrument-control and global effect-parameter SysEx codecs are available.
 These codecs and maps do not imply a synthesizer, complete GM2 message coverage,
 device support or live qualification. See [the API contract](plan/api.md).
+
+Slice 6.5 adds bounded GM2 routing/key/global-parameter SysEx, a pure MPE allocator
+and overlap-aware tracker, one-shot high-resolution velocity interpretation, and
+caller-driven quarter-frame time-code assembly. These operate without ports or
+background clocks. See [the API policies](plan/api.md) for explicit source/reset,
+allocation, sustain, entry limits and sequence-lock behavior.
+
 
 ## Fine controls and parameters
 
@@ -335,9 +343,3 @@ opt-ins and require target-host authorization. No unit test selects hardware.
 meedee is MIT licensed. See [third-party notices](THIRD_PARTY_NOTICES.md) and
 [vendored provenance](third_party/libremidi/SOURCE.md). Publication is a separate
 decision after the remaining qualification gates.
-
-Slice 6.5 adds bounded GM2 routing/key/global-parameter SysEx, a pure MPE allocator
-and overlap-aware tracker, one-shot high-resolution velocity interpretation, and
-caller-driven quarter-frame time-code assembly. These operate without ports or
-background clocks. See [the API policies](plan/api.md) for explicit source/reset,
-allocation, sustain, entry limits and sequence-lock behavior.

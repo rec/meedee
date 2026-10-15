@@ -1,4 +1,4 @@
-//! MTC full-frame wire values only. No quarter-frame assembly or clock locking.
+//! MTC wire values, SMPTE labels and caller-driven quarter-frame sequence lock.
 use crate::messages::{Message, PrimitiveMessage, SysEx, ValueError};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
