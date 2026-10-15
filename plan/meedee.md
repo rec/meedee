@@ -784,9 +784,11 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
     exercise four-stream recording saturation, and supervise Rust/Python native
     virtual-endpoint attempts separately. See qualification.md for reproducible
     Linux/Windows/Pi procedures and validation.md for measurements and the feature
-    matrix. No Pi/Linux/Windows host is available. CoreMIDI client creation still
-    fails in all three native modes; actual latency and isolated-worker resource
-    totals remain unmeasured. Select the Pi image/environment, run target workloads
+    matrix. A follow-up in the owner's Terminal passes all three Mac MIDI 1
+    virtual loopbacks, typed capture/replay/cancellation and a CoreMIDI UMP SysEx7
+    CI exchange. A direct Apple API probe distinguishes the agent-context failure
+    from working Terminal access. Pi/Linux/Windows runs, full process-tree resource
+    totals and physical fault recovery remain open. Select the Pi image/environment, run target workloads
     and agree budgets from those results before claiming complete qualification
     or making a separately authorized release. CI remains release-only.
 

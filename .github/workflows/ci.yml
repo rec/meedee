@@ -48,11 +48,11 @@ jobs:
           targets=(libremidi callback_lifetime_test)
           case "$RUNNER_OS" in
             macOS) targets+=(coremidi_properties_test coremidi_teardown_test) ;;
-            Windows) targets+=(winmm_teardown_test winmm_output_test) ;;
+            Windows) targets+=(winmm_teardown_test winmm_output_test winmm_discovery_test winmm_discovery_ansi_test) ;;
           esac
           cmake --build target/native-tests --config Debug --target "${targets[@]}" --parallel 2
           ctest --test-dir target/native-tests -C Debug --output-on-failure \
-            -R '^(callback_lifetime|coremidi_properties|coremidi_teardown|winmm_teardown|winmm_output)_test$'
+            -R '^(callback_lifetime|coremidi_properties|coremidi_teardown|winmm_teardown|winmm_output|winmm_discovery|winmm_discovery_ansi)_test$'
       - name: Preserve native diagnostics
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

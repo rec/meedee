@@ -1178,3 +1178,90 @@ backend safety gaps, full resource profiling, Linux/Windows/Pi runs, native UMP
 and successful CoreMIDI transport remain open in issues.md. No release or CI run
 was created, and the workflow remains unchanged: published releases only,
 Python 3.11 and 3.15.
+
+## Native access and WinMM discovery follow-up, 2026-10-15
+
+A standalone C++ program calls Apple's MIDIClientCreate directly, bypassing both
+meedee and libremidi. From the agent execution context it returns **268435459**
+(**0x10000003**, MACH_SEND_INVALID_DEST in the installed Mach headers) and leaves
+the zero-initialized client reference unchanged. This reproduces the first-call
+failure without either wrapper and does not identify the underlying service or
+access-policy cause. The opt-in access.py test compiles/runs it with separate
+30/10 second limits; it creates no endpoints and sends no MIDI.
+
+The owner ran the identical test in ordinary Terminal: **one passed**, with
+MIDIClientCreate and MIDIClientDispose both returning zero. The tool execution
+context therefore cannot stand in for the user's normal CoreMIDI access. No OS
+service was restarted and no system configuration was changed.
+
+The owner then ran the three supervised MIDI 1 virtual loopbacks from Terminal:
+**three passed**. Rust, Python in-process and Python isolated each delivered 256
+CC messages through a uniquely test-owned destination. Both Python modes wrote
+and verified complete archives of their 256 events. The preserved output is
+qualification-macos-native.jsonl; target/mac-terminal-native.log is the original
+local transcript. This supersedes the earlier absence of successful native
+MIDI 1 loopback evidence, while retaining the agent-context failure as a distinct
+access limitation. Native round-trip measurements include host scheduling and
+return to the receiver, and Python also includes typed delivery/record admission.
+
+| MIDI 1 loopback | Median round trip | p95 | Maximum |
+| --- | --- | --- | --- |
+| Rust native | 24.396 microseconds | Not calculated | 85 microseconds |
+| Python in-process | 59.771 microseconds | 82.671 microseconds | 413.708 microseconds |
+| Python isolated | 91.230 microseconds | 144.156 microseconds | 2.619 milliseconds |
+
+These are short serial virtual round trips, not physical-wire latency,
+sustained-load limits or synchronization measurements. Open times vary with
+service warmup. Parent-only idle CPU samples do not measure whole isolated
+process trees; full resource profiling remains open.
+
+The fork patch b6c7dfe checks every WinMM capability-query result before reading
+its output, reports the failed index/direction/status and omits that port.
+Duplicate suffixes use only successful snapshots from the same enumeration,
+removing additional native queries and their disappearance race. The error hook
+has a nonblocking atomic reentrancy/concurrency guard; nested/concurrent error
+notifications may be suppressed while a hook is active, but failed records remain
+omitted. meedee's existing sticky native-error diagnostics can reject the whole
+enumeration rather than returning libremidi's successful subset.
+
+The original sibling checkout was clean but had two unpushed commits diverging
+from origin/master. It was preserved. The patch was committed/pushed from an
+isolated fork worktree on codex/checked-winmm-discovery, based on the exact
+previous vendor pin, and the committed sources were imported byte-for-byte.
+SOURCE.md records the new revision. ANSI/Unicode Windows-only regressions cover
+untouched outputs on failure, successful metadata, duplicate names, recovery,
+reentrant hooks and concurrent hook suppression. Neither new executable has
+been compiled or run here because no Windows toolchain/host is available. All
+three existing Mac device-free regression targets pass with address/undefined-
+behavior sanitizers against the fork. Release CI adds the two Windows targets;
+its published-release-only trigger and Python 3.11/3.15 endpoints are unchanged.
+No release or workflow was triggered.
+
+The audit also identified Apple's documented client-disposal lifetime warning:
+disposing the last client can prevent later creation by that application if the
+server exits. That is distinct from the first-call agent-context failure. It
+needs an explicit ownership/resource design, including observer callbacks,
+before implementation; no process-global client or additional retained resources
+were silently introduced. The concern remains in issues.md B1.
+
+The owner also ran the extended supervised fixtures in ordinary Terminal:
+**two passed**. Typed capture, archive verification, clock-aware replay and
+receive cancellation pass with isolation enabled and disabled. The native UMP
+fixture packetizes/reassembles SysEx7 and completes a MIDI-CI discovery/reply
+exchange between two test-owned peers. Its declarations advertise zero optional
+CI categories, and no physical device or tuning/reset/configuration command is
+used. Their output is appended to qualification-macos-native.jsonl; the local
+transcript is target/mac-terminal-extended.log. This closes the basic Mac virtual
+capture/replay/cancellation and CoreMIDI UMP SysEx7 exchange gaps. It does not
+qualify MIDI 2 channel-voice precision on physical equipment, other backends,
+Profiles/Property Exchange or recovery from driver/hardware failure.
+
+For this import, the full source suites pass 247 tests on each Python endpoint,
+and the linked Rust suite passes 113 ordinary tests with five opt-in cases
+ignored. Ruff, formatting, ty, pyupgrade, Cargo formatting and workspace Clippy
+pass (the existing local atomic-deprecation exception remains). A fresh macOS
+arm64 CPython 3.11 wheel builds from the sdist; both artifact checks pass,
+including the newly shipped access probe and WinMM discovery test source.
+Reinstalling that finished wheel and testing outside the checkout passes 246
+installed-package tests. Windows native compilation remains an explicit open
+gate; Mac sanitizer and packaging checks do not replace it.

@@ -1,6 +1,6 @@
 # Open issues and failure review
 
-Updated through file/live integration in slices 8–10, 2026-10-15. These are
+Updated through the native qualification and discovery follow-up, 2026-10-15. These are
 remaining risks, deliberate API limitations and validation gaps. Resolved midir
 binding findings are removed. The historical upstream report remains in
 [midir-suggestions.md](midir-suggestions.md); it is not an audit of libremidi.
@@ -63,17 +63,21 @@ client-level CoreMIDI disposal errors and other output backends are outside
 that guarantee. Ignored disposal errors can leave OS resources whose extent is
 not measured by the library's known retained-resource count.
 
-Windows capability-query failure paths need work: pinned WinMM observer/name
-helpers read MIDIINCAPS/MIDIOUTCAPS without checking every capability query's
-return value. Device disappearance during enumeration may leave those structures
-unwritten. Windows compilation alone would not resolve this risk.
-
 Windows native qualification remains open. Windows MIDI Services SDK/tooling
 integration is unfinished and that backend is disabled; requesting it raises a
-capability error. The selected Pi image/sysroot and cross-build remain open.
-Real CoreMIDI software I/O is also open: service access was unavailable during
-the latest tool-environment attempt. Device-free native tests exercise code
-paths and injected faults, not driver or hardware guarantees.
+capability error. The new WinMM discovery failure/recovery and error-hook tests
+still need Windows compilation and execution in ANSI and Unicode builds.
+The selected Pi image/sysroot and cross-build remain open.
+Device-free native tests and virtual loopbacks do not establish driver-fault
+recovery or physical hardware guarantees.
+
+CoreMIDI client lifetime also needs a decision. Apple documents that disposing
+the last client can stop the server when no other clients exist and prevent
+subsequent client creation by that application. libremidi's current destructors
+explicitly dispose clients. A shared or retained client changes ownership and
+resource accounting and must preserve observer notification contexts. This is
+distinct from the first-call access failure reproduced by the standalone probe.
+See [Apple's disposal contract](https://developer.apple.com/documentation/coremidi/midiclientdispose%28_%3A%29).
 
 ## R2. Resource admission is bounded only in specified places
 
@@ -239,10 +243,10 @@ negotiation/semantic qualification remains deferred pending specification access
 No clock mapping establishes physical synchronization. Timestamps can be absent,
 driver fallback time, inaccurate, discontinuous or only completion time. Packet
 spans cannot reconstruct individual-byte timing. Quarter-frame time-code event
-views lack precise first-quarter contributor timing and expose None. Native
-capture/replay validation remains open because test-client creation returned
-268435459. Fake-device/clock and file fault tests do not qualify real scheduling,
-physical instruments, OS service crashes or target Pi resource behavior.
+views lack precise first-quarter contributor timing and expose None.
+Fake-device/clock tests and short virtual loopbacks do not qualify scheduling
+under sustained load, physical instruments, OS service crashes or target Pi
+resource behavior.
 
 
 ## C1. MIDI-CI management cannot establish device health or trusted identity
@@ -260,4 +264,5 @@ ones. Product Instance IDs do not authorize automatic reconnect or restoration.
 Timeouts establish unanswered requests, not offline devices. Local collision/loss
 requires a fresh randomized MUID and explicit restart; no notes, profiles or physical
 state are restored. Previously returned actions must be retired after reset. Native
-UMP backend qualification remains open independently of codec/session tests.
+UMP qualification on Linux/Windows and physical CI interoperability remain
+open independently of codec/session tests and the CoreMIDI virtual exchange.

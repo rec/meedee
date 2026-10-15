@@ -7,8 +7,9 @@ None.
 ## Status and boundaries
 
 The owner authorized bounded synthetic workloads, temporary files and exclusively
-test-owned virtual endpoints on the available Mac. No Pi, Linux or Windows host
-is available. Measure a baseline before agreeing acceptance budgets. The selected
+test-owned virtual endpoints on the available Mac. The owner has a Pi for later
+testing; no Pi environment/access has been provided yet, nor a Linux/Windows test
+host. Measure a baseline before agreeing acceptance budgets. The selected
 board remains **Pi Zero 2 W with 64-bit Raspberry Pi OS**; the OS release/image,
 libc, Python installation, MIDI endpoint and build sysroot are still unselected.
 Do not substitute an original Pi Zero or claim board qualification from an arm64
@@ -125,9 +126,15 @@ stall; Windows uses taskkill for that child's tree. Never launch native.py or
 qualification_transport directly when backend liveness is unknown. Build the
 Rust example first: a missing executable is a reported skip, not a pass.
 
+The supervisor also runs the existing typed capture/replay/cancellation fixture
+(`typed`) and native UMP SysEx7 CI discovery/reply fixture (`ump_ci`), each in its
+own process. Select these with `-k 'typed or ump_ci'` to avoid repeating completed
+latency measurements. These extended fixtures send NoteOn/NoteOff or CI management
+messages only to their own endpoints; they never configure physical devices.
+
 Names are unique to each run, and discovery must match exactly one test-created
-virtual destination. No pre-existing destination is selected. Only CC 7 values
-are sent. Python checks captured events and the archive trailer. One outstanding
+virtual destination. No pre-existing destination is selected. The latency
+workloads send only CC 7 values. Python checks captured events and the archive trailer. One outstanding
 transaction at a time avoids interpreting queue buildup as one-way latency.
 Host perf-counter durations are independent of backend timestamp clock origins;
 there is no cross-clock subtraction or physical-wire latency claim.
@@ -136,9 +143,24 @@ WinMM does not supply virtual endpoint creation, so the portable virtual test
 cannot qualify that backend without an independently arranged loopback route.
 Do not silently choose a hardware endpoint or install a virtual driver. Agree a
 Windows endpoint and test separately when a Windows host is available. Likewise,
-ALSA raw is not qualified by sequencer loopback. Native UMP uses the separately
-opt-in existing test/native/meedee_ci_loopback.py fixture and needs outer
-supervision; MIDI 1 measurements alone do not qualify live MIDI 2.
+ALSA raw is not qualified by sequencer loopback. The `ump_ci` supervisor case uses
+test/native/meedee_ci_loopback.py; MIDI 1 measurements alone do not qualify live
+MIDI 2. A successful CoreMIDI UMP loopback does not qualify other backends or
+physical MIDI 2 equipment.
+
+If CoreMIDI client creation fails, compare with a wrapper-independent probe in
+an ordinary Terminal session:
+
+```bash
+uv run --frozen pytest -q -s test/qualification/access.py
+```
+
+It compiles a small program against the installed Apple SDK, creates/disposes
+one client and exits. It creates no endpoints and sends no MIDI. Compilation
+and execution have separate 30/10 second limits. The agent execution context
+returned 268435459 (0x10000003 / MACH_SEND_INVALID_DEST); the owner's ordinary
+Terminal succeeded in both creation and disposal. Diagnose access context before
+changing library code or restarting services.
 
 Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
 crash, unresponsive hardware or musical state after uncertain sends. Those need
@@ -160,7 +182,7 @@ release workflow without publishing a release. Include the vendored device-free
 native regression targets and sanitizer settings exactly as configured there.
 Record compiler, OS/architecture, Python endpoint versions, test totals, wheel
 from-sdist result, license/provenance content, external dynamic dependencies and
-all skips. Keep Windows SDK integration, WinMM capability-query risks and Rust
+all skips. Keep Windows SDK integration, WinMM discovery test qualification and Rust
 1.87 validation distinct from compilation with a newer compiler. See issues.md.
 
 ## Acceptance review and remaining gates
