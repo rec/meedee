@@ -699,11 +699,44 @@ and wire evidence before stateful interpretation or live writes.
    preserving the existing serialized send/progress contract. GM1 banks remain
    unspecified. GM changes explicitly fed to the control interpreter invalidate
    cached context. There is no implicit mode change, wait, request or reset send.
-   **Approved deferrals:** GM2 controller-destination routing, key-based
+   **Deferred to slice 6.5:** GM2 controller-destination routing, key-based
    instrument-control and global effect-parameter SysEx; MPE voice allocation/
    expression tracking; quarter-frame MTC assembly/clock locking and
-   high-resolution velocity-prefix interpretation. These remain follow-up scope,
+   high-resolution velocity-prefix interpretation. These are planned work,
    not implemented coverage or a claim of GM2 synthesizer conformance.
+
+**6.5. Remaining MIDI 1.0 profile codecs and interpretation engines.** Complete
+the features deferred from slice 6 before moving to UMP and file formats. Keep
+the core pure Rust with matching immutable Python values and caller-driven
+state machines. Reuse the existing focused modules, explicit SysEx decoding and
+compound-command sending where their semantics fit. This slice opens no ports
+and starts no background scheduling; live integration remains in slice 10.
+
+- Add GM2 controller-destination routing, key-based instrument-control and
+  global effect-parameter SysEx values/codecs. Review their normative layouts,
+  bound variable-length inputs and define unknown/unsupported-content behavior
+  before implementation. Test independent wire vectors and malformed lengths.
+- Add MPE voice allocation and expression tracking on top of zone configuration.
+  Decide voice identity, member-channel reuse, overlapping notes, sustain,
+  release/stealing and expression lifetimes before implementation. Keep source
+  state bounded and make reset, loss and zone reconfiguration explicit.
+- Add quarter-frame MTC assembly and clock-lock tracking. Define forward/reverse
+  sequences, discontinuities, rate changes, full-frame relocation, drop-frame
+  rules, lock acquisition/loss and caller-supplied time/deadlines before coding.
+  No inferred clock may claim native synchronization or physical timing accuracy.
+- Add high-resolution velocity-prefix interpretation, distinct from fine CC
+  pairing and MIDI 2.0 velocity. Acquire the relevant addendum and decide prefix
+  lifetime, note association, source/channel isolation and missing-prefix/loss
+  behavior from the standard before implementation. Preserve original messages.
+
+Gate: approve the remaining API/state policies with the owner before coding;
+pass shared Rust/Python wire fixtures, immutable-value checks, bounded-state and
+malformed/reordered/lost-input tests, plus deterministic fake-clock tests. File
+slices must explicitly account for these families and report unsupported export
+semantics. Passing this slice does not establish full GM2 synthesizer conformance
+or qualify instrument behavior. Slice 10 integrates the engines with live typed
+events and timing; slice 12 qualifies their selected platform/resource workloads.
+
 7. **UMP and MIDI 2.0 core.** Implement packet/value families and explicit
    translation. Gate: shared codec fixtures, preserved wide values, SysEx7/8
    segmentation, capability checks, and explicit live-qualification status.
