@@ -79,8 +79,11 @@ protocol/mode combination. The failing endpoint, cycle and OS status were not
 recorded in the original run. A subsequent instrumented standalone run delivered
 and closed the first MIDI 1 isolated cycle, then failed at discovery in cycle 2
 after creating its new virtual input. The other five cases are not required to
-trigger it. The failing endpoint and OS status remain unknown; the fork now
-reports both the object handle and OS status for the next native run.
+trigger it. The next run reported object `158564417`, OSStatus `-50` (`paramErr`)
+at the same stage. That code does not identify whether the endpoint was stale,
+which lifecycle operation invalidated it, or why discovery returned it. A direct
+SDK endpoint-replacement probe is prepared to separate wrapper behavior from
+CoreMIDI client creation order and run-loop servicing; native results are pending.
 Full-width MIDI 2 CC delivery in that fixture also remains unverified.
 See `qualification-macos-final.jsonl` and
 `validation.md` for the successful cases and the preserved failure.

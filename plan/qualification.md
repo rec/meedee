@@ -169,6 +169,30 @@ returned 268435459 (0x10000003 / MACH_SEND_INVALID_DEST); the owner's ordinary
 Terminal succeeded in both creation and disposal. Diagnose access context before
 changing library code or restarting services.
 
+For the repeated-reopen discovery failure, use the separate direct SDK probe:
+
+```bash
+uv run --frozen pytest -q -s test/qualification/reopen.py
+```
+
+This compiles a standalone C++ executable and runs three independent cases.
+Each uses a producer process and a consumer process, with three create/dispose
+cycles of test-owned virtual MIDI 1 destinations. No MIDI is sent and no hardware
+connections are opened. The producer maintains a keeper and replaces its ordinary
+client and endpoint each cycle. The consumer logs enumerated handles, unique-ID
+query statuses and matches to the producer's reported ID. Names of existing
+hardware endpoints are not logged.
+
+`late` creates the consumer keeper after its first enumeration, matching the
+wrapper's lazy output creation. `early` creates it before the first enumeration.
+`serviced` uses late creation but gives the consumer run loop 50 milliseconds
+before each enumeration, instead of the existing zero-duration call. This is a
+diagnostic comparison, not a production sleep or proposed retry policy. Every
+failed property read or missing/duplicate test-owned ID fails the case; all three
+cycles still produce diagnostic output. Compilation has a 30-second limit and
+each case has a 10-second outer deadline with process-group cleanup on timeout.
+Keep these results separate from the meedee transport qualification.
+
 Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
 crash, unresponsive hardware or musical state after uncertain sends. Those need
 named equipment, explicit authorization and a test-specific recovery procedure.

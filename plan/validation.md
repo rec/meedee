@@ -1419,3 +1419,30 @@ reopen qualification remains open.
 The rebuilt editable Python package passes all 252 ordinary tests in 25.17
 seconds. The preserved JSON records parse, the imported files match the fork,
 and `git diff --check` passes. No Python source or dependency versions changed.
+
+### Native status and wrapper-independent reproduction
+
+The owner reran the diagnostic build. The failure again followed successful
+delivery/close in the first isolated MIDI 1 cycle, during discovery in cycle 2.
+The exact diagnostic was `object=158564417, OSStatus=-50`. The result was **one
+failed, nine deselected in 1.27 seconds**; both raw JSON records are preserved in
+`qualification-macos-reopen-status.jsonl`. The installed Apple SDK defines
+`paramErr = -50` in CarbonCore's `MacErrors.h`. This is not proof of a particular
+lifetime or run-loop failure.
+
+`test/native/coremidi_reopen.cpp` and `test/qualification/reopen.py` now provide
+a direct SDK comparison, independent of Rust, libremidi and Python transport.
+Three fresh producer/consumer process pairs compare lazy client creation, early
+client creation and positive-duration run-loop servicing. Each replaces only
+its own virtual endpoints and ordinary clients while retaining private keepers.
+No MIDI is sent. Handles and checked unique-ID query results are logged for all
+three replacement cycles, including failures, without logging hardware names.
+The harness bounds each pair and kills its process group on timeout. The native
+probe compiles with `-Wall -Wextra -Werror`; runtime evidence remains pending in
+ordinary Terminal. No production behavior was changed in this follow-up.
+
+The producer is launched through `posix_spawn` into a fresh executable image,
+avoiding a forked copy of initialized Apple runtime state. The ordinary suite
+passes all 252 tests in 25.18 seconds. Ruff checking/formatting, ty and pyupgrade
+pass for the new Python harness. The preserved JSON parses and
+`git diff --check` passes. No dependencies or CI triggers changed.
