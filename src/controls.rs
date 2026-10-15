@@ -114,8 +114,125 @@ fn to_python(py: Python<'_>, observations: Vec<controls::Observation>) -> PyResu
 }
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    register_helpers(module)?;
     register_enums(module)?;
     register_observations(module)?;
     module.add_class::<Interpreter>()?;
     Ok(())
+}
+
+macro_rules! controllers {
+    ($($name:ident),*) => {
+        #[pyclass(eq,frozen,from_py_object,module="meedee.controls")]
+        #[derive(Clone,Copy,PartialEq,Eq)]
+        enum Controller {$($name),*}
+        #[pymethods]
+        impl Controller {
+            #[getter]
+            fn number(&self)->u8 {match self {$(Self::$name=>controls::Controller::$name.number()),*}}
+            #[pyo3(signature=(*,channel,value))]
+            fn message(&self,py:Python<'_>,channel:&Bound<'_,PyAny>,value:&Bound<'_,PyAny>)->PyResult<Py<PyAny>> {
+                let value=meedee::messages::ControlChange::new(crate::messages::integer(channel,"channel")?,self.number().into(),crate::messages::integer(value,"value")?).map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+                crate::messages::to_python(py,meedee::messages::AnyMessage::ControlChange(value))
+            }
+        }
+    };
+}
+controllers!(
+    BankSelectMsb,
+    Modulation,
+    Breath,
+    Foot,
+    PortamentoTime,
+    DataEntryMsb,
+    ChannelVolume,
+    Balance,
+    Pan,
+    Expression,
+    EffectControl1,
+    EffectControl2,
+    BankSelectLsb,
+    DataEntryLsb,
+    Hold1,
+    Portamento,
+    Sostenuto,
+    SoftPedal,
+    LegatoFootswitch,
+    Hold2,
+    SoundVariation,
+    FilterResonance,
+    ReleaseTime,
+    AttackTime,
+    Brightness,
+    DecayTime,
+    VibratoRate,
+    VibratoDepth,
+    VibratoDelay,
+    PortamentoControl,
+    ReverbSend,
+    ChorusSend,
+    DataIncrement,
+    DataDecrement,
+    NrpnLsb,
+    NrpnMsb,
+    RpnLsb,
+    RpnMsb,
+    AllSoundOff,
+    ResetAllControllers,
+    LocalControl,
+    AllNotesOff,
+    OmniOff,
+    OmniOn,
+    MonoMode,
+    PolyMode
+);
+
+macro_rules! helpers {
+    (rpn: {$($rpn:ident($($field:ident),*));*}; cc: {$($cc:ident($($arg:ident),*));*})=>{
+        $(#[pyfunction]
+        #[pyo3(signature=(*,$($field),*))]
+        fn $rpn(py:Python<'_>,$($field:&Bound<'_,PyAny>),*)->PyResult<Py<PyAny>> {
+            let value=controls::$rpn($(crate::messages::integer($field,stringify!($field))?),*)
+                .map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+            crate::messages::rpn_to_python(py,value)
+        })*
+        $(#[pyfunction]
+        #[pyo3(signature=(*,$($arg),*))]
+        fn $cc(py:Python<'_>,$($arg:&Bound<'_,PyAny>),*)->PyResult<Py<PyAny>> {
+            let value=controls::$cc($(crate::messages::integer($arg,stringify!($arg))?),*)
+                .map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+            crate::messages::to_python(py,meedee::messages::AnyMessage::ControlChange(value))
+        })*
+        fn register_helpers(module:&Bound<'_,PyModule>)->PyResult<()> {
+            $(module.add_function(wrap_pyfunction!($rpn,module)?)?;)*
+            $(module.add_function(wrap_pyfunction!($cc,module)?)?;)*
+            module.add_class::<Controller>()?;
+            module.add_function(wrap_pyfunction!(local_control,module)?)?;
+            Ok(())
+        }
+    };
+}
+helpers! {
+    rpn: {pitch_bend_sensitivity(channel,semitones,cents);channel_fine_tuning(channel,value);
+    channel_coarse_tuning(channel,semitones);tuning_program(channel,program);tuning_bank(channel,bank);modulation_depth_range(channel,value)};
+    cc: {all_sound_off(channel);reset_all_controllers(channel);all_notes_off(channel);omni_off(channel);omni_on(channel);mono_mode(channel,channels);poly_mode(channel)}
+}
+#[pyfunction]
+#[pyo3(signature=(*,channel,enabled))]
+fn local_control(
+    py: Python<'_>,
+    channel: &Bound<'_, PyAny>,
+    enabled: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyAny>> {
+    if !enabled.is_exact_instance_of::<pyo3::types::PyBool>() {
+        return Err(pyo3::exceptions::PyTypeError::new_err(
+            "enabled must be a bool",
+        ));
+    }
+    let value = controls::local_control(
+        crate::messages::integer(channel, "channel")?,
+        enabled.extract()?,
+    )
+    .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+    crate::messages::to_python(py, meedee::messages::AnyMessage::ControlChange(value))
 }

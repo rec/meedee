@@ -116,7 +116,17 @@ class Worker:
                 raise BusyError("MIDI connection is closed")
             if operation == "send_command":
                 name, fields, _ = cast(tuple[str, dict[str, int], int], args[0])
-                self.connection.send_command(getattr(messages, name)(**fields))
+                if name == "BankProgramSelect":
+                    from .gm import BankProgramSelect
+
+                    command = BankProgramSelect(**fields)
+                elif name == "ZoneConfiguration":
+                    from .mpe import ZoneConfiguration
+
+                    command = ZoneConfiguration(**fields)
+                else:
+                    command = getattr(messages, name)(**fields)
+                self.connection.send_command(command)
                 return None
             data = args[0]
             self.connection.send(

@@ -3,15 +3,17 @@
 A Rust MIDI toolkit with matching Python bindings, using vendored
 [libremidi](https://github.com/celtera/libremidi) for native transport. Python
 imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
-`meedee.controls` and `meedee.tuning`; the package root is empty. There are no
-Python runtime dependencies.
+`meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`
+and `meedee.timecode`; the package root is empty. There are no Python runtime
+dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented. Immutable MIDI 1.0 messages and a bounded incremental byte
 codec, fine controls, RPN/NRPN commands and MIDI Tuning Standard values/codecs
-are available. MIDI 2.0 values and file support are later slices in
-[the plan](plan/meedee.md). Encode primitive
-messages for raw transport; use `send_command` for compound CC commands.
+are available, along with GM sound maps and selected profile codecs/helpers.
+MIDI 2.0 values and file support are later slices in [the plan](plan/meedee.md).
+Encode primitive messages for raw transport; use `send_command` for compound
+control, bank/program and MPE configuration commands.
 
 ## Messages and byte codecs
 
@@ -83,6 +85,57 @@ opening ports or sending requests. MTS has no transaction ID, so identical late
 or unsolicited dumps cannot be distinguished. A successful send does not prove
 an instrument accepted or applied the tuning. See [the API contract](plan/api.md)
 for units, names, checksum behavior and request tracking.
+
+## General MIDI and profile helpers
+
+```python
+from meedee import codecs, controls, gm, mpe
+
+matches = gm.find_programs("acoustic grand piano")  # All GM1/GM2 matches.
+entry = gm.gm2_program(bank_lsb=4, program=6)
+assert entry is not None and entry.name == "EP Phase"
+selection = gm.BankProgramSelect(
+    channel=1, bank_msb=entry.bank_msb, bank_lsb=entry.bank_lsb, program=entry.program,
+)
+packets = [codecs.encode(p) for p in codecs.expand(selection)]
+volume = controls.Controller.ChannelVolume.message(channel=1, value=100)
+zone = mpe.ZoneConfiguration(manager_channel=1, members=7)
+# An open MIDI 1.0 output can explicitly send selection or zone with send_command().
+```
+
+Rust owns the GM1 instrument/family and percussion maps, all 256 GM2 melodic
+entries and nine drum-kit note maps. Python returns frozen entries or list
+copies. Program numbers are 1–128, notes and bank bytes retain their wire
+numbers, and GM1 percussion uses channel 10. GM1 defines no banks: its entries
+expose program/name/family only. GM2 entries provide their standardized banks.
+Unknown map addresses return None; the library does not emulate a device's
+fallback sounds. Name lookup ignores case and surrounding whitespace, preserves
+the published names and returns all matches without nickname/fuzzy aliases.
+
+BankProgramSelect sends both bank halves before ProgramChange, with the same
+serialization and partial-progress rules as other commands. It never changes
+mode automatically. Gm1On/Gm2On/GmOff are explicit SysEx values; GM2 On resets
+musical state and requires settling time (the standard specifies up to 100 ms).
+The library inserts no sleeps. GM1 initialization varies by device. GM2 bank
+selection can change a channel's melodic/rhythm role, including channel 10.
+
+`meedee.universal` provides identity request/reply, master volume and signed
+master fine/coarse tuning. `meedee.timecode` provides full-frame MTC values with
+an explicit rate code and broadcast device ID 127, without assembling quarter
+frames or converting time lines. Their `decode(SysEx)` functions interpret
+complete messages explicitly; the byte decoder continues to return raw SysEx.
+MPE support configures one zone at a time; it does not allocate voices, configure
+bend ranges or infer expressive per-note state. Named RPN helpers keep pitch-bend
+cents, fine-tuning units and GM2 modulation-depth units distinct. Channel-mode
+helpers construct ordinary CC values. All Notes Off can leave sustained sound;
+it has a different purpose from All Sound Off.
+
+Feed a relevant typed GM mode message to the control interpreter, or reset it
+explicitly, to invalidate cached context. Constructing/sending a value has no
+automatic connection to that pure interpreter. Full GM2 controller-destination,
+key-based instrument-control and global effect-parameter SysEx remain deferred.
+These codecs and maps do not imply a synthesizer, complete GM2 message coverage,
+device support or live qualification. See [the API contract](plan/api.md).
 
 ## Fine controls and parameters
 

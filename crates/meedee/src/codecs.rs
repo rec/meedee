@@ -11,8 +11,8 @@ pub fn encode(message: &(impl PrimitiveMessage + ?Sized)) -> Vec<u8> {
     message.encode()
 }
 
-/// Expand a semantic command into ordered primitive CC messages. No I/O occurs.
-pub fn expand(command: &(impl Command + ?Sized)) -> Vec<ControlChange> {
+/// Expand a semantic command into ordered primitive MIDI 1.0 messages. No I/O occurs.
+pub fn expand(command: &(impl Command + ?Sized)) -> Vec<AnyMessage> {
     command.expand()
 }
 
@@ -273,12 +273,7 @@ fn cc(channel: u8, controller: u8, value: u8) -> ControlChange {
         .expect("expanded fields have validated wire ranges")
 }
 
-fn parameter_command(
-    channel: u8,
-    parameter: u16,
-    msb: u8,
-    data: &[(u8, u8)],
-) -> Vec<ControlChange> {
+fn parameter_command(channel: u8, parameter: u16, msb: u8, data: &[(u8, u8)]) -> Vec<AnyMessage> {
     let mut messages = vec![
         cc(channel, msb, (parameter >> 7) as u8),
         cc(channel, msb - 1, (parameter & 127) as u8),
@@ -289,10 +284,13 @@ fn parameter_command(
     );
     messages.extend([cc(channel, 101, 127), cc(channel, 100, 127)]);
     messages
+        .into_iter()
+        .map(AnyMessage::ControlChange)
+        .collect()
 }
 
 impl Command for ControlChange14 {
-    fn expand(&self) -> Vec<ControlChange> {
+    fn expand(&self) -> Vec<AnyMessage> {
         vec![
             cc(self.channel(), self.controller(), (self.value() >> 7) as u8),
             cc(
@@ -301,13 +299,16 @@ impl Command for ControlChange14 {
                 (self.value() & 127) as u8,
             ),
         ]
+        .into_iter()
+        .map(AnyMessage::ControlChange)
+        .collect()
     }
 }
 
 macro_rules! parameter_commands {
     (sets: $($set:ident => $selector:literal),*; steps: $($step:ident => ($family:literal, $controller:literal)),* $(;)?) => {
         $(impl Command for $set {
-            fn expand(&self) -> Vec<ControlChange> {
+            fn expand(&self) -> Vec<AnyMessage> {
                 let data = if self.resolution() == 7 {
                     vec![(6, self.value() as u8)]
                 } else {
@@ -317,14 +318,16 @@ macro_rules! parameter_commands {
             }
         })*
         $(impl Command for $step {
-            fn expand(&self) -> Vec<ControlChange> {
+            fn expand(&self) -> Vec<AnyMessage> {
                 parameter_command(self.channel(), self.parameter(), $family, &[($controller, 0)])
             }
         })*
         impl Command for AnyCommand {
-            fn expand(&self) -> Vec<ControlChange> {
+            fn expand(&self) -> Vec<AnyMessage> {
                 match self {
                     Self::ControlChange14(command) => command.expand(),
+                    Self::BankProgramSelect(command) => command.expand(),
+                    Self::ZoneConfiguration(command) => command.expand(),
                     $(Self::$set(command) => command.expand(),)*
                     $(Self::$step(command) => command.expand(),)*
                 }

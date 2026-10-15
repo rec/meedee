@@ -691,6 +691,19 @@ and wire evidence before stateful interpretation or live writes.
 6. **General MIDI and other MIDI 1.0 profiles.** Add GM1/GM2 maps/mode messages,
    bank/program helpers, and selected universal/MPE/time-code features. Gate:
    one Rust table source, exact numbering, explicit mode effects, no auto-reset.
+   **Implemented selected scope 2026-10-15.** Rust owns GM1/GM2 melodic and
+   percussion maps. Frozen Python entries share those tables. Mode messages,
+   explicit bank/program commands, named CC/channel-mode/RPN helpers, identity
+   and master controls, MPE zone configuration and full-frame MTC are available
+   through pure focused modules. Compound expansion now yields AnyMessage,
+   preserving the existing serialized send/progress contract. GM1 banks remain
+   unspecified. GM changes explicitly fed to the control interpreter invalidate
+   cached context. There is no implicit mode change, wait, request or reset send.
+   **Approved deferrals:** GM2 controller-destination routing, key-based
+   instrument-control and global effect-parameter SysEx; MPE voice allocation/
+   expression tracking; quarter-frame MTC assembly/clock locking and
+   high-resolution velocity-prefix interpretation. These remain follow-up scope,
+   not implemented coverage or a claim of GM2 synthesizer conformance.
 7. **UMP and MIDI 2.0 core.** Implement packet/value families and explicit
    translation. Gate: shared codec fixtures, preserved wide values, SysEx7/8
    segmentation, capability checks, and explicit live-qualification status.

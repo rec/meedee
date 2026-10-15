@@ -188,9 +188,15 @@ class OutputConnection:
         if self.mode.startswith("partial_command_"):
             accepted = int(self.mode.rpartition("_")[2])
             raise midi.CompoundSendError("device disconnected", accepted, len(packets))
-        if self.mode == "check_command":
+        if self.mode in ("check_command", "check_bank", "check_mpe"):
             expected = bytes.fromhex(
-                "b0 63 09 b0 62 52 b0 06 4e b0 26 10 b0 65 7f b0 64 7f"
+                {
+                    "check_command": (
+                        "b0 63 09 b0 62 52 b0 06 4e b0 26 10 b0 65 7f b0 64 7f"
+                    ),
+                    "check_bank": "bf 00 79 bf 20 03 cf 7f",
+                    "check_mpe": "bf 65 00 bf 64 06 bf 06 0f bf 65 7f bf 64 7f",
+                }[self.mode]
             )
             if b"".join(packets) != expected:
                 raise midi.CompoundSendError(

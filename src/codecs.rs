@@ -124,9 +124,7 @@ fn encode<'py>(py: Python<'py>, message: &Bound<'py, PyAny>) -> PyResult<Bound<'
 fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
     codecs::expand(&messages::extract_command(command)?)
         .into_iter()
-        .map(|message| {
-            messages::to_python(py, meedee::messages::AnyMessage::ControlChange(message))
-        })
+        .map(|message| messages::to_python(py, message))
         .collect()
 }
 

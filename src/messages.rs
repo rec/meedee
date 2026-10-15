@@ -264,6 +264,7 @@ macro_rules! short_messages {
             $(if let Ok(message) = message.extract::<PyRef<'_, $name>>() {
                 return Ok(message.value.encode());
             })*
+            if let Some(bytes) = crate::profiles::encode_message(message) { return Ok(bytes); }
             crate::tuning::encode_message(message)
         }
 
@@ -283,9 +284,12 @@ macro_rules! short_messages {
             if let Ok(message) = message.extract::<PyRef<'_, ControlChange>>() {
                 return Ok(InputMessage::ControlChange(message.value.clone()));
             }
-            if message.is_instance_of::<SystemReset>() { return Ok(InputMessage::SystemReset); }
+            if message.is_instance_of::<SystemReset>() || crate::profiles::changes_mode(message) {
+                return Ok(InputMessage::SystemReset);
+            }
             if message.is_instance_of::<NoteOn>() || message.is_instance_of::<SysEx>()
                 || crate::tuning::is_message(message)
+                || crate::profiles::is_message(message)
                 $(|| message.is_instance_of::<$name>())* {
                 return Ok(InputMessage::Other);
             }
@@ -325,12 +329,14 @@ macro_rules! command_messages {
             $(if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
                 return Ok(messages::AnyCommand::$name(command.value.clone()));
             })*
-            Err(PyTypeError::new_err("command must be a supported fine-CC or RPN/NRPN command"))
+            crate::profiles::extract_command(command)
+                .ok_or_else(|| PyTypeError::new_err("command must be a supported compound command"))
         }
         pub fn command_wire(command: &messages::AnyCommand) -> (String, std::collections::HashMap<String, i64>) {
             match command {
                 $(messages::AnyCommand::$name(value) => (stringify!($name).into(),
                     [$( (stringify!($field).into(), i64::from(value.$field())) ),*].into_iter().collect()),)*
+                _ => crate::profiles::command_wire(command),
             }
         }
     };
@@ -344,6 +350,14 @@ command_messages! {
     RpnDecrement (*, channel, parameter) { channel, parameter };
     NrpnIncrement (*, channel, parameter) { channel, parameter };
     NrpnDecrement (*, channel, parameter) { channel, parameter };
+}
+
+pub(crate) fn rpn_to_python(py: Python<'_>, value: messages::RpnSet) -> PyResult<Py<PyAny>> {
+    Ok(Py::new(
+        py,
+        PyClassInitializer::from(Message).add_subclass(RpnSet { value }),
+    )?
+    .into_any())
 }
 
 pub fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {

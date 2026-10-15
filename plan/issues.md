@@ -1,6 +1,6 @@
 # Open issues and failure review
 
-Updated through MTS slice 5, 2026-10-15. These are
+Updated through profile helpers in slice 6, 2026-10-15. These are
 remaining risks, deliberate API limitations and validation gaps. Resolved midir
 binding findings are removed. The historical upstream report remains in
 [midir-suggestions.md](midir-suggestions.md); it is not an audit of libremidi.
@@ -177,3 +177,15 @@ Dropping a virtual endpoint can disrupt peers connected to that endpoint.
 Cleanup does not restore musical state or promise delivery of pending output.
 Native driver failures and client-level disposal errors prevent a guarantee of
 zero effects on unrelated applications using the same OS MIDI service.
+
+Profile helpers do not establish instrument capabilities. GM1 entries deliberately
+have no bank numbers; GM2 table addresses can be unsupported by a particular
+instrument. Bank/program commands can leave a changed bank without a completed
+ProgramChange after partial failure. GM mode messages can mute/reset an instrument;
+callers choose targets and settling delays. Only explicitly supplied typed GM
+mode messages invalidate control-interpreter context, not arbitrary raw SysEx.
+MPE configuration does not allocate voices or prevent competing zone changes.
+Full-frame time code represents a position, not a running or synchronized clock.
+GM2 controller-destination, key-based instrument-control and global effect-parameter
+SysEx, MPE expression tracking, quarter-frame assembly and high-resolution velocity
+interpretation remain outside the implemented scope.

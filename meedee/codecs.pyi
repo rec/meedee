@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from . import messages
+from . import gm, messages, mpe
 from .messages import Message
 
 def encode(message: Message) -> bytes: ...
@@ -13,8 +13,10 @@ def expand(
     | messages.RpnIncrement
     | messages.RpnDecrement
     | messages.NrpnIncrement
-    | messages.NrpnDecrement,
-) -> list[messages.ControlChange]: ...
+    | messages.NrpnDecrement
+    | gm.BankProgramSelect
+    | mpe.ZoneConfiguration,
+) -> list[Message]: ...
 
 class Decoder:
     def __init__(self, *, sysex_limit: int = 1048576) -> None: ...

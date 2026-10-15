@@ -206,7 +206,7 @@ units. Increment/decrement has no amount field or guessed absolute value.
 Rust `Message` is now the common marker trait. The existing encoding method
 moves to `PrimitiveMessage: Message`; method-style encoding callers import that
 subtrait. Free `codecs::encode` retains its behavior. `Command: Message` exposes
-expansion and `AnyCommand` stores the seven command families inline, separate
+expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
 `OutputConnection.send_command(command)` accepts these commands on MIDI 1.0
@@ -437,3 +437,132 @@ retuning succeeded. Physical tuning and device support are not established by
 these pure-codec tests. RPN fine/coarse tuning, MIDI 2.0 pitch and MPE remain
 separate mechanisms; existing RpnSet can explicitly select MTS tuning programs
 and banks without adding an automatic selection operation here.
+
+### Slice 6 GM and selected profiles, approved 2026-10-15
+
+Pure public modules are `meedee.gm`, `meedee.universal`, `meedee.mpe` and
+`meedee.timecode`; named controllers and RPN/channel-mode helpers remain in
+`meedee.controls`. Imports initialize no MIDI workers. Native message/command
+classes inherit Message and retain frozen fields, strict keyword constructors,
+checked replacement, equality/hash, annotations and pattern matching. Lookup
+entries are frozen, non-constructible records; list results are caller-owned
+copies. There are no package-root re-exports or compatibility aliases.
+
+GM lookup has a single Rust table source. `program(program=...)` and `programs()`
+return the 128 GM1 Program entries (program/name/family). GM1 defines no bank
+address, so these entries expose no bank fields. `gm2_program(bank_lsb=...,
+program=...)` and `gm2_programs()` return BankProgram entries for the 256
+standard melodic sounds, with bank_msb=121 and their specified LSB. Programs
+are 1–128 and bank bytes are 0–127; no general shift is applied to other IDs.
+Families use the GM1 instrument-group labels. Invalid numeric ranges raise
+ValueError; structurally valid but undefined GM2 addresses return None.
+
+`find_programs(name)` searches GM1 and GM2 and returns every matching entry, GM1
+first then GM2 table order. Matching trims surrounding whitespace and ignores
+ASCII case; standard display names are preserved. It does not normalize internal
+spacing or add nickname/fuzzy aliases. `drum_kits()` and `find_drum_kits(name)`
+expose the nine GM2 kits in bank 120/0, with one-based program numbers.
+`percussion(note=...)` returns GM1 note/name entries at 35–81;
+`gm2_percussion(program=..., note=...)` returns the specified kit's entry or None
+for a silent/undefined position or unknown kit. GM2 standard-set inheritance is
+resolved from the Rust table; None does not emulate a sound generator's fallback.
+Pan positions/exclusion-group synthesis rules are not implemented by these name
+lookups. `GM1_DRUM_CHANNEL=10` is a convention, not a restriction on GM2 channels;
+GM2 permits melodic channel 10 and rhythm channel 11, and optionally others.
+
+`BankProgramSelect(channel, bank_msb, bank_lsb, program)` is a semantic command
+in meedee.gm. Both bank values are mandatory, either explicitly chosen by the
+caller or copied from a GM2 entry. It expands into CC0, CC32, ProgramChange in
+that order. It never chooses a GM mode or inherits an unobserved bank. GM1
+callers can send the existing ProgramChange primitive or deliberately specify
+both bank bytes; the library supplies no invented GM1 bank. Mode controls are
+separate Gm1On/GmOff/Gm2On primitive SysEx classes with explicit device_id.
+Mode changes can mute notes and reset programs/controllers/tuning. GM2 specifies
+completion within 100 ms after Gm2On; `GM2_ON_SETTLING_NS=100_000_000` records
+that standard interval, not a runtime device-health guarantee. GM1's developer
+guidelines discuss varying initialization times rather than a universal safe
+constant. Callers schedule settling themselves; no codec/command inserts sleeps
+or sends a mode/reset message on import/open/close.
+
+The approved Rust change makes `Command.expand()` and `codecs::expand()` return
+Vec<AnyMessage>, replacing the CC-only vector throughout. Python expand returns
+a fresh list of primitive Messages; existing CC commands produce the same CC
+objects and bytes. AnyCommand additionally carries BankProgramSelect and
+mpe::ZoneConfiguration. `send_command` accepts both types through the same
+in-process owner-thread operation or isolated worker protocol. Serialization,
+known completed-prefix/unknown-progress reporting and no retries are unchanged;
+there is no extra command-sending path. Raw send and primitive encode remain
+separate. A command may partially select a bank or partially configure a zone
+before failing. Other applications can interleave on the device, and backend
+acceptance is not physical acknowledgment. UMP outputs reject these commands
+without implicit translation.
+
+`controls.Controller` names common standardized CC identifiers and exposes
+`.number` plus `.message(channel=..., value=...)` returning an ordinary frozen
+ControlChange. Raw values remain seven-bit; enum objects are not coerced into
+integer fields. `all_sound_off`, `reset_all_controllers`, `all_notes_off`,
+`local_control(enabled=bool)`, `omni_off`, `omni_on`, `mono_mode(channels=...)`
+and `poly_mode` construct canonical channel-mode CC values. Mono channels are
+0–16, where zero requests the receiver's voice count; GM2's supported mono mode
+specifically uses one. These helpers do not emulate a synthesizer's controller
+response. All Notes Off differs from immediate All Sound Off and can leave
+sustained/releasing sound.
+
+Named RPN factories return the existing RpnSet, using fresh selectors and the
+existing RPN-null release. `pitch_bend_sensitivity(channel, semitones, cents)`
+keeps both seven-bit fields exactly, without carry/normalization;
+`channel_fine_tuning(channel, value)` is signed -8192–8191 in 100/8192-cent units;
+`channel_coarse_tuning(channel, semitones)` is -64–63. `tuning_program` and
+`tuning_bank` retain 0–127 identifiers. `modulation_depth_range(channel, value)`
+keeps 0–16383 raw bits: in GM2 these are 1/128-semitone units, so its LSB is not
+the cents byte of pitch-bend sensitivity. CA-026 alone assigns no universal
+physical unit/default outside a specified profile. Devices may ignore bend
+sensitivity cents and have smaller supported physical ranges. No helper claims
+that constructing or sending a value establishes a receiver's response.
+
+Universal primitives are IdentityRequest(device_id), IdentityReply(device_id,
+manufacturer, family, model, revision), MasterVolume(device_id, value),
+MasterFineTuning(device_id, value), MasterCoarseTuning(device_id, semitones).
+All require explicit device IDs 0–127, with 127 deliberately broadcast.
+Identity manufacturer bytes have one nonzero byte or three bytes starting with
+zero; revision is exactly four seven-bit bytes in device-specific order.
+Family/model are unsigned 14-bit values, serialized LSB first. Lists/tuples are
+bounded and copied; getters return immutable tuples. Manufacturer registration
+and revision meaning are not guessed. Master volume is 0–16383, master fine
+is signed -8192–8191 in 100/8192-cent units, and coarse is -64–63 semitones.
+Coarse's unused LSB must be zero; malformed input is rejected rather than
+silently normalized. No request/reply wait or capability discovery is started.
+
+`mpe.ZoneConfiguration(manager_channel, members)` accepts manager 1 or 16 and
+0–15 members. It expands into a seven-bit RPN6 set plus the standard RPN-null
+release. Zero disables that zone only; it does not necessarily leave MPE mode.
+There is no automatic second-zone command, bend-range setup, voice allocation
+or expression tracking. The receiver applies MPE's last-configuration-wins
+rule to overlapping zones; the library maintains no shared zone registry.
+
+`timecode.FrameRate` preserves the four MTC rate codes Fps24, Fps25,
+DropFrame30 and Fps30. FullFrame(device_id, rate, hours, minutes, seconds, frames)
+requires explicit broadcast device_id=127 per the full-message specification;
+hours are 0–23, minutes/seconds 0–59, frames 0–23/24/29 according to rate.
+The drop-frame code is preserved as a wire label, without a frame-count/time-line
+conversion or a claim that skipped SMPTE labels are validated. There is no
+quarter-frame assembly, two-frame latency correction, phase inference or
+clock locking. Full-frame input does not imply that time is running.
+
+`gm.decode`, `universal.decode` and `timecode.decode` explicitly interpret a
+complete SysEx, returning their typed primitive or None for unrelated/unsupported
+forms. Known malformed lengths/fields raise ValueError. The byte decoder keeps
+raw SysEx and does not promote it. Callers retain raw bytes for unknown messages
+or byte-for-byte evidence. Typed GM mode messages explicitly fed to the control
+interpreter clear all cached channels with StateReset diagnostics, including
+GmOff as a conservative context boundary; raw SysEx is ignored. Rust accepts
+ModeMessage or the individual mode types as interpreter input. A caller selects
+which addressed mode changes are relevant to that source, or calls reset after
+known mode changes/loss; sending a value does not implicitly feed an interpreter.
+
+Approved deferrals are GM2 controller-destination routing, key-based instrument
+controls and global effect-parameter SysEx; MPE voice allocation/expression
+tracking; quarter-frame MTC assembly/clock locking and high-resolution velocity
+prefix interpretation. Generic raw messages remain available for these forms.
+This selected coverage does not claim full GM2 message support, synthesis,
+manufacturer extensions, device conformance or physical/native qualification.

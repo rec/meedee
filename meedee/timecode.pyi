@@ -1,0 +1,49 @@
+"""Pure timecode values backed by the shared Rust toolkit."""
+
+from enum import Enum
+
+from . import messages
+
+class FrameRate(Enum):
+    Fps24 = ...
+    Fps25 = ...
+    DropFrame30 = ...
+    Fps30 = ...
+
+class FullFrame(messages.Message):
+    def __init__(
+        self,
+        *,
+        device_id: int,
+        rate: FrameRate,
+        hours: int,
+        minutes: int,
+        seconds: int,
+        frames: int,
+    ) -> None: ...
+    @property
+    def device_id(self) -> int: ...
+    @property
+    def rate(self) -> FrameRate: ...
+    @property
+    def hours(self) -> int: ...
+    @property
+    def minutes(self) -> int: ...
+    @property
+    def seconds(self) -> int: ...
+    @property
+    def frames(self) -> int: ...
+    def replace(
+        self,
+        *,
+        device_id: int = ...,
+        rate: FrameRate = ...,
+        hours: int = ...,
+        minutes: int = ...,
+        seconds: int = ...,
+        frames: int = ...,
+    ) -> FullFrame: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
+
+def decode(message: messages.SysEx) -> FullFrame | None: ...

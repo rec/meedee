@@ -35,15 +35,7 @@ scoped and do not copy full copyrighted tables or specification text into code.
 
 ## Documents required before dependent slices
 
-- General MIDI 1: acquire RP-003, the 1996 specification identified on the
-  [GM1 page](https://midi.org/general-midi-level-1), before committing sound maps.
-- General MIDI 2: acquire the 1.2a document identified on the
-  [GM2 page](https://midi.org/general-midi-level-2-2), before implementing its
-  banks, drum kits and additional controller/mode semantics.
-- MPE: acquire M1-100-UM 1.1 from the
-  [MPE page](https://midi.org/mpe-midi-polyphonic-expression); do not use the
-  superseded RP-053 document without explaining a version difference.
-- SMF, MIDI Time Code, high-resolution velocity prefix, and selected universal
+- SMF, high-resolution velocity prefix, and further selected universal
   SysEx addenda: acquire and record the particular revisions before their codecs.
 - MIDI-CI base, profiles and property exchange: acquire the selected current
   normative revisions before defining transaction formats or negotiation.
@@ -126,3 +118,54 @@ resolution, including the actual +8191 * 100/8192-cent upper bound. Zero count/
 zero channel masks are preserved as no-ops; no additional reserved-value rule
 is invented. RPN tuning selection does not alter the approved 0–127 tuning
 bank/program identifiers in the SysEx API.
+
+## Slice 6 profile evidence, 2026-10-15
+
+Additional acquired documents, read before implementing their selected layouts:
+
+| Family | Reviewed baseline | Primary source |
+| --- | --- | --- |
+| GM1 | RP-003 / MMA 0007, copyright 1991/1994; distributed in the 96-1-4 collection | [GM1](https://midi.org/general-midi-level-1) |
+| GM2 | RP-024, revision 1.2a, February 6, 2007 | [GM2](https://midi.org/general-midi-level-2-2) |
+| MPE | M1-100-UM 1.1, April 14, 2022 | [MPE](https://midi.org/mpe-midi-polyphonic-expression) |
+| MIDI Time Code | RP-004/RP-008, 4.1.1 core plus 4.2 addendum, distributed in the 4.2.1 collection | [MTC](https://midi.org/midi-time-code) |
+| Master tuning | CA-025, March 2, 1999 | [Master fine/coarse tuning](https://midi.org/cmaster-fine-course-tuning) |
+| Modulation depth | CA-026, March 2, 1999 | [MIDI 1.0 addenda](https://midi.org/midi-1-0-addenda) |
+| GM1 initialization guidance | Developer Guidelines, 1995 commission/1996 distribution; guidance rather than a normative timing guarantee | [Guidelines](https://midi.org/general-midi-level-1-developer-guidelines) |
+
+```text
+gm1.pdf              ba09e13069ce3ad79989c3abc1d70c8f1e8ce3e3dd1097d9c241d6665e152bac
+gm2.pdf              56af9df9d9da3cbca39e743af0595a8441246124cdaa3f70736071ced164996e
+mpe.pdf              c5f6727af065e454fe9bc4ff80f66414e8b25ffb6c1019ce7795ab4a89da1f1e
+timecode.pdf         5ead666921d995391624ac23a2b15af785a85b6a5ab6b4608aeab10a3921cad0
+master-tuning.pdf    5d4ecbc9cdc563fc40d66a3b3b23ee4d70b1993330f1f1f95b36ded184e21cc1
+modulation-depth.pdf 49be1c7b497827a889374028e789198649ca8d94ae92afc395c66d3929c3ecba
+gm1-guidelines.pdf   d65bf7ef6d230cf421637529ba9b248a95b3787fb72c5513e0bb477281a15a75
+```
+
+GM1 supplies program numbers and percussion assignments, without bank numbers.
+GM2's sound/percussion tables supply 256 melodic addresses, nine drum kits and
+per-key overrides, including explicit silent keys. The Rust tables contain
+functional names and addresses, not copied page layouts, synthesis requirements,
+key ranges, panning or exclusion-group prose. Python uses those same Rust tables.
+MIDI 1.0's device-inquiry/master-volume layouts supply the identity codecs;
+CA-025 supplies master tuning. GM2 supplies named RPN semantics, while CA-026
+identifies modulation-depth RPN 5 without guaranteeing a universal physical
+response. Bend-sensitivity cents remain seven-bit values; modulation-depth fine
+units instead divide a semitone by 128.
+
+`crates/meedee/tests/fixtures/profiles.txt` contains independent compact vectors
+for bank/program ordering, MPE RPN 6, GM modes, identity request, master controls
+and full-frame MTC. Rust and Python consume the same expected bytes, stated
+independently of the encoder. Additional tests cover both identity manufacturer
+forms, malformed lengths, table addresses/counts, inherited/silent drum entries,
+frame-rate bounds and explicit GM interpreter resets. These are regression
+vectors, not certification or physical instrument validation.
+
+Full-frame MTC follows the acquired broadcast layout and requires device ID 127;
+its rate/frame fields do not implement timeline conversion or quarter-frame
+locking. MPE supports zone configuration only. GM2 controller-destination,
+key-based instrument-control and global effect-parameter SysEx are explicitly
+deferred. Full GM2 message coverage is not claimed. GM2 On's 100 ms settling
+requirement is exposed as metadata; no automatic sleep/reset is performed.
+GM1 developer guidance does not establish a universally safe initialization delay.

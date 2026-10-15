@@ -4,7 +4,7 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import ClassVar
 
-from . import events, messages
+from . import events, gm, messages, mpe
 
 __version__: str
 
@@ -145,7 +145,9 @@ class OutputConnection:
         | messages.RpnIncrement
         | messages.RpnDecrement
         | messages.NrpnIncrement
-        | messages.NrpnDecrement,
+        | messages.NrpnDecrement
+        | gm.BankProgramSelect
+        | mpe.ZoneConfiguration,
     ) -> None: ...
     def send(self, packet: bytes | bytearray | memoryview | UmpPacket) -> None: ...
     @property

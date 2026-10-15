@@ -576,14 +576,14 @@ fn changes_tuple<'py>(
         .collect::<PyResult<Vec<_>>>()?;
     Ok(PyTuple::new(py, values)?.into_any())
 }
-fn render(object: &Bound<'_, PyAny>, name: &str, fields: &[&str]) -> PyResult<String> {
+pub(crate) fn render(object: &Bound<'_, PyAny>, name: &str, fields: &[&str]) -> PyResult<String> {
     let values = fields
         .iter()
         .map(|field| Ok(format!("{field}={}", object.getattr(*field)?.repr()?)))
         .collect::<PyResult<Vec<_>>>()?;
     Ok(format!("{name}({})", values.join(", ")))
 }
-fn replacement<'py>(
+pub(crate) fn replacement<'py>(
     object: &Bound<'py, PyAny>,
     fields: &[&str],
     changes: Option<&Bound<'py, PyDict>>,

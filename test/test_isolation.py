@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meedee import messages, midi
+from meedee import gm, messages, midi, mpe
 from meedee._native import CallbackBridge
 from meedee._transport import (
     RECEIVE_CAPACITY,
@@ -1071,3 +1071,25 @@ def test_shutdown_drains_callbacks_even_without_a_live_client() -> None:
             release.set()
             closer.join(3)
     assert finished.is_set()
+
+
+@pytest.mark.parametrize("mode", ["check_bank", "check_mpe", "partial_command_2"])
+def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pipe(
+    mode: str, workers: list[Popen[bytes]]
+) -> None:
+    source = output_client(mode)
+    connection = source.connect(source.ports()[0])
+    command = (
+        mpe.ZoneConfiguration(manager_channel=16, members=15)
+        if mode == "check_mpe"
+        else gm.BankProgramSelect(channel=16, bank_msb=121, bank_lsb=3, program=128)
+    )
+    if mode == "partial_command_2":
+        with pytest.raises(midi.CompoundSendError) as error:
+            connection.send_command(command)
+        assert (error.value.completed_messages, error.value.total_messages) == (2, 3)
+        assert connection.closed
+    else:
+        connection.send_command(command)
+        assert not connection.closed
+        connection.close()

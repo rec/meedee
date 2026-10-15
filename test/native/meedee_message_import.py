@@ -8,7 +8,17 @@ def main() -> None:
     with patch(
         "atexit.register", side_effect=AssertionError("cleanup was initialized")
     ):
-        from meedee import codecs, controls, events, messages, tuning
+        from meedee import (
+            codecs,
+            controls,
+            events,
+            gm,
+            messages,
+            mpe,
+            timecode,
+            tuning,
+            universal,
+        )
 
         assert events.ReceivedPacket.__module__ == "meedee.events"
         assert (
@@ -27,6 +37,14 @@ def main() -> None:
             == 6
         )
         assert controls.Interpreter().feed(messages.TimingClock()) == []
+        assert gm.program(program=1).name == "Acoustic Grand Piano"
+        assert (
+            len(codecs.expand(mpe.ZoneConfiguration(manager_channel=1, members=1))) == 5
+        )
+        assert codecs.encode(universal.IdentityRequest(device_id=127)) == bytes.fromhex(
+            "f0 7e 7f 06 01 f7"
+        )
+        assert timecode.FullFrame.__module__ == "meedee.timecode"
         assert tuning.Pitch.from_frequency(frequency_hz=440.0).pitch.semitone == 69
         assert codecs.encode(
             tuning.BulkDumpRequest(device_id=1, program=0)

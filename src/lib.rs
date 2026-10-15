@@ -13,6 +13,7 @@ mod controls;
 mod messages;
 mod packets;
 mod ports;
+mod profiles;
 mod tuning;
 
 #[cfg(all(test, target_os = "macos"))]
@@ -27,7 +28,28 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_codecs, module)?)?;
     module.add_function(wrap_pyfunction!(populate_controls, module)?)?;
     module.add_function(wrap_pyfunction!(populate_tuning, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_gm, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_universal, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_mpe, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_timecode, module)?)?;
     Ok(())
+}
+
+#[pyfunction]
+fn populate_gm(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    profiles::register_gm(module)
+}
+#[pyfunction]
+fn populate_universal(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    profiles::register_universal(module)
+}
+#[pyfunction]
+fn populate_mpe(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    profiles::register_mpe(module)
+}
+#[pyfunction]
+fn populate_timecode(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    profiles::register_timecode(module)
 }
 
 #[pyfunction]

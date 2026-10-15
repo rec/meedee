@@ -1,0 +1,16 @@
+# Independent wire vectors: GM1 p4, GM2 1.2a p22, MPE 1.1 §2.2.1,
+# MIDI1 device inquiry/master volume, CA-025, MTC 4.2.1 full message.
+BankProgramSelect 16 121 3 128|bf 00 79 bf 20 03 cf 7f
+ZoneConfiguration 1 15|b0 65 00 b0 64 06 b0 06 0f b0 65 7f b0 64 7f
+ZoneConfiguration 16 0|bf 65 00 bf 64 06 bf 06 00 bf 65 7f bf 64 7f
+Gm1On 127|f0 7e 7f 09 01 f7
+GmOff 1|f0 7e 01 09 02 f7
+Gm2On 2|f0 7e 02 09 03 f7
+IdentityRequest 127|f0 7e 7f 06 01 f7
+MasterVolume 1 16383|f0 7f 01 04 01 7f 7f f7
+MasterFineTuning 1 -8192|f0 7f 01 04 03 00 00 f7
+MasterFineTuning 1 0|f0 7f 01 04 03 00 40 f7
+MasterFineTuning 1 8191|f0 7f 01 04 03 7f 7f f7
+MasterCoarseTuning 1 -64|f0 7f 01 04 04 00 00 f7
+MasterCoarseTuning 1 63|f0 7f 01 04 04 00 7f f7
+FullFrame 127 3 1 37 52 16|f0 7f 7f 01 01 61 25 34 10 f7

@@ -12,7 +12,7 @@ pub trait PrimitiveMessage: Message {
 }
 
 pub trait Command: Message {
-    fn expand(&self) -> Vec<ControlChange>;
+    fn expand(&self) -> Vec<AnyMessage>;
 }
 
 macro_rules! short_messages {
@@ -76,7 +76,11 @@ macro_rules! commands {
             }
         )*
         #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-        pub enum AnyCommand { $($name($name)),* }
+        pub enum AnyCommand {
+            $($name($name)),*,
+            BankProgramSelect(crate::gm::BankProgramSelect),
+            ZoneConfiguration(crate::mpe::ZoneConfiguration),
+        }
         impl Message for AnyCommand {}
     };
 }

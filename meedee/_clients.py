@@ -10,7 +10,7 @@ from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, messages, midi
+from . import _native, gm, messages, midi, mpe
 from ._errors import CompoundSendError
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
 from .events import Clock, ReceivedPacket
@@ -309,7 +309,9 @@ class OutputConnection:
         | messages.RpnIncrement
         | messages.RpnDecrement
         | messages.NrpnIncrement
-        | messages.NrpnDecrement,
+        | messages.NrpnDecrement
+        | gm.BankProgramSelect
+        | mpe.ZoneConfiguration,
     ) -> None:
         _native.check_thread()
         wire = _native.prepare_command(self._client._protocol, command)

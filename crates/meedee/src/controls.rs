@@ -325,3 +325,182 @@ fn diagnostic(
         last_index,
     })
 }
+
+/// Named RPN helpers retain exact protocol units and the shared release policy.
+pub fn pitch_bend_sensitivity(
+    channel: i64,
+    semitones: i64,
+    cents: i64,
+) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+    if !(0..=127).contains(&semitones) || !(0..=127).contains(&cents) {
+        return Err(crate::messages::ValueError(
+            "semitones and cents must be seven-bit values".into(),
+        ));
+    }
+    crate::messages::RpnSet::new(channel, 0, semitones * 128 + cents, 14)
+}
+pub fn channel_fine_tuning(
+    channel: i64,
+    value: i64,
+) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+    if !(-8192..=8191).contains(&value) {
+        return Err(crate::messages::ValueError(
+            "value must be in -8192..=8191".into(),
+        ));
+    }
+    crate::messages::RpnSet::new(channel, 1, value + 8192, 14)
+}
+pub fn channel_coarse_tuning(
+    channel: i64,
+    semitones: i64,
+) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+    if !(-64..=63).contains(&semitones) {
+        return Err(crate::messages::ValueError(
+            "semitones must be in -64..=63".into(),
+        ));
+    }
+    crate::messages::RpnSet::new(channel, 2, semitones + 64, 7)
+}
+pub fn tuning_program(
+    channel: i64,
+    program: i64,
+) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+    crate::messages::RpnSet::new(channel, 3, program, 7)
+}
+pub fn tuning_bank(
+    channel: i64,
+    bank: i64,
+) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+    crate::messages::RpnSet::new(channel, 4, bank, 7)
+}
+/// GM2's modulation-depth units are 1/128 semitone; this is not the cents LSB
+/// of Pitch Bend Sensitivity. Other profiles can assign a different response.
+pub fn modulation_depth_range(
+    channel: i64,
+    value: i64,
+) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+    crate::messages::RpnSet::new(channel, 5, value, 14)
+}
+
+/// Common standardized controller identifiers. Values remain wire numbers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Controller {
+    BankSelectMsb = 0,
+    Modulation = 1,
+    Breath = 2,
+    Foot = 4,
+    PortamentoTime = 5,
+    DataEntryMsb = 6,
+    ChannelVolume = 7,
+    Balance = 8,
+    Pan = 10,
+    Expression = 11,
+    EffectControl1 = 12,
+    EffectControl2 = 13,
+    BankSelectLsb = 32,
+    DataEntryLsb = 38,
+    Hold1 = 64,
+    Portamento = 65,
+    Sostenuto = 66,
+    SoftPedal = 67,
+    LegatoFootswitch = 68,
+    Hold2 = 69,
+    SoundVariation = 70,
+    FilterResonance = 71,
+    ReleaseTime = 72,
+    AttackTime = 73,
+    Brightness = 74,
+    DecayTime = 75,
+    VibratoRate = 76,
+    VibratoDepth = 77,
+    VibratoDelay = 78,
+    PortamentoControl = 84,
+    ReverbSend = 91,
+    ChorusSend = 93,
+    DataIncrement = 96,
+    DataDecrement = 97,
+    NrpnLsb = 98,
+    NrpnMsb = 99,
+    RpnLsb = 100,
+    RpnMsb = 101,
+    AllSoundOff = 120,
+    ResetAllControllers = 121,
+    LocalControl = 122,
+    AllNotesOff = 123,
+    OmniOff = 124,
+    OmniOn = 125,
+    MonoMode = 126,
+    PolyMode = 127,
+}
+impl Controller {
+    pub fn number(self) -> u8 {
+        self as u8
+    }
+    pub fn message(
+        self,
+        channel: i64,
+        value: i64,
+    ) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+        crate::messages::ControlChange::new(channel, self.number().into(), value)
+    }
+}
+pub fn all_sound_off(
+    channel: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::AllSoundOff.message(channel, 0)
+}
+pub fn reset_all_controllers(
+    channel: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::ResetAllControllers.message(channel, 0)
+}
+pub fn local_control(
+    channel: i64,
+    enabled: bool,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::LocalControl.message(channel, if enabled { 127 } else { 0 })
+}
+pub fn all_notes_off(
+    channel: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::AllNotesOff.message(channel, 0)
+}
+pub fn omni_off(
+    channel: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::OmniOff.message(channel, 0)
+}
+pub fn omni_on(
+    channel: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::OmniOn.message(channel, 0)
+}
+pub fn mono_mode(
+    channel: i64,
+    channels: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    if !(0..=16).contains(&channels) {
+        return Err(crate::messages::ValueError(
+            "channels must be in 0..=16 (zero means receiver voice count)".into(),
+        ));
+    }
+    Controller::MonoMode.message(channel, channels)
+}
+pub fn poly_mode(
+    channel: i64,
+) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
+    Controller::PolyMode.message(channel, 0)
+}
+
+impl From<&crate::gm::ModeMessage> for InputMessage {
+    fn from(_: &crate::gm::ModeMessage) -> Self {
+        Self::SystemReset
+    }
+}
+macro_rules! mode_boundaries {
+    ($($name:ident),*)=>{$(impl From<&crate::gm::$name> for InputMessage {
+        fn from(_: &crate::gm::$name)->Self {Self::SystemReset}
+    })*};
+}
+mode_boundaries!(Gm1On, Gm2On, GmOff);

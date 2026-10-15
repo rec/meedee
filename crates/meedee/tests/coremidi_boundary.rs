@@ -13,37 +13,46 @@ use std::time::Duration;
 #[test]
 fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {
     enable();
-    let command = meedee::messages::NrpnSet::new(1, 1234, 10000, 14).unwrap();
-    let expected = meedee::codecs::expand(&command);
-    for accepted in 0..expected.len() {
-        let name = format!("compound-failure-{accepted}");
-        let (sender, receiver) = mpsc::channel();
-        let input = Input::new(InputOptions::default())
-            .unwrap()
-            .create_virtual(&name, move |packet| {
-                sender.send(packet.packet).unwrap();
-            })
-            .unwrap();
-        let output = Output::new(OutputOptions::default()).unwrap();
-        let port = output
-            .ports()
-            .unwrap()
-            .into_iter()
-            .find(|p| p.name() == name)
-            .unwrap();
-        fail_send_after(u32::try_from(port.backend_id()).unwrap(), accepted as i32);
-        let output = output.connect(&port).unwrap();
-        assert!(
-            matches!(output.send_command(&command), Err(Error::CompoundSend { completed_messages: Some(n), total_messages: 6, .. }) if n == accepted)
-        );
-        let actual: Vec<_> = receiver.try_iter().collect();
-        let expected: Vec<_> = expected[..accepted]
-            .iter()
-            .map(|m| Packet::Bytes(meedee::codecs::encode(m)))
-            .collect();
-        assert_eq!(actual, expected);
-        drop(output);
-        drop(input.close().unwrap());
+    for command in [
+        meedee::messages::AnyCommand::NrpnSet(
+            meedee::messages::NrpnSet::new(1, 1234, 10000, 14).unwrap(),
+        ),
+        meedee::messages::AnyCommand::BankProgramSelect(
+            meedee::gm::BankProgramSelect::new(1, 121, 3, 128).unwrap(),
+        ),
+    ] {
+        let expected = meedee::codecs::expand(&command);
+        let total = expected.len();
+        for accepted in 0..expected.len() {
+            let name = format!("compound-failure-{accepted}");
+            let (sender, receiver) = mpsc::channel();
+            let input = Input::new(InputOptions::default())
+                .unwrap()
+                .create_virtual(&name, move |packet| {
+                    sender.send(packet.packet).unwrap();
+                })
+                .unwrap();
+            let output = Output::new(OutputOptions::default()).unwrap();
+            let port = output
+                .ports()
+                .unwrap()
+                .into_iter()
+                .find(|p| p.name() == name)
+                .unwrap();
+            fail_send_after(u32::try_from(port.backend_id()).unwrap(), accepted as i32);
+            let output = output.connect(&port).unwrap();
+            assert!(
+                matches!(output.send_command(&command), Err(Error::CompoundSend { completed_messages: Some(n), total_messages, .. }) if n == accepted && total_messages == total)
+            );
+            let actual: Vec<_> = receiver.try_iter().collect();
+            let expected: Vec<_> = expected[..accepted]
+                .iter()
+                .map(|m| Packet::Bytes(meedee::codecs::encode(m)))
+                .collect();
+            assert_eq!(actual, expected);
+            drop(output);
+            drop(input.close().unwrap());
+        }
     }
 }
 

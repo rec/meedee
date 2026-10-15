@@ -848,3 +848,42 @@ No instrument operation or new native-service flow was run. Windows/Services,
 real macOS I/O, physical failure scenarios and selected Pi qualification remain
 open. Codec/state-machine evidence does not qualify device tuning behavior or
 change the transport's delivery, native-driver or liveness guarantees.
+
+## Slice 6 General MIDI and bounded profile helpers, 2026-10-15
+
+Rust owns the GM1/GM2 sound and percussion maps and all new codec logic. Python
+exposes frozen native entries/messages in gm, universal, mpe and timecode, plus
+named CC/channel-mode/RPN helpers in controls. GM1 banks remain unspecified.
+Compound expansion now returns primitive MIDI 1.0 messages, allowing explicit
+bank/program selection through the existing serialization/progress path.
+No backend, dependency version or runtime initialization policy changed.
+
+Python 3.11.7 and 3.15.0 each pass 198 tests. The Rust workspace passes 78
+ordinary tests with five ignored cases; pytest separately runs the three
+finalization cases. Four new pure Rust tests and six Python tests cover shared
+independent wire vectors, strict immutable values/replacement, identity variants,
+malformed/truncated messages, rate bounds, map counts/addresses, drum inheritance
+and silence, named controls and explicit typed GM interpreter resets. The pure
+import fixture exercises every new namespace without transport initialization.
+
+Device-free native boundary tests now check every known failure prefix of both
+the six-message NRPN command and three-message bank/program command, preserving
+no-retry behavior. Isolated-worker tests verify exact bank/program and MPE bytes
+and known partial progress across the pipe. These checks establish software
+ordering and backend acceptance reporting, not atomic physical instrument changes.
+
+Cargo formatting and workspace Clippy pass, retaining only the existing local
+Rust 1.99 atomic-deprecation exception; CI still targets Rust 1.87. Ruff,
+formatting, ty, pyupgrade and whitespace checks pass. The release workflow adds
+the installed profile tests while retaining published-release-only execution
+and Python endpoints 3.11/3.15. No release or CI run was triggered.
+
+The approved deferrals are recorded in meedee.md and api.md. No hardware or new
+native-service flow was run. Windows/Services, physical device behavior, real
+macOS I/O and selected Pi qualification remain open. GM2 message completeness,
+MPE voice/expression engines, quarter-frame locking and instrument timing or
+capability guarantees are not claimed.
+
+A CPython 3.11 wheel rebuilt from the source distribution passes all 197
+installed-package tests outside the checkout. Both distribution archive checks
+pass, including the four new module/stub pairs, Rust tables and profile fixtures.
