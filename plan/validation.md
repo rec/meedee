@@ -1475,3 +1475,46 @@ remain pending. Production keeper behavior, discovery policy and CI are unchange
 
 The ordinary suite passes all 252 tests in 18.75 seconds. Ruff checking/formatting,
 ty and pyupgrade pass for the changed Python harness; `git diff --check` passes.
+
+## Continuous two-process event-loop probe, 2026-10-16
+
+The previously requested notification comparison is now read and preserved in
+`qualification-macos-notified-reopen.txt`. Both `notified` and
+`notified_serviced` failed: **two failed, three deselected in 1.75 seconds**.
+Both enumerated the disposed cycle-1 endpoint in subsequent cycles; neither
+logged any notification. Registering a callback alone, or combining it with the
+tested 50 ms consumer-loop wait, therefore gives no verified remedy. Those probes
+left the producer blocked on pipe input, so they did not test continuous event
+servicing in both processes.
+
+The owner authorized replacing the short-run-loop comparisons with an
+event-driven probe. Both processes now create their notification clients on
+their main thread and run `CFRunLoopRun` continuously. `CFFileDescriptor` sources
+handle pipe readiness on those same loops. The producer creates/disposes its
+test-owned destination and ordinary client, then acknowledges only after its
+matching added/removed notification. The consumer retains notifications that
+arrive before the reply and waits for its own matching event before enumeration.
+It verifies the new unique ID appears once and the removed ID disappears across
+three cycles. SDK results, notification IDs, roles and handles are logged. No MIDI
+is sent and no hardware connections or names are used.
+
+Each notification wait uses a two-second run-loop timer, with 128 destination
+changes of bounded per-wait storage. A 20-second supervisor bounds the pair and
+kills its whole process group on timeout. This outer deadline also covers a
+native call blocking an owning loop. The producer is still a fresh executable
+launched with `posix_spawn`. Successful completion closes its command pipe and
+stops the producer through its EOF readiness event. Only private keepers remain
+until process exit. The production keeper and transport are unchanged.
+
+The new probe compiles against the installed SDK with
+`-std=c++20 -Wall -Wextra -Werror`. Its supervised agent-context attempt failed
+at `MIDIClientCreate` in both processes with **268435459**, before endpoints or
+notification waits. Extracted output is preserved in
+`qualification-macos-event-driven-agent.txt`. This is the previously observed
+agent access limitation; it supplies no evidence about discovery under continuous
+event servicing. Ordinary Terminal execution is still required.
+
+The ordinary suite passes **252 tests in 18.39 seconds**. Ruff checking/formatting,
+ty and pyupgrade pass for the changed harness; `git diff --check` passes. No
+dependencies or CI triggers changed. The historical short-run-loop cases remain
+in Git/evidence; the current command runs only the event-driven probe.

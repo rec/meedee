@@ -1,6 +1,6 @@
 # Open issues and failure review
 
-Updated through the native qualification and discovery follow-up, 2026-10-15. These are
+Updated through the native qualification and discovery follow-up, 2026-10-16. These are
 remaining risks, deliberate API limitations and validation gaps. Resolved midir
 binding findings are removed. The historical upstream report remains in
 [midir-suggestions.md](midir-suggestions.md); it is not an audit of libremidi.
@@ -85,8 +85,12 @@ which lifecycle operation invalidated it, or why discovery returned it. A direct
 SDK probe reproduced stale endpoint enumeration without either wrapper: in
 cycles 2 and 3 the consumer could still enumerate the disposed cycle-1 endpoint.
 Early client creation did not fix it; 50 ms run-loop servicing was inconsistent.
-The next diagnostic compares notification registration, with native results
-pending. No discovery errors are suppressed and reopen remains unqualified.
+Notification registration, with or without a 50 ms consumer-loop wait, also
+failed; neither run logged notifications. The probe now runs both owning loops
+continuously and waits for matching add/remove events. Its agent-context attempt
+failed at client creation before any endpoints, with `268435459`; ordinary
+Terminal evidence is pending. No discovery errors are suppressed and reopen
+remains unqualified.
 Full-width MIDI 2 CC delivery in that fixture also remains unverified.
 See `qualification-macos-final.jsonl` and
 `validation.md` for the successful cases and the preserved failure.

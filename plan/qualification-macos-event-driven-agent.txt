@@ -1,0 +1,7 @@
+consumer output:
+consumer MIDIClientCreate=268435459 keeper=0
+producer output:
+probe failed: create notification client
+producer MIDIClientCreate=268435459 keeper=0
+probe failed: create notification client
+

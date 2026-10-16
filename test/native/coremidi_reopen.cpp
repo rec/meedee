@@ -1,6 +1,7 @@
 // Direct SDK endpoint churn probe. No MIDI messages or hardware connections.
 #include <CoreMIDI/CoreMIDI.h>
 
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -12,18 +13,6 @@ extern char** environ;
 
 namespace
 {
-struct Reply
-{
-  OSStatus status{};
-  MIDIEndpointRef endpoint{};
-  SInt32 unique_id{};
-};
-
-void notification(const MIDINotification* message, void*)
-{
-  std::printf("notification=%d\n", message->messageID);
-}
-
 void require(bool condition, const char* operation)
 {
   if (!condition)
@@ -33,30 +22,183 @@ void require(bool condition, const char* operation)
   }
 }
 
-void producer(int commands, int replies)
+struct Reply
 {
+  OSStatus status{};
+  MIDIEndpointRef endpoint{};
+  SInt32 unique_id{};
+};
+
+struct Change
+{
+  MIDINotificationMessageID kind{};
+  MIDIObjectRef object{};
+};
+
+struct Probe
+{
+  bool producer;
+  int incoming;
+  int outgoing;
   MIDIClientRef keeper{}, client{};
   MIDIEndpointRef endpoint{};
+  CFFileDescriptorRef descriptor{};
+  CFRunLoopSourceRef source{};
+  CFRunLoopTimerRef timer{};
+  std::array<Change, 128> changes{};
+  std::size_t change_count{};
   char command{};
-  while (read(commands, &command, 1) == 1)
+  Reply reply{};
+  MIDIEndpointRef expected{};
+  int cycle{1};
+  bool awaiting{}, ready{}, busy{}, valid{true};
+
+  FILE* log() const { return producer ? stderr : stdout; }
+  const char* role() const { return producer ? "producer" : "consumer"; }
+
+  void cancel_deadline()
   {
-    Reply reply;
+    if (timer)
+    {
+      CFRunLoopTimerInvalidate(timer);
+      CFRelease(timer);
+      timer = nullptr;
+    }
+  }
+
+  void begin(char next)
+  {
+    command = next;
+    change_count = 0;
+    ready = false;
+    awaiting = true;
+    expected = next == 'x' ? endpoint : 0;
+    CFRunLoopTimerContext context{0, this, nullptr, nullptr, nullptr};
+    timer = CFRunLoopTimerCreate(
+        nullptr, CFAbsoluteTimeGetCurrent() + 2, 0, 0, 0,
+        +[](CFRunLoopTimerRef, void* info) {
+          const auto& state = *static_cast<Probe*>(info);
+          std::fprintf(stderr,
+                       "%s notification deadline: cycle=%d command=%c expected=%u reply=%d\n",
+                       state.role(), state.cycle, state.command, state.expected, state.ready);
+          std::exit(3);
+        }, &context);
+    require(timer != nullptr, "create notification deadline");
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer, kCFRunLoopDefaultMode);
+    std::fprintf(log(), "%s cycle=%d command=%c waiting\n", role(), cycle, command);
+    if (!producer)
+      require(write(outgoing, &command, 1) == 1, "write producer command");
+  }
+
+  bool enumerate(bool present)
+  {
+    const auto count = MIDIGetNumberOfDestinations();
+    int matches{};
+    bool complete = true;
+    for (ItemCount index = 0; index < count; ++index)
+    {
+      const auto object = MIDIGetDestination(index);
+      SInt32 unique_id{};
+      const auto status = MIDIObjectGetIntegerProperty(object, kMIDIPropertyUniqueID, &unique_id);
+      std::printf("index=%lu endpoint=%u status=%d unique_id=%d\n",
+                  static_cast<unsigned long>(index), object, status, unique_id);
+      complete &= status == noErr;
+      matches += status == noErr && unique_id == reply.unique_id;
+    }
+    std::printf("cycle=%d expected_present=%d test-owned matches=%d\n", cycle, present, matches);
+    return complete && matches == (present ? 1 : 0);
+  }
+
+  void advance()
+  {
+    if (!awaiting || !ready || busy)
+      return;
+    const auto kind = command == 'c' ? kMIDIMsgObjectAdded : kMIDIMsgObjectRemoved;
+    bool observed = false;
+    for (std::size_t index = 0; index < change_count; ++index)
+      observed |= changes[index].kind == kind && changes[index].object == expected;
+    if (!observed)
+      return;
+    awaiting = false;
+    cancel_deadline();
+    std::fprintf(log(), "%s cycle=%d matched notification=%d endpoint=%u\n",
+                 role(), cycle, kind, expected);
+    if (producer)
+    {
+      require(write(outgoing, &reply, sizeof(reply)) == sizeof(reply), "write producer reply");
+      if (command == 'x')
+        ++cycle;
+      return;
+    }
+    valid &= enumerate(command == 'c');
     if (command == 'c')
     {
-      if (!keeper)
-        reply.status = MIDIClientCreate(CFSTR("meedee-churn-keeper"), nullptr, nullptr, &keeper);
-      if (reply.status == noErr)
-        reply.status = MIDIClientCreate(CFSTR("meedee-churn-input"), nullptr, nullptr, &client);
+      MIDIPortRef port{};
+      require(MIDIClientCreate(CFSTR("meedee-churn-output"), nullptr, nullptr, &client) == noErr,
+              "create consumer client");
+      require(MIDIOutputPortCreate(client, CFSTR("meedee-churn-output"), &port) == noErr,
+              "create consumer port");
+      require(MIDIPortDispose(port) == noErr, "dispose consumer port");
+      require(MIDIClientDispose(client) == noErr, "dispose consumer client");
+      client = 0;
+      begin('x');
+    }
+    else if (++cycle <= 3)
+      begin('c');
+    else
+    {
+      close(outgoing); // EOF wakes the producer's pipe source so its run loop can stop.
+      outgoing = -1;
+      CFRunLoopStop(CFRunLoopGetCurrent());
+    }
+  }
+
+  static void notification(const MIDINotification* message, void* info)
+  {
+    auto& state = *static_cast<Probe*>(info);
+    std::fprintf(state.log(), "%s notification=%d\n", state.role(), message->messageID);
+    if (!state.awaiting || (message->messageID != kMIDIMsgObjectAdded
+                           && message->messageID != kMIDIMsgObjectRemoved))
+      return;
+    require(message->messageSize >= sizeof(MIDIObjectAddRemoveNotification), "notification size");
+    const auto& change = *reinterpret_cast<const MIDIObjectAddRemoveNotification*>(message);
+    if (change.childType != kMIDIObjectType_Destination)
+      return;
+    require(state.change_count < state.changes.size(), "notification buffer capacity");
+    state.changes[state.change_count++] = {message->messageID, change.child};
+    std::fprintf(state.log(), "%s destination change=%d endpoint=%u\n",
+                 state.role(), message->messageID, change.child);
+    state.advance();
+  }
+
+  void produce()
+  {
+    char next{};
+    const auto size = read(incoming, &next, 1); // Called only when the pipe is readable.
+    if (size == 0)
+    {
+      CFRunLoopStop(CFRunLoopGetCurrent());
+      return;
+    }
+    require(size == 1 && !awaiting, "read next producer command");
+    begin(next);
+    busy = true;
+    reply = {};
+    if (command == 'c')
+    {
+      reply.status = MIDIClientCreate(CFSTR("meedee-churn-input"), nullptr, nullptr, &client);
       if (reply.status == noErr)
         reply.status = MIDIDestinationCreate(
             client, CFSTR("meedee-churn-test-owned"),
             +[](const MIDIPacketList*, void*, void*) {}, nullptr, &endpoint);
+      expected = endpoint;
       reply.endpoint = endpoint;
       if (reply.status == noErr)
         reply.status = MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyUniqueID, &reply.unique_id);
     }
-    else if (command == 'x')
+    else
     {
+      require(command == 'x', "known producer command");
       reply.status = MIDIEndpointDispose(endpoint);
       if (reply.status == noErr)
       {
@@ -66,38 +208,73 @@ void producer(int commands, int replies)
           client = 0;
       }
     }
-    else
-      std::exit(2);
-    require(write(replies, &reply, sizeof(reply)) == sizeof(reply), "write producer reply");
+    std::fprintf(stderr, "producer SDK status=%d endpoint=%u unique_id=%d\n",
+                 reply.status, reply.endpoint, reply.unique_id);
+    require(reply.status == noErr, "producer SDK operation");
+    ready = true;
+    busy = false;
+    advance();
   }
-  // The private keeper is left to process cleanup, matching the library contract.
-  std::exit(0);
-}
 
-Reply exchange(int commands, int replies, char command)
-{
-  require(write(commands, &command, 1) == 1, "write producer command");
-  Reply reply;
-  require(read(replies, &reply, sizeof(reply)) == sizeof(reply), "read producer reply");
-  std::printf("producer command=%c status=%d endpoint=%u unique_id=%d\n",
-              command, reply.status, reply.endpoint, reply.unique_id);
-  require(reply.status == noErr, "producer SDK operation");
-  return reply;
-}
+  void consume()
+  {
+    Reply received;
+    require(read(incoming, &received, sizeof(received)) == sizeof(received), "read producer reply");
+    require(awaiting && received.status == noErr, "successful pending producer reply");
+    if (command == 'c')
+    {
+      reply = received;
+      endpoint = received.endpoint;
+      expected = endpoint;
+    }
+    ready = true;
+    advance();
+  }
+
+  void run()
+  {
+    const auto status = MIDIClientCreate(CFSTR("meedee-churn-keeper"), notification, this, &keeper);
+    std::fprintf(log(), "%s MIDIClientCreate=%d keeper=%u\n", role(), status, keeper);
+    require(status == noErr, "create notification client");
+    CFFileDescriptorContext context{0, this, nullptr, nullptr, nullptr};
+    descriptor = CFFileDescriptorCreate(
+        nullptr, incoming, false,
+        +[](CFFileDescriptorRef descriptor, CFOptionFlags, void* info) {
+          auto& state = *static_cast<Probe*>(info);
+          if (state.producer)
+            state.produce();
+          else
+            state.consume();
+          CFFileDescriptorEnableCallBacks(descriptor, kCFFileDescriptorReadCallBack);
+        }, &context);
+    require(descriptor != nullptr, "create pipe descriptor");
+    source = CFFileDescriptorCreateRunLoopSource(nullptr, descriptor, 0);
+    require(source != nullptr, "create pipe run-loop source");
+    CFRunLoopAddSource(CFRunLoopGetCurrent(), source, kCFRunLoopDefaultMode);
+    CFFileDescriptorEnableCallBacks(descriptor, kCFFileDescriptorReadCallBack);
+    if (!producer)
+      begin('c');
+    CFRunLoopRun();
+    CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, kCFRunLoopDefaultMode);
+    CFFileDescriptorInvalidate(descriptor);
+    CFRelease(source);
+    CFRelease(descriptor);
+    cancel_deadline();
+    // Keeper and callback context remain alive until this process exits.
+  }
+};
 }
 
 int main(int argc, char** argv)
 {
-  if (argc == 2 && std::strcmp(argv[1], "--producer") == 0)
-    producer(STDIN_FILENO, STDOUT_FILENO);
-  require(argc == 2, "expected a discovery probe mode");
-  const bool notified = std::strcmp(argv[1], "notified") == 0
-                        || std::strcmp(argv[1], "notified_serviced") == 0;
-  const bool early = notified || std::strcmp(argv[1], "early") == 0;
-  const bool serviced = std::strcmp(argv[1], "serviced") == 0
-                        || std::strcmp(argv[1], "notified_serviced") == 0;
-  require(early || serviced || std::strcmp(argv[1], "late") == 0, "unknown mode");
   std::setbuf(stdout, nullptr);
+  if (argc == 2 && std::strcmp(argv[1], "--producer") == 0)
+  {
+    Probe producer{true, STDIN_FILENO, STDOUT_FILENO};
+    producer.run();
+    return 0;
+  }
+  require(argc == 1, "unexpected probe arguments");
   int commands[2], replies[2];
   require(pipe(commands) == 0 && pipe(replies) == 0, "create pipes");
   posix_spawn_file_actions_t actions;
@@ -117,50 +294,11 @@ int main(int argc, char** argv)
   posix_spawn_file_actions_destroy(&actions);
   close(commands[0]);
   close(replies[1]);
-  MIDIClientRef keeper{};
-  if (early)
-    require(MIDIClientCreate(
-                CFSTR("meedee-churn-keeper"), notified ? notification : nullptr, nullptr, &keeper)
-                == noErr,
-            "create early consumer keeper");
-  bool valid = true;
-  for (int cycle = 1; cycle <= 3; ++cycle)
-  {
-    std::printf("mode=%s cycle=%d\n", argv[1], cycle);
-    const auto created = exchange(commands[1], replies[0], 'c');
-    const auto runloop = CFRunLoopRunInMode(kCFRunLoopDefaultMode, serviced ? 0.05 : 0, false);
-    const auto count = MIDIGetNumberOfDestinations();
-    std::printf("runloop=%d destinations=%lu\n", runloop, static_cast<unsigned long>(count));
-    int matches{};
-    for (ItemCount index = 0; index < count; ++index)
-    {
-      const auto endpoint = MIDIGetDestination(index);
-      SInt32 unique_id{};
-      const auto status = MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyUniqueID, &unique_id);
-      std::printf("index=%lu endpoint=%u status=%d unique_id=%d\n",
-                  static_cast<unsigned long>(index), endpoint, status, unique_id);
-      valid &= status == noErr;
-      matches += status == noErr && unique_id == created.unique_id;
-    }
-    valid &= matches == 1;
-    std::printf("test-owned matches=%d\n", matches);
-    if (!keeper)
-      require(MIDIClientCreate(CFSTR("meedee-churn-keeper"), nullptr, nullptr, &keeper) == noErr,
-              "create late consumer keeper");
-    MIDIClientRef client{};
-    MIDIPortRef port{};
-    require(MIDIClientCreate(CFSTR("meedee-churn-output"), nullptr, nullptr, &client) == noErr,
-            "create consumer client");
-    require(MIDIOutputPortCreate(client, CFSTR("meedee-churn-output"), &port) == noErr,
-            "create consumer port");
-    require(MIDIPortDispose(port) == noErr, "dispose consumer port");
-    require(MIDIClientDispose(client) == noErr, "dispose consumer client");
-    exchange(commands[1], replies[0], 'x');
-  }
-  close(commands[1]);
+  Probe consumer{false, replies[0], commands[1]};
+  consumer.run();
   close(replies[0]);
   int status{};
   require(waitpid(child, &status, 0) == child && WIFEXITED(status) && WEXITSTATUS(status) == 0,
           "producer exit");
-  return valid ? 0 : 1;
+  return consumer.valid ? 0 : 1;
 }
