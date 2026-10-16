@@ -2,14 +2,30 @@
 
 Repository: `git@github.com:rec/libremidi.git`
 
-Revision: `faf5b3bf724b2de162a8bdacf2f57b2687d9a790`
+Revision: `a3d7d168615675f1257b5f5bc480cae2e75b5510`
 
-Imported 2026-10-15 from the fork's `codex/checked-winmm-discovery` branch, based
+Imported 2026-10-16 from the fork's `codex/checked-winmm-discovery` branch, based
 on `master` at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`. This is a commit pin,
 not the previously audited upstream v5.4.3 release archive. The fork already
 contained other changes at base `996a73c216756de2dd6d58e66245ecae4830f9ff`.
 
 The fork fixes are separate commits:
+
+- [a3d7d16](https://github.com/rec/libremidi/commit/a3d7d168615675f1257b5f5bc480cae2e75b5510):
+  replace the callback-free keeper with one process-lifetime notification-loop
+  thread and private client, including discovery-only use. Ordinary operations
+  remain on their per-client owner threads. A fixed 256-event sequence history
+  acknowledges virtual endpoint creation/disposal, with steady-clock two-second
+  waits. History overflow fails explicitly; old notifications cannot satisfy a
+  later operation. The internal callback retains no application pointers.
+  Successful native disposal is recorded before waiting, so a late acknowledgement
+  cannot cause a second SDK disposal. Checked C API cleanup retains failed objects
+  as before; direct C++ teardown remains outside that guarantee. Keep the linked
+  library loaded until process exit, because the private loop and client persist.
+  Startup failure can be retried on a later explicit request; a failed/stopped
+  running loop is not restarted automatically. Existing keeper/teardown targets
+  now deliver fake notifications through the actual private run loop and cover
+  stale acknowledgements, timeout, overflow and delayed disposal acknowledgement.
 
 - [faf5b3b](https://github.com/rec/libremidi/commit/faf5b3bf724b2de162a8bdacf2f57b2687d9a790):
   preserve the failing CoreMIDI integer-property query's OSStatus and report it

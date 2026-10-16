@@ -206,6 +206,12 @@ def serve(worker: Worker, source: BinaryIO) -> None:
                 or isinstance(error, (midi.MidiError, RuntimeError, MemoryError))
                 and not isinstance(error, NotImplementedError)
             )
+            if (
+                operation == "ports"
+                and sys.platform == "darwin"
+                and isinstance(error, midi.PortInfoError)
+            ):
+                fatal = False
             kind = (
                 "ResourceError"
                 if isinstance(error, MemoryError)

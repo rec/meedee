@@ -30,15 +30,15 @@ public:
     if (configuration.client_name.empty())
       configuration.client_name = "libremidi observer";
 
-    if (!configuration.has_callbacks())
-      return;
-
     if (const auto result = ensure_coremidi_client_keeper(); result != noErr)
     {
       libremidi_handle_error(
           this->configuration, "error creating CoreMIDI client keeper: " + std::to_string(result));
       return;
     }
+
+    if (!configuration.has_callbacks())
+      return;
 
     auto result = MIDIClientCreate(
         toCFString(configuration.client_name).get(),

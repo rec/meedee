@@ -31,6 +31,7 @@ struct endpoint {
   void *context{};
   MIDIReceiveBlock block{};
   bool fail_disposal{};
+  std::atomic_bool fail_query{};
   bool retired{};
   int sends_remaining{-1};
   MIDIEndpointRef connected_source{};
@@ -48,10 +49,26 @@ struct state {
   std::unordered_map<MIDIPortRef, std::shared_ptr<endpoint>> inputs;
   std::atomic<UInt32> next{100};
   std::atomic_bool enabled{};
+  MIDINotifyProc notify{};
+  void *notify_context{};
+  CFRunLoopRef loop{};
 };
 state &registry() {
-  static state instance;
-  return instance;
+  static auto *instance = new state;
+  return *instance;
+}
+
+// Called with the registry lock held. Deliver on the keeper's actual run loop.
+void publish(state &state, MIDIEndpointRef id, bool source, MIDINotificationMessageID kind) {
+  const auto notify = state.notify;
+  const auto context = state.notify_context;
+  const MIDIObjectAddRemoveNotification message{
+      kind, sizeof(MIDIObjectAddRemoveNotification), 0, kMIDIObjectType_Device,
+      id, source ? kMIDIObjectType_Source : kMIDIObjectType_Destination};
+  CFRunLoopPerformBlock(state.loop, kCFRunLoopDefaultMode, ^{
+    notify(reinterpret_cast<const MIDINotification *>(&message), context);
+  });
+  CFRunLoopWakeUp(state.loop);
 }
 
 std::shared_ptr<endpoint> find(MIDIEndpointRef id) {
@@ -79,6 +96,7 @@ OSStatus create(MIDIClientRef client, CFStringRef name, bool source,
   std::lock_guard guard{state.mutex};
   *out = state.next++;
   state.endpoints.emplace(*out, std::move(value));
+  publish(state, *out, source, kMIDIMsgObjectAdded);
   return noErr;
 }
 MIDIEndpointRef at(bool source, ItemCount index) {
@@ -114,11 +132,23 @@ extern "C" void md_fixture_fail_send_after(UInt32 id, int accepted) {
   }
 }
 extern "C" bool md_fixture_endpoint_exists(UInt32 id) { return bool(find(id)); }
+extern "C" void md_fixture_fail_query(UInt32 id) {
+  if (auto endpoint = find(id))
+    endpoint->fail_query = true;
+}
 
-extern "C" OSStatus MIDIClientCreate(CFStringRef, MIDINotifyProc, void *,
+extern "C" OSStatus MIDIClientCreate(CFStringRef name, MIDINotifyProc notify, void *context,
                                      MIDIClientRef *out) {
   if (!registry().enabled)
     return kMIDIInvalidClient;
+  if (CFEqual(name, CFSTR("libremidi client keeper"))) {
+    auto &state = registry();
+    std::lock_guard guard{state.mutex};
+    state.notify = notify;
+    state.notify_context = context;
+    state.loop = CFRunLoopGetCurrent();
+    CFRetain(state.loop);
+  }
   *out = registry().next++;
   return noErr;
 }
@@ -146,6 +176,8 @@ extern "C" OSStatus MIDIObjectGetIntegerProperty(MIDIObjectRef object,
   auto endpoint = find(object);
   if (!endpoint)
     return kMIDIObjectNotFound;
+  if (endpoint->fail_query.exchange(false))
+    return -50; // paramErr; deliberately leave the output untouched.
   if (CFEqual(property, kMIDIPropertyUniqueID))
     *out = static_cast<SInt32>(object);
   else if (CFEqual(property, kMIDIPropertyProtocolID))
@@ -213,6 +245,7 @@ extern "C" OSStatus MIDIEndpointDispose(MIDIEndpointRef id) {
   auto &state = registry();
   std::lock_guard guard{state.mutex};
   state.endpoints.erase(id);
+  publish(state, id, endpoint->source, kMIDIMsgObjectRemoved);
   return noErr;
 }
 extern "C" OSStatus MIDIOutputPortCreate(MIDIClientRef, CFStringRef,

@@ -892,6 +892,26 @@ def test_isolated_snapshots_disambiguate_duplicate_ids_and_do_not_rediscover_on_
         connection.send(b"\xf8")
 
 
+@pytest.mark.parametrize("direction", ["input", "output"])
+def test_discovery_metadata_failure_preserves_coremidi_worker_for_explicit_retry(
+    workers: list[Popen[bytes]], direction: str
+) -> None:
+    client = (
+        input_client("discovery_error_once")
+        if direction == "input"
+        else output_client("discovery_error_once")
+    )
+    with pytest.raises(midi.PortInfoError, match="endpoint disappeared"):
+        client.ports()
+    if sys.platform == "darwin":
+        assert client.ports()
+        assert client.worker_failure is None
+        assert len(workers) == 1
+    else:
+        with pytest.raises((midi.StateError, midi.WorkerError)):
+            client.ports()
+
+
 @pytest.mark.parametrize("foreign", [True, False])
 def test_foreign_or_refreshed_snapshots_fail_open_and_invalidate_the_worker(
     foreign: bool, workers: list[Popen[bytes]]

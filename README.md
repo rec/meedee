@@ -459,10 +459,15 @@ the owner's Terminal; a direct Apple API probe isolates the agent's first-call
 failure to its execution context. Physical hardware, fault recovery, Windows
 and Pi qualification remain open. See [validation](plan/validation.md).
 
-CoreMIDI retains one additional callback-free native client per MIDI-using
-process until process exit, avoiding Apple's last-client disposal/reopen hazard.
+CoreMIDI retains one additional native client and notification-loop thread per
+MIDI-using process until exit, avoiding Apple's last-client disposal/reopen hazard
+and continuously servicing topology notifications. Existing per-client operation
+threads remain separate. Virtual creation/disposal waits up to two seconds for
+its matching local notification; SDK calls themselves can still block. A failed
+CoreMIDI metadata read fails discovery without returning partial results or
+preventing a later explicit discovery attempt. There are no automatic retries.
 Ports and ordinary clients still close normally. Pure message/file imports do
-not create it. This is not recovery from a crashed/restarted MIDI service;
+not initialize this runtime. This is not recovery from a crashed/restarted MIDI service;
 default isolation permits replacing the affected child, while in-process use
 may require restarting the application. Observer disposal failures remain open.
 

@@ -3,12 +3,51 @@
 use meedee::transport::{
     Error, Input, InputOptions, Output, OutputOptions, Packet, Protocol, TimestampMode,
 };
-use meedee_coremidi_fixture::{emit, enable, endpoint_exists, fail_disposal, fail_send_after};
+use meedee_coremidi_fixture::{
+    emit, enable, endpoint_exists, fail_disposal, fail_query, fail_send_after,
+};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc,
 };
 use std::time::Duration;
+
+#[test]
+fn failed_discovery_returns_no_snapshot_and_allows_explicit_rediscovery() {
+    enable();
+    for protocol in [Protocol::Midi1, Protocol::Ump] {
+        let name = format!("discovery-recovery-{protocol:?}");
+        let input = Input::new(InputOptions {
+            protocol,
+            ..InputOptions::default()
+        })
+        .unwrap()
+        .create_virtual(&name, |_| {})
+        .unwrap();
+        let output = Output::new(OutputOptions {
+            protocol,
+            ..OutputOptions::default()
+        })
+        .unwrap();
+        let port = output
+            .ports()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name() == name)
+            .unwrap();
+        fail_query(port.backend_id() as u32);
+        assert!(matches!(output.ports(), Err(Error::Native(_))));
+        let port = output
+            .ports()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name() == name)
+            .unwrap();
+        let connection = output.connect(&port).unwrap();
+        drop(connection.close().unwrap());
+        drop(input.close().unwrap());
+    }
+}
 
 #[test]
 fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {

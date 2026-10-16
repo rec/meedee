@@ -1541,3 +1541,65 @@ wrapper's repeated-reopen or full-width MIDI 2 send path. The open issue is
 retained with this narrower, current status. No further runtime tests were run
 for this documentation/evidence-only follow-up; counts and checks were reviewed
 against the log and `git diff --check` passes.
+
+## Production CoreMIDI notification integration, 2026-10-16
+
+The owner approved one persistent notification-loop thread per MIDI-using process
+while preserving per-client operation threads, fixed two-second notification
+deadlines, and recoverable CoreMIDI discovery-call errors. The fork implements
+the native changes in `a3d7d168615675f1257b5f5bc480cae2e75b5510`; the vendor pin and
+imported source match that commit. Windows/Linux operation ownership is unchanged.
+
+The private client is now created on a process-lifetime CoreMIDI loop, including
+discovery-only client use. It retains only internal state, not application
+callbacks or observer objects. A fixed 256-entry sequence history records endpoint
+add/remove notifications without allocating in the callback. Each virtual open
+or disposal marks the history before entering the SDK, then waits for its own
+matching event on a steady-clock two-second deadline. Overflow fails explicitly;
+an earlier event cannot acknowledge a later operation. SDK disposal success is
+recorded before waiting, preserving failed cleanup state without disposing the
+same endpoint again after a delayed acknowledgement. Direct C++ destruction and
+other existing native cleanup gaps remain outside the checked C API guarantee.
+
+Rust now separates observer diagnostics from connection diagnostics. A CoreMIDI
+metadata-read error returns no partial snapshot and clears only that observer
+call's diagnostic, leaving explicit rediscovery possible. Connection diagnostics
+remain sticky. Other backends retain their prior sticky discovery behavior. The
+isolated Python worker also keeps CoreMIDI PortInfoError replies nonfatal;
+otherwise it would terminate a recoverable Rust client. No automatic retry,
+skipped error, public timeout option or musical cleanup send was added.
+
+All three affected C++ targets pass with address/undefined-behavior sanitizers
+in 5.51 seconds. Their fakes deliver notifications through the actual private
+run loop. Coverage includes startup failure/retry, concurrent clients, pre-operation
+events, two-second timeout, history overflow and late removal acknowledgement
+without a second SDK disposal. The final Rust workspace passes **114 ordinary
+tests, with five opt-in cases ignored**. A new boundary case verifies explicit
+rediscovery and subsequent connection after a failed metadata read for both
+MIDI 1 and UMP. It uses fake CoreMIDI resources, not the OS service.
+
+Both source Python suites pass **254 tests**: 25.39 seconds on CPython 3.11 and
+34.86 seconds on 3.15. Two new controlled-worker cases cover input/output
+rediscovery after an error and preserve the old non-macOS fatal policy. Ruff,
+formatting, ty, pyupgrade, Cargo formatting and workspace Clippy pass, using the
+existing local Rust 1.99 deprecation exception. Release Rust examples rebuild.
+A fresh CPython 3.11 wheel builds from the sdist; both artifact checks pass,
+including the required new notification header. After explicit reinstallation,
+**253 installed-package tests** pass outside the checkout in 17.19 seconds.
+
+The agent attempted the production `native and reopen` supervisor case. It
+failed at initial client construction with **268435459**, before creating a
+virtual endpoint: one failed, nine deselected in 0.17 seconds. Both JSON records
+are preserved in `qualification-macos-production-reopen-agent.jsonl`. This is
+the known agent-context service-access failure; it does not establish the new
+runtime's native discovery behavior. The owner has been asked to run the same
+production case in ordinary Terminal, preserving its result in
+`target/mac-terminal-production-reopen.log`. That qualification, including
+full-width MIDI 2 delivery, remains open until the log is available. The direct
+SDK probe's successful result is not substituted for this production gate.
+
+Account for one additional thread/client and the bounded history in every
+MIDI-using process, including isolated children. These changes do not qualify
+Pi budgets, physical faults, other MIDI libraries' initialization choices, or
+recovery from MIDI-server restart. CI stays published-release-only with Python
+3.11 and 3.15; no Actions run or release was initiated. No dependencies changed.

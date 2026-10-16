@@ -26,6 +26,8 @@ class Input:
 
     def ports(self) -> list[midi.Port]:
         self.snapshot += 1
+        if self.mode == "discovery_error_once" and self.snapshot == 1:
+            raise midi.PortInfoError("endpoint disappeared during metadata read")
         return [
             midi.Port._from_wire(
                 self.identity,
@@ -117,6 +119,8 @@ class Output:
 
     def ports(self) -> list[midi.Port]:
         self.snapshot += 1
+        if self.mode == "discovery_error_once" and self.snapshot == 1:
+            raise midi.PortInfoError("endpoint disappeared during metadata read")
         return [
             midi.Port._from_wire(
                 self.identity,

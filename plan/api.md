@@ -59,9 +59,24 @@ their reservations. This is a count limit, not a machine-wide memory/Pi budget.
 Closing a connection restores its reusable client and does not terminate that
 client's worker. Connections retain their clients; drop those references when
 the client is no longer needed, and allow asynchronous retirement to complete.
-CoreMIDI retains one additional callback-free keeper client per MIDI-using process
-until process exit; ordinary ports/clients still close. It does not detect or
-recover a MIDI-server restart, and does not initialize during pure codec/file use.
+CoreMIDI retains one additional keeper client and notification-loop thread per
+MIDI-using process until exit; ordinary ports/clients still close. Per-client
+operation ownership is preserved. The private notification callback stores no
+application context. A fixed 256-entry sequence history bounds event tracking;
+history loss fails explicitly rather than acknowledging an unobserved change.
+Virtual endpoint creation and disposal wait up to two seconds on a steady-clock
+deadline for the matching local add/remove event. Disposal success is recorded
+before waiting, so delayed acknowledgement does not dispose an endpoint twice.
+Timeouts report errors under the existing failed-open/unsafe-cleanup ownership
+rules; they do not interrupt SDK calls or guarantee peer-process visibility.
+
+CoreMIDI metadata-read failures return PortInfoError with no partial snapshot,
+without poisoning the client or isolated worker. A later explicit ports() call
+can succeed. Connection errors remain sticky, and other backends keep their
+existing discovery-failure policy. There is no retry or error suppression.
+The runtime does not detect/recover a MIDI-server restart and does not initialize
+during pure codec/file use. Its native lifetime integration still needs the
+production virtual-reopen qualification on macOS.
 
 ### Construction, inspection and replacement
 
