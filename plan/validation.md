@@ -1518,3 +1518,26 @@ The ordinary suite passes **252 tests in 18.39 seconds**. Ruff checking/formatti
 ty and pyupgrade pass for the changed harness; `git diff --check` passes. No
 dependencies or CI triggers changed. The historical short-run-loop cases remain
 in Git/evidence; the current command runs only the event-driven probe.
+
+### Ordinary Terminal event-driven result
+
+The owner ran the new probe successfully: **one passed in 2.74 seconds**. Raw
+native output is preserved in `qualification-macos-event-driven.txt`. Both
+notification clients were created successfully. Each process matched all six
+expected destination add/remove events across three cycles. The consumer's three
+post-add enumerations found the created ID exactly once; its three post-remove
+enumerations found that ID absent. All enumerated property reads succeeded.
+
+The created endpoints were 396460099, 396460103 and 396460107, with distinct
+unique IDs 515369766, 1962367418 and 149930890. No stale disposed endpoint was
+reported after the matching removal notification. This demonstrates correct
+discovery for the tested combination of continuous run-loop servicing in both
+processes, notification registration and matching-event barriers. It does not
+isolate which part is necessary or establish physical-device/OS-fault behavior.
+
+The production transport has not changed and still needs an integration fix
+and its own native validation. The successful SDK probe does not qualify the
+wrapper's repeated-reopen or full-width MIDI 2 send path. The open issue is
+retained with this narrower, current status. No further runtime tests were run
+for this documentation/evidence-only follow-up; counts and checks were reviewed
+against the log and `git diff --check` passes.

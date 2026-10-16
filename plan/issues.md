@@ -72,28 +72,20 @@ Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
 The process-lifetime CoreMIDI keeper passes deterministic concurrency/reopen
-tests and five native virtual-only qualification cases. Native repeated reopen
-remains unqualified: the final run failed during output-port discovery with
-`PortInfoError: could not read CoreMIDI port unique ID`, before completing any
-protocol/mode combination. The failing endpoint, cycle and OS status were not
-recorded in the original run. A subsequent instrumented standalone run delivered
-and closed the first MIDI 1 isolated cycle, then failed at discovery in cycle 2
-after creating its new virtual input. The other five cases are not required to
-trigger it. The next run reported object `158564417`, OSStatus `-50` (`paramErr`)
-at the same stage. That code does not identify whether the endpoint was stale,
-which lifecycle operation invalidated it, or why discovery returned it. A direct
-SDK probe reproduced stale endpoint enumeration without either wrapper: in
-cycles 2 and 3 the consumer could still enumerate the disposed cycle-1 endpoint.
-Early client creation did not fix it; 50 ms run-loop servicing was inconsistent.
-Notification registration, with or without a 50 ms consumer-loop wait, also
-failed; neither run logged notifications. The probe now runs both owning loops
-continuously and waits for matching add/remove events. Its agent-context attempt
-failed at client creation before any endpoints, with `268435459`; ordinary
-Terminal evidence is pending. No discovery errors are suppressed and reopen
-remains unqualified.
-Full-width MIDI 2 CC delivery in that fixture also remains unverified.
-See `qualification-macos-final.jsonl` and
-`validation.md` for the successful cases and the preserved failure.
+tests and five native virtual-only qualification cases. The production repeated
+reopen fixture still fails during discovery after replacing its virtual endpoint,
+with OSStatus `-50` (`paramErr`). Direct SDK probes reproduce enumeration of a
+disposed endpoint under short-run-loop servicing. In contrast, the event-driven
+SDK probe passes three create/dispose cycles with both owning loops continuously
+running and matching add/remove notification barriers. Both processes observe
+all six expected notifications, and every presence/absence check succeeds. See
+`qualification-macos-event-driven.txt` and `validation.md`.
+
+This supports an event-loop integration change but does not establish which part
+of that combined setup is sufficient. The production native owner threads still
+block on command queues between operations, and their keeper remains callback-free.
+The production fix and repeated-reopen validation remain open, including exact
+full-width MIDI 2 CC delivery in that fixture. No discovery errors are suppressed.
 
 ## R2. Resource admission is bounded only in specified places
 
