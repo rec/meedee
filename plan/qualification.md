@@ -151,8 +151,11 @@ physical MIDI 2 equipment.
 The `reopen` supervisor case repeats three virtual open/send/close cycles on
 each of the same Input/Output clients, in both Python modes and MIDI protocols.
 It also checks exact delivery of a full-width MIDI 2 CC on group/channel 16.
-One callback-free keeper client remains in each MIDI-using process until exit;
-include this intentional extra client in resource accounting. The keeper avoids
+One keeper client and a private notification-loop thread remain in each
+MIDI-using process until exit; include both in resource accounting. Per-client
+operation threads are unchanged. Virtual creation/disposal waits for the matching
+local event with a two-second deadline; SDK calls remain subject to the outer
+supervisor. The keeper avoids
 last-client disposal during normal operation, not recovery after a server crash.
 
 If CoreMIDI client creation fails, compare with a wrapper-independent probe in
@@ -200,8 +203,9 @@ meedee transport qualification.
 
 This replaces the earlier short-run-loop diagnostic modes, whose failures are
 preserved in validation.md. It tests continuous event servicing in both processes
-without changing the production keeper's callback-free contract. Run the whole
-file; the earlier `-k notified` selection no longer applies.
+independently of the new production notification runtime. Run the whole file;
+the earlier `-k notified` selection no longer applies. This successful direct
+probe does not replace the production `reopen` supervisor case above.
 
 Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
 crash, unresponsive hardware or musical state after uncertain sends. Those need

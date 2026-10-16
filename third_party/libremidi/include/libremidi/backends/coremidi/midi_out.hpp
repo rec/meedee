@@ -36,7 +36,7 @@ public:
   {
     midi_out_core::close_port();
 
-    if (this->endpoint)
+    if (this->endpoint && !this->endpoint_disposed)
       MIDIEndpointDispose(this->endpoint);
 
     close_client(*this);
@@ -71,6 +71,8 @@ public:
 
   stdx::error open_virtual_port(std::string_view portName) override
   {
+    auto& notifications = coremidi_notifications::instance();
+    const auto sequence = notifications.mark();
     // Create a virtual MIDI output source.
     MIDIEndpointRef endpoint;
     OSStatus result = MIDISourceCreate(this->client, toCFString(portName).get(), &endpoint);
@@ -84,10 +86,25 @@ public:
 
     // Save our api-specific connection information.
     this->endpoint = endpoint;
-    return stdx::error{};
+    const auto notification_result = notifications.wait(sequence, this->endpoint, kMIDIMsgObjectAdded);
+    if (notification_result != stdx::error{})
+      libremidi_handle_error(
+          this->configuration, notification_result == std::errc::timed_out
+                                   ? "CoreMIDI endpoint-add notification timed out (2 seconds)"
+                                   : "CoreMIDI endpoint-add notification failed");
+    return notification_result;
   }
 
-  stdx::error close_port() override { return coremidi_data::close_port(); }
+  stdx::error close_port() override
+  {
+    const auto result = coremidi_data::close_port();
+    if (result != stdx::error{} && this->endpoint_disposed)
+      libremidi_handle_error(
+          this->configuration, result == std::errc::timed_out
+                                   ? "CoreMIDI endpoint-removal notification timed out (2 seconds)"
+                                   : "CoreMIDI endpoint-removal notification failed");
+    return result;
+  }
 
   stdx::error send_message(const unsigned char* message, size_t size) override
   {

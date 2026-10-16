@@ -5,6 +5,7 @@ unsafe extern "C" {
     fn md_fixture_enable();
     fn md_fixture_fail_send_after(endpoint: u32, accepted: i32);
     fn md_fixture_fail_disposal(endpoint: u32);
+    fn md_fixture_fail_query(endpoint: u32);
     fn md_fixture_endpoint_exists(endpoint: u32) -> bool;
     fn md_fixture_emit(endpoint: u32, data: *const u8, size: usize) -> i32;
 }
@@ -17,6 +18,11 @@ pub fn enable() {
 pub fn fail_disposal(endpoint: u32) {
     // SAFETY: an integer ID into the test registry, never an OS resource.
     unsafe { md_fixture_fail_disposal(endpoint) };
+}
+
+pub fn fail_query(endpoint: u32) {
+    // SAFETY: changes only a test endpoint's next metadata-query result.
+    unsafe { md_fixture_fail_query(endpoint) };
 }
 
 pub fn endpoint_exists(endpoint: u32) -> bool {

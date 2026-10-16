@@ -643,7 +643,10 @@ and wire evidence before stateful interpretation or live writes.
    selected by the owner; creation, operations and teardown stay on that thread.
    The Rust wrapper now uses this ownership model and statically builds the
    pinned C++ source. Its byte/UMP FFI paths have device-free macOS fixture tests;
-   real CoreMIDI service access, Windows/Services and Pi qualification remain open.
+   Mac virtual I/O and the persistent-notification runtime pass production
+   reopen qualification: three cycles per protocol/process-mode combination,
+   including full-width MIDI 2 delivery. Windows/Services and Pi qualification
+   remain open.
    Python transport now uses this wrapper for both isolated and in-process I/O;
    midir and its old filtering/naming/ID-lookup API have been removed.
    Raw callbacks carry immutable ReceivedPacket values with signed nanoseconds,

@@ -1,5 +1,6 @@
 #pragma once
 #include <libremidi/backends/coremidi/error_domain.hpp>
+#include <libremidi/backends/coremidi/notifications.hpp>
 #include <libremidi/detail/memory.hpp>
 #include <libremidi/detail/midi_api.hpp>
 #include <libremidi/error_handler.hpp>
@@ -244,26 +245,10 @@ locate_object(auto& self, const port_information& info, MIDIObjectType requested
   return object;
 }
 
-// Apple warns that disposing a process's last client can prevent subsequent
-// client creation. Keep one callback-free client until OS process cleanup.
-// Leaking this bounded state also avoids static destruction racing owner threads.
+// The retained first client receives topology changes on its continuously running loop.
 inline OSStatus ensure_coremidi_client_keeper()
 {
-  struct keeper_state
-  {
-    std::mutex mutex;
-    MIDIClientRef client{};
-  };
-  static auto* state = new keeper_state;
-  std::lock_guard lock{state->mutex};
-  if (state->client)
-    return noErr;
-  MIDIClientRef candidate{};
-  const auto result = MIDIClientCreate(
-      CFSTR("libremidi client keeper"), nullptr, nullptr, &candidate);
-  if (result == noErr)
-    state->client = candidate;
-  return result;
+  return coremidi_notifications::instance().ensure();
 }
 
 // A structure to hold variables related to the CoreMIDI API
@@ -273,9 +258,13 @@ struct coremidi_data
   MIDIClientRef client{};
   MIDIPortRef port{};
   MIDIEndpointRef endpoint = 0;
+  bool endpoint_disposed{};
+  uint64_t removal_sequence{};
 
   [[nodiscard]] OSStatus init_client(auto& configuration)
   {
+    if (const auto result = ensure_coremidi_client_keeper(); result != noErr)
+      return result;
     if (configuration.context)
     {
       client = *configuration.context;
@@ -283,8 +272,6 @@ struct coremidi_data
     }
     else
     {
-      if (const auto result = ensure_coremidi_client_keeper(); result != noErr)
-        return result;
       // Set up our client.
       return MIDIClientCreate(
           toCFString(configuration.client_name).get(), nullptr, nullptr, &client);
@@ -367,9 +354,19 @@ struct coremidi_data
   {
     if (this->endpoint)
     {
-      if (auto status = MIDIEndpointDispose(this->endpoint); status != noErr)
-        return from_osstatus(status);
+      auto& notifications = coremidi_notifications::instance();
+      if (!endpoint_disposed)
+      {
+        removal_sequence = notifications.mark();
+        if (auto status = MIDIEndpointDispose(this->endpoint); status != noErr)
+          return from_osstatus(status);
+        endpoint_disposed = true;
+      }
+      if (auto result = notifications.wait(removal_sequence, endpoint, kMIDIMsgObjectRemoved);
+          result != stdx::error{})
+        return result;
       this->endpoint = 0;
+      endpoint_disposed = false;
     }
 
     if (this->port)

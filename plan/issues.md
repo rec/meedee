@@ -71,22 +71,6 @@ The selected Pi image/sysroot and cross-build remain open.
 Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
-The process-lifetime CoreMIDI keeper passes deterministic concurrency/reopen
-tests and five native virtual-only qualification cases. The production repeated
-reopen fixture still fails during discovery after replacing its virtual endpoint,
-with OSStatus `-50` (`paramErr`). Direct SDK probes reproduce enumeration of a
-disposed endpoint under short-run-loop servicing. In contrast, the event-driven
-SDK probe passes three create/dispose cycles with both owning loops continuously
-running and matching add/remove notification barriers. Both processes observe
-all six expected notifications, and every presence/absence check succeeds. See
-`qualification-macos-event-driven.txt` and `validation.md`.
-
-This supports an event-loop integration change but does not establish which part
-of that combined setup is sufficient. The production native owner threads still
-block on command queues between operations, and their keeper remains callback-free.
-The production fix and repeated-reopen validation remain open, including exact
-full-width MIDI 2 CC delivery in that fixture. No discovery errors are suppressed.
-
 ## R2. Resource admission is bounded only in specified places
 
 **Confirmed limits; exhaustion behavior partly unqualified.** The Rust core
@@ -94,8 +78,11 @@ admits 32 native clients per process, including retained owner threads. The
 Python registry admits 32 connections with four cleanup workers. Each client
 has a native owner thread; each isolated client also has a Python child and
 communication threads, and each isolated input has forwarding/dispatch threads.
-CoreMIDI also retains one callback-free keeper client per MIDI-using process
-until process exit, including isolated children; this is outside connection counts.
+CoreMIDI also retains one keeper client and notification-loop thread per
+MIDI-using process until exit, including isolated children; these are outside
+connection counts. A fixed 256-event history bounds notification storage; losing
+a required event through history overflow fails explicitly. Two-second waits
+cannot interrupt blocking native calls or establish peer-process visibility.
 Per-parent count limits do not impose a machine-wide memory budget across
 independent applications. Many idle clients can still consume substantial memory,
 threads, handles and scheduling time on a Pi.

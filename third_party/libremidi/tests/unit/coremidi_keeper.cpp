@@ -23,6 +23,21 @@ bool fail_keeper = true;
 bool fail_owned{};
 bool server_stopped{};
 bool keeper_has_callback{};
+MIDINotifyProc notification{};
+void* notification_context{};
+CFRunLoopRef notification_loop{};
+std::thread::id notification_owner;
+
+void publish(MIDINotificationMessageID kind, MIDIObjectRef object)
+{
+  const MIDIObjectAddRemoveNotification message{
+      kind, sizeof(MIDIObjectAddRemoveNotification), 0, kMIDIObjectType_Device,
+      object, kMIDIObjectType_Source};
+  CFRunLoopPerformBlock(notification_loop, kCFRunLoopDefaultMode, ^{
+    notification(reinterpret_cast<const MIDINotification*>(&message), notification_context);
+  });
+  CFRunLoopWakeUp(notification_loop);
+}
 }
 
 // Native client calls only are replaced. If every client is disposed, this fake
@@ -49,6 +64,14 @@ extern "C" OSStatus MIDIClientCreate(
   }
   if (server_stopped)
     return kMIDIServerStartErr;
+  if (keeper)
+  {
+    notification = notify;
+    notification_context = context;
+    notification_loop = CFRunLoopGetCurrent();
+    CFRetain(notification_loop);
+    notification_owner = std::this_thread::get_id();
+  }
   *output = next_client++;
   clients.emplace(*output, keeper);
   return noErr;
@@ -70,7 +93,7 @@ extern "C" OSStatus MIDIClientDispose(MIDIClientRef client)
   return noErr;
 }
 
-TEST_CASE("CoreMIDI keeps one callback-free client across failure, concurrency and reopen", "[coremidi]")
+TEST_CASE("CoreMIDI keeps one serviced notification client across failure, concurrency and reopen", "[coremidi]")
 {
   std::atomic_int errors{};
   const auto error_hook = [&](std::string_view, const libremidi::source_location&) { ++errors; };
@@ -106,7 +129,8 @@ TEST_CASE("CoreMIDI keeps one callback-free client across failure, concurrency a
   REQUIRE(keeper_attempts == 2); // One failed creation, one successful keeper.
   REQUIRE(clients.size() == 1);
   REQUIRE(clients.begin()->second);
-  REQUIRE_FALSE(keeper_has_callback);
+  REQUIRE(keeper_has_callback);
+  REQUIRE(notification_owner != std::this_thread::get_id());
   REQUIRE_FALSE(server_stopped);
 
   {
@@ -137,4 +161,20 @@ TEST_CASE("CoreMIDI keeps one callback-free client across failure, concurrency a
   REQUIRE(keeper_disposals == 0);
   REQUIRE(invalid_disposals == 0);
   REQUIRE(clients.size() == 1);
+
+  auto& notifications = libremidi::coremidi_notifications::instance();
+  const auto before = notifications.mark();
+  publish(kMIDIMsgObjectAdded, 700);
+  REQUIRE(notifications.wait(before, 700, kMIDIMsgObjectAdded) == stdx::error{});
+  // A pre-operation event must not acknowledge a later operation on the same handle.
+  const auto after = notifications.mark();
+  const auto start = std::chrono::steady_clock::now();
+  REQUIRE(notifications.wait(after, 700, kMIDIMsgObjectAdded) == std::errc::timed_out);
+  REQUIRE(std::chrono::steady_clock::now() - start < std::chrono::seconds{5});
+
+  const auto overflow = notifications.mark();
+  for (unsigned i = 0; i < 257; ++i)
+    publish(kMIDIMsgObjectRemoved, 800 + i);
+  REQUIRE(notifications.wait(overflow, 1056, kMIDIMsgObjectRemoved) == stdx::error{});
+  REQUIRE(notifications.wait(overflow, 700, kMIDIMsgObjectAdded) == std::errc::no_buffer_space);
 }

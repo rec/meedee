@@ -17,6 +17,23 @@ int port_disposals{};
 int client_disposals{};
 MIDIReadProc read_callback{};
 void* read_context{};
+MIDINotifyProc notification{};
+void* notification_context{};
+CFRunLoopRef notification_loop{};
+bool suppress_removal{};
+
+void publish(MIDINotificationMessageID kind, MIDIObjectRef object)
+{
+  if (suppress_removal && kind == kMIDIMsgObjectRemoved)
+    return;
+  const MIDIObjectAddRemoveNotification message{
+      kind, sizeof(MIDIObjectAddRemoveNotification), 0, kMIDIObjectType_Device,
+      object, kMIDIObjectType_Destination};
+  CFRunLoopPerformBlock(notification_loop, kCFRunLoopDefaultMode, ^{
+    notification(reinterpret_cast<const MIDINotification*>(&message), notification_context);
+  });
+  CFRunLoopWakeUp(notification_loop);
+}
 
 void reset()
 {
@@ -26,6 +43,7 @@ void reset()
   endpoint_disposals = port_disposals = client_disposals = 0;
   read_callback = nullptr;
   read_context = nullptr;
+  suppress_removal = false;
 }
 
 libremidi_midi_configuration input_configuration(int& calls)
@@ -55,8 +73,15 @@ void deliver()
 }
 
 // Fake CoreMIDI resources only: never create clients or ports in the OS.
-extern "C" OSStatus MIDIClientCreate(CFStringRef, MIDINotifyProc, void*, MIDIClientRef* out)
+extern "C" OSStatus MIDIClientCreate(CFStringRef name, MIDINotifyProc notify, void* context, MIDIClientRef* out)
 {
+  if (CFEqual(name, CFSTR("libremidi client keeper")))
+  {
+    notification = notify;
+    notification_context = context;
+    notification_loop = CFRunLoopGetCurrent();
+    CFRetain(notification_loop);
+  }
   *out = 10;
   return noErr;
 }
@@ -71,6 +96,7 @@ extern "C" OSStatus MIDIDestinationCreate(
   read_callback = callback;
   read_context = ctx;
   *out = 20;
+  publish(kMIDIMsgObjectAdded, *out);
   return noErr;
 }
 extern "C" OSStatus MIDIInputPortCreate(
@@ -91,12 +117,14 @@ extern "C" OSStatus MIDIOutputPortCreate(MIDIClientRef, CFStringRef, MIDIPortRef
 extern "C" OSStatus MIDISourceCreate(MIDIClientRef, CFStringRef, MIDIEndpointRef* out)
 {
   *out = 20;
+  publish(kMIDIMsgObjectAdded, *out);
   return noErr;
 }
 extern "C" OSStatus MIDISourceCreateWithProtocol(
     MIDIClientRef, CFStringRef, MIDIProtocolID, MIDIEndpointRef* out)
 {
   *out = 20;
+  publish(kMIDIMsgObjectAdded, *out);
   return noErr;
 }
 extern "C" OSStatus MIDIObjectFindByUniqueID(
@@ -110,9 +138,11 @@ extern "C" OSStatus MIDIPortConnectSource(MIDIPortRef, MIDIEndpointRef, void*)
 {
   return connect_status;
 }
-extern "C" OSStatus MIDIEndpointDispose(MIDIEndpointRef)
+extern "C" OSStatus MIDIEndpointDispose(MIDIEndpointRef endpoint)
 {
   ++endpoint_disposals;
+  if (endpoint_status == noErr)
+    publish(kMIDIMsgObjectRemoved, endpoint);
   return endpoint_status;
 }
 extern "C" OSStatus MIDIPortDispose(MIDIPortRef)
@@ -124,6 +154,7 @@ extern "C" OSStatus MIDIPortDispose(MIDIPortRef)
 TEST_CASE("CoreMIDI disposal retains failed handles and clears successful ones", "[coremidi]")
 {
   reset();
+  REQUIRE(libremidi::ensure_coremidi_client_keeper() == noErr);
   libremidi::coremidi_data data;
   data.endpoint = 20;
   data.port = 30;
@@ -270,4 +301,23 @@ TEST_CASE("C output port disposal and failed-open rollback remain checked", "[co
     REQUIRE(port_disposals == 0);
     REQUIRE(client_disposals == 1);
   }
+}
+
+TEST_CASE("CoreMIDI delayed removal retains state without disposing an endpoint twice", "[coremidi]")
+{
+  reset();
+  REQUIRE(libremidi::ensure_coremidi_client_keeper() == noErr);
+  libremidi::coremidi_data data;
+  data.endpoint = 20;
+  suppress_removal = true;
+  REQUIRE(data.close_port() == std::errc::timed_out);
+  REQUIRE(data.endpoint == 20);
+  REQUIRE(data.endpoint_disposed);
+  REQUIRE(endpoint_disposals == 1);
+  suppress_removal = false;
+  publish(kMIDIMsgObjectRemoved, 20);
+  REQUIRE(data.close_port() == stdx::error{});
+  REQUIRE(data.endpoint == 0);
+  REQUIRE_FALSE(data.endpoint_disposed);
+  REQUIRE(endpoint_disposals == 1);
 }

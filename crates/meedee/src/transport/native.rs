@@ -174,6 +174,21 @@ impl Drop for Payload<'_> {
 #[derive(Default)]
 struct Diagnostics(Mutex<Option<String>>);
 
+impl Diagnostics {
+    fn check(&self, code: i32, consume: bool) -> Result<()> {
+        let mut diagnostic = self.0.lock().unwrap_or_else(|p| p.into_inner());
+        if diagnostic.is_none() && code != 0 {
+            *diagnostic = Some(format!("native MIDI operation failed ({code})"));
+        }
+        let error = if consume {
+            diagnostic.take()
+        } else {
+            diagnostic.clone()
+        };
+        error.map_or(Ok(()), |error| Err(Error::Native(error)))
+    }
+}
+
 pub(super) struct Native {
     input_direction: bool,
     backend: Backend,
@@ -186,6 +201,7 @@ pub(super) struct Native {
     // The allocation behind Arc has a stable callback context address.
     receiver: Option<Arc<Receiver>>,
     diagnostics: Box<Diagnostics>,
+    observer_diagnostics: Box<Diagnostics>,
     runtime: bool,
     retained: bool,
 }
@@ -203,6 +219,7 @@ impl Native {
             output: ptr::null_mut(),
             receiver: None,
             diagnostics: Box::default(),
+            observer_diagnostics: Box::default(),
             runtime: false,
             retained: false,
         }
@@ -216,12 +233,14 @@ impl Native {
         let result = unsafe {
             ffi::md_observer_new(
                 self.backend as i32,
-                self.error_context(),
+                (&*self.observer_diagnostics as *const Diagnostics)
+                    .cast_mut()
+                    .cast(),
                 on_error,
                 &mut self.observer,
             )
         };
-        self.check(result)
+        self.observer_diagnostics.check(result, false)
     }
 
     pub fn ports(&mut self) -> Result<Vec<Port>> {
@@ -241,7 +260,9 @@ impl Native {
                 visit,
             )
         };
-        self.check(result)?;
+        self.observer_diagnostics
+            .check(result, self.is_coremidi())?;
+        self.check(0)?;
         if let Some(error) = collector.error {
             return Err(error);
         }
@@ -435,14 +456,15 @@ impl Native {
     }
 
     fn check(&self, code: i32) -> Result<()> {
-        let mut diagnostic = self.diagnostics.0.lock().unwrap_or_else(|p| p.into_inner());
-        if diagnostic.is_none() && code != 0 {
-            *diagnostic = Some(format!("native MIDI operation failed ({code})"));
+        self.diagnostics.check(code, false)?;
+        if !self.is_coremidi() {
+            self.observer_diagnostics.check(0, false)?;
         }
-        match &*diagnostic {
-            Some(error) => Err(Error::Native(error.clone())),
-            None => Ok(()),
-        }
+        Ok(())
+    }
+
+    fn is_coremidi(&self) -> bool {
+        matches!(self.backend, Backend::CoreMidi | Backend::CoreMidiUmp)
     }
 }
 
