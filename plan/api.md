@@ -75,8 +75,9 @@ without poisoning the client or isolated worker. A later explicit ports() call
 can succeed. Connection errors remain sticky, and other backends keep their
 existing discovery-failure policy. There is no retry or error suppression.
 The runtime does not detect/recover a MIDI-server restart and does not initialize
-during pure codec/file use. Its native lifetime integration still needs the
-production virtual-reopen qualification on macOS.
+during pure codec/file use. Production macOS virtual-reopen qualification passes
+three cycles in each MIDI 1/UMP and isolated/in-process combination, including
+exact full-width MIDI 2 delivery and timestamps; see `validation.md`.
 
 ### Construction, inspection and replacement
 

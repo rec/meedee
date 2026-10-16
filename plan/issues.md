@@ -71,25 +71,6 @@ The selected Pi image/sysroot and cross-build remain open.
 Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
-The process-lifetime CoreMIDI keeper passes deterministic concurrency/reopen
-tests and five native virtual-only qualification cases before the notification
-integration. The previous production repeated-reopen build failed during
-discovery after replacing its virtual endpoint, with OSStatus `-50` (`paramErr`).
-Direct SDK probes reproduce enumeration of a
-disposed endpoint under short-run-loop servicing. In contrast, the event-driven
-SDK probe passes three create/dispose cycles with both owning loops continuously
-running and matching add/remove notification barriers. Both processes observe
-all six expected notifications, and every presence/absence check succeeds. See
-`qualification-macos-event-driven.txt` and `validation.md`.
-
-The approved production integration now adds a process-lifetime notification
-thread while preserving per-client operation owners. Virtual lifecycle operations
-wait up to two seconds for matching local notifications; metadata-read failures
-fail only the discovery call, with no partial snapshot or automatic retry.
-Deterministic native regressions pass, but actual repeated-reopen validation of
-this implementation remains open, including exact full-width MIDI 2 CC delivery.
-The successful direct SDK probe does not replace that production qualification.
-
 ## R2. Resource admission is bounded only in specified places
 
 **Confirmed limits; exhaustion behavior partly unqualified.** The Rust core

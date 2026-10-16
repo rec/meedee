@@ -1592,11 +1592,19 @@ failed at initial client construction with **268435459**, before creating a
 virtual endpoint: one failed, nine deselected in 0.17 seconds. Both JSON records
 are preserved in `qualification-macos-production-reopen-agent.jsonl`. This is
 the known agent-context service-access failure; it does not establish the new
-runtime's native discovery behavior. The owner has been asked to run the same
-production case in ordinary Terminal, preserving its result in
-`target/mac-terminal-production-reopen.log`. That qualification, including
-full-width MIDI 2 delivery, remains open until the log is available. The direct
-SDK probe's successful result is not substituted for this production gate.
+runtime's native discovery behavior.
+
+The owner then ran the same production case in ordinary Terminal. The result
+is **one passed, nine deselected in 7.49 seconds**, with supervisor return code
+zero and no child stderr. All four MIDI 1/UMP and isolated/in-process combinations
+complete three open/discover/send/close cycles each, for **12 successful cycles**.
+Every cycle checks exact typed-message equality, a present native timestamp and
+closed connections. The MIDI 2 case preserves group 16, channel 16, controller 7
+and the full-width value `0xFEDCBA98`; MIDI 1 preserves channel 16, controller 7
+and value 127. Both JSON records from `target/mac-terminal-production-reopen.log`
+are preserved in `qualification-macos-production-reopen.jsonl`. This closes the
+production virtual-reopen discovery gate on this Mac; the resolved issue text
+has been removed from `issues.md`.
 
 Account for one additional thread/client and the bounded history in every
 MIDI-using process, including isolated children. These changes do not qualify
