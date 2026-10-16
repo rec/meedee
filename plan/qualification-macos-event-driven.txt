@@ -1,0 +1,86 @@
+consumer output:
+consumer MIDIClientCreate=0 keeper=396460096
+consumer cycle=1 command=c waiting
+consumer notification=2
+consumer destination change=2 endpoint=396460099
+consumer notification=1
+consumer cycle=1 matched notification=2 endpoint=396460099
+index=0 endpoint=396460046 status=0 unique_id=-1788209693
+index=1 endpoint=396460099 status=0 unique_id=515369766
+cycle=1 expected_present=1 test-owned matches=1
+consumer cycle=1 command=x waiting
+consumer notification=3
+consumer destination change=3 endpoint=396460099
+consumer notification=1
+consumer cycle=1 matched notification=3 endpoint=396460099
+index=0 endpoint=396460046 status=0 unique_id=-1788209693
+cycle=1 expected_present=0 test-owned matches=0
+consumer cycle=2 command=c waiting
+consumer notification=2
+consumer destination change=2 endpoint=396460103
+consumer notification=1
+consumer cycle=2 matched notification=2 endpoint=396460103
+index=0 endpoint=396460046 status=0 unique_id=-1788209693
+index=1 endpoint=396460103 status=0 unique_id=1962367418
+cycle=2 expected_present=1 test-owned matches=1
+consumer cycle=2 command=x waiting
+consumer notification=3
+consumer destination change=3 endpoint=396460103
+consumer notification=1
+consumer cycle=2 matched notification=3 endpoint=396460103
+index=0 endpoint=396460046 status=0 unique_id=-1788209693
+cycle=2 expected_present=0 test-owned matches=0
+consumer cycle=3 command=c waiting
+consumer notification=2
+consumer destination change=2 endpoint=396460107
+consumer notification=1
+consumer cycle=3 matched notification=2 endpoint=396460107
+index=0 endpoint=396460046 status=0 unique_id=-1788209693
+index=1 endpoint=396460107 status=0 unique_id=149930890
+cycle=3 expected_present=1 test-owned matches=1
+consumer cycle=3 command=x waiting
+consumer notification=3
+consumer destination change=3 endpoint=396460107
+consumer notification=1
+consumer cycle=3 matched notification=3 endpoint=396460107
+index=0 endpoint=396460046 status=0 unique_id=-1788209693
+cycle=3 expected_present=0 test-owned matches=0
+diagnostics (both processes):
+producer MIDIClientCreate=0 keeper=396460097
+producer cycle=1 command=c waiting
+producer SDK status=0 endpoint=396460099 unique_id=515369766
+producer notification=2
+producer destination change=2 endpoint=396460099
+producer cycle=1 matched notification=2 endpoint=396460099
+producer notification=1
+producer cycle=1 command=x waiting
+producer SDK status=0 endpoint=0 unique_id=0
+producer notification=3
+producer destination change=3 endpoint=396460099
+producer cycle=1 matched notification=3 endpoint=396460099
+producer notification=1
+producer cycle=2 command=c waiting
+producer SDK status=0 endpoint=396460103 unique_id=1962367418
+producer notification=2
+producer destination change=2 endpoint=396460103
+producer cycle=2 matched notification=2 endpoint=396460103
+producer notification=1
+producer cycle=2 command=x waiting
+producer SDK status=0 endpoint=0 unique_id=0
+producer notification=3
+producer destination change=3 endpoint=396460103
+producer cycle=2 matched notification=3 endpoint=396460103
+producer notification=1
+producer cycle=3 command=c waiting
+producer SDK status=0 endpoint=396460107 unique_id=149930890
+producer notification=2
+producer destination change=2 endpoint=396460107
+producer cycle=3 matched notification=2 endpoint=396460107
+producer notification=1
+producer cycle=3 command=x waiting
+producer SDK status=0 endpoint=0 unique_id=0
+producer notification=3
+producer destination change=3 endpoint=396460107
+producer cycle=3 matched notification=3 endpoint=396460107
+producer notification=1
+

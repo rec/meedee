@@ -34,22 +34,21 @@ def executable(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="CoreMIDI is macOS-only")
-@pytest.mark.parametrize(
-    "mode", ["late", "early", "serviced", "notified", "notified_serviced"]
-)
-def test_direct_endpoint_replacement(executable: Path, mode: str) -> None:
+def test_direct_endpoint_replacement(executable: Path) -> None:
     child = subprocess.Popen(
-        [str(executable), mode],
+        [str(executable)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         start_new_session=True,
     )
     try:
-        stdout, stderr = child.communicate(timeout=10)
+        stdout, stderr = child.communicate(timeout=20)
     except subprocess.TimeoutExpired:
         os.killpg(child.pid, signal.SIGKILL)
         stdout, stderr = child.communicate(timeout=10)
-        pytest.fail(f"{mode}: probe deadline exceeded\n{stdout}\n{stderr}")
-    print(f"mode={mode}\n{stdout}{stderr}", flush=True)
-    assert child.returncode == 0, f"{mode}: direct SDK discovery failed"
+        pytest.fail(f"Event-driven probe deadline exceeded\n{stdout}\n{stderr}")
+    print(
+        f"consumer output:\n{stdout}diagnostics (both processes):\n{stderr}", flush=True
+    )
+    assert child.returncode == 0, "Event-driven direct SDK discovery failed"

@@ -175,30 +175,33 @@ For the repeated-reopen discovery failure, use the separate direct SDK probe:
 uv run --frozen pytest -q -s test/qualification/reopen.py
 ```
 
-This compiles a standalone C++ executable and runs five independent cases.
-Each uses a producer process and a consumer process, with three create/dispose
-cycles of test-owned virtual MIDI 1 destinations. No MIDI is sent and no hardware
-connections are opened. The producer maintains a keeper and replaces its ordinary
-client and endpoint each cycle. The consumer logs enumerated handles, unique-ID
-query statuses and matches to the producer's reported ID. Names of existing
-hardware endpoints are not logged.
+This compiles a standalone C++ executable and starts a producer and consumer in
+separate processes. Both register notification clients on their main thread and
+run `CFRunLoopRun` continuously. Pipe readiness is handled by run-loop sources;
+neither process blocks its owning loop awaiting a command or reply. The producer
+is launched through `posix_spawn` into a fresh executable image.
 
-`late` creates the consumer keeper after its first enumeration, matching the
-wrapper's lazy output creation. `early` creates it before the first enumeration.
-`serviced` uses late creation but gives the consumer run loop 50 milliseconds
-before each enumeration, instead of the existing zero-duration call. This is a
-diagnostic comparison, not a production sleep or proposed retry policy. Every
-failed property read or missing/duplicate test-owned ID fails the case; all three
-cycles still produce diagnostic output. Compilation has a 30-second limit and
-each case has a 10-second outer deadline with process-group cleanup on timeout.
-Keep these results separate from the meedee transport qualification.
+Three cycles create/dispose only test-owned virtual MIDI 1 destinations and
+ordinary clients. Each process retains a private keeper until exit. No MIDI is
+sent and no hardware connections are opened. Each process waits for the matching
+destination-added or destination-removed notification for its current operation;
+the producer acknowledges only after observing its own notification. The consumer
+accepts either notification/reply arrival order, then enumerates and verifies
+that the created ID appears exactly once or that the removed ID is absent.
+Every property-query failure fails the result. No discovery errors are suppressed.
 
-The first three modes reproduced stale enumeration in ordinary Terminal.
-`notified` and `notified_serviced` add a static notification callback to the early
-consumer keeper, using zero and 50 ms run-loop servicing respectively. The
-callback logs only notification IDs and retains no application context. Select
-these two follow-up cases with `-k notified`. This tests notification registration
-without changing the production keeper's callback-free contract.
+Each notification wait has a two-second run-loop timer; the harness has a
+20-second outer deadline and kills the entire process group on timeout, including
+a native call that blocks a loop. Compilation has a separate 30-second limit.
+Per-wait notification storage is bounded at 128 destination changes. Logs identify
+the process role, cycle, notification IDs, endpoint handles and checked unique-ID
+query results, without logging hardware names. Keep results separate from the
+meedee transport qualification.
+
+This replaces the earlier short-run-loop diagnostic modes, whose failures are
+preserved in validation.md. It tests continuous event servicing in both processes
+without changing the production keeper's callback-free contract. Run the whole
+file; the earlier `-k notified` selection no longer applies.
 
 Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
 crash, unresponsive hardware or musical state after uncertain sends. Those need
