@@ -1,383 +1,337 @@
-# Suggested features for meedee
+# Suggested features and integrations for meedee
 
-Prepared 2026-10-18. This is a collection of proposals for discussion, not an
-implementation commitment or a replacement for [the existing plan](meedee.md).
-Priorities below express likely usefulness to a working MIDI programmer or
-music-programming hobbyist, rather than a fixed release sequence.
+Updated 2026-10-18 after reviewing uFor, arpeg, enveLFO and enge. These are
+proposals for discussion, not implementation commitments or a replacement for
+[the existing plan](meedee.md). Priorities reflect practical usefulness to MIDI
+programmers and hobbyists, rather than a fixed release sequence.
 
 Additional work beyond the prompt
 
 None.
 
-## Starting point
+## Existing capabilities and ownership
 
 meedee already provides immutable Rust/Python messages, MIDI 1 and UMP codecs,
 fine controls and RPN/NRPN, MTS, General MIDI, selected universal messages, MPE
 helpers and tracking, time-code assembly, standard files, exact event archives,
-typed live I/O, recording/playback and MIDI-CI management. Suggestions here build
-on those capabilities rather than proposing them again. Profiles and Property
-Exchange are existing deferred work, identified separately below.
+typed live I/O, recording/playback and MIDI-CI management. Build on these rather
+than implementing them again.
 
-Keep shared musical behavior in Rust and expose it through Python. Optional
-CLI, TUI and GUI tools should use that behavior rather than acquire separate
-implementations. Library use should continue to work without an interface,
-a display, a Python interpreter for Rust applications, or a network service.
-A Pi Zero 2 W should remain a useful deployment target; heavier visual tools
-can run on a desktop.
+The surrounding projects already supply much of the musical layer:
 
-The most promising first additions are a MIDI inspector, musical transformations,
-explicit routing and controller mapping. Together they support both practical
-troubleshooting and small custom musical instruments.
+| Project | Existing responsibility | Boundary to preserve |
+| --- | --- | --- |
+| uFor | Portable musical definitions, tuning/scales and Scala conversion, bindings, sequence planning and reference calculations | Definitions do not imply live device adapters or complete runtime support |
+| arpeg | Python/Rust pattern execution, rhythms, swing/groove, phrase capture, musical transformations, note scheduling and MIDI clock following | Musical decisions and owned-note policy remain in arpeg |
+| enveLFO | Python/Rust envelopes, LFOs, control graphs, delayed events and retained state | Hosts supply clocks, observation cadence and output delivery |
+| enge | Synthesis, sampling, modulation realization and audio voice execution | Hosts supply device I/O; audio lifetime is not MIDI note-state observation |
+| meedee | MIDI protocols, device transport, files, timestamp identity and protocol diagnostics | No second composition, pattern, modulation or audio engine |
 
-## First candidates
+uFor's [capability matrix](../../ufor/doc/capabilities.md) distinguishes definitions,
+reference behavior and host work. arpeg's [engine description](../../arpeg/README.md)
+and [enveLFO bridge contract](../../arpeg/doc/envelfo.md), and enveLFO's
+[ownership audit](../../envelfo/doc/extraction-audit.md), describe execution already
+available. These sibling-checkout links record the local review context; they
+are not runtime dependencies or assumptions about installed package locations.
+
+Keep meedee's core MIDI behavior shared in Rust and exposed through Python.
+Integrations should be optional, with placement decided for each concrete use
+case. Do not make the standalone Rust library require Python or make ordinary
+Python MIDI use import every musical engine. No new mandatory dependencies or
+workspace restructuring are proposed here.
+
+CLI, TUI, GUI and notebook tools may present the same underlying operations.
+Start with whichever interface serves a selected workflow; there is no need to
+build every interface. A Pi Zero 2 W remains a useful headless target, while
+heavier visualization can run on a desktop.
+
+## Independent meedee features
 
 ### 1. MIDI inspector and diagnostic monitor
 
-**Use:** Discover why a keyboard, synthesizer or script is doing something
-unexpected without writing a fresh monitoring script each time.
+**Use:** Explain unexpected keyboard, synthesizer or script behavior without
+writing a fresh monitoring script each time.
 
-Provide a reusable inspection layer that summarizes typed events, raw packets,
-source identity, timestamp domains and diagnostics. Optional interpreted views
-could show paired CC values, parameter changes, tuning messages and MPE activity
-while retaining access to the original traffic.
+Summarize typed events, raw packets, source identity, timestamp domains and
+diagnostics. Reuse existing interpretation for fine CC, parameter changes,
+tuning messages and MPE, while keeping original traffic available. Useful
+views include filters, a frozen snapshot, controller traces and note activity.
 
-A CLI could list ports and produce readable or machine-readable observations.
-A TUI could filter a live stream, freeze a view and inspect individual messages.
-A later GUI could add controller plots and a keyboard display. These are choices
-of presentation, not three interfaces that must all be built initially.
+A CLI or TUI is a natural first interface; a GUI or notebook can follow using
+the same inspection logic. Bound display history, show losses and unknown state,
+and send no traffic by default. Capture export should use existing recording
+and archive facilities.
 
-Show queue losses, incomplete state and unknown values prominently. Make display
-buffering bounded so a busy MIDI stream cannot exhaust memory. Observation
-should send no traffic by default. Exporting a capture should reuse the archive
-and recording facilities already present.
+### 2. Capture comparison and file validation
 
-### 2. Musical transformations and filters
+**Use:** Determine whether changing a script altered its messages, ordering or
+timing, and diagnose damaged or unsuitable MIDI files.
 
-**Use:** Turn a keyboard into a split/layer controller, adapt an awkward device,
-or build a small MIDI effect in a few lines of Rust or Python.
+Compare captures with explicit source matching, timestamp tolerances and ignored
+fields. Explain gaps, clock discontinuities, protocol differences and export
+losses. Reuse readers and codecs; compare raw records when interpretation is
+unavailable. A tolerance is a user-selected comparison policy, not proof that
+a difference is musically harmless.
 
-Offer composable operations for channel/group remapping, note-range filtering,
-transposition, velocity curves, controller remapping and value scaling. Support
-both event streams and file workflows without rewriting the same transformation
-for each one. The first version can be a small set of explicit operations;
-a general expression language is unnecessary.
+Expose reusable Rust/Python reports and an optional CLI. This is inspection and
+regression support, not a new musical sequence editor.
 
-Stateful transformations must remember the output corresponding to each input
-NoteOn so that a later NoteOff still releases the right note after settings
-change. Overlapping repetitions of the same note, zero-velocity NoteOn, sustain,
-filtered releases and MIDI 2 per-note expression need deliberate policies.
-Define out-of-range behavior rather than silently wrapping pitches or values.
+### 3. Protocol-aware routing, merging and splitting
 
-Useful later additions include scale constraints, chord voicing and controlled
-humanization. Any randomness should permit a seed for repeatable file processing
-and regression tests.
+**Use:** Connect controllers and instruments, combine sources or run a small
+headless MIDI patch bay.
 
-### 3. Explicit routing, merging and splitting
+Start with explicit routes, channel/group selection and remapping, merging and
+fan-out. Preserve source identity, bound queues, report route-specific overload
+and define equal-time ordering. Comparing timestamps from different sources
+requires explicit clock mappings. Detect or prevent known routing cycles without
+inventing a hop counter inside ordinary MIDI messages.
 
-**Use:** Replace a small patch bay, combine controllers, distribute one keyboard
-to several instruments, or build a headless Pi MIDI processor.
+Musical transformations should be supplied by existing engines or approved
+adapters. Do not recreate arpeg's scale mapping, voicing, swing or note scheduler.
+Use uFor's composition/binding vocabulary where it fits rather than inventing
+a second general graph or setup language. A transport-specific router can still
+be independently useful without a uFor dependency.
 
-Provide a reusable router that connects selected sources through transformations
-to selected destinations. Start with direct routes, channel/group splits,
-merging and fan-out. A CLI could run a saved setup; a TUI or GUI could eventually
-make the connections visible and editable.
+Changing a route while notes are active requires an explicit ownership/cleanup
+policy. No automatic replay after reconnect or channel-wide reset on a shared
+destination. A CLI could run selected routes; a TUI/GUI could display them.
 
-Preserve source identity when merging. Define ordering for equal-time events and
-require explicit clock mappings where timing from different sources is compared.
-Use bounded queues and report overload at the affected route. Prevent or identify
-routing feedback; an ordinary MIDI message has no universal hop counter that
-can safely be added to traffic.
+### 4. Observed MIDI state and explicit scoped cleanup
 
-Configuration changes need a clear policy for notes already sounding. Avoid
-implicitly replaying old commands after reconnect or silently broadcasting
-cleanup to destinations shared with other applications.
+**Use:** Diagnose stuck notes and inspect what a source or route has actually
+sent or received.
 
-### 4. Controller mapping, learn and pickup
+Extend protocol observation beyond existing MPE views where a concrete need
+exists: active note instances, pedal knowledge and reset/loss boundaries. Reuse
+existing trackers and established pairing policies before adding new state.
+This is distinct from arpeg's generated occurrence ownership, uFor's semantic
+trigger planning and enge's sounding voices or release tails.
 
-**Use:** Make inexpensive knobs, sliders, pedals and buttons useful with software
-or hardware whose control assignments differ.
+An explicit cleanup plan could identify releases for traffic owned by one route.
+Let callers inspect and send it. A targeted panic action may also be useful,
+with its broader effects clearly described. NoteOff, pedal release, All Notes
+Off and All Sound Off are different actions. Lost traffic and competing writers
+limit certainty; cleanup must not become an implicit cancellation/disposal action.
 
-A mapping layer could bind observed controls to named application parameters,
-with explicit input/output ranges, curves, inversion, toggle/momentary behavior
-and supported relative-encoder conventions. Reuse existing 14-bit CC and NRPN
-interpretation. Device-specific encoder conventions should be named choices,
-not guessed from an ambiguous sequence.
+### 5. Topology watching and explicit recovery
 
-A learn operation should observe traffic and propose a binding for approval.
-Pickup/soft-takeover could avoid a sudden parameter jump when a physical knob
-and the known target value disagree. Report when the target value is unknown;
-observed outbound traffic is not proof of the instrument's actual state.
+**Use:** Keep a long-running application understandable when devices appear,
+unplug, reboot or change endpoint identity.
 
-A small TUI would make learning and testing convenient. Motorized controls and
-LED feedback can follow later, with explicit suppression of feedback loops.
+Expose bounded topology observations and support selecting fresh endpoints after
+loss. Platform notification/discovery races require qualification. A visible
+endpoint does not prove a responsive instrument, and names/backend IDs are not
+durable physical identities.
 
-### 5. Observed note and pedal state, with scoped cleanup
+An opt-in reconnect policy could restore a specifically selected route. Restoring
+patches, tuning, controllers or notes is a separate action. Reset affected
+interpreters after known loss; never silently replay uncertain operations.
 
-**Use:** Diagnose stuck notes, display playing activity and clean up a route that
-the application itself owns.
+### 6. SysEx transfer execution and diagnostics
 
-Generalize useful note-state observation beyond the existing MPE tracker:
-active note instances, held versus sustained notes, pedal knowledge and reset/loss
-boundaries. Distinguish what was observed from what a synthesizer might still
-be sounding, including its unknowable release envelope.
+**Use:** Back up or restore an instrument using documented transfer rules.
 
-Offer an explicit cleanup plan derived from the messages a particular sender or
-route owns. Let callers inspect and send that plan. A monitor could also offer
-a clearly targeted panic action, explaining that channel-wide commands can affect
-other performers. NoteOff, All Notes Off, pedal release and All Sound Off have
-different musical effects; they should not be interchangeable hidden fallbacks.
+Build bounded transfer plans over existing SysEx files/codecs, deadlines and
+request tracking. Plans may express device-specific pacing, chunks and expected
+replies. Retain original bytes and show progress and uncertainty. Do not infer
+arbitrary manufacturer protocols or retry uncertain state-changing commands.
 
-Cleanup remains uncertain after lost traffic, a crash or competing writers.
-Do not automatically add it to cancellation or connection disposal.
+Device descriptions and librarian organization belong to the integration work
+below. meedee's independent contribution is transport and transfer execution,
+plus generic packet inspection. Successful byte delivery does not establish
+that an instrument accepted or completed a restore.
 
-## Timing and musical construction
+### 7. MIDI-CI browser and supported configuration
 
-### 6. MIDI clock following and generation
+**Use:** Inspect supported device profiles and properties without hard-coding
+every instrument capability.
 
-**Use:** Synchronize an arpeggiator, sequencer or visualizer to a drum machine,
-or make a Pi-based instrument provide tempo to other equipment.
+Continue existing deferred Profiles and Property Exchange work once the required
+normative documents are acquired. Reuse the current CI management/session path;
+do not create another CI implementation or advertise unsupported categories.
+A read-oriented browser can precede explicit configuration writes.
 
-Build on the existing Clock, Start, Continue, Stop and Song Position messages
-with a caller-driven transport state and clock follower. Expose estimated tempo,
-phase, running state, uncertainty and loss of lock. Keep MIDI beat-clock timing
-separate from MIDI Time Code and native packet timestamps. Their roles differ,
-as described in the [MIDI Association's message overview](https://midi.org/about-midi-part-3midi-messages).
+Dynamic CI information can complement uFor instrument descriptions. Neither
+advertised properties nor a stored definition proves device health. Detailed
+standards and physical interoperability evidence remain implementation gates.
 
-Offer clock generation as an explicit scheduling operation. Decide how to handle
-missing pulses, abrupt tempo changes, silence and late deadlines before exposing
-it as a synchronization engine. Do not promise hard real-time performance or
-silently emit a burst of overdue clock pulses.
+### 8. Selected machine-control helpers
 
-### 7. Musical time, patterns and an event scheduler
+**Use:** Control compatible studio recorders and transport equipment.
+
+Add typed values/codecs for a bounded MIDI Machine Control subset, with explicit
+request/reply handling where required. Reuse existing time-code values and
+obtain the normative command specifications before implementation. This is
+protocol coverage, separate from arpeg's beat-clock follower and from a new
+studio automation engine. A small interface could expose explicitly targeted
+transport actions.
+
+### 9. Deterministic transport tests and virtual-device tools
 
-**Use:** Express a small sequence in bars and beats rather than manually calculating
-nanoseconds, and schedule live-generated events as well as existing recordings.
+**Use:** Test applications without a physical synthesizer, and exercise real
+integration separately when a native backend is available.
 
-Extend existing tempo conversion and playback with a musical position/duration
-model, time signatures and explicit tempo maps. Add a bounded deadline scheduler
-for events submitted while playback is running, including cancellation and
-lateness reports. Keep musical positions distinct from physical clock domains.
+Expose a small transport test double for injected input, recorded output, loss,
+disconnection and uncertain failures, reusing suitable existing fixtures.
+Combine it with engine conformance cases without duplicating protocol parsers
+or musical behavior. In-memory tests do not qualify drivers.
 
-Pure pattern helpers could construct repeated phrases, Euclidean rhythms,
-arpeggios, chords and controlled variations. They should return ordinary events
-or scheduling actions so applications can inspect, edit and save the results.
+Optional manual tools could provide test-owned virtual endpoints where supported.
+Reuse arpeg's existing keyboard/browser instrument for musical input where
+appropriate instead of building another general-purpose playable instrument.
 
-Specify tempo-change behavior, equal-time ordering, looping boundaries and what
-happens to sounding notes when a pattern changes. Swing and quantization are
-optional musical transformations, not corrections applied to every recording.
+### 10. Timing and load diagnostics
 
-### 8. Note-duration and performance editing views
+**Use:** Establish whether a particular Pi, interface and application can handle
+a workload before a performance.
 
-**Use:** Edit a phrase as notes with durations, while keeping meedee's message
-representation useful for low-level programming.
+Make suitable qualification measurements reusable: throughput, queue occupancy,
+loss, scheduling lateness and process-tree resources. Include backend, mode and
+clock conditions. Round-trip loopback timing is not one-way physical latency;
+the latter needs additional instrumentation or a justified clock relationship.
+
+Reuse arpeg/enveLFO performance work for their engines. meedee should measure
+its transport and integration contribution. Any emitted MIDI needs explicitly
+selected destinations and bounded runs. This does not replace open Windows,
+Pi or physical-fault qualification.
+
+## Integration work
 
-Add a derived note view over event sequences with explicit pairing policies for
-overlapping same-pitch notes, missing releases and sustain. Preserve links to
-the underlying events so edits can retain unrelated controllers and metadata.
-A duration inferred from key release should remain distinct from sounding length.
+### A. Use meedee for arpeg's MIDI device boundary
+
+**Use:** Exercise meedee with a substantial real musical application while
+keeping arpeg's existing engine and interfaces.
+
+arpeg's [Rust live host](../../arpeg/crates/arpeg-midi/src/live.rs) currently uses
+midir; its [Python MIDI host](../../arpeg/arpeg/midi.py) uses Mido/RtMidi. Propose
+replacing those device paths with meedee after agreeing a bounded migration.
+The resulting host should use one selected transport path, not retain parallel
+production backends solely for compatibility.
 
-Useful operations include trim, split, concatenate, repeat, quantize and
-velocity editing. Preserve stable ordering and exact time where possible;
-report rounding and unsupported export rather than hiding them.
-
-A CLI could inspect, compare and transform files. A piano-roll GUI is a possible
-later client, not a requirement to turn the library into a full DAW.
-
-## Instrument and studio workflows
-
-### 9. A tuning workbench
-
-**Use:** Design a scale, inspect its tuning error and prepare a deliberate tuning
-transfer to a compatible instrument.
-
-Build on existing MTS values and codecs with scale construction, interval-ratio
-helpers, keyboard mappings and optional Scala scale/mapping file interoperability.
-Keep tuning descriptions separate from a specific device's transmission format.
-Support an inspectable comparison between desired pitches and encoded results.
-
-A CLI could convert files and explain quantization. A GUI could visualize tuning
-and keyboard assignments. Auditioning would need a separate optional sound engine;
-the MIDI library itself does not synthesize audio.
-
-Sending a tuning should require an explicit destination and action. Preserve
-original dumps for backup, and never describe a successful send as verified tuning
-unless a device-supported response actually establishes it.
-
-### 10. SysEx librarian and transfer workflow
-
-**Use:** Back up a synthesizer, compare dumps and restore a selected patch without
-inventing a separate ad hoc transfer script for every instrument.
-
-Build transfer plans over the existing SysEx codecs/files, request tracking and
-recording. Plans could express documented chunk sizes, pacing, replies, deadlines
-and cancellation. Manufacturer/device support should be a collection of explicitly
-supported formats, not a claim that arbitrary SysEx is self-describing.
-
-Provide a generic byte/difference view even when a patch format is unknown.
-A TUI or GUI could organize named backups and show transfer progress.
-Do not resend an uncertain state-changing command automatically. A completed
-byte send and a completed instrument restore are different outcomes.
-
-### 11. Device definitions and reusable setups
-
-**Use:** Give a controller or synthesizer meaningful parameter and patch names,
-then reuse a setup across a script, a router and a desktop tool.
-
-A device definition could describe documented bank/program names, CC/NRPN units,
-encoder conventions, supported tuning mechanisms and transfer constraints.
-Separate these descriptions from observed capabilities and current device state.
-Keep user/vendor instrument definitions distinct from standardized GM tables.
-
-A saved setup could describe desired routes and mappings. On load, show current
-endpoint matches and require resolution of ambiguity. Names and backend IDs are
-not durable proof of physical identity. Applying a setup must distinguish opening
-routes from sending mode changes, patch selections or other musical commands.
-
-Prefer a small declarative format if this becomes useful. Do not introduce a
-plugin framework or executable configuration merely to store parameter names.
-
-### 12. Topology watching and explicit recovery
-
-**Use:** Keep a long-running musical application understandable when a USB device
-is unplugged, rebooted or appears after startup.
-
-Expose bounded topology-change observations and a recovery helper that retires
-old interpretations and proposes fresh endpoint selections. Backend notification
-support and discovery races need platform qualification; watching a port list
-does not prove that a silent device is responsive.
-
-Automatic reconnect could be an opt-in policy for a specifically identified route.
-Restoring patch, tuning, controllers or notes must be a separate action. Do not
-silently replay captured traffic, inherit stale parser state or claim to provide
-a generic instrument heartbeat.
-
-### 13. MIDI-CI browser and supported configuration
-
-**Use:** Inspect a capable instrument's advertised properties and profiles instead
-of hard-coding every capability into an application.
-
-This extends the existing deferred Profiles and Property Exchange work, rather
-than introducing another CI implementation. Once normative documents are acquired,
-add the agreed bounded exchanges and expose a read-oriented browser. Configuration
-writes and profile changes should be explicit actions with inspectable outcomes.
-
-The [MIDI Association's Property Exchange overview](https://midi.org/midi-2-0-property-exchange)
-describes access to device properties; its
-[Profiles overview](https://midi.org/profiles) describes standardized behavioral
-agreements. Neither overview replaces the detailed specifications needed for
-implementation. A device definition from the previous proposal remains useful
-for instruments without these facilities.
-
-### 14. Machine-control helpers
-
-**Use:** Control compatible recorders or studio transport equipment from scripts
-and custom control surfaces.
-
-Add typed values and codecs for a selected subset of
-[MIDI Machine Control](https://midi.org/midi-machine-control), followed by explicit
-request/reply handling where the selected commands require it. Reuse the existing
-time-code values where applicable. Support should follow acquired normative
-specifications and actual device tests.
-
-A small transport-control interface could be useful, but record, locate and
-other state-changing actions need clear targets. Keep this distinct from MIDI
-clock synchronization and from a general-purpose DAW control protocol suite.
-
-## Programming and diagnostic facilities
-
-### 15. Virtual devices and deterministic application tests
-
-**Use:** Test a musical application without requiring an attached synthesizer or
-running a live OS MIDI session in every unit test.
-
-Provide a small transport test double that records sends, injects input and
-simulates time, loss, disconnects and uncertain send failures. It should exercise
-the public musical behavior without pretending to qualify native drivers.
-Reuse existing fake-clock and transport fixtures where practical; avoid creating
-a second protocol implementation solely for tests.
-
-For manual integration work, a CLI could expose a test-owned virtual keyboard,
-controller or responder where the selected backend supports virtual endpoints.
-Clearly distinguish these OS-visible tools from deterministic in-memory tests.
-
-### 16. Capture comparison, validation and regression reports
-
-**Use:** Check whether a new version of a script changed the notes, timing or
-controller behavior it produces.
-
-Compare captures semantically with explicit options for timestamp tolerance,
-source matching and ignored fields. Explain differences in messages, ordering,
-gaps, clock discontinuities and tuning/parameter observations. Compare raw
-records when semantic interpretation is unavailable.
-
-A file checker could report structure, integrity, protocol diagnostics and export
-losses using existing readers/codecs. A CLI is a natural interface; the comparison
-and validation logic should also be callable from Rust/Python tests. Never call
-a timing difference harmless merely because it falls below a default tolerance.
-
-### 17. Python interactive and notebook inspection
-
-**Use:** Explore a recording or prototype an algorithm without manually unpacking
-every immutable message object.
-
-Offer concise inspection summaries and optional notebook views for note activity,
-controller traces, tempo and loss diagnostics. Provide straightforward records
-for analysis, retaining integer/rational timing and explicit clock identity.
-Heavy plotting or data-analysis dependencies should remain optional integrations.
-
-A notebook view should be passive unless the user explicitly opens a port or
-starts playback. Reuse the same analysis used by the monitor and file tools.
-
-### 18. Timing and load diagnostics for real setups
-
-**Use:** Find out whether a particular Pi, USB interface and script can handle
-a workload before using them in a performance.
-
-Turn suitable qualification machinery into opt-in, reusable diagnostics for
-observed throughput, queue occupancy, losses, scheduling lateness and process-tree
-resource consumption. A loopback measurement can report round-trip timing;
-one-way physical latency needs additional instrumentation or a justified clock
-relationship. Separate measured facts from inferred bottlenecks.
-
-Reports should identify backend, mode, clock domains and test conditions.
-Tests that emit MIDI must use explicitly selected destinations and bounded runs.
-This is a practical tool built on qualification work, not a substitute for the
-remaining Windows, Pi and physical-fault validation.
-
-## Longer-term candidates
-
-- **Step sequencer or performance looper:** a useful client for patterns, routing,
-  recording and editing, once loop-boundary and overdub policies are agreed.
-- **Controller-surface editor:** combine mappings, named parameters and optional
-  feedback into a desktop interface for a specific performance setup.
-- **Opt-in network transport/bridges:** useful for studio or distributed Pi setups,
-  but require a separate decision about protocol, clock relationships, discovery,
-  security, loss and reconnect behavior. No network service should appear merely
-  because the library is imported.
-- **Interoperability adapters:** integrations with selected music-programming,
-  notation or audio environments, chosen from actual user projects rather than
-  a broad compatibility layer.
-
-Do not begin with a full DAW, synthesizer, plugin host, notation editor or generic
-remote-control platform. They can consume the project without improving its
-central Rust/Python MIDI programming experience.
+Preserve held/latched/history behavior, expression ordering, bounded admission,
+output pacing and owned-note cleanup. arpeg already follows MIDI clock, handles
+transport and schedules notes; the migration should not move those decisions
+into meedee. Preserve its existing CLI/browser roles rather than recreate them.
+
+Map timestamp origins and units explicitly: meedee's signed native nanoseconds
+and clock identity cannot simply be relabeled as arpeg's host-relative time.
+Test chunk framing, callback/process-mode behavior, disconnects and uncertain
+sends. Initial work can preserve current MIDI 1 behavior; MIDI 2/MPE expansion
+requires a separate musical-policy decision.
+
+### B. Adapt meedee events to uFor performance bindings and enge
+
+**Use:** Drive the same instrument from a MIDI file or live input using declared
+musical rules.
+
+uFor's [performance binding](../../ufor/doc/performance-binding.md) defines channel
+selection, repeated-key release policy, tuning and named controller conversion,
+but leaves the live adapter to a host. Implement that missing execution boundary
+using meedee's decoded events, preserving source identity, trigger ownership,
+unknown state and loss/reset handling. Respect binding semantics instead of
+adding another general mapping model.
+
+[enge's MIDI importer](../../enge/enge/midi.py) currently uses Mido for a restricted
+file-to-performance conversion. An integration could replace that parsing path
+with meedee's file readers and reuse the same binding conversion for live input.
+Do not change existing interpretation silently: its FIFO pairing, channel-based
+parts, controller subset, bend assumptions and ignored program changes must be
+reviewed against the selected binding behavior.
+
+Channel numbering and conversions to exact frame boundaries need explicit tests.
+Rounding belongs at the destination boundary and should be reported where
+material. uFor semantic events and meedee protocol/archive events retain different
+purposes; integration need not replace either representation. enge continues to
+own audio realization and voice retirement.
+
+### C. Realize enveLFO outputs as MIDI controls
+
+**Use:** Modulate external instruments with existing envelopes, LFOs and control
+graphs rather than add another modulation engine.
+
+Map selected named outputs to existing meedee CC, fine-CC, parameter or appropriate
+UMP messages. Agree ranges, quantization, observation cadence, update suppression
+and output-rate limits. Omit no required command ordering, and report overload
+rather than silently claim all intermediate values reached hardware.
+
+Reuse the optional [arpeg/enveLFO bridge](../../arpeg/doc/envelfo.md) for their
+combined musical behavior. It already separates scheduling and realization so
+expression can precede NoteOn. Preserve that ordering rather than adding a
+second bridge with different onset semantics.
+
+The host owns clock mappings and merges engine deadlines with input and delivery.
+enveLFO does not acquire MIDI clock; arpeg already has a particular clock-following
+policy. Assess reuse of that policy before proposing a more general clock service.
+Do not introduce another autonomous scheduler or advance a graph implicitly when
+encoding a MIDI message.
+
+### D. Connect uFor tunings to MTS, with optional enge audition
+
+**Use:** Design a tuning once, audition it and prepare an explicit transfer.
+
+Use uFor's existing tuning/scales and Scala conversion. Sample or resolve the
+selected pitches into meedee's MTS values, reporting range limitations, unmapped
+keys and protocol quantization. Additional keyboard-map formats should be separate
+gap-driven additions to the appropriate owner, not a second Scala/tuning stack.
+
+A CLI or GUI could compare intended and encoded pitches. Optional audition
+should use enge's existing synthesis/sampling. Sending tuning requires an explicit
+destination and action; it is not a side effect of previewing or loading a scale.
+
+### E. Reuse uFor device descriptions, mappings and sequence plans
+
+**Use:** Share meaningful instrument parameters and saved material across musical
+applications without another format for the same information.
+
+Build on uFor's parameter mappings, bindings, instrument definitions and partial
+SysEx descriptions. Its [VL70m proof of concept](../../ufor/doc/vl70m-sysex-example.md)
+already supports lossless dump inspection and bounded relocation; a complete
+librarian score or universal device-description engine is not thereby implemented.
+Use those established contracts and identify actual missing pieces before adding
+schema or device codecs. meedee can supply protocol execution and transfer reports.
+
+Controller learn could propose a supported uFor binding; pickup and hardware
+feedback would need explicit runtime ownership and known/unknown target state.
+Do not implement a second curve evaluator, parameter model or modulation graph.
+Use enveLFO for applicable time-varying control execution.
+
+For file editing and looping, adapt selected meedee records to uFor's existing
+sequence planning where semantics fit. Its raw captures are inert, while semantic
+triggers have ownership and cleanup rules. Do not blindly send every raw record
+or infer sounding duration from a release. An editor/looper may be a future
+integration client, not a second meedee composition or playback-planning engine.
+
+## Interface opportunities
+
+A monitor, capture checker, patch bay, tuning workbench or librarian could justify
+a CLI, TUI or GUI. Notebook views can reuse inspection reports without mandatory
+plotting dependencies. These are workflow clients of the libraries above.
+
+Use existing arpeg interfaces for arpeggiation and enge for audio audition. No
+new DAW, synthesizer, pattern engine, envelope engine or generic plugin framework
+is proposed. Network bridges remain a separate future decision about transport,
+clock relationships, security and recovery, rather than part of these integrations.
 
 ## Suggested order and decisions
 
 | Stage | Candidate scope | Why this order |
 | --- | --- | --- |
-| First | Inspector plus capture validation/comparison | Immediately useful, exercises existing features and improves diagnosis |
-| Second | Transformations, note-state observation and a small router | Enables practical MIDI effects and Pi applications |
-| Third | Controller mapping, clock following and musical scheduling | Adds interactive instrument and sequencer building blocks |
-| Fourth | Choose a tuning, librarian or editing workflow | Develop one complete musical use case before several partial tools |
-| In parallel when available | Device/platform qualification and normative specification acquisition | Provides evidence needed for reliable live and standardized features |
+| First | Inspector and capture validation/comparison | Useful independently and supports integration regression evidence |
+| Second | One bounded arpeg host migration | Tests meedee against an existing real application without new musical behavior |
+| Third | uFor performance-binding adapter and enge input | Connects file/live MIDI to established instrument semantics |
+| Fourth | enveLFO control output or uFor-to-MTS workflow | Choose one complete musical integration before several partial ones |
+| As needed | Routing, topology and instrument transfers | Add concrete transport features demonstrated by those clients |
+| In parallel when available | Platform/device qualification and normative document acquisition | Supplies evidence required for reliable live and standardized features |
 
-These are candidate work packages, not new numbered slices or estimates. Before
-selecting one, agree its musical policies and whether its first interface is
-library-only, a CLI, a TUI or a GUI. Start with one interface where possible.
-Do not choose CLI commands, widget layouts, dependencies or a configuration
-language until a specific proposal is approved.
+These are candidate work packages, not new numbered slices or estimates. Agree
+placement, dependencies, musical policies and the initial interface before
+implementing one. Preserve language boundaries: Python integrations may use
+uFor's Python models, while standalone Rust hosts use existing native engine
+contracts or explicitly prepared data. Do not require Python just to interpret
+a MIDI packet or run an existing Rust engine.
 
-The existing native qualification gates remain release considerations. New pure
-library features can be developed independently, but an attractive interface must
-not obscure unqualified live behavior or imply that device support is universal.
+Core library imports must not start devices, audio, interfaces or network services.
+The existing platform qualification gates remain release considerations. New
+interfaces and integrations must expose losses, uncertainty and unsupported
+capabilities rather than imply universal device support.
