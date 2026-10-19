@@ -1222,7 +1222,7 @@ def test_typed_input_exposes_receive_drops_without_another_packet(
         assert connection.failure is None
         assert connection.receive(timeout=0) is None
         with pytest.raises(AttributeError):
-            connection.dropped_packets = 0
+            connection.dropped_packets = 0  # ty: ignore[invalid-assignment]
     assert connection.dropped_packets == 7
 
 
