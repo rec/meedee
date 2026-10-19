@@ -455,6 +455,10 @@ def read_results(context: Context) -> None:
                     context.update_dropped(dropped)
                     if context.delivery is not None:
                         offer(context.delivery, packet, dropped)
+            elif tag == "dropped":
+                generation, dropped = cast(tuple[int, int], payload)
+                if generation == context.generation:
+                    context.update_dropped(dropped)
             else:
                 context.replies.put_nowait((tag, payload))
                 if tag == "error":

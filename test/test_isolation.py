@@ -1041,6 +1041,23 @@ def test_native_drop_count_arrives_with_packets_without_an_extra_request(
     assert connection.dropped_packets == 7
 
 
+def test_native_drop_count_arrives_while_input_stays_silent(
+    workers: list[Popen[bytes]],
+) -> None:
+    received = Event()
+    source = input_client("native_drop_idle")
+    connection = source.connect(source.ports()[0], lambda packet: received.set())
+    deadline = monotonic() + 3
+    while connection.dropped_packets != 7 and monotonic() < deadline:
+        sleep(0.01)
+    assert connection.dropped_packets == 7
+    assert not received.is_set()
+    # An idle status must not enter the command-reply queue or poison the worker.
+    assert source.worker_failure is None
+    connection.close()
+    assert connection.dropped_packets == 7
+
+
 @pytest.mark.parametrize("accepted", range(6))
 def test_compound_failure_preserves_progress_through_the_worker_pipe(
     accepted: int, workers: list[Popen[bytes]]

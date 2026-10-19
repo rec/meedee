@@ -1611,3 +1611,28 @@ MIDI-using process, including isolated children. These changes do not qualify
 Pi budgets, physical faults, other MIDI libraries' initialization choices, or
 recovery from MIDI-server restart. CI stays published-release-only with Python
 3.11 and 3.15; no Actions run or release was initiated. No dependencies changed.
+
+
+## Isolated receive-loss reporting while idle, 2026-10-19
+
+The Python arpeg host migration exposed a gap in the private worker protocol:
+known native drops were carried by subsequent MIDI packets or command replies,
+so dropping a final packet followed by silence left the parent counter stale.
+The forwarding thread now uses its existing 100 ms empty-queue wake-up to report
+changed native/forwarding drop totals in a status-only message. It starts no
+additional thread and sends no MIDI traffic. Packet messages still carry their
+counts. Unchanged idle counts produce no status message.
+
+The parent consumes these notifications outside the command-reply queue and
+accepts only the active connection generation. Existing monotonic count merging
+and close-time snapshots remain in use. Scheduling, pipe backpressure and worker
+failure still prevent an absolute reporting deadline or a complete loss account.
+
+A controlled child regression changes its native drop count after open and sends
+no MIDI callback. The parent observes seven drops without another command or
+packet, remains usable, and retains the count after explicit close. The existing
+packet-carried accounting regression also passes. This uses controlled child
+faults, not CoreMIDI or a physical device. The Python 3.11 full suite passes
+255 tests in 24.84 seconds; Python 3.15 passes the same 255 tests in 34.17
+seconds. Ruff, Python formatting, ty, pyupgrade and diff checks pass. The native
+arpeg integration will be rerun against this Git revision independently.
