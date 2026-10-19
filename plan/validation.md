@@ -1688,3 +1688,15 @@ Python checks pass 267 tests with one optional skip; focused comparison cases
 cover all four formats, identity policy, span/metadata timing, malformed trailers,
 length changes and example bounds. Rust checks and the serial workspace suite
 pass. Static checks pass with the existing local Clippy deprecation exception.
+
+## Optional offline CLI, 2026-10-19
+
+Slice 3 adds the optional `meedee` command with Pydantic/Tyro inspect, validate
+and compare models, text/JSON presentation and the approved 0/1/2 statuses.
+The CLI dependencies remain an optional extra, committed separately without
+upgrading existing packages. Inspect is detailed; validate is a compact quality
+verdict. Missing timestamps alone are informational. Source checks pass 270
+tests with one optional skip, including parser, identity-map, JSON, missing-file,
+invalid-argument, comparison and capture-quality cases. Ruff, formatting, ty,
+pyupgrade, lock consistency and whitespace checks pass. The release-only workflow
+installs CLI extras from the lock and tests the installed command surface.

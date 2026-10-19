@@ -34,6 +34,9 @@ cli = [
 Repository = "https://github.com/rec/meedee"
 Issues = "https://github.com/rec/meedee/issues"
 
+[project.scripts]
+meedee = "meedee.cli:main"
+
 [dependency-groups]
 dev = [
     "maturin==1.15.0",
