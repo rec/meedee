@@ -13,6 +13,40 @@ struct Report {
 #[pymethods]
 impl Report {
     #[getter]
+    fn source_counts(&self) -> BTreeMap<String, u64> {
+        self.value.timing.source_counts.clone()
+    }
+    #[getter]
+    fn timing_segments(&self) -> Vec<TimingSegment> {
+        self.value
+            .timing
+            .segments
+            .iter()
+            .map(|v| TimingSegment { value: v.clone() })
+            .collect()
+    }
+    #[getter]
+    fn timing_diagnostics(&self) -> Vec<TimingDiagnostic> {
+        self.value
+            .timing
+            .diagnostics
+            .iter()
+            .map(|v| TimingDiagnostic { value: v.clone() })
+            .collect()
+    }
+    #[getter]
+    fn timestamp_regressions(&self) -> u64 {
+        self.value.timing.regressions
+    }
+    #[getter]
+    fn omitted_segments(&self) -> u64 {
+        self.value.timing.omitted_segments
+    }
+    #[getter]
+    fn omitted_diagnostics(&self) -> u64 {
+        self.value.timing.omitted_diagnostics
+    }
+    #[getter]
     fn complete(&self) -> bool {
         self.value.complete
     }
@@ -84,13 +118,14 @@ impl Report {
 }
 
 #[pyfunction]
-#[pyo3(signature=(source, *, format, payload_limit=1_048_576, preserve_unknown=false))]
+#[pyo3(signature=(source, *, format, payload_limit=1_048_576, preserve_unknown=false, detail_limit=128))]
 fn inspect_file(
     py: Python<'_>,
     source: &Bound<'_, PyAny>,
     format: &str,
     #[pyo3(from_py_with=limit)] payload_limit: usize,
     #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
+    #[pyo3(from_py_with=limit)] detail_limit: usize,
 ) -> PyResult<Report> {
     let format = match format {
         "archive" => inspection::Format::Archive,
@@ -105,12 +140,89 @@ fn inspect_file(
     };
     let source = Stream::input(source)?;
     let value = py
-        .detach(move || inspection::inspect(source, format, payload_limit, preserve_unknown))
+        .detach(move || {
+            inspection::inspect(
+                source,
+                format,
+                payload_limit,
+                preserve_unknown,
+                detail_limit,
+            )
+        })
         .map_err(os_error)?;
     Ok(Report { value })
 }
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Report>()?;
+    module.add_class::<TimingSegment>()?;
+    module.add_class::<TimingDiagnostic>()?;
     module.add_function(wrap_pyfunction!(inspect_file, module)?)
+}
+
+#[pyclass(frozen, module = "meedee.inspection")]
+struct TimingSegment {
+    value: meedee::inspection_timing::TimingSegment,
+}
+#[pymethods]
+impl TimingSegment {
+    #[getter]
+    fn source(&self) -> &str {
+        &self.value.source
+    }
+    #[getter]
+    fn clock_identity(&self) -> Option<&str> {
+        self.value.clock_identity.as_deref()
+    }
+    #[getter]
+    fn number(&self) -> u64 {
+        self.value.number
+    }
+    #[getter]
+    fn events(&self) -> u64 {
+        self.value.events
+    }
+    #[getter]
+    fn untimed(&self) -> u64 {
+        self.value.untimed
+    }
+    #[getter]
+    fn first(&self) -> Option<i128> {
+        self.value.first
+    }
+    #[getter]
+    fn last(&self) -> Option<i128> {
+        self.value.last
+    }
+    #[getter]
+    fn minimum(&self) -> Option<i128> {
+        self.value.minimum
+    }
+    #[getter]
+    fn maximum(&self) -> Option<i128> {
+        self.value.maximum
+    }
+    #[getter]
+    fn regressions(&self) -> u64 {
+        self.value.regressions
+    }
+}
+#[pyclass(frozen, module = "meedee.inspection")]
+struct TimingDiagnostic {
+    value: meedee::inspection_timing::TimingDiagnostic,
+}
+#[pymethods]
+impl TimingDiagnostic {
+    #[getter]
+    fn source(&self) -> &str {
+        &self.value.source
+    }
+    #[getter]
+    fn record(&self) -> u64 {
+        self.value.record
+    }
+    #[getter]
+    fn kind(&self) -> &str {
+        self.value.kind
+    }
 }

@@ -48,6 +48,7 @@ fn archive_completion_is_separate_from_capture_loss() {
         Format::Archive,
         file_io::DEFAULT_LIMIT,
         false,
+        128,
     )
     .unwrap();
     assert!(r.complete);
@@ -67,6 +68,7 @@ fn archive_completion_is_separate_from_capture_loss() {
         Format::Archive,
         file_io::DEFAULT_LIMIT,
         false,
+        128,
     )
     .unwrap();
     assert!(!r.complete);
@@ -76,12 +78,12 @@ fn archive_completion_is_separate_from_capture_loss() {
 
 #[test]
 fn malformed_input_returns_only_verified_prefix_counts() {
-    let r = inspect(&b"\xf0\x7d\xf7\xf0\x01"[..], Format::Syx, 10, false).unwrap();
+    let r = inspect(&b"\xf0\x7d\xf7\xf0\x01"[..], Format::Syx, 10, false, 128).unwrap();
     assert!(!r.complete);
     assert_eq!(r.records, 1);
     assert_eq!(r.message_counts["SysEx"], 1);
     assert!(r.problem.unwrap().contains("byte 5"));
-    let r = inspect(&b"invalid"[..], Format::Smf, 10, false).unwrap();
+    let r = inspect(&b"invalid"[..], Format::Smf, 10, false, 128).unwrap();
     assert!(!r.complete);
     assert!(r.smf_header.is_none());
     assert_eq!(r.records, 0);
@@ -101,11 +103,15 @@ fn input_failures_and_invalid_limits_are_not_format_reports() {
     }
     for format in [Format::Archive, Format::Smf, Format::Syx, Format::Clip] {
         assert_eq!(
-            inspect(FailedDisk, format, 1024, false).unwrap_err().kind(),
+            inspect(FailedDisk, format, 1024, false, 128)
+                .unwrap_err()
+                .kind(),
             io::ErrorKind::PermissionDenied
         );
         assert_eq!(
-            inspect(io::empty(), format, 0, false).unwrap_err().kind(),
+            inspect(io::empty(), format, 0, false, 128)
+                .unwrap_err()
+                .kind(),
             io::ErrorKind::InvalidInput
         );
     }

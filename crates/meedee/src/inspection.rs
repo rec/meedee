@@ -15,6 +15,7 @@ pub enum Format {
 /// Completion does not certify lossless capture, device support or safe replay.
 #[derive(Debug, Default)]
 pub struct Report {
+    pub timing: crate::inspection_timing::Timing,
     pub complete: bool,
     pub problem: Option<String>,
     pub records: u64,
@@ -40,11 +41,12 @@ pub fn inspect<R: Read>(
     format: Format,
     payload_limit: usize,
     preserve_unknown: bool,
+    detail_limit: usize,
 ) -> io::Result<Report> {
-    if payload_limit == 0 {
+    if payload_limit == 0 || detail_limit == 0 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "payload limit must be positive",
+            "payload and detail limits must be positive",
         ));
     }
     let mut report = Report::default();
@@ -53,6 +55,7 @@ pub fn inspect<R: Read>(
         format,
         payload_limit,
         preserve_unknown,
+        detail_limit,
     );
     match result {
         Ok(()) => report.complete = true,
@@ -76,6 +79,7 @@ impl Report {
         format: Format,
         limit: usize,
         preserve: bool,
+        detail_limit: usize,
     ) -> io::Result<()> {
         match format {
             Format::Archive => {
@@ -87,6 +91,25 @@ impl Report {
                         archive::Record::Clock(c) => self.clocks.push(c),
                         r @ archive::Record::Stream { .. } => self.streams.push(r),
                         archive::Record::Event(e) => {
+                            let clock =
+                                e.timestamp
+                                    .as_ref()
+                                    .map(|t| t.clock.identity())
+                                    .or_else(|| {
+                                        self.streams.iter().find_map(|r| match r {
+                                            archive::Record::Stream {
+                                                id, clock_identity, ..
+                                            } if id == &e.stream => clock_identity.as_deref(),
+                                            _ => None,
+                                        })
+                                    });
+                            self.timing.observe(
+                                &e.stream,
+                                clock,
+                                e.timestamp.as_ref().map(|t| i128::from(t.ticks)),
+                                self.records - 1,
+                                detail_limit,
+                            );
                             self.untimed_events += u64::from(e.timestamp.is_none());
                             match &e.message {
                                 events::Payload::Midi1(v) => self.count(midi1_kind(v)),
@@ -94,11 +117,21 @@ impl Report {
                                 events::Payload::Command(v) => self.count(command_kind(v)),
                             }
                         }
-                        archive::Record::Gap { lost, .. } => {
+                        archive::Record::Gap { stream, lost, .. } => {
+                            self.timing
+                                .boundary(&stream, self.records - 1, "gap", detail_limit);
                             self.gap_records += 1;
                             self.lost_events += u128::from(lost);
                         }
-                        archive::Record::Discontinuity { .. } => self.discontinuities += 1,
+                        archive::Record::Discontinuity { stream, .. } => {
+                            self.discontinuities += 1;
+                            self.timing.boundary(
+                                &stream,
+                                self.records - 1,
+                                "discontinuity",
+                                detail_limit,
+                            );
+                        }
                         archive::Record::Opaque { .. } => self.opaque_records += 1,
                         archive::Record::Metadata { .. } => {}
                     }
@@ -111,6 +144,13 @@ impl Report {
                     let event = event?;
                     self.records += 1;
                     if !matches!(event.record, smf::Record::Chunk { .. }) {
+                        self.timing.observe(
+                            &format!("track:{}", event.track),
+                            Some("smf_ticks"),
+                            Some(i128::from(event.tick)),
+                            self.records - 1,
+                            detail_limit,
+                        );
                         *self.track_records.entry(event.track).or_default() += 1;
                     }
                     match event.record {
@@ -126,6 +166,8 @@ impl Report {
                     record?;
                     self.records += 1;
                     self.count("SysEx");
+                    self.timing
+                        .observe("syx", None, None, self.records - 1, detail_limit);
                     self.untimed_events += 1;
                 }
             }
@@ -134,6 +176,13 @@ impl Report {
                     let entry = entry?;
                     self.records += 1;
                     self.count_ump(&entry.message);
+                    self.timing.observe(
+                        "clip",
+                        Some("clip_ticks"),
+                        entry.tick.map(i128::from),
+                        self.records - 1,
+                        detail_limit,
+                    );
                     self.untimed_events += u64::from(entry.tick.is_none());
                 }
             }

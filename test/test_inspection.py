@@ -161,3 +161,39 @@ def test_argument_and_file_access_errors_are_not_malformed_file_reports(
 
     with pytest.raises(OSError, match="read denied"):
         inspection.inspect_file(FailedDisk(), format="archive")
+
+
+def test_timing_segments_preserve_exact_ranges_and_reset_after_loss() -> None:
+    output = BytesIO()
+    writer = archive.Writer(output)
+    clock = events.Clock(identity="c")
+    writer.write(clock)
+    writer.write(archive.Stream(id="s", label="", clock_identity="c"))
+    for t in [5, 3, None]:
+        writer.write(
+            events.Event(
+                stream="s",
+                message=messages.TimingClock(),
+                timestamp=None if t is None else events.Timestamp(ticks=t, clock=clock),
+            )
+        )
+    writer.write(archive.Gap(stream="s", lost=1, reason="loss"))
+    writer.write(
+        events.Event(
+            stream="s",
+            message=messages.TimingClock(),
+            timestamp=events.Timestamp(ticks=-100, clock=clock),
+        )
+    )
+    writer.finish()
+    report = inspection.inspect_file(
+        BytesIO(output.getvalue()), format="archive", detail_limit=1
+    )
+    assert report.complete and report.timestamp_regressions == 1
+    assert report.source_counts == {"s": 4}
+    segment = report.timing_segments[0]
+    assert segment.first == 5 and segment.last == 3
+    assert segment.minimum == 3 and segment.maximum == 5
+    assert segment.untimed == 1 and segment.regressions == 1
+    assert report.omitted_segments == 1 and report.omitted_diagnostics == 2
+    assert report.timing_diagnostics[0].kind == "timestamp_regression"

@@ -1665,3 +1665,14 @@ The two archive-content checks pass. Each wheel passes all seven focused
 inspection/message/import tests in a separate environment outside the checkout.
 Release CI includes the new installed-wheel tests without changing its trigger
 or Python endpoints. No hardware, live MIDI, release or workflow was run.
+
+## Source-local inspection timing, 2026-10-19
+
+Slice 1 adds exact source/segment counts and tick ranges, regression diagnostics,
+and visible omitted-detail totals. Known loss, discontinuity and clock changes
+reset chronology without changing structural completeness. File-derived source
+state is bounded by the readers' descriptor/track limits; retained segment and
+diagnostic examples default to 128 each. Source Python checks pass 263 tests with
+one optional skip; focused Rust timing tests and the serial workspace suite pass.
+Ruff, formatting, ty, pyupgrade, Cargo formatting and Clippy with the previously
+documented local deprecation exception pass. No live MIDI was used.
