@@ -1676,3 +1676,15 @@ diagnostic examples default to 128 each. Source Python checks pass 263 tests wit
 one optional skip; focused Rust timing tests and the serial workspace suite pass.
 Ruff, formatting, ty, pyupgrade, Cargo formatting and Clippy with the previously
 documented local deprecation exception pass. No live MIDI was used.
+
+## Same-format capture comparison, 2026-10-19
+
+Slice 2 compares canonical raw file records by position, including file metadata,
+configuration and archive source spans. Source/clock remapping is explicit and
+one-to-one; timing is exact unless ignored or given an explicit tick tolerance.
+Both inputs are read through completion checks even after differences, with
+bounded indexed examples and no implicit alignment or resynchronization.
+Python checks pass 267 tests with one optional skip; focused comparison cases
+cover all four formats, identity policy, span/metadata timing, malformed trailers,
+length changes and example bounds. Rust checks and the serial workspace suite
+pass. Static checks pass with the existing local Clippy deprecation exception.

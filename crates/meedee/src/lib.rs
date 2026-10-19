@@ -16,6 +16,7 @@ pub mod velocity;
 
 pub mod archive;
 pub mod clip;
+pub mod comparison;
 pub mod event_views;
 pub mod events;
 pub mod file_io;

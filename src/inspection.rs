@@ -127,17 +127,7 @@ fn inspect_file(
     #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
     #[pyo3(from_py_with=limit)] detail_limit: usize,
 ) -> PyResult<Report> {
-    let format = match format {
-        "archive" => inspection::Format::Archive,
-        "smf" => inspection::Format::Smf,
-        "syx" => inspection::Format::Syx,
-        "clip" => inspection::Format::Clip,
-        _ => {
-            return Err(PyValueError::new_err(
-                "format must be archive, smf, syx or clip",
-            ))
-        }
-    };
+    let format = parse_format(format)?;
     let source = Stream::input(source)?;
     let value = py
         .detach(move || {
@@ -154,10 +144,23 @@ fn inspect_file(
 }
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    crate::comparison::register(module)?;
     module.add_class::<Report>()?;
     module.add_class::<TimingSegment>()?;
     module.add_class::<TimingDiagnostic>()?;
     module.add_function(wrap_pyfunction!(inspect_file, module)?)
+}
+
+pub fn parse_format(format: &str) -> PyResult<inspection::Format> {
+    match format {
+        "archive" => Ok(inspection::Format::Archive),
+        "smf" => Ok(inspection::Format::Smf),
+        "syx" => Ok(inspection::Format::Syx),
+        "clip" => Ok(inspection::Format::Clip),
+        _ => Err(PyValueError::new_err(
+            "format must be archive, smf, syx or clip",
+        )),
+    }
 }
 
 #[pyclass(frozen, module = "meedee.inspection")]

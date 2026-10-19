@@ -141,6 +141,29 @@ fixed message-family counts and one counter per declared SMF track. It does not
 grow with event count. Inspection reads to EOF without a CPU/time deadline or
 filesystem cancellation guarantee. No file conversion or rewriting is performed.
 
+`inspection.compare_files(left, right, format=...)` compares decoded records in
+the same format, preserving metadata, configuration, source order and opaque
+content. It is not a byte-for-byte comparison of running-status encoding.
+Archives use explicit left-to-right `source_map` and `clock_map` dictionaries;
+unmapped identities must match exactly. Clock units and other descriptors still
+must match. An identity mapping declares a comparison role, not synchronization.
+
+Timestamps are exact by default. `tick_tolerance=N` permits a nonnegative
+difference in the unchanged clock/file tick unit; alternatively
+`ignore_timestamps=True` ignores timestamp values and presence. These choices
+cannot be combined. Span packet indexes and all non-timing content remain
+significant. Clip DCS values are compared through cumulative ticks under those
+timing policies; DCTPQ/configuration remain exact. No automatic time alignment,
+protocol conversion, stream merging or matching past insertions/deletions occurs.
+
+The comparison report contains equality, both completion/problem states, record
+counts, total differences and at most `detail_limit` indexed examples. None as
+an example's record index identifies an SMF header difference. Both files are
+read through completion checks; identical invalid prefixes are never equal.
+Examples contain reasons/indexes rather than copies of potentially large payloads.
+Missing/inaccessible files and read failures raise errors. Comparison does not
+retain the full files or change either source.
+
 ## MIDI-CI management
 
 `meedee.ci` provides immutable MIDI-CI 1.2.1 Discovery/Reply, Endpoint Inquiry/Reply,
