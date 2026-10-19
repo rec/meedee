@@ -48,9 +48,53 @@ class Compare(FileOptions, frozen=True):
         return self
 
 
+class Monitor(BaseModel, frozen=True):
+    """Passively monitor one input selected by its exact, unique port name."""
+
+    port: tyro.conf.Positional[str] = Field(min_length=1)
+    protocol: Literal["midi1", "ump"]
+    backend: (
+        Literal[
+            "CoreMidi",
+            "CoreMidiUmp",
+            "AlsaSeq",
+            "AlsaSeqUmp",
+            "AlsaRaw",
+            "AlsaRawUmp",
+            "WinMm",
+            "WindowsMidiServices",
+        ]
+        | None
+    ) = None
+    output: Literal["text", "json"] = "text"
+    isolated: bool = True
+    duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    types: list[str] = Field(default_factory=list)
+    channel: int | None = Field(default=None, ge=1, le=16)
+    group: int | None = Field(default=None, ge=1, le=16)
+    history_limit: int = Field(default=128, gt=0)
+    preview_bytes: int = Field(default=64, gt=0)
+    event_limit: int = Field(default=128, gt=0)
+    receive_byte_limit: int = Field(default=8_388_608, gt=0)
+    sysex_limit: int = Field(default=1_048_576, gt=0)
+    detail_limit: int = Field(default=128, gt=0)
+
+    @model_validator(mode="after")
+    def check_group(self) -> Self:
+        if self.protocol == "midi1" and self.group is not None:
+            raise ValueError("a group filter requires UMP protocol")
+        return self
+
+
 def run(args: list[str] | None = None) -> int:
     try:
-        command = tyro.cli(Inspect | Validate | Compare, args=args, prog="meedee")
+        command = tyro.cli(
+            Inspect | Validate | Compare | Monitor, args=args, prog="meedee"
+        )
+        if isinstance(command, Monitor):
+            from ._monitor import run_monitor
+
+            return run_monitor(command)
         if isinstance(command, Compare):
             report = inspection.compare_files(
                 command.left,

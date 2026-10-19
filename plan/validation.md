@@ -1700,3 +1700,29 @@ tests with one optional skip, including parser, identity-map, JSON, missing-file
 invalid-argument, comparison and capture-quality cases. Ruff, formatting, ty,
 pyupgrade, lock consistency and whitespace checks pass. The release-only workflow
 installs CLI extras from the lock and tests the installed command surface.
+
+## Passive live monitor and final inspection verification, 2026-10-19
+
+Slice 4 adds exact single-input selection, required protocol choice, display
+filters, bounded history/payload previews and caller-thread text/JSON output.
+The existing typed queue and Rust decoders/interpreters remain the only receive
+path. A pure one-source Observer reuses file timing/message aggregation and
+returns frozen snapshots without claiming file completion. Known loss resets
+views and continues; terminal queue/worker failures stop. Asynchronous transport
+drop totals remain separate from overlapping sequence-gap counts.
+
+The final Python 3.11 suite passes **274 tests with one optional skip**. Focused
+monitor tests use controlled events, loss and clocks to verify filtering without
+context loss, resets, source rejection, bounded history/previews, duration,
+interrupts, terminal failures and input closure. No OS MIDI endpoint was opened.
+The Rust workspace and focused observer/timing suites pass. Ruff, formatting,
+ty, pyupgrade, Cargo formatting, whitespace and lock checks pass. Clippy passes
+with the pre-existing local Rust 1.99 atomic-deprecation exception.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution.
+Both distribution checks pass, including the console entry point, new sources,
+typing and optional-only dependency metadata. Each installed wheel passes all
+**19** inspection/comparison/CLI/monitor/message tests outside the checkout.
+These are device-free software and packaging checks. Physical live-monitor
+operation and other platforms retain their qualification gates. CI remains
+published-release-only; no workflow, release or physical MIDI test was run.

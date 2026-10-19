@@ -22,7 +22,7 @@ pub struct TimingDiagnostic {
     pub kind: &'static str,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Timing {
     pub source_counts: BTreeMap<String, u64>,
     pub segments: Vec<TimingSegment>,
@@ -33,7 +33,7 @@ pub struct Timing {
     states: BTreeMap<String, State>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct State {
     number: u64,
     clock: Option<String>,
