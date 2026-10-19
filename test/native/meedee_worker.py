@@ -59,16 +59,17 @@ class Input:
         )
         if self.mode == "failed_open":
             raise midi.ConnectError("device vanished during connect")
-        if self.mode == "native_drop":
+        if self.mode in ("native_drop", "native_drop_idle"):
 
             def deliver_after_open_reply() -> None:
                 assert connection.observed.wait(3)
                 connection.native_dropped = 7
-                callback(
-                    ReceivedPacket(
-                        timestamp_ns=17, clock=connection.clock, packet=b"\xf8"
+                if self.mode == "native_drop":
+                    callback(
+                        ReceivedPacket(
+                            timestamp_ns=17, clock=connection.clock, packet=b"\xf8"
+                        )
                     )
-                )
 
             Thread(target=deliver_after_open_reply, daemon=True).start()
         if self.mode in ("early", "twice", "burst"):
@@ -161,7 +162,10 @@ class InputConnection:
 
     @property
     def dropped_packets(self) -> int:
-        if self.mode == "native_drop" and not self.observed.is_set():
+        if (
+            self.mode in ("native_drop", "native_drop_idle")
+            and not self.observed.is_set()
+        ):
             self.observed.set()
             return 0
         return self.native_dropped

@@ -51,18 +51,22 @@ class Producer:
             self.dropped += 1
 
     def emit(self) -> None:
+        reported = 0
         try:
             while not self.stopped.is_set():
                 try:
                     packet = self.messages.get(timeout=0.1)
                 except Empty:
-                    continue
+                    packet = None
                 native_dropped = (
                     0 if self.connection is None else self.connection.dropped_packets
                 )
-                self.sender.send(
-                    "message", (self.generation, packet, self.dropped + native_dropped)
-                )
+                dropped = self.dropped + native_dropped
+                if packet is not None:
+                    self.sender.send("message", (self.generation, packet, dropped))
+                elif dropped != reported:
+                    self.sender.send("dropped", (self.generation, dropped))
+                reported = dropped
         except (OSError, ValueError):
             self.stopped.set()
 

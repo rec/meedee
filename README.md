@@ -416,7 +416,11 @@ Native receive admission bounds owned in-flight payloads to 8 MiB per input by
 default. Each isolated receive queue additionally holds at most 128 packets and
 8 MiB of payload. The same input byte-limit setting applies at each stage.
 `dropped_packets` combines known native-admission and forwarding/dispatch queue
-drops; a worker crash can lose the final count, and driver loss is not measured.
+drops. While input is idle, the existing forwarding thread checks for changed
+worker drop counts on its 100 ms queue wake-up and reports them without another
+MIDI packet or command. This is a reporting cadence, not a latency deadline under
+CPU/GIL contention or pipe backpressure. A worker crash can still lose the final
+count, and driver loss is not measured.
 Application-retained data, Python/queue overhead and OS buffers are outside these
 budgets. Floods and allocation/process aborts remain possible.
 
