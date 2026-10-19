@@ -21,6 +21,7 @@ pub mod events;
 pub mod file_io;
 pub mod file_timing;
 pub mod inspection;
+pub mod inspection_timing;
 pub mod live;
 pub mod playback;
 pub mod recording;

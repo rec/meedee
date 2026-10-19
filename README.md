@@ -128,6 +128,15 @@ independent sources. This report does not certify device capabilities or safe
 playback. Existing readers remain the way to inspect individual raw records.
 
 Working storage follows the existing readers' payload/descriptor limits plus
+bounded timing detail (`detail_limit=128` by default). `source_counts` counts
+archive events per stream, SMF records per `track:N`, Clip packets and SYX dumps.
+`timing_segments` retain exact first/last/minimum/maximum ticks, missing times
+and regressions. Archive clocks remain independent; SMF/Clip ticks are file
+units. Gaps, discontinuities and clock changes start new source-local segments.
+`timestamp_regressions` remains a diagnostic and does not change `complete`.
+Omitted segment/diagnostic totals make exhausted detail limits visible.
+
+Other working storage follows the existing readers' payload/descriptor limits plus
 fixed message-family counts and one counter per declared SMF track. It does not
 grow with event count. Inspection reads to EOF without a CPU/time deadline or
 filesystem cancellation guarantee. No file conversion or rewriting is performed.
