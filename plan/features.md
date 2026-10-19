@@ -141,6 +141,13 @@ limit certainty; cleanup must not become an implicit cancellation/disposal actio
 
 ### 5. Topology watching and explicit recovery
 
+**Implemented observation:** Rust/Python complete-descriptor multiset snapshots,
+bounded change samples/history, a caller-driven Python discovery poller, and
+read-only `ports`/`watch-ports` CLI commands. Discovery failure or port-limit
+overflow stops polling and retains the last complete snapshot. Polling is not
+an atomic OS view and can miss transients. Native subscriptions, route recovery,
+reconnection and MIDI-state restoration remain separate proposals.
+
 **Use:** Keep a long-running application understandable when devices appear,
 unplug, reboot or change endpoint identity.
 

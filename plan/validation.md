@@ -1784,3 +1784,36 @@ The release-only workflow includes the new installed-wheel tests. No application
 native MIDI endpoint, physical device, audio engine, release or CI workflow was
 started. External feedback loops, physical delivery and other platforms retain
 their existing qualification limits.
+
+## Topology observation and discovery polling, 2026-10-19
+
+Three slices add shared Rust/Python descriptor-multiset snapshots and bounded
+change reports, a caller-driven Python discovery poller, and read-only `ports`
+and `watch-ports` CLI commands. The approved comparison uses backend, protocol,
+direction, backend ID and name, preserving duplicate counts. The first complete
+scan establishes a baseline without inventing arrivals. Discovery failure or
+port-limit overflow stops polling and retains the last complete observation.
+No native notification interface, reconnect, route mutation or MIDI-state replay
+was added. Limits bound retained observations, not full native enumeration.
+
+The full Python 3.11 suite passes **307 tests with one optional skip**. Checks
+cover descriptor equality and frozen copies, duplicate counts, rename semantics,
+rejected scans without false removals, lazy client creation and reuse, failure
+partway through a paired input/output scan, failed initialization, quiet unchanged
+polls, duration, Ctrl-C and CLI failure versus complete-empty-result reporting.
+Discovery clients are controlled substitutes; no native discovery was run.
+The pure-import harness also constructs the poller while transport initialization
+is forbidden, confirming import/construction remain passive.
+
+Rust workspace tests and doctests pass, including three topology cases for
+multiset changes, bounded history/details and preservation of rejected-scan
+baselines. Ruff, formatting, ty, pyupgrade, Cargo formatting, lock and whitespace
+checks pass. Clippy passes with the existing Rust 1.99 atomic-deprecation
+exception; lifecycle code and warning suppressions remain unchanged.
+
+The macOS arm64 Python 3.11/3.15 wheels build from the source distribution. Both
+distribution checks pass, and each installed wheel passes **52** focused checks
+outside the checkout. The release-only workflow includes the new topology and
+discovery tests. No application, native MIDI endpoint, physical device, release
+or CI workflow was started. Polling remains serial and can miss transients;
+physical topology races and other platforms retain their qualification gates.

@@ -1075,3 +1075,65 @@ capacity stop or a valid archive whose routing stops, and 2 for malformed input,
 arguments/access/setup/transport failures or an interrupted uncertain send.
 Interruption with pending deliveries stops and reports them without counting
 unsent copies as confirmed. Already-sent notes can remain active after stopping.
+
+## Topology observations and discovery polling
+
+Rust `topology::Endpoint` and frozen Python `topology.Endpoint` contain backend
+label, protocol (`midi1`/`ump`), direction (`input`/`output`), backend ID and name.
+Equality compares all five fields. The backend label is observation metadata;
+backend IDs and names do not establish physical identity or health. Empty names
+are retained. Endpoints are inert descriptors, without native handles or
+connectable discovery tickets.
+
+`topology.Tracker(port_limit=256, detail_limit=128, history_limit=128)` accepts
+complete endpoint lists with `observe`. Rust uses the same three constructor
+limits. Repeated identical descriptors retain multiplicity through `PortCount`;
+the port limit counts all instances, not only distinct descriptors. Generation
+zero means no complete baseline exists. The first accepted scan establishes a
+baseline with zero arrivals/removals. Later reports compare multisets, so a rename
+is removal plus addition even when the backend ID is unchanged. Reordering alone
+is not a change. Identical observations cannot prove uninterrupted presence.
+
+Frozen `Report` values expose generation, total port count, grouped ports, the
+last `Delta`, changed-scan history, omitted-history total, stopped state and reason.
+Every accepted scan advances the generation. Only changed scans enter history;
+eviction increments `omitted_history`. `added`/`removed` count port instances,
+while `omitted_changes` counts descriptor-delta entries excluded by detail_limit.
+The complete current baseline still advances when only diagnostic samples are
+omitted. Changes have deterministic descriptor order, not inferred event timing.
+
+An oversized scan stops the tracker and rejects the entire observation. Explicit
+`stop(reason)` likewise retains the last complete baseline, delta and history;
+the first reason is retained, capped at 1024 Unicode characters. No removals are
+inferred from a failed/partial scan. `observe` after stopping raises an error.
+Snapshots and collection getters return independent copies. Cardinality limits
+bound retained observations, not metadata byte sizes or caller-owned copies.
+
+`discovery.Poller` is a Python adapter with explicit protocol, optional backend,
+isolation enabled by default and the same observation limits. Import and
+construction start no transport clients. The first explicit `poll()` creates
+one unconnected Input and one Output client; subsequent polls reuse them. Each
+poll enumerates both directions through existing APIs and commits only when both
+scans succeed within the total port limit. Existing discovery APIs enumerate full
+results before this adapter can reject their size; they have no new allocation
+budget. Input/output enumeration is serial, not an atomic topology transaction.
+
+Known discovery/transport errors and limit overflow produce a stopped report and
+close the poller, preserving the last complete baseline. `snapshot()` remains
+available after closure; polling a closed poller raises ValueError. `close()` and
+context exit release owned client references through the existing retirement
+path, without promising synchronous native destruction. No endpoint is opened,
+no traffic is sent, and no background polling thread is introduced. Rust hosts
+can feed their existing discovery results to the shared tracker directly.
+
+The optional CLI adds `ports --protocol midi1|ump` for one scan and `watch-ports`
+for polling, with explicit backend/isolation choices and text/JSON output.
+Watch defaults to a one-second interval, prints the initial baseline and actual
+changes, and emits a final bounded summary on duration expiry, Ctrl-C or failure.
+Unchanged scans produce no intermediate rows. Output explicitly distinguishes an
+uninitialized failed/interrupted scan from a complete empty result. Status 0
+means clean completion/interruption; status 2 means discovery failure or overflow.
+Ordinary appearance/disappearance is not an error. Duration cannot interrupt an
+in-flight transport operation. Existing backend/client qualification limits apply.
+Polling can miss transitions between scans; no notification, reconnect, route
+mutation, MIDI-state replay, cleanup or physical-identity guarantee is supplied.

@@ -10,6 +10,7 @@ pub mod mpe;
 pub mod notes;
 pub mod routing;
 pub mod timecode;
+pub mod topology;
 pub mod transport;
 pub mod tuning;
 pub mod ump;
