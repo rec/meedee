@@ -159,6 +159,11 @@ class TypedInputConnection:
         return self._raw is None or self._raw.closed
 
     @property
+    def dropped_packets(self) -> int:
+        """Observed raw receive drops, including drops followed by silence."""
+        return 0 if self._raw is None else self._raw.dropped_packets
+
+    @property
     def failure(self) -> Exception | None:
         return self._failure or (
             None if self._raw is None else self._raw.worker_failure
