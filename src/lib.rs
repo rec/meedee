@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 
 mod errors;
 mod input;
+mod inspection;
 mod output;
 mod state;
 
@@ -34,6 +35,7 @@ mod transport_tests;
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ci, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_inspection, module)?)?;
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
     module.add_function(wrap_pyfunction!(populate_events, module)?)?;
     module.add_function(wrap_pyfunction!(populate_codecs, module)?)?;
@@ -214,4 +216,9 @@ fn populate_archive(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_ci(module: &Bound<'_, PyModule>) -> PyResult<()> {
     ci::register(module)
+}
+
+#[pyfunction]
+fn populate_inspection(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    inspection::register(module)
 }

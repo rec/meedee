@@ -64,6 +64,12 @@ and archive facilities.
 
 ### 2. Capture comparison and file validation
 
+**Implemented foundation:** `meedee.inspection.inspect_file` and the shared Rust
+`inspection::inspect` summarize archive/SMF/SYX/Clip files and report verified
+prefixes, completion, capture gaps/discontinuities, source/clock descriptors and
+opaque content. Live monitoring, comparison policies and interfaces remain
+separate work.
+
 **Use:** Determine whether changing a script altered its messages, ordering or
 timing, and diagnose damaged or unsuitable MIDI files.
 

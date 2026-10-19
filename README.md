@@ -88,6 +88,50 @@ streaming: reading and verifying an entire capture before playback is necessary
 if no output may precede discovering a damaged or incomplete trailer. CRCs detect
 accidental corruption and do not authenticate a file.
 
+## File inspection and capture validation
+
+```python
+from meedee import inspection
+
+report = inspection.inspect_file("take.meedee", format="archive")
+print(report.complete, report.problem)
+print(report.message_counts)
+print(report.gap_records, report.lost_events, report.discontinuities)
+for source in report.streams:
+    print(source.id, source.label, source.clock_identity)
+```
+
+Choose `format="archive"`, `"smf"`, `"syx"` or `"clip"` explicitly. Paths and
+binary streams are accepted; borrowed streams stay open and are read from their
+current position. Inspection starts no MIDI workers and sends nothing. Rust
+applications use `meedee::inspection::inspect` with the corresponding `Format`.
+
+The frozen report counts successfully decoded records and messages without
+retaining the event payloads. It retains archive clock/stream descriptors and,
+for SMF, the header and per-track record counts. Collection properties return
+copies. Malformed input, CRC failure, missing completion and configured payload
+limits stop inspection at the verified prefix, with `complete=False` and the
+reader's location/reason in `problem`. File access and read failures raise
+`OSError`. Unknown archive/UMP content is rejected unless
+`preserve_unknown=True`; preserved unknown/rejected UMP layouts and unknown
+archive records are counted as opaque. SMF unknown chunks are always counted as
+opaque, following that reader's preservation policy.
+
+`complete` means the entire file passed the selected reader's completion checks.
+A structurally complete capture may still have gaps or discontinuities. Inspect
+those counts separately. UMP counts include individual clock/configuration
+packets, and SMF SysEx fragments remain fragments, without implicit assembly.
+`untimed_events` counts archive events with no timestamp, all SYX messages and
+Clip packets before a known file tick; SMF events always have file ticks.
+File ticks are not host timestamps, and clock descriptors do not synchronize
+independent sources. This report does not certify device capabilities or safe
+playback. Existing readers remain the way to inspect individual raw records.
+
+Working storage follows the existing readers' payload/descriptor limits plus
+fixed message-family counts and one counter per declared SMF track. It does not
+grow with event count. Inspection reads to EOF without a CPU/time deadline or
+filesystem cancellation guarantee. No file conversion or rewriting is performed.
+
 ## MIDI-CI management
 
 `meedee.ci` provides immutable MIDI-CI 1.2.1 Discovery/Reply, Endpoint Inquiry/Reply,
