@@ -67,6 +67,12 @@ packet's timestamp and their contributing packet span. Optional `EventInterprete
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
 
+`TypedInputConnection.dropped_packets` exposes the observed raw receive-drop
+count, including updates during silence. Poll it alongside `failure` when loss
+must stop a live session: typed queue overflow is reported through `failure`.
+Isolated updates are asynchronous, so neither property proves loss-free delivery
+or device health.
+
 `input_connection.start_recording(path)` attaches a bounded background recorder;
 `stop_recording()` returns a report whose `complete`, `gap_records` and `failure`
 fields must be checked. By default any observed input loss or write/admission

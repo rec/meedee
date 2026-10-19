@@ -1209,6 +1209,23 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
         connection.close()
 
 
+def test_typed_input_exposes_receive_drops_without_another_packet(
+    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MEEDEE_TEST_MODE", "native_drop_idle")
+    source = midi.TypedInput(timeout=1)
+    with source.connect(source.ports()[0]) as connection:
+        deadline = monotonic() + 3
+        while connection.dropped_packets != 7 and monotonic() < deadline:
+            sleep(0.01)
+        assert connection.dropped_packets == 7
+        assert connection.failure is None
+        assert connection.receive(timeout=0) is None
+        with pytest.raises(AttributeError):
+            connection.dropped_packets = 0
+    assert connection.dropped_packets == 7
+
+
 def test_typed_queue_reports_overflow_and_retains_primitive_events(
     workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
