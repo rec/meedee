@@ -25,6 +25,7 @@ def main() -> None:
             smf,
             syx,
             timecode,
+            topology,
             tuning,
             ump,
             universal,
@@ -115,6 +116,13 @@ def main() -> None:
             )
         )
         assert router.snapshot().admitted == 1
+        tracker = topology.Tracker()
+        assert tracker.observe([]).generation == 1
+        from meedee import discovery
+
+        poller = discovery.Poller(protocol="midi1")
+        assert poller.snapshot().generation == 0
+        poller.close()
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
         view = controls.EventInterpreter()
         assert view.feed(events.Event(stream="s", message=messages.TimingClock())) == []

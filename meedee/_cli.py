@@ -144,13 +144,55 @@ class Patch(RouteOptions, frozen=True):
     sysex_limit: int = Field(default=1_048_576, gt=0)
 
 
+class Ports(BaseModel, frozen=True):
+    """List a complete input/output discovery snapshot, without opening endpoints."""
+
+    protocol: Literal["midi1", "ump"]
+    backend: (
+        Literal[
+            "CoreMidi",
+            "CoreMidiUmp",
+            "AlsaSeq",
+            "AlsaSeqUmp",
+            "AlsaRaw",
+            "AlsaRawUmp",
+            "WinMm",
+            "WindowsMidiServices",
+        ]
+        | None
+    ) = None
+    isolated: bool = True
+    port_limit: int = Field(default=256, gt=0)
+    detail_limit: int = Field(default=128, gt=0)
+    output: Literal["text", "json"] = "text"
+
+
+class WatchPorts(Ports, frozen=True):
+    """Poll discovery; print the baseline and changes, with bounded history."""
+
+    interval: float = Field(default=1.0, gt=0, allow_inf_nan=False)
+    duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    history_limit: int = Field(default=128, gt=0)
+
+
 def run(args: list[str] | None = None) -> int:
     try:
         command = tyro.cli(
-            Inspect | Validate | Compare | Monitor | RoutePreview | Patch,
+            Inspect
+            | Validate
+            | Compare
+            | Monitor
+            | RoutePreview
+            | Patch
+            | Ports
+            | WatchPorts,
             args=args,
             prog="meedee",
         )
+        if isinstance(command, Ports):
+            from ._topology_cli import run_discovery
+
+            return run_discovery(command)
         if isinstance(command, RoutePreview):
             from ._routing_cli import run_preview
 

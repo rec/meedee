@@ -740,3 +740,43 @@ session without cleanup or retry. Already-sent notes can remain active. Object a
 provenance overhead is outside the payload-byte budget; returned snapshots/examples
 are caller-owned copies. External feedback loops and physical device responses
 remain unqualified. See [the routing contract](plan/api.md#static-protocol-aware-routing).
+
+### Port discovery and topology changes
+
+The optional CLI can list ports or watch discovery without opening endpoints:
+
+```bash
+meedee ports --protocol midi1 --output json
+meedee watch-ports --protocol ump --interval 1 --duration 60
+```
+
+Watch prints an initial baseline, changes and a final bounded summary. Unchanged
+scans stay quiet. Discovery failure or port-limit overflow stops the session with
+status 2 and retains the last complete snapshot; ordinary topology changes and
+clean completion/Ctrl-C return 0. Failed initial discovery is explicitly marked
+uninitialized rather than presented as an empty port list.
+
+`meedee.topology` provides the same pure Rust/Python snapshot/change model.
+Descriptors compare backend, protocol, direction, backend ID and name, preserving
+duplicate counts. A rename is removal/addition, not proof of device continuity.
+`Tracker.observe(...)` accepts complete descriptor lists; the first accepted scan
+establishes a baseline without inventing arrivals.
+
+`meedee.discovery.Poller` creates its existing isolated discovery clients only on
+the first explicit poll, reuses them, and releases its references on close:
+
+```python
+from meedee.discovery import Poller
+
+with Poller(protocol="midi1") as poller:
+    report = poller.poll()
+    if report.stopped:
+        print(report.reason)
+```
+
+Defaults retain at most 256 port instances, 128 change samples per scan and 128
+changed-scan history entries. These bound retained cardinality, not native
+enumeration allocation or metadata byte sizes. Input and output enumeration is
+serial; polling can miss transient changes and does not establish physical
+identity or device health. No reconnect, route change or MIDI-state restoration
+is performed. See [the topology contract](plan/api.md#topology-observations-and-discovery-polling).
