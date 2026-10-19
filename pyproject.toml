@@ -23,6 +23,9 @@ classifiers = [
     "Programming Language :: Python :: 3.15",
 ]
 
+[project.optional-dependencies]
+ufor = ["ufor; python_version >= '3.13'"]
+
 [project.urls]
 Repository = "https://github.com/rec/meedee"
 Issues = "https://github.com/rec/meedee/issues"
@@ -35,6 +38,10 @@ dev = [
     "ruff>=0.11",
     "ty>=0.0.1",
 ]
+
+[tool.uv.sources]
+ufor = { git = "https://github.com/rec/ufor", branch = "main" }
+reccy = { git = "https://github.com/rec/reccy.git", branch = "main" }
 
 [tool.maturin]
 python-source = "."
