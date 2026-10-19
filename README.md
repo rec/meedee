@@ -161,6 +161,7 @@ counts, total differences and at most `detail_limit` indexed examples. None as
 an example's record index identifies an SMF header difference. Both files are
 read through completion checks; identical invalid prefixes are never equal.
 Examples contain reasons/indexes rather than copies of potentially large payloads.
+Equal files can both contain capture loss; use `validate` to check capture quality.
 Missing/inaccessible files and read failures raise errors. Comparison does not
 retain the full files or change either source.
 
@@ -184,6 +185,47 @@ capture-quality problems, and 2 for malformed/incomplete data, access errors or
 invalid arguments. Missing times alone are informational, since untimed captures
 and SYX files are legitimate. Opaque content, gaps, discontinuities and timestamp
 regressions are quality findings. No offline command opens a MIDI client.
+
+### Passive live monitoring
+
+```sh
+meedee monitor "Exact input port name" --protocol midi1 --duration 30
+meedee monitor "Exact UMP input name" --protocol ump --group 16 --channel 1 --output json
+```
+
+The name must match exactly one input in the selected backend's current discovery
+snapshot; no first-port fallback or automatic reconnect is performed. Protocol
+selection is required; `--backend` can select a compiled backend by its API name
+(for example `CoreMidi` or `CoreMidiUmp`). Isolation remains enabled by default.
+This command opens only input and sends no MIDI. Stop with Ctrl-C or `--duration`
+in seconds. Input closes before the final summary, including on terminal failure.
+
+`--types NoteOn ControlChange`, `--channel` and UMP-only `--group` filter display,
+not the underlying source interpretation. Existing Rust control and velocity
+views receive the full source; MIDI 1 interpretation inside UMP requires a selected
+group. Other MIDI 2 values remain typed packet observations, without translation.
+Loss/failure diagnostics bypass filters. Known loss resets interpretation and
+source timing, then monitoring continues. Terminal typed-queue or worker failures
+stop with status 2. A completed session with diagnostics/loss/regressions returns
+1; a clean session returns 0. A live summary is not file-completion evidence.
+
+Retained display history defaults to 128 entries and SysEx previews to 64 bytes
+(`--history-limit`, `--preview-bytes`). The typed input retains its existing count,
+payload and SysEx bounds (`--event-limit`, `--receive-byte-limit`, `--sysex-limit`).
+Source timing examples use `--detail-limit`. The final summary includes bounded
+history and all observed counters, including filtered events. Output is emitted
+on the controlling thread, never in a native callback. Slow output can still
+overload input; it is reported rather than silently treated as complete capture.
+
+`transport_drop_total` is an asynchronous observation and can overlap
+sequence-derived `lost_events`; they are not additive. Counter changes reset views
+without adding the same loss again, including updates during silence and close.
+The ongoing pure Rust `inspection::Observer` / Python `inspection.Observer` uses
+the same timing/message aggregation as files and exposes immutable snapshots.
+It is tied to one source and initial connection clock; create another observer
+for another connection. Its snapshots never claim file completion. Device health,
+driver-loss detection, physical latency and hardware interoperability remain
+outside these observations.
 
 ## MIDI-CI management
 

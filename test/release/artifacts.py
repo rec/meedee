@@ -48,6 +48,7 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                 "meedee/inspection.pyi",
                 "meedee/cli.py",
                 "meedee/_cli.py",
+                "meedee/_monitor.py",
                 "meedee/_typed.py",
                 "meedee/smf.py",
                 "meedee/smf.pyi",
@@ -74,6 +75,10 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             )
             (metadata_name,) = (n for n in names if n.endswith(".dist-info/METADATA"))
             metadata = BytesParser().parsebytes(archive.read(metadata_name))
+            entry_points = archive.read(
+                metadata_name.rsplit("/", 1)[0] + "/entry_points.txt"
+            ).decode()
+            assert "meedee=meedee.cli:main" in entry_points.replace(" ", "")
             assert metadata["Name"] == "meedee"
             assert metadata["Version"] == version
             assert metadata["Requires-Python"] == ">=3.11"
@@ -167,6 +172,8 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/cli.py",
                 "meedee/_cli.py",
                 "test/test_cli.py",
+                "test/test_monitor.py",
+                "meedee/_monitor.py",
                 "test/test_comparison.py",
                 "crates/meedee/src/inspection.rs",
                 "crates/meedee/tests/inspection.rs",

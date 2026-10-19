@@ -13,7 +13,7 @@ pub enum Format {
 
 /// Counts describe successfully decoded records before the first problem.
 /// Completion does not certify lossless capture, device support or safe replay.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Report {
     pub timing: crate::inspection_timing::Timing,
     pub complete: bool,
@@ -31,6 +31,97 @@ pub struct Report {
     pub discontinuities: u64,
     pub untimed_events: u64,
     pub opaque_records: u64,
+}
+
+/// Caller-driven inspection of one live source. It owns no transport or thread.
+/// Snapshots are ongoing observations, never certificates of file completion.
+pub struct Observer {
+    report: Report,
+    stream: String,
+    clock: events::Clock,
+    detail_limit: usize,
+}
+impl Observer {
+    pub fn snapshot(&self) -> Report {
+        self.report.clone()
+    }
+    pub fn new(stream: String, clock: events::Clock, detail_limit: usize) -> io::Result<Self> {
+        if stream.is_empty() || detail_limit == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "stream and positive detail limit required",
+            ));
+        }
+        let report = Report {
+            clocks: vec![clock.clone()],
+            streams: vec![archive::Record::Stream {
+                id: stream.clone(),
+                label: String::new(),
+                clock_identity: Some(clock.identity().into()),
+            }],
+            ..Report::default()
+        };
+        Ok(Self {
+            report,
+            stream,
+            clock,
+            detail_limit,
+        })
+    }
+    pub fn feed(&mut self, item: &crate::live::Item) -> io::Result<()> {
+        if let crate::live::Item::Event(e) = item {
+            e.validate()?;
+        }
+        let stream = match item {
+            crate::live::Item::Event(e) => &e.stream,
+            crate::live::Item::Diagnostic(d) => &d.stream,
+        };
+        if stream != &self.stream {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "observer belongs to one source",
+            ));
+        }
+        self.report.records += 1;
+        match item {
+            crate::live::Item::Event(e) => {
+                self.report
+                    .observe_event(e, Some(self.clock.identity()), self.detail_limit)
+            }
+            crate::live::Item::Diagnostic(d) => {
+                let kind = match d.kind {
+                    crate::live::DiagnosticKind::Loss => {
+                        self.report.gap_records += 1;
+                        self.report.lost_events += u128::from(d.lost);
+                        "gap"
+                    }
+                    crate::live::DiagnosticKind::ClockChange => {
+                        self.report.discontinuities += 1;
+                        "clock_change"
+                    }
+                    crate::live::DiagnosticKind::Malformed => "malformed",
+                    crate::live::DiagnosticKind::Truncated => "truncated",
+                };
+                self.report.timing.boundary(
+                    &self.stream,
+                    self.report.records - 1,
+                    kind,
+                    self.detail_limit,
+                );
+            }
+        }
+        Ok(())
+    }
+    /// Asynchronous counters can overlap sequence gaps. Reset without adding
+    /// their counts to sequence-derived lost_events a second time.
+    pub fn loss_counter_changed(&mut self) {
+        self.report.timing.boundary(
+            &self.stream,
+            self.report.records,
+            "loss_counter",
+            self.detail_limit,
+        );
+    }
 }
 
 /// Inspect from the current position through EOF, stopping at the first error.
@@ -91,31 +182,13 @@ impl Report {
                         archive::Record::Clock(c) => self.clocks.push(c),
                         r @ archive::Record::Stream { .. } => self.streams.push(r),
                         archive::Record::Event(e) => {
-                            let clock =
-                                e.timestamp
-                                    .as_ref()
-                                    .map(|t| t.clock.identity())
-                                    .or_else(|| {
-                                        self.streams.iter().find_map(|r| match r {
-                                            archive::Record::Stream {
-                                                id, clock_identity, ..
-                                            } if id == &e.stream => clock_identity.as_deref(),
-                                            _ => None,
-                                        })
-                                    });
-                            self.timing.observe(
-                                &e.stream,
-                                clock,
-                                e.timestamp.as_ref().map(|t| i128::from(t.ticks)),
-                                self.records - 1,
-                                detail_limit,
-                            );
-                            self.untimed_events += u64::from(e.timestamp.is_none());
-                            match &e.message {
-                                events::Payload::Midi1(v) => self.count(midi1_kind(v)),
-                                events::Payload::Ump(v) => self.count_ump(v),
-                                events::Payload::Command(v) => self.count(command_kind(v)),
-                            }
+                            let clock = self.streams.iter().find_map(|r| match r {
+                                archive::Record::Stream {
+                                    id, clock_identity, ..
+                                } if id == &e.stream => clock_identity.clone(),
+                                _ => None,
+                            });
+                            self.observe_event(&e, clock.as_deref(), detail_limit);
                         }
                         archive::Record::Gap { stream, lost, .. } => {
                             self.timing
@@ -192,6 +265,32 @@ impl Report {
 
     fn count(&mut self, kind: &'static str) {
         *self.message_counts.entry(kind).or_default() += 1;
+    }
+
+    fn observe_event(
+        &mut self,
+        e: &events::Event,
+        default_clock: Option<&str>,
+        detail_limit: usize,
+    ) {
+        let clock = e
+            .timestamp
+            .as_ref()
+            .map(|t| t.clock.identity())
+            .or(default_clock);
+        self.timing.observe(
+            &e.stream,
+            clock,
+            e.timestamp.as_ref().map(|t| i128::from(t.ticks)),
+            self.records - 1,
+            detail_limit,
+        );
+        self.untimed_events += u64::from(e.timestamp.is_none());
+        match &e.message {
+            events::Payload::Midi1(v) => self.count(midi1_kind(v)),
+            events::Payload::Ump(v) => self.count_ump(v),
+            events::Payload::Command(v) => self.count(command_kind(v)),
+        }
     }
 
     fn count_ump(&mut self, value: &ump::UmpMessage) {

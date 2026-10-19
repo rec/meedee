@@ -49,6 +49,11 @@ heavier visualization can run on a desktop.
 
 ### 1. MIDI inspector and diagnostic monitor
 
+**Implemented:** source-local timing diagnostics, optional file inspection and
+validation CLI, and passive single-input monitoring with bounded display history,
+filters, existing control/velocity interpretation and explicit loss/failure
+reporting. Broader interactive views remain proposals.
+
 **Use:** Explain unexpected keyboard, synthesizer or script behavior without
 writing a fresh monitoring script each time.
 
@@ -67,8 +72,9 @@ and archive facilities.
 **Implemented foundation:** `meedee.inspection.inspect_file` and the shared Rust
 `inspection::inspect` summarize archive/SMF/SYX/Clip files and report verified
 prefixes, completion, capture gaps/discontinuities, source/clock descriptors and
-opaque content. Live monitoring, comparison policies and interfaces remain
-separate work.
+opaque content. Same-format comparison now supports explicit source/clock maps,
+timing policies and bounded differences through Rust/Python APIs and the optional
+CLI. Cross-format musical comparisons and interactive editors remain separate.
 
 **Use:** Determine whether changing a script altered its messages, ordering or
 timing, and diagnose damaged or unsuitable MIDI files.

@@ -913,7 +913,7 @@ budgets. Native UMP qualification is separate from this software capability.
 ## File inspection and capture validation
 
 `meedee.inspection.inspect_file(source, *, format, payload_limit=1048576,
-preserve_unknown=False)` uses the shared Rust `inspection::inspect` pass over
+preserve_unknown=False, detail_limit=128)` uses the shared Rust `inspection::inspect` pass over
 the existing archive/SMF/SYX/Clip readers. Format is explicit. Inspection is
 read-only, opens no MIDI resources and adds no parser, scheduler or dependencies.
 
@@ -929,4 +929,29 @@ counts never include the rejected record. `complete` requires successful EOF
 validation, independently of gap/discontinuity/opaque counts. File I/O failures
 propagate rather than being labeled malformed data. Unknown-content policy is
 inherited from the selected reader. See README.md for counting/resource details.
-Live monitoring, capture comparison and user interfaces remain separate work.
+
+Source-local timing summaries retain exact ticks, first/last/min/max ranges,
+missing times and regression counts. Loss, discontinuity and clock changes start
+new segments; they do not invalidate structural completeness. Segment/diagnostic
+examples are bounded by detail_limit, with explicit omitted totals.
+
+`compare_files` and Rust `comparison::compare` compare same-format records by
+position with explicit one-to-one archive source/clock maps. Timestamp policy is
+exact by default, with either a tick tolerance or ignoring timestamps. Metadata,
+configuration, span packet indexes and non-timing content remain significant.
+Both inputs must reach verified completion before equality is reported. There
+is no automatic alignment, cross-format musical conversion or resynchronization.
+
+The optional `cli` extra supplies Pydantic/Tyro inspect, validate, compare and
+monitor commands, text/JSON output and 0/1/2 verdicts. Core imports remain free
+of mandatory Python dependencies. The passive monitor selects one exact unique
+input name and explicit protocol, with isolation enabled by default and existing
+typed-queue/payload limits. Display filters do not filter interpretation or hide
+loss/failure notices. Known loss resets views and continues; terminal transport
+failure stops. History and payload previews are bounded. It sends no MIDI.
+
+Pure `inspection.Observer` instances aggregate one live source using the same
+Rust timing/message logic and return frozen snapshots, without file-completion
+claims. Asynchronous transport drop totals may overlap sequence-gap diagnostics;
+counter notices reset source context without double counting sequence loss.
+README.md documents CLI selection, filters, resource bounds and examples.

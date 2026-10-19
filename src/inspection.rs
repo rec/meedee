@@ -146,9 +146,52 @@ fn inspect_file(
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     crate::comparison::register(module)?;
     module.add_class::<Report>()?;
+    module.add_class::<Observer>()?;
     module.add_class::<TimingSegment>()?;
     module.add_class::<TimingDiagnostic>()?;
     module.add_function(wrap_pyfunction!(inspect_file, module)?)
+}
+
+#[pyclass(module = "meedee.inspection")]
+struct Observer {
+    value: inspection::Observer,
+}
+#[pymethods]
+impl Observer {
+    #[new]
+    #[pyo3(signature=(*,stream,clock,detail_limit=128))]
+    fn new(
+        stream: String,
+        clock: PyRef<'_, crate::packets::Clock>,
+        #[pyo3(from_py_with=limit)] detail_limit: usize,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            value: inspection::Observer::new(stream, clock.value.clone(), detail_limit)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+        })
+    }
+    fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
+        let item = if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
+            meedee::live::Item::Event(Box::new(e.value.clone()))
+        } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
+            meedee::live::Item::Diagnostic(d.value.clone())
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "expected Event or StreamDiagnostic",
+            ));
+        };
+        self.value
+            .feed(&item)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+    fn loss_counter_changed(&mut self) {
+        self.value.loss_counter_changed();
+    }
+    fn snapshot(&self) -> Report {
+        Report {
+            value: self.value.snapshot(),
+        }
+    }
 }
 
 pub fn parse_format(format: &str) -> PyResult<inspection::Format> {
