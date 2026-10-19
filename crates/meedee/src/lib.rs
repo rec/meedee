@@ -8,6 +8,7 @@ pub mod gm;
 pub mod messages;
 pub mod mpe;
 pub mod notes;
+pub mod routing;
 pub mod timecode;
 pub mod transport;
 pub mod tuning;

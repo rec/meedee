@@ -90,6 +90,14 @@ regression support, not a new musical sequence editor.
 
 ### 3. Protocol-aware routing, merging and splitting
 
+**Implemented static foundation:** Rust/Python one-hop routes select sources and
+channels/groups, remap channel-voice addresses and fan out in caller arrival
+order. A bounded queue admits complete fan-outs, with per-route capacity and
+confirmation reports. Archive preview and an optional one-input live patch-bay
+CLI reuse this core. Routes remain fixed; loss/overload/failure stops the session.
+Scheduled merging, dynamic routes, recovery and ownership-based cleanup remain
+separate proposals. External physical feedback loops are not detected.
+
 **Use:** Connect controllers and instruments, combine sources or run a small
 headless MIDI patch bay.
 

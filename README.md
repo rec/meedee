@@ -693,3 +693,50 @@ monitor event rows and final summaries include it. Monitor filters affect displa
 only. Outstanding notes and unmatched releases do not change file completeness
 or validation exit codes. See [the API contract](plan/api.md#observed-note-activity)
 for reset, channel-mode and uncertainty policies.
+
+### Static routing and patch bay
+
+`meedee.routing` provides caller-driven Rust/Python routes, bounded arrival-order
+merging and fan-out. Routes select exact sources and optionally filter/remap
+channels and UMP groups. Channel voice is forwarded by default; other traffic
+requires opt-in. Source/timestamp/span provenance stays attached to each delivery,
+and native MIDI 2 values are preserved. There is no automatic protocol conversion,
+timestamp scheduling, reconnect or cleanup send.
+
+```python
+from meedee import events, messages, routing
+
+router = routing.Router(routes=[routing.Route(
+    name="keys-to-synth", source="keys", destination="synth",
+    protocol="midi1", remap_channel=2,
+)])
+router.feed(events.Event(
+    stream="keys", message=messages.NoteOn(channel=1, note=60, velocity=100)
+))
+delivery = router.peek()
+# The host sends delivery.event.message to the selected destination.
+# After success: router.confirm(delivery.id)
+# After a failed/uncertain send: router.fail(delivery.id, reason)
+```
+
+Install the optional CLI extra for offline archive preview or live forwarding:
+
+```bash
+meedee route-preview capture.meedee --stream keys --protocol midi1 --destinations synth --remap-channel 2
+meedee patch "Keyboard" --protocol midi1 --destinations "Synthesizer" --remap-channel 2
+```
+
+Preview opens no ports and labels simulated deliveries `planned`. Patch uses exact
+unique port names and isolation by default. It sends only when explicitly invoked;
+changing routes requires a new session. `--include-nonchannel` permits supported
+system/SysEx/UMP traffic; file-only/opaque UMP and compound commands are not
+implicitly sent. Byte MIDI has no group options.
+
+The queue defaults to 128 deliveries and 8 MiB of encoded payload. Capacity
+admission is all-or-none for each fan-out; sending can stop after a partial fan-out.
+Reports retain per-route capacity rejections, confirmed progress, pending copies
+and uncertain destinations. Input loss, overload or output failure stops the whole
+session without cleanup or retry. Already-sent notes can remain active. Object and
+provenance overhead is outside the payload-byte budget; returned snapshots/examples
+are caller-owned copies. External feedback loops and physical device responses
+remain unqualified. See [the routing contract](plan/api.md#static-protocol-aware-routing).

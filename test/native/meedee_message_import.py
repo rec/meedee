@@ -21,6 +21,7 @@ def main() -> None:
             messages,
             mpe,
             notes,
+            routing,
             smf,
             syx,
             timecode,
@@ -101,6 +102,19 @@ def main() -> None:
             )
         )
         assert tracker.snapshot().channels[0].notes[0].held == 1
+        router = routing.Router(
+            routes=[
+                routing.Route(
+                    name="r", source="pure", destination="out", protocol="midi1"
+                )
+            ]
+        )
+        router.feed(
+            events.Event(
+                stream="pure", message=messages.NoteOn(channel=1, note=60, velocity=1)
+            )
+        )
+        assert router.snapshot().admitted == 1
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
         view = controls.EventInterpreter()
         assert view.feed(events.Event(stream="s", message=messages.TimingClock())) == []
