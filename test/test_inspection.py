@@ -104,6 +104,8 @@ def test_smf_tracks_and_fragments_retain_file_semantics(tmp_path: Path) -> None:
     assert report.smf_header.format == 2 and report.smf_header.division == 480
     assert report.track_records == {0: 2, 1: 2}
     assert report.message_counts == {"NoteOn": 1, "SysExFragment": 1}
+    assert report.note_state.channels[0].source == "track:0"
+    assert report.note_state.channels[0].unmatched_releases == 1
     assert not report.clocks and not report.streams
     unknown = before[:14] + b"JUNK\x00\x00\x00\x02xy" + before[14:]
     report = inspection.inspect_file(BytesIO(unknown), format="smf")
@@ -124,6 +126,9 @@ def test_clip_completion_and_syx_limits_use_existing_readers() -> None:
     assert report.message_counts["UMP.Midi1ChannelVoice"] == 1
     assert report.message_counts["UMP.Stream"] == 2
     assert report.untimed_events == 0
+    assert report.note_state.channels[0].source == "clip"
+    assert report.note_state.channels[0].group == 1
+    assert report.note_state.channels[0].notes[0].held == 1
     unknown = data[:40] + bytes.fromhex("60000000") + data[44:]
     report = inspection.inspect_file(BytesIO(unknown), format="clip")
     assert not report.complete and report.records == 5

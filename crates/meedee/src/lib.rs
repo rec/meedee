@@ -7,6 +7,7 @@ pub mod controls;
 pub mod gm;
 pub mod messages;
 pub mod mpe;
+pub mod notes;
 pub mod timecode;
 pub mod transport;
 pub mod tuning;

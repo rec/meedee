@@ -65,6 +65,21 @@ def test_group_channel_filters_and_sysex_previews_are_bounded() -> None:
         Monitor(port="keys", protocol="midi1", group=1)
 
 
+def test_filtered_notes_update_state_and_loss_invalidates_it() -> None:
+    session = Session(
+        Monitor(port="keys", protocol="midi1", types=["NoteOff"]),
+        "s",
+        events.Clock(identity="c"),
+    )
+    assert session.feed(event(messages.NoteOn(channel=1, note=60, velocity=1))) == []
+    row = session.feed(event(messages.NoteOff(channel=1, note=60, velocity=0)))[0]
+    state = row["note_state"]
+    assert isinstance(state, list) and state[0]["notes"][0]["released"] == 1
+    session.counter(1)
+    channel = session.observer.snapshot().note_state.channels[0]
+    assert channel.uncertain and channel.notes == []
+
+
 class Feed:
     def __init__(self, items: list[events.Event]) -> None:
         self.stream = "s"

@@ -3,7 +3,7 @@
 from os import PathLike
 from typing import BinaryIO, Literal
 
-from . import archive, events, smf
+from . import archive, events, notes, smf
 
 def inspect_file(
     source: str | PathLike[str] | BinaryIO,
@@ -15,6 +15,8 @@ def inspect_file(
 ) -> Report: ...
 
 class Report:
+    @property
+    def note_state(self) -> notes.Report: ...
     @property
     def source_counts(self) -> dict[str, int]: ...
     @property
@@ -125,6 +127,9 @@ class Difference:
     def reason(self) -> str: ...
 
 class Observer:
+    def channel_states(
+        self, *, channel: int, group: int | None = None
+    ) -> list[notes.ChannelState]: ...
     def __init__(
         self, *, stream: str, clock: events.Clock, detail_limit: int = 128
     ) -> None: ...
