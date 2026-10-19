@@ -173,6 +173,20 @@ or unsolicited dumps cannot be distinguished. A successful send does not prove
 an instrument accepted or applied the tuning. See [the API contract](plan/api.md)
 for units, names, checksum behavior and request tracking.
 
+## Optional uFor tuning bridge
+
+On Python 3.13+, install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
+`meedee.ufor_tuning.preview(source, notes=[...])` resolves an existing uFor
+`Tuning`, retaining exact frequencies where available, encoded pitches and signed
+MTS rounding errors. Finite-source gaps and evaluation/range failures stay
+explicit. `bulk_dump()` and `note_changes()` construct messages with explicit
+device/program/bank and real-time settings. They open no ports and send nothing.
+Unmapped keys require deliberate `preserve_unmapped=True`; invalid pitches always
+block generation. See the [bridge contract](plan/ufor-tuning.md).
+
+Ordinary meedee installs retain Python 3.11 support and no runtime dependencies.
+The optional module explains its Python requirement when imported on 3.11/3.12.
+
 ## General MIDI and profile helpers
 
 ```python
