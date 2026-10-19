@@ -11,6 +11,57 @@ pytest.importorskip("pydantic", reason="install meedee[cli] for CLI tests")
 from meedee import archive, cli, events, messages
 
 
+def test_route_preview_is_offline_and_labels_simulated_deliveries(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "capture.meedee"
+    writer = archive.Writer(path)
+    writer.write(archive.Stream(id="s", label=""))
+    writer.write(
+        events.Event(
+            stream="s", message=messages.NoteOn(channel=1, note=60, velocity=100)
+        )
+    )
+    writer.finish()
+    before = path.read_bytes()
+    with pytest.raises(SystemExit) as result:
+        cli.main(
+            [
+                "route-preview",
+                str(path),
+                "--stream",
+                "s",
+                "--protocol",
+                "midi1",
+                "--destinations",
+                "out",
+                "--remap-channel",
+                "16",
+                "--output",
+                "json",
+            ]
+        )
+    assert result.value.code == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["dry_run"] and data["complete"] and data["planned"] == 1
+    assert "confirmed" not in data and "channel=16" in data["examples"][0]["preview"]
+    assert path.read_bytes() == before
+    with pytest.raises(SystemExit) as result:
+        cli.main(
+            [
+                "route-preview",
+                str(path),
+                "--stream",
+                "missing",
+                "--protocol",
+                "midi1",
+                "--destinations",
+                "out",
+            ]
+        )
+    assert result.value.code == 2 and capsys.readouterr().err
+
+
 def test_inspect_validate_compare_exit_status_and_json(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

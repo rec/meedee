@@ -1004,3 +1004,74 @@ rows include matching channel summaries. Display filters run after state updates
 addressed channel's protocol views, so live rows do not copy unrelated history.
 History limits still bound stored rows, and no cleanup messages are constructed
 or sent. The existing MPE tracker retains its separate zone/member semantics.
+
+## Static protocol-aware routing
+
+Rust `routing::Route` and Python `routing.Route` specify name, exact source and
+destination identities, protocol, optional channel/group selectors and optional
+channel/group remaps. Python protocol values are `"midi1"` or `"ump"`, allowing
+configuration and preview without importing transport clients. Channels/groups
+use 1-16; byte MIDI rejects group options. Python routes are frozen; Rust fields
+are private and constructor-validated. No mandatory dependency is added.
+
+`Router(routes=..., event_limit=128, byte_limit=8388608)` accepts 1-128 uniquely
+named routes. A destination must have one protocol. `feed(Event)` selects routes
+in configuration order, preserving caller event order without timestamp sorting.
+Several matching routes may deliberately deliver multiple copies to one output.
+No protocol conversion, command expansion, musical transformation or autonomous
+scheduler is implied. `Delivery.event` retains the original stream, timestamp and
+contributor span with its transformed message. Destination labels are never
+recursively fed back as sources: routing is one hop, with no internal graph loop.
+External device/wire feedback is not detected or inferred from endpoint names.
+
+Only MIDI 1/2 channel-voice traffic matches by default. Explicit
+`include_nonchannel=True` permits supported system, SysEx and UMP traffic.
+Channel selection/remapping applies only to channel voice; opted-in non-channel
+traffic bypasses the channel selector. A group selector excludes groupless UMP.
+Group remapping touches only actual group fields, preserving utility/stream
+headers and native payload bits. Flex Data channel addresses are not channel-voice
+remap targets. Opaque/file-only UMP is never forwarded, even with opt-in. Compound
+archive commands require explicit expansion before routing. Native MIDI 2 values
+and zero-velocity NoteOn meaning remain unchanged.
+
+All copies of an event pass event-count and aggregate encoded-payload-byte
+capacity checks before any is admitted. Byte limits cover encoded payloads, not
+object/provenance metadata overhead. Returned copies belong to the caller.
+Overflow stops the router without admitting a partial fan-out, records per-route
+`capacity_rejections`, and retains previously pending progress. Sending is not
+atomic: some copies can be accepted before another send fails.
+
+`peek()` returns the head without consuming it; `confirm(id)` advances only that
+head after a successful whole-message handoff. `fail(id, reason)` records the
+uncertain delivery, route and destination and stops everything. `stop(reason)`
+stops without declaring a send uncertain. The first reason is retained, bounded
+to 1024 Unicode characters. Stopped routers cannot feed, drain or confirm again.
+Reports retain admitted/confirmed/pending counts, queue bytes and per-route totals.
+Confirmation means caller-reported handoff, not instrument acceptance. Python
+`feed(StreamDiagnostic)` stops for diagnostics belonging to configured sources;
+Rust callers use `boundary(source, reason)`. There is no retry, replay, reconnect,
+cleanup generation or reset send.
+
+`routing.preview_file` and Rust `routing::preview` read an archive through its
+canonical reader and simulate queue draining. Structural completion is verified
+even after routing stops at a selected source's gap/discontinuity or admission
+failure. Malformed/incomplete input retains verified prefix results; I/O failures
+propagate. A configured source absent from a complete archive is an argument
+error. Examples are bounded by both `detail_limit` and the aggregate byte limit,
+with explicit omissions. Native preview confirmation is simulated acceptance;
+the CLI labels these counts `planned`, never sent.
+
+The optional CLI adds `route-preview` and `patch`, sharing protocol, destinations,
+channel/group options, non-channel opt-in and bounds. Preview opens no ports and
+changes no files. Patch selects one exact unique input and exact unique output
+names, using isolated typed connections by default. It opens outputs before input
+reception, checks input failure/loss before each send and closes opened connections
+on completion, interruption or failure. Routes cannot change during a session.
+One native send can delay every route; duration does not interrupt a blocked
+transport call. Existing native client/worker admission limits still apply.
+
+CLI status is 0 for clean completion/interruption, 1 for input diagnostics/loss,
+capacity stop or a valid archive whose routing stops, and 2 for malformed input,
+arguments/access/setup/transport failures or an interrupted uncertain send.
+Interruption with pending deliveries stops and reports them without counting
+unsent copies as confirmed. Already-sent notes can remain active after stopping.

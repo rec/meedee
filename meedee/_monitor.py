@@ -112,11 +112,13 @@ class Session:
         return [row]
 
 
-def select_port(ports: list[midi.Port], name: str) -> midi.Port:
+def select_port(
+    ports: list[midi.Port], name: str, *, direction: str = "input"
+) -> midi.Port:
     matches = [p for p in ports if p.name == name]
     if len(matches) != 1:
         raise ValueError(
-            f"expected exactly one input named {name!r}; found {len(matches)}"
+            f"expected exactly one {direction} named {name!r}; found {len(matches)}"
         )
     return matches[0]
 

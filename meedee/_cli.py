@@ -86,11 +86,79 @@ class Monitor(BaseModel, frozen=True):
         return self
 
 
+class RouteOptions(BaseModel, frozen=True):
+    protocol: Literal["midi1", "ump"]
+    destinations: list[str] = Field(min_length=1, max_length=128)
+    channel: int | None = Field(default=None, ge=1, le=16)
+    group: int | None = Field(default=None, ge=1, le=16)
+    remap_channel: int | None = Field(default=None, ge=1, le=16)
+    remap_group: int | None = Field(default=None, ge=1, le=16)
+    include_nonchannel: bool = False
+    event_limit: int = Field(default=128, gt=0)
+    byte_limit: int = Field(default=8_388_608, gt=0)
+    output: Literal["text", "json"] = "text"
+
+    @model_validator(mode="after")
+    def check_routes(self) -> Self:
+        if any(not d for d in self.destinations) or len(set(self.destinations)) != len(
+            self.destinations
+        ):
+            raise ValueError("destinations must be nonempty and distinct")
+        if self.protocol == "midi1" and (
+            self.group is not None or self.remap_group is not None
+        ):
+            raise ValueError("group selection/remapping requires UMP")
+        return self
+
+
+class RoutePreview(RouteOptions, frozen=True):
+    """Preview one archive source routed to destination labels; opens no ports."""
+
+    source: tyro.conf.Positional[Path]
+    stream: str = Field(min_length=1)
+    payload_limit: int = Field(default=1_048_576, gt=0)
+    detail_limit: int = Field(default=128, gt=0)
+    preview_bytes: int = Field(default=64, gt=0)
+
+
+class Patch(RouteOptions, frozen=True):
+    """Forward one exact input to exact output names using fixed routes."""
+
+    port: tyro.conf.Positional[str] = Field(min_length=1)
+    backend: (
+        Literal[
+            "CoreMidi",
+            "CoreMidiUmp",
+            "AlsaSeq",
+            "AlsaSeqUmp",
+            "AlsaRaw",
+            "AlsaRawUmp",
+            "WinMm",
+            "WindowsMidiServices",
+        ]
+        | None
+    ) = None
+    isolated: bool = True
+    duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    receive_byte_limit: int = Field(default=8_388_608, gt=0)
+    sysex_limit: int = Field(default=1_048_576, gt=0)
+
+
 def run(args: list[str] | None = None) -> int:
     try:
         command = tyro.cli(
-            Inspect | Validate | Compare | Monitor, args=args, prog="meedee"
+            Inspect | Validate | Compare | Monitor | RoutePreview | Patch,
+            args=args,
+            prog="meedee",
         )
+        if isinstance(command, RoutePreview):
+            from ._routing_cli import run_preview
+
+            return run_preview(command)
+        if isinstance(command, Patch):
+            from ._patch import run_patch
+
+            return run_patch(command)
         if isinstance(command, Monitor):
             from ._monitor import run_monitor
 

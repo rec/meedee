@@ -1752,3 +1752,35 @@ distribution checks pass, including new native/Python sources, typing and test
 files. Each installed wheel passes **27** focused note, inspection, comparison,
 CLI, monitor and pure-message checks from outside the checkout. No application,
 MIDI endpoint, physical device, audio engine, release or CI workflow was started.
+
+## Static routing and patch bay, 2026-10-19
+
+Four slices add Rust/Python route selection/remapping, bounded arrival-order
+merging and fan-out, archive-routing preview, and a static one-input live CLI
+patch bay. The approved defaults forward channel voice only, preserve timestamps
+as provenance, and stop the whole session on input loss, overload or send failure.
+Other supported traffic requires explicit opt-in. Routes remain fixed and no
+cleanup, retry, replay, reconnect or protocol conversion is generated.
+
+The full Python 3.11 suite passes **297 tests with one optional skip**. Focused
+tests cover channel/group remaps, native 32-bit values, source/timestamp/span
+provenance, atomic capacity admission, per-route rejections, explicit delivery
+confirmation and uncertain destinations, archive completion after routing stops,
+bounded previews, CLI parsing and nonmutating preview. Controlled transport tests
+exercise successful fan-out, failure after an accepted prefix, loss between sends,
+input diagnostics, terminal failure, overload, interrupted sends and closure of
+all opened connections. Pure imports still forbid transport initialization.
+
+The Rust workspace tests and doctests pass, including four routing cases; the
+focused routing tests also pass after reusing the shared boundary handler in
+preview. Ruff, formatting, ty, pyupgrade, Cargo formatting, lock and whitespace
+checks pass. Clippy passes with the existing Rust 1.99 atomic-deprecation
+exception; lifecycle code and warning suppressions are unchanged.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the final source distribution.
+Both distribution checks pass. Each installed wheel passes **42** focused checks
+outside the checkout, including the routing, patch-bay and pure-import surfaces.
+The release-only workflow includes the new installed-wheel tests. No application,
+native MIDI endpoint, physical device, audio engine, release or CI workflow was
+started. External feedback loops, physical delivery and other platforms retain
+their existing qualification limits.
