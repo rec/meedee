@@ -46,6 +46,8 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                 "meedee/ci.pyi",
                 "meedee/inspection.py",
                 "meedee/inspection.pyi",
+                "meedee/cli.py",
+                "meedee/_cli.py",
                 "meedee/_typed.py",
                 "meedee/smf.py",
                 "meedee/smf.pyi",
@@ -78,8 +80,8 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             requirements = [
                 Requirement(r) for r in metadata.get_all("Requires-Dist", [])
             ]
-            assert [r.name for r in requirements] == ["ufor"]
-            assert metadata.get_all("Provides-Extra") == ["ufor"]
+            assert {r.name for r in requirements} == {"ufor", "pydantic", "tyro"}
+            assert set(metadata.get_all("Provides-Extra", [])) == {"ufor", "cli"}
             for python in ["3.11", "3.13", "3.15"]:
                 assert not any(
                     r.marker is None
@@ -92,14 +94,24 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                     )
                     for r in requirements
                 )
-                assert requirements[0].marker is not None
-                assert requirements[0].marker.evaluate(
+                ufor = next(r for r in requirements if r.name == "ufor")
+                assert ufor.marker is not None
+                assert ufor.marker.evaluate(
                     {
                         "extra": "ufor",
                         "python_version": python,
                         "python_full_version": f"{python}.0",
                     }
                 ) == (python != "3.11")
+                for r in requirements:
+                    assert r.marker is not None
+                    assert r.marker.evaluate(
+                        {
+                            "extra": "cli",
+                            "python_version": python,
+                            "python_full_version": f"{python}.0",
+                        }
+                    ) == (r.name in {"tyro", "pydantic"})
             assert metadata["License-Expression"] == "MIT"
             assert any(n.endswith("/licenses/LICENSE") for n in names)
             assert any(
@@ -147,6 +159,15 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/_native.pyi",
                 "src/ci.rs",
                 "src/inspection.rs",
+                "src/comparison.rs",
+                "crates/meedee/src/comparison.rs",
+                "crates/meedee/src/inspection_timing.rs",
+                "crates/meedee/tests/comparison.rs",
+                "crates/meedee/tests/inspection_timing.rs",
+                "meedee/cli.py",
+                "meedee/_cli.py",
+                "test/test_cli.py",
+                "test/test_comparison.py",
                 "crates/meedee/src/inspection.rs",
                 "crates/meedee/tests/inspection.rs",
                 "test/test_inspection.py",

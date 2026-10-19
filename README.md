@@ -164,6 +164,27 @@ Examples contain reasons/indexes rather than copies of potentially large payload
 Missing/inaccessible files and read failures raise errors. Comparison does not
 retain the full files or change either source.
 
+### Optional command-line tools
+
+Install `meedee[cli]` (in this checkout: `uv sync --extra cli`). The optional
+Tyro/Pydantic dependency set does not change ordinary library installations.
+
+```sh
+meedee inspect take.meedee --format archive
+meedee validate take.meedee --format archive --output json
+meedee compare before.meedee after.meedee --format archive --tick-tolerance 1000
+```
+
+`inspect` prints full summaries and timing detail; `validate` prints a compact
+completeness/quality verdict. `compare` preserves the library's record semantics.
+Archive identity mappings use `--source-map LEFT RIGHT` and `--clock-map LEFT RIGHT`
+with additional key/value pairs as needed. All commands accept `--output json`.
+Exit statuses are 0 for a clean/equal result, 1 for differences or reported
+capture-quality problems, and 2 for malformed/incomplete data, access errors or
+invalid arguments. Missing times alone are informational, since untimed captures
+and SYX files are legitimate. Opaque content, gaps, discontinuities and timestamp
+regressions are quality findings. No offline command opens a MIDI client.
+
 ## MIDI-CI management
 
 `meedee.ci` provides immutable MIDI-CI 1.2.1 Discovery/Reply, Endpoint Inquiry/Reply,
