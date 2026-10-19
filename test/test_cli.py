@@ -23,6 +23,7 @@ def test_inspect_validate_compare_exit_status_and_json(
     assert result.value.code == 0
     data = json.loads(capsys.readouterr().out)
     assert data["records"] == 1 and data["message_counts"] == {"SysEx": 1}
+    assert data["note_state"]["channels"] == []
     with pytest.raises(SystemExit) as result:
         cli.main(["validate", str(a), "--format", "syx"])
     assert result.value.code == 0

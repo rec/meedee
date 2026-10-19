@@ -1726,3 +1726,29 @@ typing and optional-only dependency metadata. Each installed wheel passes all
 These are device-free software and packaging checks. Physical live-monitor
 operation and other platforms retain their qualification gates. CI remains
 published-release-only; no workflow, release or physical MIDI test was run.
+
+## Observed note state, 2026-10-19
+
+Four slices add a shared Rust/Python note observer, native pedal and reset/loss
+observations, bounded file-inspection summaries and passive live-monitor views.
+The approved policy uses per-key counts across MIDI 1 bytes, MIDI 1 in UMP and
+native MIDI 2, without occurrence pairing, sounding-voice inference or cleanup
+generation. Source, group, channel and protocol views remain separate. Display
+filters cannot remove interpretation context, and live rows project only their
+addressed channel rather than copying unrelated history.
+
+The full Python 3.11 suite passes **282 tests with one optional skip**. New checks
+cover repeated notes and zero-velocity protocol differences, source/track/group
+separation, raw 32-bit pedal values, channel modes, unmatched releases, clock and
+loss boundaries, immutable snapshots, limits, incomplete-file prefixes and
+filtered monitor events. The Rust workspace tests and doctests pass, including
+the new source-isolation and bounded-admission cases. Physical CoreMIDI tests
+remain opt-in and were not run. Ruff, formatting, ty, pyupgrade, Cargo formatting,
+lock consistency and whitespace checks pass. Clippy passes with the existing
+Rust 1.99 atomic-deprecation exception; no suppression or lifecycle code changed.
+
+The macOS arm64 Python 3.11/3.15 wheels build from the source distribution. Both
+distribution checks pass, including new native/Python sources, typing and test
+files. Each installed wheel passes **27** focused note, inspection, comparison,
+CLI, monitor and pure-message checks from outside the checkout. No application,
+MIDI endpoint, physical device, audio engine, release or CI workflow was started.

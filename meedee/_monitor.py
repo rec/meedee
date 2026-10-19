@@ -4,7 +4,7 @@ from collections import deque
 from time import monotonic
 
 from . import controls, events, inspection, messages, midi, ump
-from ._cli import Monitor, emit, inspection_data
+from ._cli import Monitor, channel_state_data, emit, inspection_data
 
 
 class Session:
@@ -86,6 +86,12 @@ class Session:
                     }
                     for o in observations
                 ],
+                "note_state": [
+                    channel_state_data(c)
+                    for c in self.observer.channel_states(channel=channel, group=group)
+                ]
+                if channel is not None
+                else [],
             }
         self.history.append(row)
         return [row]

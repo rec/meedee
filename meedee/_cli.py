@@ -8,7 +8,7 @@ from typing import Literal, Self
 import tyro
 from pydantic import BaseModel, Field, model_validator
 
-from . import inspection
+from . import inspection, notes
 
 
 class FileOptions(BaseModel, frozen=True):
@@ -231,7 +231,37 @@ def inspection_data(report: inspection.Report) -> dict[str, object]:
         {"source": d.source, "record": d.record, "kind": d.kind}
         for d in report.timing_diagnostics
     ]
+    data["note_state"] = note_state_data(report.note_state)
     return data
+
+
+def note_state_data(report: notes.Report) -> dict[str, object]:
+    return {
+        "boundaries": report.boundaries,
+        "omitted_events": report.omitted_events,
+        "channels": [channel_state_data(c) for c in report.channels],
+    }
+
+
+def channel_state_data(channel: notes.ChannelState) -> dict[str, object]:
+    return {
+        n: getattr(channel, n)
+        for n in (
+            "source",
+            "group",
+            "channel",
+            "protocol",
+            "sustain",
+            "sostenuto",
+            "uncertain",
+            "unmatched_releases",
+        )
+    } | {
+        "notes": [
+            {"note": n.note, "held": n.held, "released": n.released}
+            for n in channel.notes
+        ]
+    }
 
 
 def emit(data: dict[str, object], output: Literal["text", "json"]) -> None:

@@ -13,6 +13,12 @@ struct Report {
 #[pymethods]
 impl Report {
     #[getter]
+    fn note_state(&self) -> crate::notes::Report {
+        crate::notes::Report {
+            value: self.value.notes.snapshot(),
+        }
+    }
+    #[getter]
     fn source_counts(&self) -> BTreeMap<String, u64> {
         self.value.timing.source_counts.clone()
     }
@@ -158,6 +164,22 @@ struct Observer {
 }
 #[pymethods]
 impl Observer {
+    #[pyo3(signature=(*,channel,group=None))]
+    fn channel_states(
+        &self,
+        channel: i64,
+        group: Option<i64>,
+    ) -> PyResult<Vec<crate::notes::ChannelState>> {
+        if !(1..=16).contains(&channel) || group.is_some_and(|v| !(1..=16).contains(&v)) {
+            return Err(PyValueError::new_err("channel and group must be 1..16"));
+        }
+        Ok(self
+            .value
+            .channel_states(group.map(|v| v as u8), channel as u8)
+            .into_iter()
+            .map(|value| crate::notes::ChannelState { value })
+            .collect())
+    }
     #[new]
     #[pyo3(signature=(*,stream,clock,detail_limit=128))]
     fn new(

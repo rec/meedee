@@ -955,3 +955,52 @@ Rust timing/message logic and return frozen snapshots, without file-completion
 claims. Asynchronous transport drop totals may overlap sequence-gap diagnostics;
 counter notices reset source context without double counting sequence loss.
 README.md documents CLI selection, filters, resource bounds and examples.
+
+## Observed note activity
+
+`meedee.notes.Tracker(stream=..., detail_limit=128)` accepts `Event` or
+`StreamDiagnostic` through `feed`, returns frozen `notes.Report` snapshots, and
+offers explicit `invalidate()` for asynchronous loss. It owns no transport.
+Rust `notes::Tracker` supplies the same state machine, taking an explicit source,
+payload, optional clock identity and consistent positive detail limit from its
+caller. Python rejects another source before mutation.
+
+Snapshots separate source, optional UMP group, channel and MIDI protocol family.
+Byte MIDI 1 and MIDI 1-in-UMP interpret zero-velocity NoteOn as release; native
+MIDI 2 preserves it as NoteOn. Repeated keys retain counts, without occurrence
+pairing. `held` counts observed unreleased activity. `released` counts matched
+releases since the last boundary, including channel-mode releases, not sustained
+voices or audio tails. Unmatched releases increment `unmatched_releases` and
+mark `uncertain`. An arbitrary capture can start mid-performance: false
+`uncertain` means no observed inconsistency, never a known initial device state.
+
+CC64/66 retain raw sustain/sostenuto values at their native 7/32-bit resolution;
+no voice retention or pedal-to-occurrence attribution is inferred. CC120 clears
+outstanding held activity without adding releases; CC123-127 move held counts
+to released. CC121 forgets pedal knowledge and retains note history. These are
+observations of commands, not confirmation that a receiver obeyed them. Unknown
+instrument Basic Channel, mode, other writers and note management remain outside
+this observer's model. Raw traffic remains available through existing readers.
+
+Source loss, discontinuity and known clock-identity changes forget affected note
+and pedal history and mark uncertainty. SystemReset invalidates its source's
+byte-MIDI scope or the addressed UMP group. Boundary totals remain visible.
+Counts saturate rather than wrap; count exhaustion marks uncertainty. Up to
+`detail_limit` sources and channel states are admitted, each with at most 128
+keys. Capacity never evicts admitted state; `omitted_events` counts observations
+excluded by source/channel capacity, including an excluded boundary. Snapshots
+and their collection getters are independent copies.
+
+`inspection.Report.note_state` includes the same report for archive sources,
+separate SMF tracks, Clip packets or an empty SYX observation. SMF tracks are not
+merged into an instrument-performance view. Verified prefixes retain their state
+when file completion fails. Structural completeness and CLI validation exit
+codes are unaffected by outstanding notes, unknown pedal state or unmatched
+releases, since those can be legitimate partial captures.
+
+CLI inspection and final monitor summaries include `note_state`; visible event
+rows include matching channel summaries. Display filters run after state updates.
+`inspection.Observer.channel_states(channel=..., group=None)` projects just the
+addressed channel's protocol views, so live rows do not copy unrelated history.
+History limits still bound stored rows, and no cleanup messages are constructed
+or sent. The existing MPE tracker retains its separate zone/member semantics.

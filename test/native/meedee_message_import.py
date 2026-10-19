@@ -20,6 +20,7 @@ def main() -> None:
             inspection,
             messages,
             mpe,
+            notes,
             smf,
             syx,
             timecode,
@@ -93,6 +94,13 @@ def main() -> None:
         observer = inspection.Observer(stream="pure", clock=clock)
         observer.feed(events.Event(stream="pure", message=messages.TimingClock()))
         assert observer.snapshot().records == 1
+        tracker = notes.Tracker(stream="pure")
+        tracker.feed(
+            events.Event(
+                stream="pure", message=messages.NoteOn(channel=1, note=60, velocity=1)
+            )
+        )
+        assert tracker.snapshot().channels[0].notes[0].held == 1
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
         view = controls.EventInterpreter()
         assert view.feed(events.Event(stream="s", message=messages.TimingClock())) == []

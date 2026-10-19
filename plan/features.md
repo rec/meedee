@@ -111,6 +111,11 @@ destination. A CLI could run selected routes; a TUI/GUI could display them.
 
 ### 4. Observed MIDI state and explicit scoped cleanup
 
+**Implemented observation:** shared Rust/Python bounded per-source/group/channel
+note counts, native pedal values, channel-mode and loss/reset boundaries, file
+inspection summaries and passive monitor views. Counts describe observed traffic,
+not sounding voices. Cleanup generation and routing ownership remain proposals.
+
 **Use:** Diagnose stuck notes and inspect what a source or route has actually
 sent or received.
 

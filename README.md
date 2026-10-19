@@ -662,3 +662,34 @@ opt-ins and require target-host authorization. No unit test selects hardware.
 meedee is MIT licensed. See [third-party notices](THIRD_PARTY_NOTICES.md) and
 [vendored provenance](third_party/libremidi/SOURCE.md). Publication is a separate
 decision after the remaining qualification gates.
+### Observed note activity
+
+`meedee.notes` observes MIDI 1 bytes, MIDI 1 in UMP and native MIDI 2 without
+opening a device. For example:
+
+```python
+from meedee import events, messages, notes
+
+tracker = notes.Tracker(stream="keyboard")
+tracker.feed(events.Event(
+    stream="keyboard", message=messages.NoteOn(channel=1, note=60, velocity=100)
+))
+channel = tracker.snapshot().channels[0]
+assert channel.notes[0].held == 1
+```
+
+Counts remain separate by source, UMP group, channel and protocol. `held` records
+unreleased observed activity; `released` records matched releases since the last
+boundary. Neither is a sounding-voice count. Repeated keys use counts without
+arbitrary instance pairing. Raw sustain/sostenuto values retain native resolution.
+An unmatched release marks uncertainty; capture may also begin mid-performance.
+Loss diagnostics, clock-identity changes and explicit `invalidate()` discard
+affected history. Nothing generates cleanup traffic or claims device ownership.
+
+`detail_limit` bounds admitted sources/channels (128 by default), with at most
+128 keys per channel and explicit `omitted_events`. File inspection exposes the
+same state as `report.note_state`, keeping SMF tracks separate. CLI inspection,
+monitor event rows and final summaries include it. Monitor filters affect display
+only. Outstanding notes and unmatched releases do not change file completeness
+or validation exit codes. See [the API contract](plan/api.md#observed-note-activity)
+for reset, channel-mode and uncertainty policies.

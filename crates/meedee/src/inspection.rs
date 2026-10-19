@@ -16,6 +16,7 @@ pub enum Format {
 #[derive(Clone, Debug, Default)]
 pub struct Report {
     pub timing: crate::inspection_timing::Timing,
+    pub notes: crate::notes::Tracker,
     pub complete: bool,
     pub problem: Option<String>,
     pub records: u64,
@@ -42,6 +43,16 @@ pub struct Observer {
     detail_limit: usize,
 }
 impl Observer {
+    /// A bounded projection for live rows; avoids copying unrelated history.
+    pub fn channel_states(
+        &self,
+        group: Option<u8>,
+        channel: u8,
+    ) -> Vec<crate::notes::ChannelState> {
+        self.report
+            .notes
+            .channel_states(&self.stream, group, channel)
+    }
     pub fn snapshot(&self) -> Report {
         self.report.clone()
     }
@@ -108,6 +119,7 @@ impl Observer {
                     kind,
                     self.detail_limit,
                 );
+                self.report.notes.boundary(&self.stream, self.detail_limit);
             }
         }
         Ok(())
@@ -115,6 +127,7 @@ impl Observer {
     /// Asynchronous counters can overlap sequence gaps. Reset without adding
     /// their counts to sequence-derived lost_events a second time.
     pub fn loss_counter_changed(&mut self) {
+        self.report.notes.boundary(&self.stream, self.detail_limit);
         self.report.timing.boundary(
             &self.stream,
             self.report.records,
@@ -191,12 +204,14 @@ impl Report {
                             self.observe_event(&e, clock.as_deref(), detail_limit);
                         }
                         archive::Record::Gap { stream, lost, .. } => {
+                            self.notes.boundary(&stream, detail_limit);
                             self.timing
                                 .boundary(&stream, self.records - 1, "gap", detail_limit);
                             self.gap_records += 1;
                             self.lost_events += u128::from(lost);
                         }
                         archive::Record::Discontinuity { stream, .. } => {
+                            self.notes.boundary(&stream, detail_limit);
                             self.discontinuities += 1;
                             self.timing.boundary(
                                 &stream,
@@ -227,7 +242,15 @@ impl Report {
                         *self.track_records.entry(event.track).or_default() += 1;
                     }
                     match event.record {
-                        smf::Record::Message(v) => self.count(midi1_kind(&v)),
+                        smf::Record::Message(v) => {
+                            self.count(midi1_kind(&v));
+                            self.notes.feed(
+                                &format!("track:{}", event.track),
+                                &events::Payload::Midi1(v),
+                                Some("smf_ticks"),
+                                detail_limit,
+                            );
+                        }
                         smf::Record::SysEx { .. } => self.count("SysExFragment"),
                         smf::Record::Chunk { .. } => self.opaque_records += 1,
                         smf::Record::Meta { .. } => {}
@@ -249,6 +272,12 @@ impl Report {
                     let entry = entry?;
                     self.records += 1;
                     self.count_ump(&entry.message);
+                    self.notes.feed(
+                        "clip",
+                        &events::Payload::Ump(entry.message.clone()),
+                        Some("clip_ticks"),
+                        detail_limit,
+                    );
                     self.timing.observe(
                         "clip",
                         Some("clip_ticks"),
@@ -278,6 +307,7 @@ impl Report {
             .as_ref()
             .map(|t| t.clock.identity())
             .or(default_clock);
+        self.notes.feed(&e.stream, &e.message, clock, detail_limit);
         self.timing.observe(
             &e.stream,
             clock,
