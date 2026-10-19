@@ -12,6 +12,7 @@ mod lifecycle;
 mod archive;
 mod ci;
 mod codecs;
+mod comparison;
 mod controls;
 mod event_values;
 mod event_views;

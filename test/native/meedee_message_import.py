@@ -86,6 +86,9 @@ def main() -> None:
         assert syx.Reader.__module__ == "meedee.syx"
         assert clip.Reader.__module__ == "meedee.clip"
         assert inspection.inspect_file(BytesIO(b"\xf0\x7d\xf7"), format="syx").complete
+        assert inspection.compare_files(
+            BytesIO(b"\xf0\x7d\xf7"), BytesIO(b"\xf0\x7d\xf7"), format="syx"
+        ).equal
         clock = events.Clock(identity="file", tick_numerator=1, tick_denominator=480)
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
         view = controls.EventInterpreter()
