@@ -270,6 +270,12 @@ encoding a MIDI message.
 
 **Use:** Design a tuning once, audition it and prepare an explicit transfer.
 
+**Implemented foundation:** the optional Python
+[`meedee.ufor_tuning` bridge](ufor-tuning.md) previews selected keys and constructs
+ordinary/banked per-key MTS messages with explicit preservation and error policy.
+It opens no ports. Explicit transfer and optional enge audition remain separate
+integration work.
+
 Use uFor's existing tuning/scales and Scala conversion. Sample or resolve the
 selected pitches into meedee's MTS values, reporting range limitations, unmapped
 keys and protocol quantization. Additional keyboard-map formats should be separate

@@ -92,7 +92,13 @@ jobs:
         run: |
           rustup toolchain install 1.87.0 --profile minimal --component rustfmt --component clippy
           rustup default 1.87.0
-      - run: uv sync --frozen --python '${{ matrix.python }}'
+      - name: Install the optional uFor bridge on supported Python
+        run: |
+          extras=()
+          if [[ '${{ matrix.python }}' == '3.15' ]]; then
+            extras+=(--extra ufor)
+          fi
+          uv sync --frozen --python '${{ matrix.python }}' "${extras[@]}"
       - name: Rust checks and linked tests
         run: |
           if [[ "$RUNNER_OS" == Windows ]]; then
@@ -107,7 +113,7 @@ jobs:
       - name: Python tests
         run: |
           set +e
-          uv run --frozen pytest > target/pytest.log 2>&1
+          uv run --no-sync pytest > target/pytest.log 2>&1
           test_status=$?
           set -e
           cat target/pytest.log
@@ -119,9 +125,10 @@ jobs:
             printf '::error title=Python tests::%s\n' "$report"
           fi
           exit "$test_status"
-      - run: uv run --frozen ruff check --select B,E,F,I meedee test
-      - run: uv run --frozen ruff format --check meedee test
-      - run: uv run --frozen ty check meedee test
+      - run: uv run --no-sync ruff check --select B,E,F,I meedee test
+      - run: uv run --no-sync ruff format --check meedee test
+      - name: Type check the selected Python surface
+        run: uv run --no-sync ty check --python-version '${{ matrix.python }}' meedee test
       - name: Build wheel from sdist
         uses: PyO3/maturin-action@3e2bdf6ba6453a61e649744019b8a2d906c7eb38 # v1.51.0
         with:
@@ -141,9 +148,13 @@ jobs:
             wheel_python="$RUNNER_TEMP/meedee-wheel/bin/python"
           fi
           uv pip install --python "$wheel_python" dist/*.whl pytest
+          if [[ '${{ matrix.python }}' == '3.15' ]]; then
+            uv export --frozen --extra ufor --no-emit-project --no-dev --no-hashes --output-file target/wheel-ufor-requirements.txt
+            uv pip install --python "$wheel_python" -r target/wheel-ufor-requirements.txt
+          fi
           cd "$RUNNER_TEMP"
-          "$wheel_python" -m pytest "$GITHUB_WORKSPACE/test/test_contract.py" "$GITHUB_WORKSPACE/test/test_packets.py" "$GITHUB_WORKSPACE/test/test_isolation.py" "$GITHUB_WORKSPACE/test/test_messages.py" "$GITHUB_WORKSPACE/test/test_codecs.py" "$GITHUB_WORKSPACE/test/test_controls.py" "$GITHUB_WORKSPACE/test/test_tuning.py" "$GITHUB_WORKSPACE/test/test_profiles.py" "$GITHUB_WORKSPACE/test/test_profile_engines.py" "$GITHUB_WORKSPACE/test/test_ump.py" "$GITHUB_WORKSPACE/test/test_files.py" "$GITHUB_WORKSPACE/test/test_archive.py" "$GITHUB_WORKSPACE/test/test_live.py" "$GITHUB_WORKSPACE/test/test_file_timing.py" "$GITHUB_WORKSPACE/test/test_event_views.py" "$GITHUB_WORKSPACE/test/test_ci.py"
-      - run: uv run --frozen pytest test/release/artifacts.py -v
+          "$wheel_python" -m pytest "$GITHUB_WORKSPACE/test/test_contract.py" "$GITHUB_WORKSPACE/test/test_packets.py" "$GITHUB_WORKSPACE/test/test_isolation.py" "$GITHUB_WORKSPACE/test/test_messages.py" "$GITHUB_WORKSPACE/test/test_codecs.py" "$GITHUB_WORKSPACE/test/test_controls.py" "$GITHUB_WORKSPACE/test/test_tuning.py" "$GITHUB_WORKSPACE/test/test_profiles.py" "$GITHUB_WORKSPACE/test/test_profile_engines.py" "$GITHUB_WORKSPACE/test/test_ump.py" "$GITHUB_WORKSPACE/test/test_files.py" "$GITHUB_WORKSPACE/test/test_archive.py" "$GITHUB_WORKSPACE/test/test_live.py" "$GITHUB_WORKSPACE/test/test_file_timing.py" "$GITHUB_WORKSPACE/test/test_event_views.py" "$GITHUB_WORKSPACE/test/test_ci.py" "$GITHUB_WORKSPACE/test/test_ufor_tuning.py"
+      - run: uv run --no-sync pytest test/release/artifacts.py -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: meedee-${{ matrix.os }}-cp${{ matrix.python }}

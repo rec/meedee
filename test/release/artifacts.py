@@ -6,6 +6,8 @@ from email.parser import BytesParser
 from pathlib import Path
 from zipfile import ZipFile
 
+from packaging.requirements import Requirement
+
 
 def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
     project = Path(__file__).resolve().parents[2]
@@ -27,6 +29,7 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                 "meedee/codecs.pyi",
                 "meedee/controls.py",
                 "meedee/controls.pyi",
+                "meedee/ufor_tuning.py",
                 "meedee/tuning.py",
                 "meedee/tuning.pyi",
                 "meedee/gm.py",
@@ -70,7 +73,31 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             assert metadata["Name"] == "meedee"
             assert metadata["Version"] == version
             assert metadata["Requires-Python"] == ">=3.11"
-            assert metadata.get_all("Requires-Dist") is None
+            requirements = [
+                Requirement(r) for r in metadata.get_all("Requires-Dist", [])
+            ]
+            assert [r.name for r in requirements] == ["ufor"]
+            assert metadata.get_all("Provides-Extra") == ["ufor"]
+            for python in ["3.11", "3.13", "3.15"]:
+                assert not any(
+                    r.marker is None
+                    or r.marker.evaluate(
+                        {
+                            "extra": "",
+                            "python_version": python,
+                            "python_full_version": f"{python}.0",
+                        }
+                    )
+                    for r in requirements
+                )
+                assert requirements[0].marker is not None
+                assert requirements[0].marker.evaluate(
+                    {
+                        "extra": "ufor",
+                        "python_version": python,
+                        "python_full_version": f"{python}.0",
+                    }
+                ) == (python != "3.11")
             assert metadata["License-Expression"] == "MIT"
             assert any(n.endswith("/licenses/LICENSE") for n in names)
             assert any(
@@ -169,6 +196,7 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/codecs.pyi",
                 "meedee/controls.py",
                 "meedee/controls.pyi",
+                "meedee/ufor_tuning.py",
                 "meedee/tuning.py",
                 "meedee/tuning.pyi",
                 "meedee/gm.py",
@@ -226,6 +254,7 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "test/test_profiles.py",
                 "crates/meedee/tests/tuning.rs",
                 "crates/meedee/tests/fixtures/tuning.txt",
+                "test/test_ufor_tuning.py",
                 "test/test_tuning.py",
                 "crates/meedee/tests/controls.rs",
                 "crates/meedee/tests/fixtures/commands.txt",
