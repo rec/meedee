@@ -1,6 +1,7 @@
 """Import pure values while native worker initialization is forbidden."""
 
 import sys
+from io import BytesIO
 from unittest.mock import patch
 
 
@@ -16,6 +17,7 @@ def main() -> None:
             controls,
             events,
             gm,
+            inspection,
             messages,
             mpe,
             smf,
@@ -83,6 +85,7 @@ def main() -> None:
         assert smf.Header(format=0, tracks=1, division=480).division == 480
         assert syx.Reader.__module__ == "meedee.syx"
         assert clip.Reader.__module__ == "meedee.clip"
+        assert inspection.inspect_file(BytesIO(b"\xf0\x7d\xf7"), format="syx").complete
         clock = events.Clock(identity="file", tick_numerator=1, tick_denominator=480)
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
         view = controls.EventInterpreter()

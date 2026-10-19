@@ -909,3 +909,24 @@ by the owner because their normative documents are unavailable. Process Inquiry
 engines remain deferred. See ci.md for constructors, action/send-result ordering,
 explicit deadlines/restart, text encoding, correlation limitations and resource
 budgets. Native UMP qualification is separate from this software capability.
+
+## File inspection and capture validation
+
+`meedee.inspection.inspect_file(source, *, format, payload_limit=1048576,
+preserve_unknown=False)` uses the shared Rust `inspection::inspect` pass over
+the existing archive/SMF/SYX/Clip readers. Format is explicit. Inspection is
+read-only, opens no MIDI resources and adds no parser, scheduler or dependencies.
+
+The native frozen Report exposes decoded-prefix record/message counts, archive
+clock/stream descriptors, SMF header/track counts, gaps, total known lost events,
+discontinuities, missing times and opaque content. Collections are defensive
+copies. UMP counts describe packet families, including clock/configuration;
+compound archive commands stay commands and SMF SysEx fragments stay fragments.
+No cross-clock sorting, timestamp synthesis or semantic promotion is performed.
+
+The first format/limit/completion failure stops the pass and becomes `problem`;
+counts never include the rejected record. `complete` requires successful EOF
+validation, independently of gap/discontinuity/opaque counts. File I/O failures
+propagate rather than being labeled malformed data. Unknown-content policy is
+inherited from the selected reader. See README.md for counting/resource details.
+Live monitoring, capture comparison and user interfaces remain separate work.

@@ -1636,3 +1636,32 @@ faults, not CoreMIDI or a physical device. The Python 3.11 full suite passes
 255 tests in 24.84 seconds; Python 3.15 passes the same 255 tests in 34.17
 seconds. Ruff, Python formatting, ty, pyupgrade and diff checks pass. The native
 arpeg integration will be rerun against this Git revision independently.
+
+## File inspection and capture validation, 2026-10-19
+
+The pure Rust inspection pass and frozen Python reports summarize archive, SMF,
+SYX and MIDI Clip files through their existing streaming readers. Reports retain
+verified-prefix counts, archive source/clock descriptors, SMF header/track counts,
+capture loss/discontinuities and opaque content. Completion is independent of
+capture quality. Malformed data stops the pass with the reader's problem;
+filesystem/read failures propagate. No MIDI resources or new dependencies are
+introduced, and files are never rewritten.
+
+The Python 3.11 source suite passes **262 tests, with one optional test skipped**.
+Three added Rust tests pass and the serial Rust workspace suite passes, retaining
+its opt-in native/finalization exclusions. Five new Python tests cover complete
+and incomplete captures, every archive truncation boundary, CRC errors, strict
+versus preserved unknown content, SMF Type 2 tracks and raw fragments, Clip
+completion, payload limits, file access errors and report collection ownership.
+The pure-import fixture exercises inspection with MIDI initialization forbidden.
+
+Ruff checking/formatting, ty, pyupgrade, Cargo formatting and whitespace checks
+pass. Strict workspace Clippy still reports the pre-existing Rust 1.99
+`fetch_update` deprecation in lifecycle.rs; it passes with the previously recorded
+local deprecation exception. No lifecycle or toolchain changes were made.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution.
+The two archive-content checks pass. Each wheel passes all seven focused
+inspection/message/import tests in a separate environment outside the checkout.
+Release CI includes the new installed-wheel tests without changing its trigger
+or Python endpoints. No hardware, live MIDI, release or workflow was run.
