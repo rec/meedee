@@ -30,6 +30,7 @@ def main() -> None:
             timecode,
             topology,
             transfer,
+            transfer_input,
             transfer_output,
             tuning,
             ump,
@@ -163,6 +164,12 @@ def main() -> None:
         plan = transfer.read_file(BytesIO(b"\xf0\x7d\xf7"), gap_ns=0)
         assert transfer.Session(plan).snapshot().total_messages == 1
         assert callable(transfer_output.run)
+        capture = transfer.Capture(stream="pure", expected_messages=1, timeout_ns=10)
+        capture.start(0)
+        capture.feed(
+            events.Event(stream="pure", message=messages.SysEx(data=b"\x7d")), 1
+        )
+        assert capture.snapshot().status == "completed" and callable(transfer_input.run)
         from meedee import discovery
 
         poller = discovery.Poller(protocol="midi1")

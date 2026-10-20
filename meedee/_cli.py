@@ -197,6 +197,34 @@ class TransferSend(TransferPreview, frozen=True):
     isolated: bool = True
 
 
+class SysexReceive(BaseModel, frozen=True):
+    """Passively capture an expected MIDI 1 SysEx count, then create a new file."""
+
+    destination: tyro.conf.Positional[Path]
+    port: str = Field(min_length=1)
+    expected_messages: int = Field(gt=0)
+    timeout_ms: int = Field(gt=0, le=18_446_744_073_709)
+    byte_limit: int = Field(default=8_388_608, gt=0)
+    payload_limit: int = Field(default=1_048_576, gt=0)
+    receive_byte_limit: int = Field(default=8_388_608, gt=0)
+    backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
+    isolated: bool = True
+    output: Literal["text", "json"] = "text"
+
+    @model_validator(mode="after")
+    def check_capture(self) -> Self:
+        from . import transfer
+
+        transfer.Capture(
+            stream="validation",
+            expected_messages=self.expected_messages,
+            timeout_ns=self.timeout_ms * 1_000_000,
+            byte_limit=self.byte_limit,
+            payload_limit=self.payload_limit,
+        )
+        return self
+
+
 class CiBrowse(BaseModel, frozen=True):
     """Run one CI management discovery scan, then inquire about format-2 endpoints."""
 
@@ -267,6 +295,7 @@ def run(args: list[str] | None = None) -> int:
             | WatchPorts
             | TransferPreview
             | TransferSend
+            | SysexReceive
             | CiBrowse,
             args=args,
             prog="meedee",
@@ -275,6 +304,10 @@ def run(args: list[str] | None = None) -> int:
             from ._ci_cli import run_browse
 
             return run_browse(command)
+        if isinstance(command, SysexReceive):
+            from ._transfer_cli import run_receive
+
+            return run_receive(command)
         if isinstance(command, TransferPreview):
             from ._transfer_cli import run_transfer
 

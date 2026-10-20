@@ -1361,3 +1361,72 @@ display and shutdown work. Rate is not raw packet or wire throughput; intervals
 are not source-clock jitter. No host timestamp calls or extra summary fields are
 added when disabled. CLI defaults, exit status, filters and loss handling remain
 unchanged.
+
+## Passive MIDI 1 SysEx capture
+
+Rust `transfer::Capture` and Python `transfer.Capture` collect whole SysEx messages
+from one explicit stream. Construction requires stream, expected_messages and
+positive timeout_ns, with byte_limit=8_388_608 and payload_limit=1_048_576 defaults
+in Python. The byte budget includes F0/F7 framing; the expected count also bounds
+retained message objects. Impossible counts exceeding byte_limit/2 are rejected.
+Budgets exclude object/metadata overhead, decoder state, caller copies and native
+queues. This is passive MIDI 1 byte capture, not UMP or a dump-request protocol.
+
+`start(now_ns)` starts a fresh session and checks deadline arithmetic. `poll(now_ns)`
+notices expiry, and `feed(item, now_ns)` consumes existing typed Event or
+StreamDiagnostic values using the same unsigned, nondecreasing host clock.
+Source timestamps are preserved in the input events but do not set deadlines.
+At or after the overall deadline, the session times out before accepting another
+message. Timing begins at start, not at the first SysEx; no implicit timer or
+background polling is created. Starting twice or feeding/polling a non-active
+capture is an error. Invalid clock operations leave the prior observation intact.
+
+Every whole SysEx from the selected source counts, including empty payloads and
+unrelated manufacturer traffic. Non-SysEx MIDI 1 events increment ignored_events;
+UMP/compound events and mismatched sources fail. All decoder diagnostics stop
+capture, including known loss, malformed/truncated input and clock changes.
+Payload or aggregate-byte exhaustion fails before retaining the offending
+message. Reaching the expected count before the deadline completes the capture.
+It proves neither device-specific dump completeness nor the absence of later
+traffic or unobservable driver loss. It does not correlate replies, infer an idle
+end marker, filter manufacturer IDs or send any requests/acknowledgements.
+
+`fail(reason)` / `cancel(reason)` stop ready/active sessions and retain the first
+terminal outcome and received prefix. Independent frozen Python CaptureReport
+snapshots expose status (`ready`, `active`, `completed`, `failed`, `cancelled`,
+`timed_out`), expected_messages, received_messages, wire_bytes, ignored_events,
+deadline_ns and an optional reason capped at 1024 Unicode characters. `message(i)`
+returns a received SysEx even after failure. No automatic retry or state cleanup
+is implied.
+
+`write(destination)` exports only a completed capture through the existing SYX
+writer, preserving retained payload bytes and order. Rust accepts a caller-owned
+writer. Python paths use exclusive creation and never overwrite an existing file;
+caller-owned binary streams remain open and write at their current position.
+Writes flush without fsync. Errors propagate and can leave a partial destination;
+export does not change the capture outcome or claim power-loss durability.
+
+`transfer_input.run(capture, receiver, cancel=None)` starts a fresh capture on the
+caller thread. Supply an existing queued MIDI 1 typed input for the same stream;
+its already queued events are eligible and are not drained automatically. The
+adapter checks failure/loss counters before and after receives, polls the deadline
+and waits at most 50 ms per receive. Cancellation/Ctrl-C retain a cancelled prefix;
+known transport errors retain failed progress. Unexpected exceptions propagate
+after retiring an active capture. The caller owns and closes the input, serializes
+access and configures its existing queue/decoder budgets. No native output, timer,
+worker or additional decoder is created. Uninterruptible in-process driver or
+Python work can exceed the observation deadline.
+
+`meedee sysex-receive DESTINATION --port NAME --expected-messages N --timeout-ms MS`
+requires one exact, unique input name and uses process isolation by default.
+Start a dump on the instrument after opening capture. Backend, receive-byte,
+capture-byte and payload limits are explicit options. The capture deadline starts
+after connection setup. Setup itself uses existing transport operation deadlines.
+The input is closed before export, and a close failure prevents writing. Existing
+destinations are rejected before discovery and exclusive creation also catches
+files appearing later. Failed/cancelled/timed-out receives create no destination.
+Final write/flush failures may leave a partial file. The final text/JSON summary
+separates capture status, exported, failure and interrupted evidence; completed
+capture with exported=false is not a saved backup. Exit status is 0 for successful
+export, 1 for timeout/cancellation/interruption and 2 for setup, input, limit or
+export failure. No physical instrument was used to qualify this workflow.

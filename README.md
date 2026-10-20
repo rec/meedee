@@ -102,6 +102,21 @@ frozen snapshots and no native client initialization. See
 [timing and load diagnostics](plan/api.md#timing-and-load-diagnostics) for units,
 histogram boundaries and measurement windows.
 
+## Passive SysEx capture
+
+To receive a dump initiated on an instrument, use the optional CLI:
+
+```bash
+meedee sysex-receive backup.syx --port "Synth MIDI Out" --expected-messages 8 --timeout-ms 30000
+```
+
+This passively collects MIDI 1 SysEx, closes the input, then creates a new file.
+It refuses overwrite and writes nothing after receive loss, timeout or decoding
+failure. Final disk errors can leave a partial file. The count is caller-supplied;
+success does not establish instrument-specific dump completeness. Shared
+`transfer.Capture` and `transfer_input.run` provide the same workflow to library
+users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
+
 ## File inspection and capture validation
 
 ```python
