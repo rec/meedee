@@ -16,6 +16,7 @@ pub struct Report {
     pub records: u64,
     pub gap_records: u64,
     pub failure: Option<String>,
+    pub pressure: Option<crate::metrics::Pressure>,
 }
 struct Admission {
     used: usize,
@@ -24,6 +25,7 @@ struct Admission {
     finalizing: bool,
     failure: Option<String>,
     result: Option<Report>,
+    pressure: Option<crate::metrics::Pressure>,
 }
 struct Shared {
     state: Mutex<Admission>,
@@ -45,6 +47,7 @@ impl Recorder {
         record_limit: usize,
         byte_limit: usize,
         best_effort: bool,
+        collect_metrics: bool,
     ) -> io::Result<Self> {
         if record_limit == 0 || byte_limit == 0 || payload_limit == 0 {
             return Err(invalid(0, "recording limits must be positive"));
@@ -68,6 +71,7 @@ impl Recorder {
                 finalizing: false,
                 failure: None,
                 result: None,
+                pressure: collect_metrics.then(crate::metrics::Pressure::default),
             }),
             changed: Condvar::new(),
         });
@@ -117,6 +121,7 @@ impl Recorder {
                     records: count,
                     gap_records: gaps,
                     failure: s.failure.clone(),
+                    pressure: s.pressure.clone(),
                 });
                 worker.changed.notify_all();
             })?;
@@ -158,17 +163,31 @@ impl Recorder {
             || s.records >= self.record_limit
         {
             s.failure = Some("recording queue or payload limit exceeded".into());
+            if let Some(p) = &mut s.pressure {
+                p.capacity_rejections += 1;
+            }
             self.shared.changed.notify_all();
             return false;
         }
         s.used += size;
         s.records += 1;
         match self.sender.try_send((record, size)) {
-            Ok(()) => true,
+            Ok(()) => {
+                let (records, bytes) = (s.records, s.used);
+                if let Some(p) = &mut s.pressure {
+                    p.accepted_records += 1;
+                    p.peak_reserved_records = p.peak_reserved_records.max(records);
+                    p.peak_reserved_bytes = p.peak_reserved_bytes.max(bytes);
+                }
+                true
+            }
             Err(TrySendError::Full(_)) => {
                 s.used -= size;
                 s.records -= 1;
                 s.failure = Some("recording queue is full".into());
+                if let Some(p) = &mut s.pressure {
+                    p.capacity_rejections += 1;
+                }
                 false
             }
             Err(TrySendError::Disconnected(_)) => {
@@ -192,6 +211,14 @@ impl Recorder {
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .failure
+            .clone()
+    }
+    pub fn pressure(&self) -> Option<crate::metrics::Pressure> {
+        self.shared
+            .state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .pressure
             .clone()
     }
     pub fn stop(&self, timeout: Duration) -> io::Result<Report> {

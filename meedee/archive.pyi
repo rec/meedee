@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from os import PathLike
 from typing import BinaryIO
 
-from . import events
+from . import events, metrics
 
 class Stream:
     def __init__(
@@ -109,6 +109,8 @@ class Writer:
 
 class RecordingReport:
     @property
+    def pressure(self) -> metrics.Pressure | None: ...
+    @property
     def complete(self) -> bool: ...
     @property
     def records(self) -> int: ...
@@ -118,6 +120,8 @@ class RecordingReport:
     def failure(self) -> str | None: ...
 
 class Recorder:
+    @property
+    def pressure(self) -> metrics.Pressure | None: ...
     def __init__(
         self,
         destination: str | PathLike[str],
@@ -129,6 +133,7 @@ class Recorder:
         payload_limit: int = 1_048_576,
         record_limit: int = 128,
         byte_limit: int = 8_388_608,
+        metrics: bool = False,
     ) -> None: ...
     def record(
         self,

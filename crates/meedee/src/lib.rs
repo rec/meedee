@@ -7,6 +7,7 @@ pub mod codecs;
 pub mod controls;
 pub mod gm;
 pub mod messages;
+pub mod metrics;
 pub mod mpe;
 pub mod notes;
 pub mod routing;

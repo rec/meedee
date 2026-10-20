@@ -241,6 +241,7 @@ class TypedInputConnection:
         payload_limit: int = 1_048_576,
         record_limit: int = 128,
         byte_limit: int = 8_388_608,
+        metrics: bool = False,
     ) -> archive.Recorder:
         _native.check_thread()
         with self._lock:
@@ -262,6 +263,7 @@ class TypedInputConnection:
                 payload_limit=payload_limit,
                 record_limit=record_limit,
                 byte_limit=byte_limit,
+                metrics=metrics,
             )
             with self._lock:
                 closed = self._closing
@@ -418,6 +420,7 @@ class TypedOutputConnection:
         | None = None,
         cancel: events.Cancellation | None = None,
         allow_rounding: bool = False,
+        metrics: bool = False,
     ) -> events.PlaybackReport:
         return _native.play(
             self,
@@ -426,6 +429,7 @@ class TypedOutputConnection:
             mappings=mappings,
             cancel=cancel,
             allow_rounding=allow_rounding,
+            metrics=metrics,
         )
 
     def send_command(self, command: messages.Message) -> None:

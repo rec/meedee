@@ -136,12 +136,17 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
             sent += 1;
             Ok::<_, io::Error>(())
         },
+        true,
     )
     .unwrap();
     assert_eq!(clock.waits, [0, 0, 20]);
     assert_eq!(report.sent_events, 3);
     assert_eq!(report.max_lateness_ns, 7);
     assert_eq!(sent, 3);
+    let lateness = report.lateness.as_ref().unwrap();
+    assert_eq!(lateness.count(), 3);
+    assert_eq!(lateness.sum_ns(), 14);
+    assert_eq!(lateness.buckets()[0], 1);
     let mut sent = 0;
     let failure = playback::play(
         vec![Ok(event(0)), Ok(event(1)), Ok(event(2))].into_iter(),
@@ -164,9 +169,11 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
                 Ok(())
             }
         },
+        true,
     )
     .unwrap_err();
     assert_eq!(failure.report.sent_events, 1);
+    assert_eq!(failure.report.lateness.as_ref().unwrap().count(), 1);
     assert_eq!(sent, 2);
     let cancel = Cancellation::default();
     cancel.cancel();
@@ -184,7 +191,8 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
             .unwrap(),
             &mut FakeClock::default(),
             &cancel,
-            |_| Ok::<_, io::Error>(())
+            |_| Ok::<_, io::Error>(()),
+            false,
         )
         .unwrap()
         .cancelled
@@ -273,11 +281,13 @@ fn recording_finishes_verified_data_and_marks_loss_without_blocking_admission() 
         128,
         8192,
         false,
+        false,
     )
     .unwrap();
     assert!(r.record(Record::Event(Box::new(event(1)))));
     let report = r.stop(Duration::from_secs(2)).unwrap();
     assert!(report.complete);
+    assert!(report.pressure.is_none());
     let data = saved.lock().unwrap().clone();
     let mut reader = archive::Reader::new(&data[..], 1024, false, false).unwrap();
     assert_eq!(reader.by_ref().count(), 3);
@@ -296,6 +306,7 @@ fn recording_finishes_verified_data_and_marks_loss_without_blocking_admission() 
         1024,
         128,
         8192,
+        false,
         false,
     )
     .unwrap();
@@ -355,6 +366,7 @@ fn a_blocked_file_cannot_block_record_admission_or_exceed_stop_deadline() {
         2,
         8192,
         false,
+        true,
     )
     .unwrap();
     gate.0.lock().unwrap().0 = true;
@@ -367,6 +379,14 @@ fn a_blocked_file_cannot_block_record_admission_or_exceed_stop_deadline() {
     drop(s);
     assert!(r.record(Record::Event(Box::new(event(1)))));
     assert!(!r.record(Record::Event(Box::new(event(2)))));
+    let pressure = r.pressure().unwrap();
+    assert_eq!(pressure.accepted_records, 2);
+    assert_eq!(pressure.capacity_rejections, 1);
+    assert_eq!(pressure.peak_reserved_records, 2);
+    assert_eq!(
+        pressure.peak_reserved_bytes,
+        2 * archive::payload_size(&Record::Event(Box::new(event(0)))).unwrap()
+    );
     assert_eq!(
         r.stop(Duration::from_millis(10)).unwrap_err().kind(),
         io::ErrorKind::TimedOut
@@ -375,4 +395,5 @@ fn a_blocked_file_cannot_block_record_admission_or_exceed_stop_deadline() {
     gate.1.notify_all();
     let report = r.stop(Duration::from_secs(2)).unwrap();
     assert!(!report.complete && report.failure.is_some());
+    assert_eq!(report.pressure, Some(pressure));
 }

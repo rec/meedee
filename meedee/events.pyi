@@ -1,6 +1,6 @@
 """Immutable events and explicit clocks; transport nanoseconds do not imply accuracy."""
 
-from . import messages, midi
+from . import messages, metrics, midi
 
 class Clock:
     def __init__(
@@ -179,6 +179,8 @@ class PlaybackPlan:
     def deadline(self, event: Event) -> PlannedEvent: ...
 
 class PlaybackReport:
+    @property
+    def lateness(self) -> metrics.Distribution | None: ...
     @property
     def sent_events(self) -> int: ...
     @property

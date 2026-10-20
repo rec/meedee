@@ -234,6 +234,13 @@ appropriate instead of building another general-purpose playable instrument.
 
 ### 10. Timing and load diagnostics
 
+**Implemented observational foundation:** opt-in playback dispatch-lateness
+histograms, recording admission/peak reservation metrics and passive monitor
+host delivery rates/intervals. Public Rust/Python accumulators retain fixed
+histograms and exact aggregates with bounded memory. Queued and in-flight writes
+both count toward recording pressure. Process-tree resources and native/physical
+qualification remain separate.
+
 **Use:** Establish whether a particular Pi, interface and application can handle
 a workload before a performance.
 

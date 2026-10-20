@@ -88,4 +88,5 @@ def play(
     mappings: list[events.ClockMapping] | tuple[events.ClockMapping, ...] | None = None,
     cancel: events.Cancellation | None = None,
     allow_rounding: bool = False,
+    metrics: bool = False,
 ) -> events.PlaybackReport: ...

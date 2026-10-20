@@ -1,7 +1,7 @@
 """Passive CLI presentation over the existing typed input and Rust interpreters."""
 
 from collections import deque
-from time import monotonic
+from time import monotonic, monotonic_ns
 
 from . import controls, events, inspection, messages, midi, ump
 from ._cli import Monitor, channel_state_data, emit, inspection_data
@@ -168,6 +168,11 @@ def watch(connection: midi.TypedInputConnection, config: Monitor) -> int:
     start = monotonic()
     interrupted = False
     failure: str | None = None
+    delivery = None
+    if config.metrics:
+        from . import metrics
+
+        delivery = metrics.Delivery(start_ns=monotonic_ns())
     try:
         with connection:
             try:
@@ -185,6 +190,8 @@ def watch(connection: midi.TypedInputConnection, config: Monitor) -> int:
                     )
                     item = connection.receive(timeout=remaining)
                     if item is not None:
+                        if delivery is not None and isinstance(item, events.Event):
+                            delivery.observe(monotonic_ns())
                         for r in session.feed(item):
                             emit(r, config.output)
             except KeyboardInterrupt:
@@ -218,6 +225,30 @@ def watch(connection: midi.TypedInputConnection, config: Monitor) -> int:
             "history": list(session.history),
         }
     )
+    if delivery is not None:
+        measurement = delivery.snapshot(monotonic_ns())
+        intervals = measurement.intervals
+        data["metrics"] = {
+            "clock": "host_monotonic",
+            "events": measurement.events,
+            "elapsed_ns": measurement.elapsed_ns,
+            "events_per_second": (
+                measurement.events * 1_000_000_000 / measurement.elapsed_ns
+                if measurement.elapsed_ns
+                else None
+            ),
+            "delivery_intervals": {
+                n: getattr(intervals, n)
+                for n in (
+                    "count",
+                    "sum_ns",
+                    "minimum_ns",
+                    "maximum_ns",
+                    "upper_bounds_ns",
+                    "buckets",
+                )
+            },
+        }
     emit(data, config.output)
     return (
         2

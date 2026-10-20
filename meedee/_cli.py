@@ -68,6 +68,7 @@ class Monitor(BaseModel, frozen=True):
     ) = None
     output: Literal["text", "json"] = "text"
     isolated: bool = True
+    metrics: bool = False
     duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     types: list[str] = Field(default_factory=list)
     channel: int | None = Field(default=None, ge=1, le=16)

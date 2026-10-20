@@ -1927,3 +1927,37 @@ checkout. Release-only CI and artifact checks include the new testing surfaces.
 No application, native MIDI client/device, virtual endpoint, release or CI workflow
 was started. These are deterministic toolkit checks, not driver, physical timing,
 thread-safety or hardware qualification.
+
+## Opt-in timing and load diagnostics, 2026-10-20
+
+Four slices add shared bounded Rust/Python histograms and host-delivery windows;
+playback dispatch-lateness distributions; recording admission/peak reservation
+metrics; and passive monitor delivery rates/intervals. Collection is disabled by
+default. Fixed histograms retain exact count/minimum/maximum/u128 sum without
+sample windows or percentile claims. Recording peaks include queued and in-flight
+writes. Playback samples cover only successful handoffs, and monitor observations
+precede display filters without comparing host times to source timestamps.
+
+The full Python 3.11 suite passes **358 tests with one optional skip**. New focused
+checks cover inclusive histogram boundaries and sums beyond u64, independent frozen
+snapshots, delivery-window idle and clock regression, enabled/disabled collection,
+playback failure/cancellation prefixes, recording capacity rejection and monitor
+filtering with regressing source timestamps. Extended Rust live tests exercise
+exact playback samples and peak reservations while the file writer is blocked.
+The pure-import harness uses both accumulators while native cleanup initialization
+is forbidden. Rust workspace tests and doctests pass; native/standalone-only tests
+retain their existing explicit gates.
+
+Ruff, formatting, ty (package and tests), pyupgrade, Cargo formatting, lock and
+whitespace checks pass. Clippy passes with the existing Rust 1.99 atomic-deprecation
+exception. Native lifecycle code is unchanged. No dependency or lockfile change
+was required. No application, native MIDI client/device or traffic generator was
+started. These measurements describe host observations and retained reservations,
+not physical latency, device acceptance, wire throughput or hardware capacity.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution, and
+both distribution checks pass. Release-only CI and artifact checks include the
+new metric sources and typing surface.
+Each installed wheel passes **122 focused checks** outside the checkout,
+including the new metric and existing live record/playback tests. Physical and
+platform qualification gates remain open.

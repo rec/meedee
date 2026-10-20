@@ -25,6 +25,7 @@ mod file_timing;
 mod files;
 mod live;
 mod messages;
+mod metrics;
 mod packets;
 mod playback;
 mod ports;
@@ -40,6 +41,7 @@ mod transport_tests;
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ci, module)?)?;
     module.add_function(wrap_pyfunction!(populate_inspection, module)?)?;
     module.add_function(wrap_pyfunction!(populate_notes, module)?)?;
@@ -257,4 +259,9 @@ fn populate_transfer(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_testing(module: &Bound<'_, PyModule>) -> PyResult<()> {
     testing::register(module)
+}
+
+#[pyfunction]
+fn populate_metrics(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    metrics::register(module)
 }
