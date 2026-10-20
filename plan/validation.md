@@ -1852,3 +1852,40 @@ artifact checks include the new Python, Rust and typing sources. No application,
 native discovery/transfer, physical device, release or CI workflow was started.
 A chosen host gap is not measured wire pacing or evidence of device compatibility;
 existing native and platform qualification gates remain open.
+
+## MIDI-CI management browser, 2026-10-20
+
+Three slices add a shared Rust/Python one-scan browser over the existing CI
+session, a caller-thread typed MIDI 1 / UMP SysEx7 host, and `ci-browse` with
+explicit local identity and exact unique input/output names. The CLI chooses a
+fresh random MUID, discovers once and queries format-2 endpoint IDs sequentially.
+Existing management replies/NAKs/collision invalidations are preserved; collisions
+retire stale actions, complete required invalidation and stop without restart.
+No Profiles, Property Exchange or instrument configuration writes are introduced.
+
+The full Python 3.11 suite passes **340 tests with one optional skip**. Thirteen
+focused browser tests cover frozen independent reports, bounded samples, discovery
+and endpoint phases, collisions/stale tokens, retained peers after stopping,
+clock regression, both live protocols, partial UMP send failure without retry,
+loss/cancellation, assembly/framing diagnostics, empty complete scans, CLI identity
+and group validation, randomized local identity, and connection closure. A
+cancellation before the first actual packet does not invent uncertain delivery.
+Controlled clients/queues and fake monotonic clocks exercise the live adapter;
+no native client is created. The pure-import harness also constructs a browser
+and imports the live adapter while cleanup initialization is forbidden.
+
+Rust workspace tests and doctests pass, including five browser cases for the
+scan/inquiry sequence, timeout meaning, bounded diagnostics, collision cleanup,
+provisional early replies, known-peer endpoint NAKs, overall deadline and uncertain
+sends. Ruff, formatting, ty (package and tests), pyupgrade, Cargo formatting, lock
+and whitespace checks pass. Clippy passes with the existing Rust 1.99 atomic
+fetch_update deprecation exception; lifecycle code/suppressions remain unchanged.
+No dependency or lockfile change was required.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution. Both
+distribution checks pass; each installed wheel passes **96** focused tests outside
+the checkout. Release-only CI includes browser tests, and artifact checks include
+the added Rust/Python/typing sources. No application, native MIDI discovery or
+CI exchange, physical instrument, release or CI workflow was started. Management
+handoffs do not establish device acknowledgement, health or advertised-category
+implementation. Existing native/physical/platform qualification gates remain open.

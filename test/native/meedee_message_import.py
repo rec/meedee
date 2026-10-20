@@ -12,6 +12,7 @@ def main() -> None:
         from meedee import (
             archive,
             ci,
+            ci_live,
             clip,
             codecs,
             controls,
@@ -33,6 +34,14 @@ def main() -> None:
             universal,
         )
 
+        browser = ci.Browser(
+            local_muid=1,
+            identity=ci.Identity(
+                manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
+            ),
+            route=ci.Route(input="pure", output="none"),
+        )
+        assert browser.snapshot().status == "ready" and callable(ci_live.run)
         assert events.ReceivedPacket.__module__ == "meedee.events"
         assert (
             codecs.encode(messages.ProgramChange(channel=16, program=128))

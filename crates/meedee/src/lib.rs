@@ -1,6 +1,7 @@
 //! Shared Rust MIDI toolkit. No Python interpreter or PyO3 dependency.
 
 pub mod ci;
+pub mod ci_browser;
 pub mod ci_session;
 pub mod codecs;
 pub mod controls;

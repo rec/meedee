@@ -166,3 +166,81 @@ The opt-in native fixture uses only its own temporary UMP virtual endpoints,
 experimental manufacturer identity and freshly randomized test MUIDs. It sends
 only management discovery/reply, with zero optional capabilities. Windows, Pi and
 physical UMP qualification remain open; see validation.md for the actual outcome.
+
+## One-scan management browser
+
+Rust `ci_browser::Browser` owns a fresh `ci_session::Session`; Python `ci.Browser`
+constructs the same shared core from the existing identity, route and resource
+settings. Neither construction nor imports perform I/O. The local identity and
+MUID are explicit library inputs. Optional capability-category bits remain zero.
+The browser starts once, waits for one Discovery window, then queries each
+format-2 peer observed by the end of that window sequentially for its Product
+Instance ID. Format-1 peers remain visible without endpoint inquiries. Later
+unsolicited discoveries may appear in reports but do not extend the target list.
+
+Defaults are a three-second discovery window after handoff, one-second endpoint
+and send-confirmation deadlines, a thirty-second overall scan deadline starting
+at `start`, and 128 diagnostic samples. Discovery send confirmation retains the
+session's discovery-duration admission deadline. The overall deadline must
+exceed discovery duration. Existing peer/exchange/provisional-byte limits apply.
+The overall deadline bounds activity even if incoming requests generate replies;
+native calls and connection setup/teardown are outside its interruptibility.
+A timeout is an observation, never proof that a device is offline.
+
+`start(now_ns)`, `feed(message, input=..., group=..., now_ns=...)`, `poll(now_ns)`
+and `report_send(token=..., sent=..., now_ns=...)` return proposed `ci.Action`
+values. Use one serialized control flow and one nondecreasing host monotonic
+clock. Every action must be handed off at most once and reported. The frozen
+`BrowseReport.pending_tokens` list identifies current sendable actions; discard
+retired queued tokens before sending. Full-action confirmations count transport
+handoffs. An interrupted or failed action may have sent a prefix of UMP packets;
+its token is uncertain and none of that action counts as fully confirmed.
+No per-packet acceptance or instrument acknowledgement is inferred.
+
+The browser preserves existing generated Discovery replies, NAKs and identity
+collision invalidations. A known peer's Endpoint inquiry receives an unsupported
+NAK because no local Product Instance ID is defined by this tool. An unknown
+requester is diagnosed without inventing peer declarations. Local/peer collisions
+retire ordinary pending actions, return only required invalidation actions, and
+stop after their send results; no identity restart or rediscovery occurs. Peer
+invalidation, resource exhaustion and missing send confirmation stop immediately.
+Known input loss/failure and cancellation stop the host. There are no retries,
+reconnects, profile/property operations, tuning writes or MIDI-state restoration.
+
+Reports include status (`ready`, `discovering`, `inquiring`, `stopping`,
+`completed`, `stopped`), local MUID, the last peer declarations, confirmed action
+count, uncertain token, sendable tokens, bounded diagnostics/omission count,
+problem count and terminal reason. Diagnostics retain kind, MUID, token and at
+most 1024 characters of reason, without retaining raw reply payloads. `stop`
+retires sends and retains the first terminal reason, likewise bounded. Stopped
+reports preserve the last peer snapshot, which may have become stale or invalid;
+no identity, capability or Product Instance ID is authenticated. Caller-owned
+copies and transient session updates remain outside retained report budgets.
+
+`ci_live.run(browser, receiver, output, cancel=None, ...)` starts a fresh browser
+on existing typed connections. A route without a group means MIDI 1; an explicit
+group means UMP SysEx7. Connections must use that protocol and the receiver must
+match the route's stream. The host reuses the existing UMP assembler, ignores
+other groups and unrelated message families, and stops on input diagnostics or
+SysEx7 assembly failure. Loss counters are checked before every packet send.
+The caller owns connections. Cancellation is checked between sends and receive
+waits of at most 50 ms; an in-flight transport call cannot be forcibly cancelled.
+Operational failures propagate after progress is recorded; Ctrl-C returns a
+stopped report. Unexpected exceptions also leave the browser inspectable.
+
+`meedee ci-browse` opens one exact, unique input and output, resolves both names
+before opening either, and uses process isolation by default. It requires the
+protocol, explicit UMP group where applicable, and explicit manufacturer (three
+seven-bit hex bytes), family/model (0..16383) and revision (four seven-bit hex
+bytes). One-byte manufacturer IDs use two zero padding bytes. The fields identify
+the local participant; they are not a remote-device filter. The CLI draws a fresh
+random legal MUID for each scan and advertises zero optional capabilities. Input
+and output path/Function Block declarations are explicit settings, not inferred
+physical topology. Connections close on completion, interruption and failure.
+Text/JSON output contains the bounded final report, including declared capability
+bits without interpreting deferred categories. Status 0 means a complete scan
+without reported problems (including a scan with no peers), 1 means observations
+with problems or an incomplete/cancelled scan, and 2 means argument/setup/access,
+transport/close errors or uncertain output. Shutdown errors/interruption remain
+visible even when a scan has completed. Device-free tests do not establish native
+MIDI-CI interoperability or qualify any instrument.
