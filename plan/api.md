@@ -1298,3 +1298,66 @@ to completion on its own. There is no script interpreter, virtual-device creatio
 background delivery, automatic loopback, ownership cleanup or native backend
 selection. These doubles exercise toolkit logic; they do not qualify native
 lifecycle, driver queue behavior, physical timing, thread safety or devices.
+
+## Timing and load diagnostics
+
+Diagnostics are opt-in and observational. Existing timing/loss diagnostics and
+file-completeness rules remain unchanged. No metric proves physical latency,
+device acknowledgement, backend capacity or loss-free delivery. No process-tree
+sampling, native loopback or traffic generator is introduced here.
+
+Rust `metrics::Histogram` and Python `metrics.Histogram` accept unsigned u64
+nanoseconds through `observe`. Python `snapshot()` returns an independent frozen
+`Distribution`; Rust callers clone the accumulator. Both expose count, exact u128
+sum_ns (a Python int), optional minimum_ns/maximum_ns and nine lifetime bucket
+counts. Inclusive upper bounds are `[0, 1000, 10000, 100000, 1000000, 10000000,
+100000000, 1000000000]` nanoseconds; each bucket excludes its predecessor's upper
+bound, and the last contains values above one second. Empty distributions have
+zero counts/sum and absent extrema. Snapshots copy bucket/bound lists. No samples
+or exact percentiles are retained. Invalid/overflowing observations fail without
+changing the previous distribution.
+
+`metrics.Delivery(start_ns=...)` uses explicit caller-supplied unsigned host times.
+`observe(now_ns)` counts one event; intervals begin with the second event, so
+simultaneous events contribute zero intervals. `snapshot(now_ns)` returns events,
+elapsed_ns since start and an interval Distribution. Initial/final idle belongs
+to elapsed time, not to the interval histogram. Delivery observations cannot
+precede start or the previous event; snapshots cannot precede the last event.
+Snapshots do not advance the accumulator. Rate is events/elapsed time and is
+undefined for zero elapsed time. These accumulators initialize no native client,
+worker, timer or background sampler.
+
+Python `output.play(..., metrics=True)` and Rust `playback::play`'s collect_metrics
+argument populate Report.lateness. The default is None. It measures dispatch
+lateness at the existing pre-send host-clock sample, relative to the planned
+deadline, and includes zero values. A sample is retained only after a successful
+whole-event handoff, matching sent_events and the existing max_lateness_ns field.
+A failed send contributes no sample because acceptance is uncertain; errors and
+cancellation retain the successful prefix. Send duration, physical output timing
+and device processing are not measured. Enabled empty playback has an empty
+histogram, distinguishable from disabled collection.
+
+`input.start_recording(..., metrics=True)` and `archive.Recorder(..., metrics=True)`
+expose a live `.pressure` snapshot and final RecordingReport.pressure. Rust
+`recording::Recorder::new` takes the corresponding collect_metrics argument.
+Disabled collection returns None. accepted_records counts admitted caller records,
+not initial archive descriptors or successfully written records. capacity_rejections
+counts record/payload/byte-budget or queue-capacity rejections; semantic invalidity,
+input loss/discontinuity, prior failure, closure and worker disconnection retain
+existing failure behavior without being relabelled capacity rejection. Peaks use
+existing reservations, including queued and currently writing records. Bytes are
+reserved archive payload bytes, excluding framing, metadata and object overhead.
+Live snapshots are independent values. Final metrics survive failed/incomplete
+recording and do not change structural completeness or best-effort rules.
+
+`meedee monitor --metrics` adds a `metrics` object to its final summary. It counts
+all decoded Events delivered to the host before display filters, excluding
+StreamDiagnostic items. `clock="host_monotonic"`, events, elapsed_ns,
+events_per_second and delivery_intervals describe host receive observations;
+source event timestamps remain untouched and are diagnosed separately. The window
+starts before receiving and ends after connection closure and inspection-summary
+preparation, before final emission. It includes initial/final idle, interpretation,
+display and shutdown work. Rate is not raw packet or wire throughput; intervals
+are not source-clock jitter. No host timestamp calls or extra summary fields are
+added when disabled. CLI defaults, exit status, filters and loss handling remain
+unchanged.

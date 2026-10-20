@@ -91,6 +91,14 @@ struct PlaybackReport {
 #[pymethods]
 impl PlaybackReport {
     #[getter]
+    fn lateness(&self) -> Option<crate::metrics::Distribution> {
+        self.value
+            .lateness
+            .as_deref()
+            .cloned()
+            .map(|value| crate::metrics::Distribution { value })
+    }
+    #[getter]
     fn sent_events(&self) -> u64 {
         self.value.sent_events
     }
@@ -141,7 +149,8 @@ impl Iterator for Source {
     }
 }
 #[pyfunction]
-#[pyo3(signature=(output,source,*,origin,mappings=None,cancel=None,allow_rounding=false))]
+#[pyo3(signature=(output,source,*,origin,mappings=None,cancel=None,allow_rounding=false,metrics=false))]
+#[allow(clippy::too_many_arguments)]
 fn play(
     py: Python<'_>,
     output: &Bound<'_, PyAny>,
@@ -150,6 +159,7 @@ fn play(
     mappings: Option<&Bound<'_, PyAny>>,
     cancel: Option<PyRef<'_, Cancellation>>,
     #[pyo3(from_py_with=crate::ump::boolean)] allow_rounding: bool,
+    #[pyo3(from_py_with=crate::ump::boolean)] metrics: bool,
 ) -> PyResult<PlaybackReport> {
     crate::callback::check_thread()?;
     let planner = model::Planner::new(
@@ -186,7 +196,9 @@ fn play(
                     Ok::<(), PyErr>(())
                 })
             },
+            metrics,
         )
+        .map_err(Box::new)
     });
     match result {
         Ok(value) => Ok(PlaybackReport { value }),

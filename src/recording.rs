@@ -14,6 +14,13 @@ struct RecordingReport {
 #[pymethods]
 impl RecordingReport {
     #[getter]
+    fn pressure(&self) -> Option<crate::metrics::Pressure> {
+        self.value
+            .pressure
+            .clone()
+            .map(|value| crate::metrics::Pressure { value })
+    }
+    #[getter]
     fn complete(&self) -> bool {
         self.value.complete
     }
@@ -38,7 +45,7 @@ pub struct Recorder {
 #[pymethods]
 impl Recorder {
     #[new]
-    #[pyo3(signature=(destination,*,clock,stream,label="",best_effort=false,payload_limit=1_048_576,record_limit=128,byte_limit=8_388_608))]
+    #[pyo3(signature=(destination,*,clock,stream,label="",best_effort=false,payload_limit=1_048_576,record_limit=128,byte_limit=8_388_608,metrics=false))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
@@ -50,6 +57,7 @@ impl Recorder {
         #[pyo3(from_py_with=limit)] payload_limit: usize,
         #[pyo3(from_py_with=limit)] record_limit: usize,
         #[pyo3(from_py_with=limit)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::ump::boolean)] metrics: bool,
     ) -> PyResult<Self> {
         crate::callback::check_thread()?;
         let descriptors = vec![
@@ -69,10 +77,17 @@ impl Recorder {
                     record_limit,
                     byte_limit,
                     best_effort,
+                    metrics,
                 )
             })
             .map_err(os_error)?;
         Ok(Self { value, stream })
+    }
+    #[getter]
+    fn pressure(&self) -> Option<crate::metrics::Pressure> {
+        self.value
+            .pressure()
+            .map(|value| crate::metrics::Pressure { value })
     }
     fn record(&self, record: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(d) = record.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {

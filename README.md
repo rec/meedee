@@ -88,6 +88,20 @@ streaming: reading and verifying an entire capture before playback is necessary
 if no output may precede discovering a damaged or incomplete trailer. CRCs detect
 accidental corruption and do not authenticate a file.
 
+Pass `metrics=True` to `start_recording` or `archive.Recorder` for live/final
+`.pressure` reports: admitted records, capacity rejections and peak reserved
+records/payload bytes, including in-flight writes. Pass it to `output.play` for
+`.lateness`, a bounded histogram with exact count/minimum/maximum/sum covering
+successful handoffs. Defaults leave these fields `None`. These observations do
+not establish device acceptance or physical latency.
+
+`meedee monitor --metrics` adds host delivery rate and interval statistics to its
+final summary, before display filters. `meedee.metrics` also exposes reusable
+Rust-backed `Histogram` and caller-timed `Delivery` accumulators, with independent
+frozen snapshots and no native client initialization. See
+[timing and load diagnostics](plan/api.md#timing-and-load-diagnostics) for units,
+histogram boundaries and measurement windows.
+
 ## File inspection and capture validation
 
 ```python

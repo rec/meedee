@@ -113,6 +113,7 @@ def test_monitor_duration_interrupt_and_terminal_failure_close_the_input(
     assert feed.closed
     data = json.loads(capsys.readouterr().out.splitlines()[-1])
     assert data["records"] == 1 and data["live"] and "complete" not in data
+    assert "metrics" not in data
     feed = Feed([])
     config = Monitor(port="keys", protocol="midi1", output="json")
     assert watch(feed, config) == 0  # ty: ignore[invalid-argument-type]
@@ -134,3 +135,30 @@ def test_port_selection_requires_an_exact_unique_name() -> None:
         select_port([a], "key")
     with pytest.raises(ValueError, match="found 2"):
         select_port([a, a], "keys")
+
+
+def test_monitor_metrics_count_filtered_events_without_comparing_source_clocks(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    feed = Feed(
+        [
+            event(messages.TimingClock(), ticks=10_000_000_000),
+            event(messages.TimingClock(), ticks=1),
+        ]
+    )
+    monkeypatch.setattr("meedee._monitor.monotonic", lambda: feed.elapsed)
+    monkeypatch.setattr(
+        "meedee._monitor.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
+    )
+    config = Monitor(
+        port="keys", protocol="midi1", metrics=True, types=["NoteOn"], output="json"
+    )
+    assert watch(feed, config) == 1  # ty: ignore[invalid-argument-type]
+    data = json.loads(capsys.readouterr().out.splitlines()[-1])
+    summary = data["metrics"]
+    assert summary["clock"] == "host_monotonic" and summary["events"] == 2
+    assert summary["elapsed_ns"] == 3_000_000_000
+    assert summary["events_per_second"] == pytest.approx(2 / 3)
+    assert summary["delivery_intervals"]["count"] == 1
+    assert summary["delivery_intervals"]["sum_ns"] == 1_000_000_000
+    assert data["filtered"] == 2 and data["timestamp_regressions"] == 1

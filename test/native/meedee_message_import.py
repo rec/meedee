@@ -20,6 +20,7 @@ def main() -> None:
             gm,
             inspection,
             messages,
+            metrics,
             mpe,
             notes,
             routing,
@@ -35,6 +36,12 @@ def main() -> None:
             universal,
         )
 
+        histogram = metrics.Histogram()
+        histogram.observe(1)
+        assert histogram.snapshot().sum_ns == 1
+        deliveries = metrics.Delivery(start_ns=0)
+        deliveries.observe(5)
+        assert deliveries.snapshot(10).elapsed_ns == 10
         simulated = testing.Input(stream="pure", protocol="midi1")
         synthetic_clock = events.Clock(identity="simulation", origin="manual")
         simulated.inject(b"\xf8", clock=synthetic_clock)
