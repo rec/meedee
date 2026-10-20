@@ -1209,3 +1209,13 @@ means malformed input, access/argument/setup/close failure, execution failure
 or uncertain delivery.
 An interruption during shutdown remains visible even if all handoffs completed.
 No physical device compatibility or native transfer qualification is claimed.
+
+## MIDI-CI management browser
+
+Rust `ci_browser::Browser`, Python `ci.Browser` and the optional `ci_live` host
+coordinate one bounded discovery scan followed by sequential format-2 endpoint
+inquiries. Frozen `ci.BrowseReport` / `ci.BrowseDiagnostic` values retain bounded
+progress and peer declarations. They reuse the existing CI session and codecs;
+no deferred profile/property support is added. The exact caller-driven methods,
+limits, identity and collision policies, live byte/UMP adapter and `ci-browse`
+CLI contract are documented in [ci.md](ci.md#one-scan-management-browser).

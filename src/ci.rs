@@ -522,7 +522,209 @@ fn int(value: &Bound<'_, PyAny>) -> PyResult<i64> {
 fn error(e: meedee::messages::ValueError) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
+
+#[pyclass(module = "meedee.ci")]
+struct Browser {
+    value: meedee::ci_browser::Browser,
+}
+#[pymethods]
+impl Browser {
+    #[getter]
+    fn route(&self) -> Route {
+        Route {
+            value: self.value.route().clone(),
+        }
+    }
+    #[new]
+    #[pyo3(signature=(*,local_muid,identity,route,output_path=0,function_block=None,max_sysex=1_048_576,peer_limit=16,exchange_limit=16,reply_byte_limit=8_388_608,discovery_ns=3_000_000_000,endpoint_ns=1_000_000_000,timeout_ns=30_000_000_000,detail_limit=128))]
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        local_muid: &Bound<'_, PyAny>,
+        identity: PyRef<'_, Identity>,
+        route: PyRef<'_, Route>,
+        #[pyo3(from_py_with=int)] output_path: i64,
+        function_block: Option<&Bound<'_, PyAny>>,
+        #[pyo3(from_py_with=int)] max_sysex: i64,
+        #[pyo3(from_py_with=limit)] peer_limit: usize,
+        #[pyo3(from_py_with=limit)] exchange_limit: usize,
+        #[pyo3(from_py_with=limit)] reply_byte_limit: usize,
+        #[pyo3(from_py_with=uint)] discovery_ns: u64,
+        #[pyo3(from_py_with=uint)] endpoint_ns: u64,
+        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=limit)] detail_limit: usize,
+    ) -> PyResult<Self> {
+        let session = session::Session::new(
+            int(local_muid)?,
+            identity.value.clone(),
+            route.value.clone(),
+            output_path,
+            function_block.map(int).transpose()?,
+            max_sysex,
+            peer_limit,
+            exchange_limit,
+            reply_byte_limit,
+        )
+        .map_err(error)?;
+        Ok(Self {
+            value: meedee::ci_browser::Browser::new(
+                session,
+                discovery_ns,
+                endpoint_ns,
+                timeout_ns,
+                detail_limit,
+            )
+            .map_err(error)?,
+        })
+    }
+
+    fn start(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<Vec<Action>> {
+        Ok(self
+            .value
+            .start(now_ns)
+            .map_err(error)?
+            .into_iter()
+            .map(|value| Action { value })
+            .collect())
+    }
+    fn poll(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<Vec<Action>> {
+        Ok(self
+            .value
+            .poll(now_ns)
+            .map_err(error)?
+            .into_iter()
+            .map(|value| Action { value })
+            .collect())
+    }
+    #[pyo3(signature=(message, *, input, group=None, now_ns))]
+    fn feed(
+        &mut self,
+        message: &Bound<'_, PyAny>,
+        input: &str,
+        group: Option<&Bound<'_, PyAny>>,
+        #[pyo3(from_py_with=uint)] now_ns: u64,
+    ) -> PyResult<Vec<Action>> {
+        let raw = if let Ok(v) = message.extract::<PyRef<'_, crate::messages::SysEx>>() {
+            v.value.clone()
+        } else {
+            extract(message)?.sysex()
+        };
+        Ok(self
+            .value
+            .feed(&raw, input, optional_byte(group)?, now_ns)
+            .map_err(error)?
+            .into_iter()
+            .map(|value| Action { value })
+            .collect())
+    }
+    #[pyo3(signature=(*,token,sent,now_ns))]
+    fn report_send(
+        &mut self,
+        #[pyo3(from_py_with=uint)] token: u64,
+        #[pyo3(from_py_with=crate::ump::boolean)] sent: bool,
+        #[pyo3(from_py_with=uint)] now_ns: u64,
+    ) -> PyResult<Vec<Action>> {
+        Ok(self
+            .value
+            .report_send(token, sent, now_ns)
+            .map_err(error)?
+            .into_iter()
+            .map(|value| Action { value })
+            .collect())
+    }
+    fn stop(&mut self, reason: &str) {
+        self.value.stop(reason);
+    }
+    fn snapshot(&self) -> BrowseReport {
+        BrowseReport {
+            value: self.value.snapshot(),
+        }
+    }
+}
+#[pyclass(frozen, module = "meedee.ci")]
+struct BrowseReport {
+    value: meedee::ci_browser::Report,
+}
+#[pymethods]
+impl BrowseReport {
+    #[getter]
+    fn status(&self) -> &str {
+        self.value.status
+    }
+    #[getter]
+    fn local_muid(&self) -> u32 {
+        self.value.local_muid
+    }
+    #[getter]
+    fn peers(&self) -> Vec<Peer> {
+        self.value
+            .peers
+            .iter()
+            .cloned()
+            .map(|value| Peer { value })
+            .collect()
+    }
+    #[getter]
+    fn confirmed_actions(&self) -> u64 {
+        self.value.confirmed_actions
+    }
+    #[getter]
+    fn uncertain_token(&self) -> Option<u64> {
+        self.value.uncertain_token
+    }
+    #[getter]
+    fn pending_tokens(&self) -> Vec<u64> {
+        self.value.pending_tokens.clone()
+    }
+    #[getter]
+    fn diagnostics(&self) -> Vec<BrowseDiagnostic> {
+        self.value
+            .diagnostics
+            .iter()
+            .cloned()
+            .map(|value| BrowseDiagnostic { value })
+            .collect()
+    }
+    #[getter]
+    fn omitted_diagnostics(&self) -> u64 {
+        self.value.omitted_diagnostics
+    }
+    #[getter]
+    fn problems(&self) -> u64 {
+        self.value.problems
+    }
+    #[getter]
+    fn reason(&self) -> Option<&str> {
+        self.value.reason.as_deref()
+    }
+}
+#[pyclass(frozen, module = "meedee.ci")]
+struct BrowseDiagnostic {
+    value: meedee::ci_browser::Diagnostic,
+}
+#[pymethods]
+impl BrowseDiagnostic {
+    #[getter]
+    fn kind(&self) -> &str {
+        &self.value.kind
+    }
+    #[getter]
+    fn peer_muid(&self) -> Option<u32> {
+        self.value.peer_muid
+    }
+    #[getter]
+    fn token(&self) -> Option<u64> {
+        self.value.token
+    }
+    #[getter]
+    fn reason(&self) -> &str {
+        &self.value.reason
+    }
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<Browser>()?;
+    m.add_class::<BrowseReport>()?;
+    m.add_class::<BrowseDiagnostic>()?;
     m.add("BROADCAST_MUID", model::BROADCAST_MUID)?;
     m.add("MAX_MUID", model::MAX_MUID)?;
     m.add_class::<Address>()?;

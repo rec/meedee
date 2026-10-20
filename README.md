@@ -811,3 +811,32 @@ cancellation cannot interrupt a blocked native call. See the
 [transfer contract](plan/api.md#bounded-midi-1-sysex-transfers) for timing,
 cancellation, progress fields and CLI status codes. No native device transfer
 has been qualified by this implementation's automated checks.
+
+### One MIDI-CI management scan
+
+The optional CLI can discover CI participants on one explicitly selected route,
+then ask format-2 peers for Product Instance IDs. Supply your local participant's
+manufacturer, family, model and revision fields. For example, an explicitly
+experimental local identity can be used during development:
+
+```sh
+meedee ci-browse --input-port 'Exact input name' --output-port 'Exact output name' \
+  --protocol midi1 --manufacturer 7d0000 --family 1 --model 1 --revision 00000000
+```
+
+Those identity fields describe the local browser, not the device being sought.
+For UMP, use `--protocol ump --group N` with the intended group (1..16). A fresh
+random MUID is generated for each scan. Both ports must be uniquely named;
+process isolation is enabled by default. `--output json` produces a final report.
+The default discovery window is 3000 ms, endpoint timeout 1000 ms and overall
+scan deadline 30000 ms, adjustable with `--discovery-ms`, `--endpoint-ms` and
+`--timeout-ms`. The overall deadline does not interrupt blocked native calls.
+
+This sends management traffic, including protocol replies and required collision
+invalidations. It stops on loss/failure and never restarts or retries automatically.
+It performs no Profiles, Property Exchange or instrument configuration writes.
+An empty scan or timeout does not prove a device is offline. Peer identities and
+capability bits are declarations; successful output handoff is not device
+acknowledgement. Rust `ci_browser::Browser`, Python `ci.Browser` and `ci_live.run`
+provide the same reusable workflow. See the [browser contract](plan/ci.md#one-scan-management-browser)
+for bounds, cancellation, reporting, local identity and qualification limits.

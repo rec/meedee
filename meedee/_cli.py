@@ -196,6 +196,63 @@ class TransferSend(TransferPreview, frozen=True):
     isolated: bool = True
 
 
+class CiBrowse(BaseModel, frozen=True):
+    """Run one CI management discovery scan, then inquire about format-2 endpoints."""
+
+    input_port: str = Field(min_length=1)
+    output_port: str = Field(min_length=1)
+    protocol: Literal["midi1", "ump"]
+    manufacturer: str
+    family: int = Field(ge=0, le=16383)
+    model: int = Field(ge=0, le=16383)
+    revision: str
+    group: int | None = Field(default=None, ge=1, le=16)
+    output_path: int = Field(default=0, ge=0, le=127)
+    function_block: int | None = Field(default=None, ge=0, le=31)
+    backend: (
+        Literal[
+            "CoreMidi",
+            "CoreMidiUmp",
+            "AlsaSeq",
+            "AlsaSeqUmp",
+            "AlsaRaw",
+            "AlsaRawUmp",
+            "WinMm",
+            "WindowsMidiServices",
+        ]
+        | None
+    ) = None
+    isolated: bool = True
+    discovery_ms: int = Field(default=3000, ge=3000, le=18_446_744_073_709)
+    endpoint_ms: int = Field(default=1000, gt=0, le=18_446_744_073_709)
+    timeout_ms: int = Field(default=30000, gt=0, le=18_446_744_073_709)
+    peer_limit: int = Field(default=16, gt=0)
+    exchange_limit: int = Field(default=16, gt=0)
+    detail_limit: int = Field(default=128, gt=0)
+    event_limit: int = Field(default=128, gt=0)
+    max_sysex: int = Field(default=1_048_576, ge=128, le=268435455)
+    byte_limit: int = Field(default=8_388_608, gt=0)
+    output: Literal["text", "json"] = "text"
+
+    @model_validator(mode="after")
+    def check_scan(self) -> Self:
+        from . import ci
+
+        ci.Identity(
+            manufacturer=bytes.fromhex(self.manufacturer),
+            family=self.family,
+            model=self.model,
+            revision=bytes.fromhex(self.revision),
+        )
+        if (self.protocol == "ump") != (self.group is not None):
+            raise ValueError("UMP requires an explicit group; MIDI 1 has no group")
+        if self.protocol == "midi1" and self.function_block is not None:
+            raise ValueError("MIDI 1 has no UMP Function Block")
+        if self.timeout_ms <= self.discovery_ms:
+            raise ValueError("overall timeout must exceed discovery duration")
+        return self
+
+
 def run(args: list[str] | None = None) -> int:
     try:
         command = tyro.cli(
@@ -208,10 +265,15 @@ def run(args: list[str] | None = None) -> int:
             | Ports
             | WatchPorts
             | TransferPreview
-            | TransferSend,
+            | TransferSend
+            | CiBrowse,
             args=args,
             prog="meedee",
         )
+        if isinstance(command, CiBrowse):
+            from ._ci_cli import run_browse
+
+            return run_browse(command)
         if isinstance(command, TransferPreview):
             from ._transfer_cli import run_transfer
 

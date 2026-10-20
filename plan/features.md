@@ -183,6 +183,12 @@ that an instrument accepted or completed a restore.
 
 ### 7. MIDI-CI browser and supported configuration
 
+**Implemented management browser:** bounded Rust/Python discovery followed by
+sequential Product Instance ID inquiries, a typed MIDI 1 / UMP SysEx7 host, and
+an explicit one-scan CLI. Local identity is supplied; the CLI chooses a fresh
+random MUID. Existing management responses and collision invalidations are
+preserved. Profiles, Property Exchange and configuration writes remain deferred.
+
 **Use:** Inspect supported device profiles and properties without hard-coding
 every instrument capability.
 
