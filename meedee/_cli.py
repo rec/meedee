@@ -175,6 +175,27 @@ class WatchPorts(Ports, frozen=True):
     history_limit: int = Field(default=128, gt=0)
 
 
+class TransferPreview(BaseModel, frozen=True):
+    """Validate and preview a complete bounded MIDI 1 SysEx file; opens no ports."""
+
+    source: tyro.conf.Positional[Path]
+    gap_ms: int = Field(ge=0, le=18_446_744_073_709)
+    message_limit: int = Field(default=256, gt=0)
+    byte_limit: int = Field(default=8_388_608, gt=0)
+    payload_limit: int = Field(default=1_048_576, gt=0)
+    detail_limit: int = Field(default=128, gt=0)
+    preview_bytes: int = Field(default=64, gt=0)
+    output: Literal["text", "json"] = "text"
+
+
+class TransferSend(TransferPreview, frozen=True):
+    """Send a validated SysEx file to one exact, unique MIDI 1 output name."""
+
+    port: str = Field(min_length=1)
+    backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
+    isolated: bool = True
+
+
 def run(args: list[str] | None = None) -> int:
     try:
         command = tyro.cli(
@@ -185,10 +206,16 @@ def run(args: list[str] | None = None) -> int:
             | RoutePreview
             | Patch
             | Ports
-            | WatchPorts,
+            | WatchPorts
+            | TransferPreview
+            | TransferSend,
             args=args,
             prog="meedee",
         )
+        if isinstance(command, TransferPreview):
+            from ._transfer_cli import run_transfer
+
+            return run_transfer(command)
         if isinstance(command, Ports):
             from ._topology_cli import run_discovery
 

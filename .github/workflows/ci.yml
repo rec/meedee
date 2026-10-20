@@ -166,7 +166,9 @@ jobs:
             "$GITHUB_WORKSPACE/test/test_routing.py" \
             "$GITHUB_WORKSPACE/test/test_patch.py" \
             "$GITHUB_WORKSPACE/test/test_topology.py" \
-            "$GITHUB_WORKSPACE/test/test_discovery.py"
+            "$GITHUB_WORKSPACE/test/test_discovery.py" \
+            "$GITHUB_WORKSPACE/test/test_transfer.py" \
+            "$GITHUB_WORKSPACE/test/test_transfer_cli.py"
       - run: uv run --no-sync pytest test/release/artifacts.py -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

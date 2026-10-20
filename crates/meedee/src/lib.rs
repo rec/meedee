@@ -11,6 +11,7 @@ pub mod notes;
 pub mod routing;
 pub mod timecode;
 pub mod topology;
+pub mod transfer;
 pub mod transport;
 pub mod tuning;
 pub mod ump;

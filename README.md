@@ -780,3 +780,34 @@ enumeration allocation or metadata byte sizes. Input and output enumeration is
 serial; polling can miss transient changes and does not establish physical
 identity or device health. No reconnect, route change or MIDI-state restoration
 is performed. See [the topology contract](plan/api.md#topology-observations-and-discovery-polling).
+
+### Explicit MIDI 1 SysEx transfers
+
+Validate and preview a complete `.syx` file without opening MIDI ports:
+
+```sh
+meedee transfer-preview backup.syx --gap-ms 100 --output json
+```
+
+To send, choose a gap from the instrument's documented transfer requirements and
+an exact, unique output name. Sending may change instrument state:
+
+```sh
+meedee transfer-send backup.syx --gap-ms 100 --port 'Exact output name'
+```
+
+The 100 ms value is an example, not a device recommendation. `--gap-ms` is
+required; zero sends consecutive complete messages. No message splitting,
+automatic retries or device acknowledgements are inferred. The file is fully
+validated before output discovery. Defaults bound plans to 256 messages, 8 MiB
+of framed bytes and 1 MiB per payload; CLI options can change these limits.
+Preview samples are bounded by `--detail-limit` and `--preview-bytes`.
+
+The shared Rust/Python `transfer` module supplies immutable plans and caller-driven
+sessions; Python `transfer_output.run` delivers through an existing MIDI 1 typed
+output and accepts `events.Cancellation`. Successful handoffs and uncertain sends
+are reported separately. Handoff does not prove instrument acceptance; Ctrl-C or
+cancellation cannot interrupt a blocked native call. See the
+[transfer contract](plan/api.md#bounded-midi-1-sysex-transfers) for timing,
+cancellation, progress fields and CLI status codes. No native device transfer
+has been qualified by this implementation's automated checks.
