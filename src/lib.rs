@@ -7,6 +7,7 @@ mod notes;
 mod output;
 mod routing;
 mod state;
+mod testing;
 mod topology;
 mod transfer;
 
@@ -44,6 +45,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_notes, module)?)?;
     module.add_function(wrap_pyfunction!(populate_routing, module)?)?;
     module.add_function(wrap_pyfunction!(populate_topology, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_testing, module)?)?;
     module.add_function(wrap_pyfunction!(populate_transfer, module)?)?;
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
     module.add_function(wrap_pyfunction!(populate_events, module)?)?;
@@ -250,4 +252,9 @@ fn populate_topology(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_transfer(module: &Bound<'_, PyModule>) -> PyResult<()> {
     transfer::register(module)
+}
+
+#[pyfunction]
+fn populate_testing(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    testing::register(module)
 }

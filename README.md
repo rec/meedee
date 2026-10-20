@@ -840,3 +840,36 @@ capability bits are declarations; successful output handoff is not device
 acknowledgement. Rust `ci_browser::Browser`, Python `ci.Browser` and `ci_live.run`
 provide the same reusable workflow. See the [browser contract](plan/ci.md#one-scan-management-browser)
 for bounds, cancellation, reporting, local identity and qualification limits.
+
+### Deterministic transport tests
+
+`meedee.testing` supplies in-memory inputs, recording outputs and an explicit
+manual clock. It opens no devices and starts no threads or MIDI lifecycle:
+
+```python
+from meedee import events, testing
+
+clock = events.Clock(identity="test-clock", origin="manual")
+receiver = testing.Input(stream="keys", protocol="midi1")
+receiver.inject(b"\x90\x3c\x64", clock=clock, timestamp_ns=10)
+event = receiver.receive()  # Decoded by the production packet decoder.
+
+sink = testing.Output(protocol="midi1")
+if isinstance(event, events.Event):
+    sink.send_message(event.message)
+assert sink.take_packet() == b"\x90\x3c\x64"
+```
+
+Use `protocol="ump"` with UmpPacket/native UMP message values for MIDI 2 tests.
+Queue limits drop newest input while preserving counters and loss diagnostics;
+recorded-output capacity rejects sends without erasing evidence. Explicit
+`lose`, `fail`, `close` and `fail_next_send(accepted=True)` exercise loss,
+disconnection and uncertain delivery. The latter records a simulated sink effect
+while raising SendError, so callers must retain uncertainty rather than retry.
+
+`ManualClock.advance` changes time only when called. Empty receive returns None
+immediately, even with a timeout; it never advances a clock. Hosts must arrange
+explicit time progression. Rust has the same `testing` core. See the
+[testing contract](plan/api.md#deterministic-in-memory-testing-transports) for the
+supported connection subset, bounds and queue semantics. These tools do not
+establish native driver or physical-device behavior.

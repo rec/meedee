@@ -214,6 +214,12 @@ transport actions.
 
 ### 9. Deterministic transport tests and virtual-device tools
 
+**Implemented in-memory foundation:** public Rust/Python testing inputs and
+recording outputs, caller-driven time, bounded drop-newest queues, explicit
+loss/failure/close and accepted-before-error send simulation. Production codecs
+and decoders are reused. Routing, transfer and CI conformance tests exercise
+these doubles. Native virtual-device tools and driver qualification remain separate.
+
 **Use:** Test applications without a physical synthesizer, and exercise real
 integration separately when a native backend is available.
 
