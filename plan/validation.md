@@ -1961,3 +1961,37 @@ new metric sources and typing surface.
 Each installed wheel passes **122 focused checks** outside the checkout,
 including the new metric and existing live record/playback tests. Physical and
 platform qualification gates remain open.
+
+## Passive MIDI 1 SysEx capture, 2026-10-20
+
+Four slices extend the existing transfer surface: bounded shared Rust capture;
+frozen Python progress and exclusive SYX export; caller-thread passive receiving;
+and a `sysex-receive` CLI with unit tests, documentation and packaging checks.
+The owner selected MIDI 1 bytes only, an expected message count plus overall
+timeout, and writing only after successful capture without overwriting files.
+No dump request, reply correlation, quiet-period completion, UMP capture, retries
+or device-specific completeness inference was added.
+
+The full Python 3.11 suite passes **375 tests with one optional skip**. Seventeen
+new cases cover complete-message/payload fidelity, independent snapshots, export
+eligibility and overwrite refusal, exact deadline boundaries and clock regression,
+wrong source/protocol, fragment assembly with interleaved realtime traffic,
+loss/malformed input/worker failure, cancellation/Ctrl-C, silent timeout, failure
+detected during the final receive, CLI validation, unique-name selection and no
+file after failed receiving. The pure-import harness constructs/completes a
+capture and imports the receiver adapter while native cleanup initialization is
+forbidden. Rust capture tests cover exact output, bounded admitted prefixes,
+all decoder diagnostic kinds, cancelled sessions and deadline overflow.
+
+Ruff, formatting, ty (package and tests), pyupgrade, Cargo formatting, lock and
+whitespace checks pass. Clippy passes with the existing Rust 1.99 atomic-deprecation
+exception; native lifecycle code is unchanged. No dependency/lockfile changes
+were required. No application, native MIDI client/device or traffic generator was
+started. Expected-count completion describes the selected observed prefix, not
+instrument dump completeness, filesystem durability or physical qualification.
+
+Rust workspace tests and doctests pass. Both macOS arm64 Python 3.11/3.15 wheels
+build from the source distribution, and both distribution checks pass. Each
+installed wheel passes **139 focused checks** outside the checkout. Release-only
+CI and artifact checks include the added receiver and capture tests. Existing
+native, physical and platform qualification gates remain open.

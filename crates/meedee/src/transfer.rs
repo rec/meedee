@@ -209,3 +209,177 @@ impl Session {
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
+
+/// Bounded passive MIDI 1 capture. The caller owns the clock and input decoder.
+pub struct Capture {
+    stream: String,
+    expected: usize,
+    timeout_ns: u64,
+    byte_limit: usize,
+    payload_limit: usize,
+    messages: Vec<SysEx>,
+    wire_bytes: usize,
+    ignored: u64,
+    deadline: Option<u64>,
+    last_time: Option<u64>,
+    status: &'static str,
+    reason: Option<String>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CaptureReport {
+    pub status: &'static str,
+    pub expected_messages: usize,
+    pub received_messages: usize,
+    pub wire_bytes: usize,
+    pub ignored_events: u64,
+    pub deadline_ns: Option<u64>,
+    pub reason: Option<String>,
+}
+impl Capture {
+    pub fn new(
+        stream: String,
+        expected_messages: usize,
+        timeout_ns: u64,
+        byte_limit: usize,
+        payload_limit: usize,
+    ) -> io::Result<Self> {
+        if stream.is_empty()
+            || expected_messages == 0
+            || timeout_ns == 0
+            || byte_limit == 0
+            || payload_limit == 0
+        {
+            return Err(invalid(
+                "capture source, count, timeout and limits must be positive",
+            ));
+        }
+        if expected_messages > byte_limit / 2 {
+            return Err(invalid("expected messages exceed capture byte budget"));
+        }
+        Ok(Self {
+            stream,
+            expected: expected_messages,
+            timeout_ns,
+            byte_limit,
+            payload_limit,
+            messages: Vec::new(),
+            wire_bytes: 0,
+            ignored: 0,
+            deadline: None,
+            last_time: None,
+            status: "ready",
+            reason: None,
+        })
+    }
+    pub fn start(&mut self, now_ns: u64) -> io::Result<()> {
+        if self.status != "ready" {
+            return Err(invalid("capture must be fresh"));
+        }
+        let deadline = now_ns
+            .checked_add(self.timeout_ns)
+            .ok_or_else(|| invalid("capture deadline overflow"))?;
+        self.deadline = Some(deadline);
+        self.last_time = Some(now_ns);
+        self.status = "active";
+        Ok(())
+    }
+    pub fn poll(&mut self, now_ns: u64) -> io::Result<()> {
+        if self.status != "active" {
+            return Err(invalid("capture is not active"));
+        }
+        if self.last_time.is_some_and(|v| now_ns < v) {
+            return Err(invalid("capture clock regressed"));
+        }
+        self.last_time = Some(now_ns);
+        if self.deadline.is_some_and(|v| now_ns >= v) {
+            self.finish(
+                "timed_out",
+                "capture deadline expired before expected message count",
+            );
+        }
+        Ok(())
+    }
+    pub fn feed(&mut self, item: &crate::live::Item, now_ns: u64) -> io::Result<()> {
+        self.poll(now_ns)?;
+        if self.status != "active" {
+            return Ok(());
+        }
+        use crate::{events::Payload, live::Item, messages::AnyMessage};
+        let event = match item {
+            Item::Diagnostic(d) => {
+                self.fail(&format!("input diagnostic {:?}: {}", d.kind, d.reason));
+                return Ok(());
+            }
+            Item::Event(e) => e,
+        };
+        if event.stream != self.stream {
+            self.fail("capture received an unrelated source");
+            return Ok(());
+        }
+        let message = match &event.message {
+            Payload::Midi1(AnyMessage::SysEx(m)) => m,
+            Payload::Midi1(_) => {
+                self.ignored = self
+                    .ignored
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("capture ignored-event count exhausted"))?;
+                return Ok(());
+            }
+            _ => {
+                self.fail("capture requires MIDI 1 byte events");
+                return Ok(());
+            }
+        };
+        let size = message.data().len().checked_add(2);
+        if message.data().len() > self.payload_limit
+            || size.is_none_or(|v| v > self.byte_limit - self.wire_bytes)
+        {
+            self.fail("capture payload or byte limit exceeded");
+            return Ok(());
+        }
+        self.wire_bytes += size.expect("bounded size");
+        self.messages.push(message.clone());
+        if self.messages.len() == self.expected {
+            self.status = "completed";
+        }
+        Ok(())
+    }
+    pub fn fail(&mut self, reason: &str) {
+        if matches!(self.status, "ready" | "active") {
+            self.finish("failed", reason);
+        }
+    }
+    pub fn cancel(&mut self, reason: &str) {
+        if matches!(self.status, "ready" | "active") {
+            self.finish("cancelled", reason);
+        }
+    }
+    pub fn snapshot(&self) -> CaptureReport {
+        CaptureReport {
+            status: self.status,
+            expected_messages: self.expected,
+            received_messages: self.messages.len(),
+            wire_bytes: self.wire_bytes,
+            ignored_events: self.ignored,
+            deadline_ns: self.deadline,
+            reason: self.reason.clone(),
+        }
+    }
+    pub fn message(&self, index: usize) -> Option<&SysEx> {
+        self.messages.get(index)
+    }
+    /// Writes only a completed capture. File ownership/durability belongs to the caller.
+    pub fn write(&self, writer: &mut impl std::io::Write) -> io::Result<()> {
+        if self.status != "completed" {
+            return Err(invalid("only a completed capture can be exported"));
+        }
+        for message in &self.messages {
+            syx::write(writer, message, self.payload_limit)?;
+        }
+        writer.flush()
+    }
+    fn finish(&mut self, status: &'static str, reason: &str) {
+        self.status = status;
+        self.reason = Some(reason.chars().take(1024).collect());
+    }
+}

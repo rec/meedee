@@ -180,6 +180,8 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Step>()?;
     module.add_class::<Report>()?;
     module.add_class::<Session>()?;
+    module.add_class::<Capture>()?;
+    module.add_class::<CaptureReport>()?;
     module.add_function(wrap_pyfunction!(read_file, module)?)
 }
 fn error(e: std::io::Error) -> PyErr {
@@ -190,4 +192,131 @@ fn position(value: &Bound<'_, PyAny>) -> PyResult<usize> {
     uint(value)?
         .try_into()
         .map_err(|_| PyValueError::new_err("index exceeds platform size"))
+}
+
+#[pyclass(frozen, module = "meedee.transfer")]
+struct CaptureReport {
+    value: transfer::CaptureReport,
+}
+#[pymethods]
+impl CaptureReport {
+    #[getter]
+    fn status(&self) -> &str {
+        self.value.status
+    }
+    #[getter]
+    fn expected_messages(&self) -> usize {
+        self.value.expected_messages
+    }
+    #[getter]
+    fn received_messages(&self) -> usize {
+        self.value.received_messages
+    }
+    #[getter]
+    fn wire_bytes(&self) -> usize {
+        self.value.wire_bytes
+    }
+    #[getter]
+    fn ignored_events(&self) -> u64 {
+        self.value.ignored_events
+    }
+    #[getter]
+    fn deadline_ns(&self) -> Option<u64> {
+        self.value.deadline_ns
+    }
+    #[getter]
+    fn reason(&self) -> Option<&str> {
+        self.value.reason.as_deref()
+    }
+}
+#[pyclass(module = "meedee.transfer")]
+struct Capture {
+    value: transfer::Capture,
+}
+#[pymethods]
+impl Capture {
+    #[new]
+    #[pyo3(signature=(*,stream,expected_messages,timeout_ns,byte_limit=8_388_608,payload_limit=1_048_576))]
+    fn new(
+        stream: String,
+        #[pyo3(from_py_with=limit)] expected_messages: usize,
+        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=limit)] byte_limit: usize,
+        #[pyo3(from_py_with=limit)] payload_limit: usize,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            value: transfer::Capture::new(
+                stream,
+                expected_messages,
+                timeout_ns,
+                byte_limit,
+                payload_limit,
+            )
+            .map_err(error)?,
+        })
+    }
+    fn start(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+        self.value.start(now_ns).map_err(error)
+    }
+    fn poll(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+        self.value.poll(now_ns).map_err(error)
+    }
+    fn feed(
+        &mut self,
+        item: &Bound<'_, PyAny>,
+        #[pyo3(from_py_with=uint)] now_ns: u64,
+    ) -> PyResult<()> {
+        let item = if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
+            meedee::live::Item::Event(Box::new(e.value.clone()))
+        } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
+            meedee::live::Item::Diagnostic(d.value.clone())
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "expected Event or StreamDiagnostic",
+            ));
+        };
+        self.value.feed(&item, now_ns).map_err(error)
+    }
+    fn fail(&mut self, reason: &str) {
+        self.value.fail(reason);
+    }
+    fn cancel(&mut self, reason: &str) {
+        self.value.cancel(reason);
+    }
+    fn snapshot(&self) -> CaptureReport {
+        CaptureReport {
+            value: self.value.snapshot(),
+        }
+    }
+    fn message(
+        &self,
+        py: Python<'_>,
+        #[pyo3(from_py_with=position)] index: usize,
+    ) -> PyResult<Py<PyAny>> {
+        let value = self
+            .value
+            .message(index)
+            .ok_or_else(|| PyIndexError::new_err("capture message index out of range"))?;
+        to_python(py, meedee::messages::AnyMessage::SysEx(value.clone()))
+    }
+    fn write(&self, py: Python<'_>, destination: &Bound<'_, PyAny>) -> PyResult<()> {
+        if self.value.snapshot().status != "completed" {
+            return Err(PyValueError::new_err(
+                "only a completed capture can be exported",
+            ));
+        }
+        let mut stream = if destination.hasattr("write")? {
+            Stream::Python(destination.clone().unbind())
+        } else {
+            Stream::File(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(destination.extract::<std::path::PathBuf>()?)
+                    .map_err(os_error)?,
+            )
+        };
+        py.detach(|| self.value.write(&mut stream))
+            .map_err(os_error)
+    }
 }
