@@ -26,6 +26,8 @@ def main() -> None:
             syx,
             timecode,
             topology,
+            transfer,
+            transfer_output,
             tuning,
             ump,
             universal,
@@ -118,6 +120,9 @@ def main() -> None:
         assert router.snapshot().admitted == 1
         tracker = topology.Tracker()
         assert tracker.observe([]).generation == 1
+        plan = transfer.read_file(BytesIO(b"\xf0\x7d\xf7"), gap_ns=0)
+        assert transfer.Session(plan).snapshot().total_messages == 1
+        assert callable(transfer_output.run)
         from meedee import discovery
 
         poller = discovery.Poller(protocol="midi1")

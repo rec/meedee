@@ -1137,3 +1137,75 @@ Ordinary appearance/disappearance is not an error. Duration cannot interrupt an
 in-flight transport operation. Existing backend/client qualification limits apply.
 Polling can miss transitions between scans; no notification, reconnect, route
 mutation, MIDI-state replay, cleanup or physical-identity guarantee is supplied.
+
+## Bounded MIDI 1 SysEx transfers
+
+Rust `transfer::Plan` and frozen Python `transfer.Plan` retain a nonempty sequence
+of complete MIDI 1 SysEx messages in original order, without splitting, rewriting
+or inferred manufacturer semantics. Python construction takes a list of `SysEx`
+values. Rust construction accepts an iterator of fallible values. Both require
+an explicit unsigned `gap_ns`, including zero. Default limits are 256 messages
+and 8 MiB of wire bytes, including each F0/F7 pair. Plans expose message count,
+wire size, gap and zero-based indexed message access; Python returns independent
+frozen message values. Sessions share the immutable plan internally.
+
+Rust `Plan::read` and Python `transfer.read_file` use the existing strict SYX
+reader with a default 1 MiB per-message payload limit. They validate the entire
+input before returning a plan: an empty, malformed, truncated or oversized file
+cannot yield an executable prefix. Caller-owned binary streams remain open.
+File construction failures are OSError in Python; invalid direct plans and
+session operations are ValueError. Bounds constrain retained plan content;
+parsing can temporarily hold one additional message up to the payload limit,
+and caller-owned values, extracted arguments and copies are outside that bound.
+Limits do not impose a native transport allocation budget.
+
+Rust/Python `transfer.Session(plan)` performs no I/O and starts no threads. Callers
+supply nondecreasing unsigned nanoseconds from one monotonic clock to `prepare`
+and `confirm`. `prepare(now_ns)` reserves the next zero-based `Step` exactly once,
+or returns None before its deadline. A second prepare while a send is reserved
+is an error. `confirm(index, now_ns)` records one successful transport handoff.
+The next message is eligible only at that confirmation time plus the selected
+gap. There is no initial delay or final trailing delay, and no timing-accuracy
+promise. Deadline overflow stops the session while retaining the successful
+confirmation. A gap is host pacing, not a measured wire or device processing gap.
+
+`fail(index, reason)` stops a reserved send and marks that index uncertain.
+`cancel(reason)` stops an active session; a reserved send becomes uncertain,
+while cancellation between sends does not imply delivery of the next message.
+Terminal state is permanent and the first terminal reason is retained, capped
+at 1024 Unicode characters. No retry, resume, replay, acknowledgement inference,
+cleanup, reset, readback or device-specific request/reply exchange is provided.
+A new explicit session is a new transfer attempt, not automatic recovery.
+
+Frozen reports contain status (`active`, `completed`, `cancelled`, `failed`),
+total messages/bytes, confirmed messages/bytes, remaining messages, in-flight and
+uncertain indices, next eligible time and reason. Remaining includes every
+unconfirmed message, including an in-flight/uncertain one; neither counts as
+confirmed. Snapshots remain independent of later session operations. A successful
+handoff does not establish that bytes reached the wire or that an instrument
+accepted, applied or persisted the dump.
+
+`transfer_output.run(session, output, cancel=None)` is a synchronous Python
+adapter for an existing MIDI 1 `TypedOutputConnection`. It uses monotonic time,
+checks the existing `events.Cancellation` between sends and at most every 50 ms
+while waiting, and does not own/close the output. Native calls cannot be forcibly
+interrupted. Operational send failures return a failed report; Ctrl-C returns a
+cancelled report, conservatively marking an interrupted send uncertain.
+Unexpected exceptions propagate with the session available for inspection and
+any reserved message marked uncertain. Importing the planner/output adapter
+starts no native clients. Callers must serialize access to the session/output
+and avoid interleaving unrelated sends if device pacing requires exclusivity.
+
+The optional CLI adds `transfer-preview SOURCE --gap-ms N` and the distinct
+`transfer-send SOURCE --gap-ms N --port EXACT_NAME`. Gap is a required nonnegative
+integer number of milliseconds. Both fully validate the bounded SYX plan first.
+Preview opens no ports and prints bounded payload samples with omission counts;
+sending selects exactly one MIDI 1 output by name and defaults to process
+isolation. It closes its connection and prints final known/uncertain progress.
+Explicit backend selection is limited to existing MIDI 1 backends. Neither
+command guesses device-specific pacing. Status 0 means valid preview/completed
+handoffs, 1 means cancellation/interruption without uncertain delivery, and 2
+means malformed input, access/argument/setup/close failure, execution failure
+or uncertain delivery.
+An interruption during shutdown remains visible even if all handoffs completed.
+No physical device compatibility or native transfer qualification is claimed.

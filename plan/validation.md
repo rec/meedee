@@ -1817,3 +1817,38 @@ outside the checkout. The release-only workflow includes the new topology and
 discovery tests. No application, native MIDI endpoint, physical device, release
 or CI workflow was started. Polling remains serial and can miss transients;
 physical topology races and other platforms retain their qualification gates.
+
+## Bounded MIDI 1 SysEx transfers, 2026-10-20
+
+Four slices add shared Rust/Python immutable transfer plans, caller-driven paced
+sessions, a synchronous Python output adapter and distinct `transfer-preview` /
+`transfer-send` CLI commands. The approved scope is MIDI 1 complete-message SYX,
+with an explicit gap and no splitting, retries, acknowledgements or inferred
+manufacturer behavior. Strict bounded whole-file validation precedes output
+creation. Reports distinguish confirmed handoffs, remaining messages and a
+possibly delivered message; they do not assert instrument acceptance.
+
+The full Python 3.11 suite passes **327 tests with one optional skip**. Twenty
+focused transfer tests cover exact bytes/order and counts, immutable snapshots,
+whole-file rejection, message/payload/aggregate bounds, explicit timing and clock
+regression, no retry after uncertain failure, cancellation before/between/during
+sends, unexpected sender exceptions with inspectable progress, bounded previews,
+ambiguous output rejection, connection closure and interrupted shutdown after
+completed handoffs. All output clients are controlled substitutes. The existing
+pure-import harness now loads transfer modules and constructs a plan/session
+while native cleanup initialization is forbidden.
+
+Rust workspace tests and doctests pass, including four transfer cases covering
+bounds, pacing from confirmation, terminal progress and deadline overflow without
+losing a known successful handoff. Ruff, formatting, ty (package and tests),
+pyupgrade, Cargo formatting, lock and whitespace checks pass. Clippy passes with
+the existing Rust 1.99 atomic-deprecation exception; lifecycle code and warning
+suppressions remain unchanged. No dependency or lockfile change was required.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution. Both
+distribution checks pass, and each installed wheel passes **72** focused tests
+outside the checkout. The release-only workflow includes transfer tests and
+artifact checks include the new Python, Rust and typing sources. No application,
+native discovery/transfer, physical device, release or CI workflow was started.
+A chosen host gap is not measured wire pacing or evidence of device compatibility;
+existing native and platform qualification gates remain open.

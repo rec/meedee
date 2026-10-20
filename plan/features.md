@@ -162,6 +162,13 @@ interpreters after known loss; never silently replay uncertain operations.
 
 ### 6. SysEx transfer execution and diagnostics
 
+**Implemented one-way MIDI 1 foundation:** bounded complete-message transfer
+plans, strict whole-file SYX validation, caller-driven paced Rust/Python sessions,
+a synchronous Python output adapter, and separate preview/send CLI commands.
+Progress distinguishes handoff from uncertain delivery; cancellation never
+retries. UMP, device-specific chunking, acknowledgements and request/reply
+execution remain separate work requiring explicit protocol rules.
+
 **Use:** Back up or restore an instrument using documented transfer rules.
 
 Build bounded transfer plans over existing SysEx files/codecs, deadlines and
