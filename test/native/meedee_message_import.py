@@ -25,6 +25,7 @@ def main() -> None:
             routing,
             smf,
             syx,
+            testing,
             timecode,
             topology,
             transfer,
@@ -34,6 +35,29 @@ def main() -> None:
             universal,
         )
 
+        simulated = testing.Input(stream="pure", protocol="midi1")
+        synthetic_clock = events.Clock(identity="simulation", origin="manual")
+        simulated.inject(b"\xf8", clock=synthetic_clock)
+        assert isinstance(simulated.receive(), events.Event)
+        output = testing.Output(protocol="midi1")
+        output.send_message(messages.TimingClock())
+        assert output.take_packet() == b"\xf8"
+        ump_output = testing.Output(protocol="ump")
+        ump_input = testing.Input(stream="ump-test", protocol="ump")
+        ump_output.send_message(
+            ump.Midi2ControlChange(group=1, channel=1, controller=7, value=0xFFFFFFFF)
+        )
+        recorded = ump_output.take_packet()
+        assert recorded is not None
+        ump_input.inject(recorded, clock=synthetic_clock)
+        assert isinstance(ump_input.receive(), events.Event)
+        ump_output.close()
+        ump_input.close()
+        time = testing.ManualClock()
+        time.advance(10)
+        assert time.now_ns == 10
+        simulated.close()
+        output.close()
         browser = ci.Browser(
             local_muid=1,
             identity=ci.Identity(

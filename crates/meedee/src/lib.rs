@@ -10,6 +10,7 @@ pub mod messages;
 pub mod mpe;
 pub mod notes;
 pub mod routing;
+pub mod testing;
 pub mod timecode;
 pub mod topology;
 pub mod transfer;

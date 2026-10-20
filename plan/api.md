@@ -1219,3 +1219,82 @@ progress and peer declarations. They reuse the existing CI session and codecs;
 no deferred profile/property support is added. The exact caller-driven methods,
 limits, identity and collision policies, live byte/UMP adapter and `ci-browse`
 CLI contract are documented in [ci.md](ci.md#one-scan-management-browser).
+
+## Deterministic in-memory testing transports
+
+The public Rust `testing` module and Python `meedee.testing` provide `ManualClock`,
+`Input`, `Output` and independent frozen Python `InputReport` / `OutputReport`
+snapshots. They initialize no native lifecycle, clients, threads, timers or sleeps.
+Python constructors require `protocol="midi1"|"ump"` so even test construction
+does not require importing the native MIDI module. Rust uses the existing
+`transport::Protocol` and `Packet` values. This is a small receive/send-compatible
+testing surface, not another selectable native backend or a complete replacement
+for discovery, callback, recording, playback or compound-send connection methods.
+
+`ManualClock(now_ns=0)` stores unsigned host nanoseconds. `advance(nanoseconds)`
+changes only that clock and rejects overflow without changing its previous value.
+Nothing advances it implicitly. A caller explicitly connects its value to host
+clock hooks and chooses when to advance it. Input timestamps are separate signed
+nanosecond values and may regress deliberately to exercise diagnostics.
+
+`Input(stream=..., protocol=..., packet_limit=128, event_limit=128,
+byte_limit=8_388_608, sysex_limit=1_048_576)` owns a bounded raw packet queue and a
+bounded decoded-item queue over the existing source-local `live::Decoder`.
+`inject(packet, clock=..., timestamp_ns=None)` accepts byte buffers or an existing
+UmpPacket matching that protocol. The explicit Clock must use nanosecond ticks;
+synthetic clocks need no claimed backend. Disabled clocks reject non-None times.
+Packet content can deliberately be partial or malformed. Every valid injection
+consumes a sequence number, even when the newest packet is dropped. False means
+admission dropped that packet; protocol/clock/closed/failed-state errors do not
+pretend to be packet loss. Caller buffers are copied.
+
+`receive(timeout=None, cancel=None)` never blocks, sleeps or advances time,
+regardless of a finite nonnegative timeout. It returns one Event/StreamDiagnostic
+or None. A cancelled token raises InterruptedError. Decode order and completion
+spans, running status, UMP words, clock changes and recovery use production logic.
+When count or shared queued-byte capacity is exhausted, older queued content is
+retained and new packets/items are dropped. Raw drops increase dropped_packets;
+decoded-item drops separately increase dropped_events. Once admission of a
+decoded item fails, the remainder of that packet's decoded tail is dropped too,
+so later items cannot overtake a missing boundary diagnostic. Loss diagnostics
+follow older retained items before later packets are decoded. Decoded loss uses
+lost=0 and reports the dropped-item count in its reason, rather than relabel
+items as lost packets. Partial interpretation resets at that boundary. Raw loss followed
+by silence is still emitted; a later accepted packet does not report it again.
+`lose(count)` explicitly skips positive raw sequence counts and increments loss.
+
+Input snapshots expose next_sequence, dropped_packets, dropped_events, queued
+packet/item counts, combined queued payload bytes, closed state and failure text.
+`fail(reason)` latches the first simulated worker failure (maximum 1024 Unicode
+characters), rejects later injection and exposes a WorkerError through `.failure`.
+Already queued input/loss can be drained before receive raises that failure.
+`close` discards queued input, resets interpretation and retires receiving; it
+is idempotent. Counters and failure evidence survive close. Context exit closes.
+
+`Output(protocol=..., packet_limit=128, byte_limit=8_388_608)` records accepted
+packets without connecting them to any input automatically. `send` uses existing
+raw transport validation; `send_message` uses the existing typed-send preparation,
+including rejection of implicit protocol translation/compound commands. Capacity
+exhaustion rejects without accepting or discarding a packet. `take_packet()`
+returns the oldest recorded raw packet, releasing its capacity, or None.
+`fail_next_send(accepted=False, reason=...)` arms one fault for the next otherwise
+admissible send. It raises SendError and permanently fails the output, optionally
+recording the packet first when accepted=True. This simulated ground truth lets
+tests check uncertainty handling; the sending application still sees an uncertain
+error. No automatic retry occurs. A second armed fault or arming a failed output
+is an error. `close` preserves accepted packets for inspection and retires sends.
+
+Output snapshots expose valid send attempts (including capacity rejection),
+lifetime accepted packets, retained packet/byte counts, closed state and failure
+text. Calls rejected for invalid arguments, protocol, closure or latched failure
+are not new attempts. Reports remain independent when queues drain or close.
+Bounds cover retained queue payloads/counts, not caller copies, metadata, object
+headers, per-packet decoder temporary results or the separately bounded SysEx
+assembly state. A synthetic loss diagnostic returned directly is not queued.
+
+Callers serialize access and explicitly inject replies, drain outputs, schedule
+faults and advance time. Empty receive cannot drive an unchanged-clock host loop
+to completion on its own. There is no script interpreter, virtual-device creation,
+background delivery, automatic loopback, ownership cleanup or native backend
+selection. These doubles exercise toolkit logic; they do not qualify native
+lifecycle, driver queue behavior, physical timing, thread safety or devices.

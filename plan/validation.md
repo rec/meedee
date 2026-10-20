@@ -1889,3 +1889,41 @@ the added Rust/Python/typing sources. No application, native MIDI discovery or
 CI exchange, physical instrument, release or CI workflow was started. Management
 handoffs do not establish device acknowledgement, health or advertised-category
 implementation. Existing native/physical/platform qualification gates remain open.
+
+## Deterministic in-memory testing transports, 2026-10-20
+
+Three slices add public Rust/Python testing inputs, recording outputs and a
+manual clock; typed decoding/fault/loss behavior over existing production codecs;
+and routing, SysEx-transfer and CI conformance tests plus documentation/packaging.
+The selected model drops newest input, exposes sequence/loss counters and advances
+no time implicitly. Python testing construction accepts explicit protocol strings
+and requires no native MIDI import or lifecycle initialization. No native backend
+selection, production connection implementation or dependencies were changed.
+
+The full Python 3.11 suite passes **353 tests with one optional skip**. Thirteen
+new focused checks cover byte fragmentation/running status and signed spans,
+raw/decoded queue loss, retained snapshots, native-width UMP values, protocol
+rejection, worker failure and closure, send failures with/without simulated
+acceptance, output capacity/evidence, empty/cancelled receive and manual time.
+Conformance checks route/remap injected events, report known/uncertain SysEx
+handoffs and complete CI discovery/endpoint inquiries over both byte and UMP
+in-memory endpoints. The pure-import harness now constructs and uses both testing
+protocols while native cleanup initialization is forbidden.
+
+Rust workspace tests and doctests pass, including five testing cases for raw
+sequence loss followed by silence, bounded decoded admission, explicit loss,
+capacity/failure/close/manual clock overflow and accepted-before-error output.
+An oversized boundary diagnostic causes the remaining decoded tail to drop too,
+so later events cannot overtake the replacement loss diagnostic. Raw packet and
+decoded-item loss counts remain distinct; payload budgets do not claim to bound
+metadata/object overhead or transient decoder allocations.
+
+Ruff, formatting, ty (package and tests), pyupgrade, Cargo formatting, lock and
+whitespace checks pass. Clippy passes with the existing Rust 1.99 atomic-deprecation
+exception; native lifecycle code and suppressions remain unchanged. Both macOS
+arm64 Python 3.11/3.15 wheels build from the source distribution. Both distribution
+checks pass; each installed wheel passes **109** focused checks outside the
+checkout. Release-only CI and artifact checks include the new testing surfaces.
+No application, native MIDI client/device, virtual endpoint, release or CI workflow
+was started. These are deterministic toolkit checks, not driver, physical timing,
+thread-safety or hardware qualification.
