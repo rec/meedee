@@ -3,7 +3,8 @@
 `meedee.ufor_tuning` is an optional Python integration. uFor resolves pitch
 mathematics and Scala-derived tunings; meedee's existing Rust-backed MTS types
 perform quantization and encoding. The bridge adds no tuning engine, Rust uFor
-interpreter, transport, clock, CLI or audio host.
+interpreter, transport, clock or audio host. Optional offline CLI preview/export
+composes these existing models and codecs as described below.
 
 ## Installation and compatibility
 
@@ -135,9 +136,9 @@ Resolve the source or deliberately make a new selection before building output.
 Native message constructors retain their type/range checks. No error yields a
 partial returned message list.
 
-Octave-offset formats, device transfer, capability discovery, tuning
-request/reply workflows, an interactive preview and enge audition are deferred.
-Those need separate device, timing, recovery and musical choices. This module
+Octave-offset generation, capability discovery, interactive views and enge audition
+remain deferred here. Existing transfer and MTS-query tools handle their separate
+explicit workflows; this bridge does not add another device host. This module
 neither changes a synth's tuning nor selects a tuning program in an instrument.
 
 ## Verification
@@ -156,3 +157,74 @@ release-only and retains the oldest/newest Python matrix.
 ## Additional work beyond the prompt
 
 None.
+
+## Bounded transfer plans
+
+`bulk_plan(report, *, device_id, program, name, gap_ns, bank=None,
+preserve_unmapped=False)` composes the existing bulk builder and byte codec with
+a `transfer.Plan` containing exactly one SysEx message. Count and byte budgets
+are limited to that generated message. Explicit gap_ns has the existing transfer
+meaning; it does not create a timer or send. The same coverage/error policy and
+ordinary/banked choice apply. Library device ID 127 remains available as an
+explicit broadcast choice. No per-key transfer-plan factory is added here.
+
+Callers can inspect the message, create a `transfer.Session`, and explicitly run
+it through the existing output adapter. Plan construction opens no port and
+makes no capability, delivery or tuning-program-selection claim.
+
+## Offline file workflow
+
+On Python 3.13+, install the existing extras with `meedee[cli,ufor]`. No new
+mandatory dependency is introduced. Other commands continue to work on Python
+3.11+ without importing uFor. Selecting these commands on an older interpreter
+returns an explicit Python requirement error before reading the source.
+
+```bash
+meedee ufor-preview tuning.json --source-format tuning-json
+meedee ufor-preview scale.scl --source-format scala --root-note 69 --root-frequency 440
+meedee ufor-export scale.scl dump.syx --source-format scala --root-note 69 --root-frequency 440 --device-id 1 --program 2 --name "My tuning"
+meedee transfer-preview dump.syx --gap-ms 20
+meedee transfer-send dump.syx --port "Synth In" --gap-ms 20
+```
+
+The first three commands are offline. The final command is a separate explicit
+live action using the existing transfer executor and its failure semantics; no
+instrument was used during implementation. Preview/export neither select a
+receiver's tuning program nor send a reset, selection or tuning message.
+
+Source format is required, with no suffix inference or fallback. `tuning-json`
+loads the existing uFor Tuning model using its JSON validator, including its
+stored reference/detuning settings; CLI reference overrides are rejected.
+`scala` uses uFor's existing parser and requires explicit root note (0..127) and
+root frequency, validated by the Tuning model. It uses the model's zero-detune
+default. Scala keyboard maps, additional source schemas and new scale evaluation
+are not introduced. Text decoding uses the host's ordinary Path.read_text defaults.
+
+Both commands select all 128 keys by default. `--first-note` and `--last-note`
+select one inclusive ascending range within 0..127. The existing library preview
+continues to accept arbitrary explicit key lists. Preview shows every selected
+key's status, original resolved frequency as a string (preserving rational text),
+encoded pitch/Hz, signed quantization error and optional reason. This presentation
+is not a new loadable tuning-file format. It returns 0 when every selected key
+converted, 1 for omissions or evaluation/range problems and 2 for argument/source
+errors. At most 128 key rows are emitted.
+
+Export requires explicit device ID 0..126, program 0..127 and a native-compatible
+name of at most 16 ASCII characters. Optional `--bank` (0..127) chooses KeyBasedDump;
+otherwise it creates BulkDump. There is no CLI broadcast target, per-key note-change
+or real-time mode. All source resolution and plan validation complete before
+opening the destination. Full converted coverage is required by default.
+`--preserve-unmapped` deliberately uses NoChange for unselected/unmapped keys;
+out-of-range or evaluation failures still block generation. The summary reports
+converted keys and preserved_keys across the full 128-slot dump. A successful
+explicit-preservation export returns 0 and retains per-key statuses in its summary.
+
+Destinations use exclusive creation, preserving existing files and refusing
+symlinks or files appearing before the open. Writes use the existing SYX writer
+and flush without fsync; a disk/flush failure can leave a partial new file and
+returns 2. Validation failures create no destination. No partial generated plan
+is returned. The exported SYX is readable by existing inspection/transfer tools.
+The offline plan uses gap_ns=0; SYX stores no pacing metadata. Sending requires
+its own explicit gap through the existing transfer command, and handoff never
+proves device acceptance. No second live sending command or audition engine is
+introduced.

@@ -153,7 +153,7 @@ jobs:
             extras+=(--extra ufor)
           fi
           uv export --frozen "${extras[@]}" --no-emit-project --no-dev --no-hashes --output-file target/wheel-optional-requirements.txt
-          uv pip install --python "$wheel_python" -r target/wheel-optional-requirements.txt
+          uv pip install --python "$wheel_python" --no-deps -r target/wheel-optional-requirements.txt
           cd "$RUNNER_TEMP"
           "$wheel_python" -m pytest "$GITHUB_WORKSPACE/test/test_contract.py" "$GITHUB_WORKSPACE/test/test_packets.py" "$GITHUB_WORKSPACE/test/test_isolation.py" "$GITHUB_WORKSPACE/test/test_messages.py" "$GITHUB_WORKSPACE/test/test_codecs.py" "$GITHUB_WORKSPACE/test/test_controls.py" "$GITHUB_WORKSPACE/test/test_tuning.py" "$GITHUB_WORKSPACE/test/test_profiles.py" "$GITHUB_WORKSPACE/test/test_profile_engines.py" "$GITHUB_WORKSPACE/test/test_ump.py" "$GITHUB_WORKSPACE/test/test_files.py" "$GITHUB_WORKSPACE/test/test_archive.py" "$GITHUB_WORKSPACE/test/test_live.py" "$GITHUB_WORKSPACE/test/test_file_timing.py" "$GITHUB_WORKSPACE/test/test_event_views.py" "$GITHUB_WORKSPACE/test/test_ci.py" "$GITHUB_WORKSPACE/test/test_ufor_tuning.py"
           "$wheel_python" -m pytest \
@@ -175,7 +175,8 @@ jobs:
             "$GITHUB_WORKSPACE/test/test_capture.py" \
             "$GITHUB_WORKSPACE/test/test_capture_cli.py" \
             "$GITHUB_WORKSPACE/test/test_tuning_query.py" \
-            "$GITHUB_WORKSPACE/test/test_tuning_cli.py"
+            "$GITHUB_WORKSPACE/test/test_tuning_cli.py" \
+            "$GITHUB_WORKSPACE/test/test_ufor_cli.py"
       - run: uv run --no-sync pytest test/release/artifacts.py -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

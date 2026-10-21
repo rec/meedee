@@ -2036,3 +2036,43 @@ both distribution checks pass. Each installed wheel passes **168 focused checks*
 outside the checkout. Release-only CI and artifact checks include the new query
 sources, host, CLI, stubs and tests. Existing capture export now shares the same
 exclusive-output stream helper; its behavior remains covered by the capture tests.
+
+## Offline uFor tuning-file workflow, 2026-10-21
+
+Three slices compose the existing uFor bulk builder/codecs with a bounded
+single-message transfer plan, add offline JSON/Scala pitch preview, and add
+exclusive bulk SYX export for the existing transfer commands. The owner selected
+uFor Tuning-model JSON and Scala .scl sources, bulk dumps only, and CLI device
+IDs 0..126. Scala requires explicit root note/frequency; JSON uses its own settings.
+The library retains its existing explicit broadcast support. No new sending host,
+tuning evaluator, file envelope, per-key CLI generation or dependency was added.
+
+The full Python 3.11 suite passes **403 tests with two optional module skips**.
+Python 3.15 with the frozen optional packages passes **35 focused checks with one
+unsupported-version check skipped**. New checks cover exact resolved rational
+text, omissions/error reporting, Scala reference settings, ordinary/banked exports,
+explicit NoChange preservation, rejection of out-of-range pitches despite
+preservation, malformed sources, broadcast rejection and overwrite refusal.
+Generated plans also run through the existing transfer session/output adapter
+using a public in-memory output. Offline CLI tests forbid constructing all four
+raw/typed MIDI client types.
+
+Ruff, formatting, ty for Python 3.11 and Python 3.15 with its actual optional
+environment, pyupgrade, lock and whitespace checks pass. No Rust source, dependency
+version, lockfile, native lifecycle or transport behavior changed. No application,
+MIDI client/device, real transfer or audio playback was started. File/queue bounds
+do not qualify hardware; explicit export does not prove device tuning support.
+
+The existing complete frozen optional-dependency export exposed conflicting reccy
+main/commit URLs when uv attempted to resolve dependencies again. Installing that
+complete export with --no-deps succeeds at the recorded versions. The release-only
+wheel setup now uses that same route; no dependency pin was changed. Optional
+packages were installed in isolated target/ environments, leaving the ordinary
+Python 3.11 dependency-free installation unchanged.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution, and
+both distribution checks pass. Outside the checkout, the Python 3.11 wheel passes
+**173 focused checks with two optional skips**; Python 3.15 with the frozen uFor
+extra passes **199 focused checks with one unsupported-version check skipped**.
+The release-only wheel checks and source/wheel inventory include the new workflow.
+No release or CI workflow was triggered.

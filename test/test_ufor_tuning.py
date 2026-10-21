@@ -250,3 +250,30 @@ def test_ufor_numeric_overflow_and_underflow_cannot_generate_mts(detune: float) 
         ufor_tuning.note_changes(
             result, device_id=1, program=0, realtime=True, preserve_unmapped=True
         )
+
+
+@pytest.mark.parametrize("bank", [None, 3])
+def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast(
+    bank: int | None,
+) -> None:
+    from meedee import transfer, transfer_output
+    from meedee.testing import Output
+
+    result = ufor_tuning.preview(Tuning(source=Computed()), notes=list(range(128)))
+    plan = ufor_tuning.bulk_plan(
+        result,
+        device_id=127,
+        program=2,
+        name="planned",
+        gap_ns=37,
+        bank=bank,
+    )
+    assert plan.message_count == 1 and plan.gap_ns == 37
+    wire = codecs.encode(plan.message(0))
+    assert plan.wire_bytes == len(wire)
+    decoded = tuning.decode(plan.message(0))
+    assert decoded is not None and decoded.message.device_id == 127
+    output = Output(protocol="midi1")
+    report = transfer_output.run(transfer.Session(plan), output)  # ty: ignore[invalid-argument-type]
+    assert report.status == "completed" and output.take_packet() == wire
+    output.close()

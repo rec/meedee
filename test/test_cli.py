@@ -1,6 +1,7 @@
 """Exercise CLI parsing and file operations without launching a MIDI runtime."""
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -142,3 +143,74 @@ def test_cli_identity_maps_and_quality_verdict(
         )
     assert result.value.code == 1
     assert json.loads(capsys.readouterr().out)["quality_problems"]["lost_events"] == 1
+
+
+@pytest.mark.skipif(sys.version_info >= (3, 13), reason="checks unsupported Python")
+def test_ufor_command_explains_python_requirement_before_reading_source(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as result:
+        cli.main(
+            [
+                "ufor-preview",
+                str(tmp_path / "absent.json"),
+                "--source-format",
+                "tuning-json",
+            ]
+        )
+    assert result.value.code == 2
+    assert "Python 3.13+" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "options,reason",
+    [
+        (["--source-format", "scala"], "Scala requires"),
+        (["--source-format", "tuning-json", "--root-note", "69"], "own reference"),
+        (
+            [
+                "--source-format",
+                "tuning-json",
+                "--first-note",
+                "70",
+                "--last-note",
+                "69",
+            ],
+            "first note",
+        ),
+    ],
+)
+def test_ufor_source_choices_are_explicit_and_consistent(
+    options: list[str],
+    reason: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as result:
+        cli.main(["ufor-preview", str(tmp_path / "absent"), *options])
+    assert result.value.code == 2 and reason in capsys.readouterr().err
+
+
+def test_ufor_export_rejects_broadcast_before_reading_source(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as result:
+        cli.main(
+            [
+                "ufor-export",
+                str(tmp_path / "absent"),
+                str(tmp_path / "dump.syx"),
+                "--source-format",
+                "tuning-json",
+                "--device-id",
+                "127",
+                "--program",
+                "2",
+                "--name",
+                "test",
+            ]
+        )
+    assert result.value.code == 2 and capsys.readouterr().err
+    assert not (tmp_path / "dump.syx").exists()
