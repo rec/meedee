@@ -1,7 +1,8 @@
 # Suggested features and integrations for meedee
 
-Updated 2026-10-18 after reviewing uFor, arpeg, enveLFO and enge. These are
-proposals for discussion, not implementation commitments or a replacement for
+Updated 2026-10-21 against meedee and the sibling integration sources. Implemented
+foundations are identified below; remaining proposals are for discussion, not
+implementation commitments or a replacement for
 [the existing plan](meedee.md). Priorities reflect practical usefulness to MIDI
 programmers and hobbyists, rather than a fixed release sequence.
 
@@ -268,41 +269,37 @@ Pi or physical-fault qualification.
 **Use:** Exercise meedee with a substantial real musical application while
 keeping arpeg's existing engine and interfaces.
 
-arpeg's [Rust live host](../../arpeg/crates/arpeg-midi/src/live.rs) currently uses
-midir; its [Python MIDI host](../../arpeg/arpeg/midi.py) uses Mido/RtMidi. Propose
-replacing those device paths with meedee after agreeing a bounded migration.
-The resulting host should use one selected transport path, not retain parallel
-production backends solely for compatibility.
+**Implemented in arpeg:** its [Rust live host](../../arpeg/crates/arpeg-midi/src/live.rs)
+and [Python MIDI host](../../arpeg/arpeg/midi.py) now use meedee/libremidi.
+The committed sources at arpeg `ccf219a` contain both migrations; the checkout
+also has unrelated ongoing edits, which this review does not qualify or change.
+See [migration evidence](../../arpeg/doc/performance.md#meedee-host-migration-2026-10-18)
+and [Python migration evidence](../../arpeg/doc/performance.md#python-meedee-host-migration-2026-10-19).
+There is no remaining midir/Mido host replacement to implement here.
 
 Preserve held/latched/history behavior, expression ordering, bounded admission,
 output pacing and owned-note cleanup. arpeg already follows MIDI clock, handles
 transport and schedules notes; the migration should not move those decisions
 into meedee. Preserve its existing CLI/browser roles rather than recreate them.
 
-Map timestamp origins and units explicitly: meedee's signed native nanoseconds
-and clock identity cannot simply be relabeled as arpeg's host-relative time.
-Test chunk framing, callback/process-mode behavior, disconnects and uncertain
-sends. Initial work can preserve current MIDI 1 behavior; MIDI 2/MPE expansion
-requires a separate musical-policy decision.
+The hosts use explicit host arrival time rather than relabel native timestamps.
+Their framing, bounded admission, loss, output pacing and failure policies remain
+arpeg responsibilities. MIDI 2/MPE expansion and additional physical/platform
+qualification are separate from the completed MIDI 1 transport migration.
 
 ### B. Adapt meedee events to uFor performance bindings and enge
 
 **Use:** Drive the same instrument from a MIDI file or live input using declared
 musical rules.
 
-uFor's [performance binding](../../ufor/doc/performance-binding.md) defines channel
-selection, repeated-key release policy, tuning and named controller conversion,
-but leaves the live adapter to a host. Implement that missing execution boundary
-using meedee's decoded events, preserving source identity, trigger ownership,
-unknown state and loss/reset handling. Respect binding semantics instead of
-adding another general mapping model.
-
-[enge's MIDI importer](../../enge/enge/midi.py) currently uses Mido for a restricted
-file-to-performance conversion. An integration could replace that parsing path
-with meedee's file readers and reuse the same binding conversion for live input.
-Do not change existing interpretation silently: its FIFO pairing, channel-based
-parts, controller subset, bend assumptions and ignored program changes must be
-reviewed against the selected binding behavior.
+**Implemented in enge:** at `8c93502`, `enge.performance.MidiConverter` executes
+uFor's channel, repeated-key release, tuning and named-controller bindings over
+decoded meedee messages. [File/live dispatch](../../enge/enge/midi.py) uses the
+same converters. See [the binding contract](../../enge/doc/performance-binding.md).
+The importer uses meedee for synchronous PPQN SMF 0/1, with explicit rational
+timing/frame rounding. Caller-polled `LiveInput` assigns the caller's frame;
+it does not pretend native timestamps are audio frames. This is no longer a
+missing Mido-to-meedee migration or a missing performance-binding converter.
 
 Channel numbering and conversions to exact frame boundaries need explicit tests.
 Rounding belongs at the destination boundary and should be reported where
@@ -315,10 +312,12 @@ own audio realization and voice retirement.
 **Use:** Modulate external instruments with existing envelopes, LFOs and control
 graphs rather than add another modulation engine.
 
-Map selected named outputs to existing meedee CC, fine-CC, parameter or appropriate
-UMP messages. Agree ranges, quantization, observation cadence, update suppression
-and output-rate limits. Omit no required command ordering, and report overload
-rather than silently claim all intermediate values reached hardware.
+**Implemented in enveLFO:** at `b892317`, optional Python `envelfo.midi` and Rust
+`envelfo-midi` map observed named values to meedee CC, fine-CC and RPN/NRPN Set
+messages. Explicit ranges, integer quantization, wire-byte admission, confirmed
+suppression and uncertain-send recovery are covered by
+[the MIDI integration contract](../../envelfo/doc/midi.md). The mapper owns no
+ports, clock or scheduler. UMP mapping remains outside that implemented scope.
 
 Reuse the optional [arpeg/enveLFO bridge](../../arpeg/doc/envelfo.md) for their
 combined musical behavior. It already separates scheduling and realization so
@@ -390,16 +389,19 @@ clock relationships, security and recovery, rather than part of these integratio
 
 | Stage | Candidate scope | Why this order |
 | --- | --- | --- |
-| First | Inspector and capture validation/comparison | Useful independently and supports integration regression evidence |
-| Second | One bounded arpeg host migration | Tests meedee against an existing real application without new musical behavior |
-| Third | uFor performance-binding adapter and enge input | Connects file/live MIDI to established instrument semantics |
-| Fourth | enveLFO control output or uFor-to-MTS workflow | Choose one complete musical integration before several partial ones |
-| As needed | Routing, topology and instrument transfers | Add concrete transport features demonstrated by those clients |
-| In parallel when available | Platform/device qualification and normative document acquisition | Supplies evidence required for reliable live and standardized features |
+| Implemented | Inspector, capture comparison/validation, note observation | Shared Rust/Python foundations and optional CLI |
+| Implemented in siblings | arpeg MIDI hosts, enge performance conversion/input, enveLFO MIDI mapping | Existing owners supply musical execution; do not duplicate them |
+| Implemented | uFor bulk tuning preview/export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in meedee |
+| Implemented foundation | Static routing, polling topology, bounded diagnostics and in-memory transports | Recovery and ownership cleanup are not implied |
+| Qualification gates | Windows/Pi/native physical behavior and resource budgets | Build/software-loopback evidence cannot replace target evidence |
+| Standards gates | Deferred CI Profiles/Property Exchange, selected machine control | Acquire normative documents before dependent protocol implementation |
+| Optional proposals | Scoped cleanup, reconnect, interactive interfaces and audition | Require their own ownership, recovery or product decisions |
 
-These are candidate work packages, not new numbered slices or estimates. Agree
-placement, dependencies, musical policies and the initial interface before
-implementing one. Preserve language boundaries: Python integrations may use
+Implemented rows record source-level progress, not universal runtime support.
+The remaining rows identify candidate work packages and qualification gates,
+not new numbered slices or estimates. Agree placement, dependencies, musical
+policies and the initial interface before implementing another feature.
+Preserve language boundaries: Python integrations may use
 uFor's Python models, while standalone Rust hosts use existing native engine
 contracts or explicitly prepared data. Do not require Python just to interpret
 a MIDI packet or run an existing Rust engine.

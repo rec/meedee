@@ -287,6 +287,7 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "test/test_file_timing.py",
                 "test/test_event_views.py",
                 "test/native/meedee_typed_loopback.py",
+                "test/native/meedee_sysex_loopback.py",
                 "src/lib.rs",
                 "src/messages.rs",
                 "src/codecs.rs",

@@ -245,7 +245,7 @@ def test_recording_admission(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "mode", ["in_process", "isolated", "rust", "typed", "ump_ci", "reopen"]
+    "mode", ["in_process", "isolated", "rust", "typed", "ump_ci", "reopen", "sysex"]
 )
 def test_native_supervised(mode: str) -> None:
     """Each backend attempt has a separate process and a 30 second outer limit."""
@@ -257,11 +257,12 @@ def test_native_supervised(mode: str) -> None:
         if not executable.exists():
             pytest.skip("build the Rust qualification_transport example first")
         command = [str(executable)]
-    elif mode in ("typed", "ump_ci", "reopen"):
+    elif mode in ("typed", "ump_ci", "reopen", "sysex"):
         fixture = {
             "typed": "meedee_typed_loopback.py",
             "ump_ci": "meedee_ci_loopback.py",
             "reopen": "meedee_reopen.py",
+            "sysex": "meedee_sysex_loopback.py",
         }[mode]
         command = [sys.executable, str(project / "test/native" / fixture)]
     else:

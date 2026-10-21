@@ -15,7 +15,7 @@ def exercise(isolated: bool, destination: Path) -> None:
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
         with sender.connect(matches[0]) as output:
-            receiver.start_recording(destination)
+            receiver.start_recording(destination, metrics=True)
             notes = [
                 messages.NoteOn(channel=1, note=60, velocity=1),
                 messages.NoteOff(channel=1, note=60, velocity=0),
@@ -27,14 +27,23 @@ def exercise(isolated: bool, destination: Path) -> None:
             assert [e.message for e in received if isinstance(e, events.Event)] == notes
             report = receiver.stop_recording()
             assert report.complete and report.gap_records == 0, report.failure
+            pressure = report.pressure
+            assert pressure is not None and pressure.accepted_records == 2
+            assert pressure.capacity_rejections == 0
+            assert 1 <= pressure.peak_reserved_records <= 2
+            assert pressure.peak_reserved_bytes > 0
             reader = archive.Reader(destination)
             records = list(reader)
             assert reader.complete
             reader.close()
             captured = [e for e in records if isinstance(e, events.Event)]
             assert len(captured) == 2 and captured[0].timestamp is not None
-            replay = output.play(captured, origin=captured[0].timestamp)
+            replay = output.play(captured, origin=captured[0].timestamp, metrics=True)
             assert replay.sent_events == 2 and not replay.cancelled
+            lateness = replay.lateness
+            assert lateness is not None and lateness.count == 2
+            assert sum(lateness.buckets) == 2
+            assert lateness.maximum_ns == replay.max_lateness_ns
             assert [
                 e.message
                 for _ in notes
@@ -54,7 +63,7 @@ def exercise(isolated: bool, destination: Path) -> None:
             cancel.cancel()
             waiter.join(2)
             assert not waiter.is_alive() and len(failures) == 1
-    print(f"typed capture/replay/receive cancellation passed: isolated={isolated}")
+    print(f"typed capture/replay metrics and cancellation passed: isolated={isolated}")
 
 
 def main() -> None:
