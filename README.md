@@ -117,6 +117,14 @@ success does not establish instrument-specific dump completeness. Shared
 `transfer.Capture` and `transfer_input.run` provide the same workflow to library
 users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
+## Offline uFor tuning
+
+Python 3.13+ users with `meedee[cli,ufor]` can run `meedee ufor-preview` and
+`meedee ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
+root note/frequency. Export creates an ordinary or banked bulk `.syx` file without
+overwriting; sending remains a separate `transfer-send` action. See the
+[offline tuning workflow](plan/ufor-tuning.md#offline-file-workflow).
+
 ## Request an MTS tuning dump
 
 ```bash

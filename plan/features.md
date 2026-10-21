@@ -338,8 +338,10 @@ encoding a MIDI message.
 **Implemented foundation:** the optional Python
 [`meedee.ufor_tuning` bridge](ufor-tuning.md) previews selected keys and constructs
 ordinary/banked per-key MTS messages with explicit preservation and error policy.
-It opens no ports. Explicit transfer and optional enge audition remain separate
-integration work.
+It opens no ports. Bounded bulk transfer-plan composition and optional offline
+CLI preview/exclusive SYX export now accept existing uFor Tuning JSON and Scala
+sources. Exported files use the existing explicit transfer workflow; no second
+sending host is added. Optional enge audition remains separate integration work.
 
 Use uFor's existing tuning/scales and Scala conversion. Sample or resolve the
 selected pitches into meedee's MTS values, reporting range limitations, unmapped

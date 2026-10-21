@@ -13,7 +13,7 @@ else:
     from ufor.number import PitchNumber
     from ufor.tuning import FrequencyTable, IntervalPattern, RatioTable, Tuning
 
-from . import tuning
+from . import codecs, messages, transfer, tuning
 
 
 class PitchStatus(StrEnum):
@@ -141,6 +141,34 @@ def bulk_dump(
         )
     return tuning.KeyBasedDump(
         device_id=device_id, bank=bank, program=program, name=name, table=table
+    )
+
+
+def bulk_plan(
+    result: Preview,
+    *,
+    device_id: int,
+    program: int,
+    name: str,
+    gap_ns: int,
+    bank: int | None = None,
+    preserve_unmapped: bool = False,
+) -> transfer.Plan:
+    """Prepare one bulk dump for the existing transfer executor, without I/O."""
+    message = bulk_dump(
+        result,
+        device_id=device_id,
+        program=program,
+        name=name,
+        bank=bank,
+        preserve_unmapped=preserve_unmapped,
+    )
+    wire = codecs.encode(message)
+    return transfer.Plan(
+        [messages.SysEx(data=wire[1:-1])],
+        gap_ns=gap_ns,
+        message_limit=1,
+        byte_limit=len(wire),
     )
 
 
