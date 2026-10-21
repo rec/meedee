@@ -117,6 +117,20 @@ success does not establish instrument-specific dump completeness. Shared
 `transfer.Capture` and `transfer_input.run` provide the same workflow to library
 users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
+## Request an MTS tuning dump
+
+```bash
+meedee tuning-preview --device-id 1 --program 2 --timeout-ms 3000
+meedee tuning-query tuning.syx --input-port "Synth Out" --output-port "Synth In" --device-id 1 --program 2 --timeout-ms 3000
+```
+
+Add `--bank` for a banked request. Preview opens no ports; query sends one MIDI 1
+dump request and saves only a matched reply, after closing both connections.
+Existing files are preserved. Raw checksum bytes remain unchanged; a legacy
+checksum mismatch is saved with a flag and exit status 1. Other failures do not
+retry. Library users can drive `tuning.Query` with `tuning_live.run`. See
+[query semantics](plan/api.md#one-shot-midi-1-mts-dump-queries).
+
 ## File inspection and capture validation
 
 ```python

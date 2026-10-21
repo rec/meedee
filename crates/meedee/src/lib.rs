@@ -17,6 +17,7 @@ pub mod topology;
 pub mod transfer;
 pub mod transport;
 pub mod tuning;
+pub mod tuning_query;
 pub mod ump;
 pub mod universal;
 pub mod velocity;
