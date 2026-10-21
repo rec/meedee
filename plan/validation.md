@@ -2151,3 +2151,43 @@ Library/package code and wheel contents are unchanged by this batch, so the
 previous installed-wheel evidence remains applicable; no new wheel/runtime API
 claim is inferred from the new source-fixture inventory. Native tests remain
 explicit opt-in work and were not added to unattended CI.
+
+## Rust 1.87 qualification on the available Mac, 2026-10-21
+
+The owner requested verification of the declared minimum Rust version and
+approved the single lint correction found during verification. The base was
+16653c8, with only that correction and these qualification notes added.
+Host remains macOS 14.5 (23F79), arm64, with CMake 4.4.4. The official
+Rust 1.87.0 aarch64-apple-darwin distribution passed its published SHA-256 check
+and was installed under ignored target/qualification/rust187/, leaving the
+Homebrew Rust 1.99 compiler unchanged. rustc reports
+1.87.0 (17067e9ac 2025-05-09), Cargo 1.87.0 (99624be96 2025-05-06).
+Build artifacts use a separate target/qualification/rust187-build/ directory.
+
+Rust 1.87 Clippy initially rejected the nested else/if in velocity.rs with
+collapsible_else_if under the existing -D warnings policy. Collapsing that
+branch preserves the zero-velocity, prefixed and ordinary velocity cases;
+existing profile-engine regressions exercise that behavior. No warning
+suppression, dependency, lockfile, declared toolchain, API or wire behavior changed.
+
+With the correction, cargo fmt --all --check passes. Locked, offline workspace
+Clippy with --all-targets and -D warnings passes with both CPython 3.11.7 and
+3.15.0, without the Rust 1.99 atomic-deprecation exception. Sequential locked,
+offline workspace tests pass **150 tests per interpreter**, including Python
+binding tests, and doctests complete successfully. Five cases remain deliberately
+ignored in each run: two live CoreMIDI endpoint tests and three interpreter
+finalization tests requiring a standalone process. These were not run here.
+
+The exact check procedure is in qualification.md. Local ignored logs are:
+
+- target/qualification/20261021-rust187-clippy311.log
+- target/qualification/20261021-rust187-tests311.log
+- target/qualification/20261021-rust187-clippy315.log
+- target/qualification/20261021-rust187-tests315.log
+
+This supersedes the earlier open **local** Rust 1.87 gate. It does not qualify
+Windows or Linux/Pi builds, physical hardware, native endpoint behavior under
+this compiler, installed release artifacts or resource budgets. No Python source
+changed, full Python suites were not repeated, no MIDI endpoint was opened and
+no release or CI workflow was triggered. Pi image/access, provisioning, MIDI
+route and workload choices remain to be agreed before target qualification.

@@ -262,7 +262,34 @@ native regression targets and sanitizer settings exactly as configured there.
 Record compiler, OS/architecture, Python endpoint versions, test totals, wheel
 from-sdist result, license/provenance content, external dynamic dependencies and
 all skips. Keep Windows SDK integration, WinMM discovery test qualification and Rust
-1.87 validation distinct from compilation with a newer compiler. See issues.md.
+1.87 validation distinct from compilation with a newer compiler. The available
+Mac now passes the Rust 1.87 checks below; Windows/Linux target qualification
+remains separate. See issues.md.
+
+### Rust 1.87 on the available Mac
+
+The 2026-10-21 check uses the official Rust 1.87.0 aarch64-apple-darwin
+distribution, verified against its published SHA-256 checksum and installed
+locally under ignored target/qualification/rust187/. It does not replace the
+system compiler or change the declared minimum version. With that installation:
+
+```bash
+export PATH="$PWD/target/qualification/rust187/bin:$PATH"
+export CARGO_HOME="$PWD/target/cargo-home"
+export CARGO_TARGET_DIR="$PWD/target/qualification/rust187-build"
+export PYO3_PYTHON="$PWD/.venv/bin/python"
+cargo fmt --all --check
+cargo clippy --locked --offline --workspace --all-targets -- -D warnings
+cargo test --locked --offline --workspace -- --test-threads=1
+```
+
+Repeat Clippy and tests sequentially with PYO3_PYTHON pointing to the existing
+target/api-python315/bin/python. Offline mode uses the already populated frozen
+Cargo cache. Both Python 3.11.7 and 3.15.0 pass: 150 tests per interpreter,
+five deliberately ignored tests, no failures, and no Clippy warning exceptions.
+The ignored cases comprise two live CoreMIDI endpoint tests and three standalone
+interpreter-finalization cases. This run does not execute those cases, rebuild
+installed wheels or repeat the full Python suites. See validation.md for evidence.
 
 ## Acceptance review and remaining gates
 
