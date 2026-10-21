@@ -2076,3 +2076,78 @@ both distribution checks pass. Outside the checkout, the Python 3.11 wheel passe
 extra passes **199 focused checks with one unsupported-version check skipped**.
 The release-only wheel checks and source/wheel inventory include the new workflow.
 No release or CI workflow was triggered.
+
+## Available-Mac qualification and status reconciliation, 2026-10-21
+
+The owner explicitly authorized supervised native runs using uniquely named,
+exclusively test-owned virtual endpoints, including synthetic SysEx/MTS replies
+and the existing MIDI 1/UMP fixtures. No pre-existing endpoint was connected,
+physical traffic sent, service restarted, system configuration changed, release
+published or CI workflow triggered. Source changes are confined to qualification
+fixtures, artifact inventory and plan/status documentation; no library API,
+dependency, lockfile, native transport or lifecycle implementation was changed.
+
+Four slices reconcile completed integrations, add native SysEx/MTS workflow
+qualification, extend capture/playback metric checks and record current native
+results with remaining gates. The feature plan now reflects committed arpeg
+`ccf219a`, enge `8c93502` and enveLFO `b892317` source. arpeg's checkout contains
+unrelated ongoing edits; the committed host migration was checked separately,
+and no sibling file was changed. Existing sibling evidence is linked rather than
+claiming their complete test suites were rerun here.
+
+Environment: macOS 14.5 (23F79), arm64; Python 3.11.7 and 3.15.0; Rust 1.99.0;
+CMake 4.4.4. The meedee base was `90572591b359ea8e8e15542bdf5c58aeb185e548`
+with this batch's uncommitted fixture/documentation changes during verification.
+Python used the current editable extension; the standalone Rust qualification
+examples were rebuilt with `cargo build --locked --release -p meedee --examples`.
+Debug Python and release Rust timing values are not equivalent-work benchmarks.
+No performance acceptance budgets or hard latency claims are inferred.
+
+The standalone CoreMIDI SDK access probe passed client creation and disposal.
+The changed `typed` and `sysex` supervisor cases first passed **2 checks** on
+Python 3.11. The full native matrix then passed **7 supervised cases on 3.11**
+and **6 on 3.15**, with no native skip or failed/timeout child. Rust was run only
+in the first matrix because that executable is interpreter-independent. Each
+native child retained the existing 30-second outer process-group deadline.
+Exact commands are in [qualification.md](qualification.md#native-runs-are-a-separate-gate).
+
+The matrices cover both Python input/output modes, 256 sequential MIDI 1 CC
+round trips per mode, verified archive capture, playback/receive cancellation,
+opt-in pressure/lateness counts, UMP SysEx7 CI discovery/reply, and three repeated
+open/send/close cycles for both MIDI 1 and full-width MIDI 2 controls in both
+modes. The new fixture captures exact short/4,097-byte SysEx payloads and verifies
+ordinary, banked key-based and banked scale/octave MTS replies in each mode.
+It checks unrelated traffic, retained original legacy checksum bytes, exact SYX
+export, known request handoff, silent timeout and pre-send cancellation. Native
+query/capture success is not a physical instrument acknowledgement or dump-health
+claim. Explicit failure uncertainty remains covered by device-free tests.
+
+Raw per-case stdout/stderr, observations and child results are retained locally:
+
+- `target/qualification/20261021-changed311.xml`
+- `target/qualification/20261021-native311.xml`
+- `target/qualification/20261021-native315.xml`
+
+These ignored local artifacts are not package/publication outputs. Existing
+parent CPU/lifetime-peak RSS observations exclude child-inclusive resources;
+no process-tree resource budget was qualified. The old numeric samples remain
+historical evidence rather than being overwritten by this run.
+
+Remaining gates include physical unplug/replug, device/driver/service faults,
+real instrument interoperability, Windows native qualification and disabled
+Windows MIDI Services integration, Linux/Pi target image/ABI/runtime evidence,
+child-inclusive resource budgets and actual Rust 1.87 qualification. Deferred CI
+Profiles/Property Exchange and selected machine control still require normative
+sources and their own implementation decisions. Optional cleanup ownership,
+reconnect/state restoration, richer interfaces and audition are not implicitly
+part of this completed foundation. The archive-schema/release review remains
+explicit. Successful available-Mac loopback does not close those gates.
+
+The normal Python 3.11 regression suite passes **403 tests with two optional
+module skips**. Ruff, formatting, ty for both supported endpoint versions,
+pyupgrade, lock and whitespace checks pass. The refreshed source distribution
+includes the new opt-in fixture, and both artifact-inventory checks pass.
+Library/package code and wheel contents are unchanged by this batch, so the
+previous installed-wheel evidence remains applicable; no new wheel/runtime API
+claim is inferred from the new source-fixture inventory. Native tests remain
+explicit opt-in work and were not added to unattended CI.

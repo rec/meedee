@@ -13,8 +13,14 @@ host. Measure a baseline before agreeing acceptance budgets. The selected
 board remains **Pi Zero 2 W with 64-bit Raspberry Pi OS**; the OS release/image,
 libc, Python installation, MIDI endpoint and build sysroot are still unselected.
 Do not substitute an original Pi Zero or claim board qualification from an arm64
-build. No release, hardware probe, tuning/reset transmission, OS service restart,
+build. No release, hardware probe, physical tuning/reset transmission, OS service restart,
 system installation or workflow trigger is authorized by this procedure.
+
+On 2026-10-21 the owner additionally authorized supervised SysEx/MTS workflow
+checks using synthetic replies exclusively between uniquely named test-owned
+virtual endpoints, and native recording/playback metric checks. This does not
+authorize selecting pre-existing destinations or sending to physical equipment.
+Native results remain software-loopback evidence, not hardware qualification.
 
 The tools deliberately have no new runtime dependencies or command parser. They
 use the existing pytest runner and standalone Rust examples. Default pytest does
@@ -131,6 +137,34 @@ The supervisor also runs the existing typed capture/replay/cancellation fixture
 own process. Select these with `-k 'typed or ump_ci'` to avoid repeating completed
 latency measurements. These extended fixtures send NoteOn/NoteOff or CI management
 messages only to their own endpoints; they never configure physical devices.
+
+The `typed` fixture now enables recording pressure and playback lateness metrics
+in both Python modes. It checks accepted-record/sample counts, capacity rejection,
+peak reservations and consistency with the existing maximum-lateness report.
+It sets no performance threshold and makes no physical latency claim.
+
+The `sysex` supervisor case runs `test/native/meedee_sysex_loopback.py` under the
+same 30-second process deadline. In isolated and in-process mode it transfers and
+captures two SysEx messages (including a 4,097-byte payload), verifies exact SYX export,
+and exchanges ordinary, banked key-based and banked scale/octave MTS dumps through
+the production query host. A controlled peer verifies the one request before
+sending synthetic replies and unrelated traffic. Original legacy checksum bytes
+remain unchanged on export. Known handoff, timeout and pre-send cancellation are
+checked without retries. These replies travel only to the fixture's owned
+virtual inputs; no device state, acknowledgement protocol or interoperability is
+inferred. One standard-library worker serves the peer, and the outer
+supervisor remains the deadline for a stalled native call or worker teardown.
+
+The latest available-Mac matrix uses these standalone commands from the project
+root. The second interpreter is the existing isolated Python 3.15 environment;
+the Rust example is interpreter-independent and is therefore run only once.
+JUnit captures per-case stdout, stderr, process-resource observations and native
+child output; artifacts remain under ignored target/qualification/.
+
+```bash
+uv run --frozen pytest -q test/qualification/measure.py -k native --junitxml=target/qualification/20261021-native311.xml -o junit_logging=all
+uv run --frozen --no-sync target/api-python315/bin/python -m pytest -q test/qualification/measure.py -k 'native and not rust' --junitxml=target/qualification/20261021-native315.xml -o junit_logging=all
+```
 
 Names are unique to each run, and discovery must match exactly one test-created
 virtual destination. No pre-existing destination is selected. The latency
