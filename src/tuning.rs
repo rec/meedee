@@ -255,7 +255,7 @@ macro_rules! message_classes {
         pub fn is_message(message: &Bound<'_, PyAny>) -> bool {
             false $(|| message.is_instance_of::<$name>())*
         }
-        fn extract_message(message: &Bound<'_, PyAny>) -> PyResult<model::TuningMessage> {
+        pub(crate) fn extract_message(message: &Bound<'_, PyAny>) -> PyResult<model::TuningMessage> {
             $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {
                 return Ok(value.value.clone().into());
             })*
@@ -410,6 +410,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Decoded>()?;
     module.add_class::<RequestStatus>()?;
     module.add_class::<ReplyTracker>()?;
+    crate::tuning_query::register(module)?;
     module.add_function(wrap_pyfunction!(decode, module)?)?;
     Ok(())
 }

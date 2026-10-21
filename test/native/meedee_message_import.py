@@ -33,6 +33,7 @@ def main() -> None:
             transfer_input,
             transfer_output,
             tuning,
+            tuning_live,
             ump,
             universal,
         )
@@ -103,6 +104,14 @@ def main() -> None:
         assert codecs.encode(
             tuning.BulkDumpRequest(device_id=1, program=0)
         ) == bytes.fromhex("f0 7e 01 08 00 00 f7")
+        query = tuning.Query(
+            request=tuning.BulkDumpRequest(device_id=1, program=0),
+            stream="pure",
+            timeout_ns=10,
+        )
+        query.prepare(0)
+        query.confirm(1)
+        assert query.snapshot().request_sent and callable(tuning_live.run)
 
         assert messages.NoteOn(channel=1, note=60, velocity=100).note == 60
         assert messages.SysEx(data=memoryview(bytearray([0, 127]))).data == bytes(

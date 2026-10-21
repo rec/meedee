@@ -1995,3 +1995,44 @@ build from the source distribution, and both distribution checks pass. Each
 installed wheel passes **139 focused checks** outside the checkout. Release-only
 CI and artifact checks include the added receiver and capture tests. Existing
 native, physical and platform qualification gates remain open.
+
+## One-shot MIDI 1 MTS queries, 2026-10-21
+
+Four slices add a shared Rust one-shot query around existing ReplyTracker/codecs;
+frozen Python progress, raw reply and decoded metadata with exclusive SYX export;
+a caller-thread typed-input/output host; and offline preview/live-query CLI commands
+with unit tests, documentation and packaging checks. Both ordinary and banked
+requests are supported. Matching original BulkDump checksum mismatches retain
+unaltered bytes and explicit LegacyMismatch status. Such CLI exports return 1;
+modern malformed/checksum-invalid messages still fail under existing codec rules.
+
+The full Python 3.11 suite passes **398 tests with one optional skip**. Twenty-three
+new cases cover exact raw export/frozen snapshots, ordinary/banked matching,
+fragment/realtime decoding, unrelated traffic, pre-send input failure, uncertain
+sends with/without simulated acceptance, timeout/cancellation, input failure during
+the final receive, interruption during send/setup, preview/argument validation,
+close failure and racing/existing output files. Both ports close before export;
+known handoff and failed/uncertain progress remain distinct. The pure-import harness
+constructs/prepares/confirms a query and imports its host while native cleanup
+initialization is forbidden.
+
+Rust workspace tests and doctests pass. Three new query cases reuse the existing
+independent MTS vectors for ordinary legacy mismatch and both banked reply kinds,
+including both scale resolutions. They exercise unchanged checksum export,
+nonmatching replies, broadcast rejection, deadline overflow/regression, failure,
+cancellation and exact expiry. No new normative wire layouts were introduced.
+Ruff, formatting, ty (package and tests), pyupgrade, Cargo formatting, lock and
+whitespace checks pass. Clippy passes with the existing Rust 1.99 atomic-deprecation
+exception. No dependency/lockfile or native lifecycle changes were required.
+
+No application, native MIDI client/device, instrument request or configuration
+write was started during implementation. Tests use in-memory transports. MTS has
+no transaction ID: a matching late/unsolicited response is indistinguishable, and
+retained bytes/checksum status do not authenticate the reply or qualify hardware.
+Existing native/physical/platform qualification gates remain open.
+
+Both macOS arm64 Python 3.11/3.15 wheels build from the source distribution, and
+both distribution checks pass. Each installed wheel passes **168 focused checks**
+outside the checkout. Release-only CI and artifact checks include the new query
+sources, host, CLI, stubs and tests. Existing capture export now shares the same
+exclusive-output stream helper; its behavior remains covered by the capture tests.

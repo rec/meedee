@@ -225,6 +225,28 @@ class SysexReceive(BaseModel, frozen=True):
         return self
 
 
+class TuningPreview(BaseModel, frozen=True):
+    """Preview one unicast MIDI 1 tuning-dump request without opening ports."""
+
+    device_id: int = Field(ge=0, le=126)
+    program: int = Field(ge=0, le=127)
+    bank: int | None = Field(default=None, ge=0, le=127)
+    timeout_ms: int = Field(gt=0, le=18_446_744_073_709)
+    output: Literal["text", "json"] = "text"
+
+
+class TuningQuery(TuningPreview, frozen=True):
+    """Request one tuning dump, then save the matched raw reply to a new file."""
+
+    destination: tyro.conf.Positional[Path]
+    input_port: str = Field(min_length=1)
+    output_port: str = Field(min_length=1)
+    backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
+    isolated: bool = True
+    receive_byte_limit: int = Field(default=8_388_608, gt=0)
+    payload_limit: int = Field(default=1_048_576, gt=0)
+
+
 class CiBrowse(BaseModel, frozen=True):
     """Run one CI management discovery scan, then inquire about format-2 endpoints."""
 
@@ -296,10 +318,16 @@ def run(args: list[str] | None = None) -> int:
             | TransferPreview
             | TransferSend
             | SysexReceive
+            | TuningPreview
+            | TuningQuery
             | CiBrowse,
             args=args,
             prog="meedee",
         )
+        if isinstance(command, TuningPreview):
+            from ._tuning_cli import run_query
+
+            return run_query(command)
         if isinstance(command, CiBrowse):
             from ._ci_cli import run_browse
 

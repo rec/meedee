@@ -305,17 +305,7 @@ impl Capture {
                 "only a completed capture can be exported",
             ));
         }
-        let mut stream = if destination.hasattr("write")? {
-            Stream::Python(destination.clone().unbind())
-        } else {
-            Stream::File(
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .open(destination.extract::<std::path::PathBuf>()?)
-                    .map_err(os_error)?,
-            )
-        };
+        let mut stream = Stream::exclusive_output(destination)?;
         py.detach(|| self.value.write(&mut stream))
             .map_err(os_error)
     }

@@ -32,6 +32,7 @@ mod ports;
 mod profiles;
 mod recording;
 mod tuning;
+mod tuning_query;
 mod ump;
 
 #[cfg(all(test, target_os = "macos"))]

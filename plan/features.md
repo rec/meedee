@@ -170,8 +170,11 @@ retries. Passive MIDI 1 capture now collects an explicit expected SysEx count
 within an overall timeout, with bounded retention and exclusive post-success
 SYX export through Rust/Python APIs and the `sysex-receive` CLI. Loss or decoding
 failure stops capture; success does not infer device-specific dump completeness.
-UMP, device-specific chunking, acknowledgements and request/reply
-execution remain separate work requiring explicit protocol rules.
+One-shot ordinary/banked MTS dump queries now reuse the existing reply tracker
+and decoder through Rust/Python APIs, a caller-thread host and preview/live CLI.
+Original reply bytes and checksum status survive export; uncertain sends never
+retry. UMP, device-specific chunking, acknowledgements and other request/reply
+protocols remain separate work requiring explicit rules.
 
 **Use:** Back up or restore an instrument using documented transfer rules.
 

@@ -1430,3 +1430,82 @@ separates capture status, exported, failure and interrupted evidence; completed
 capture with exported=false is not a saved backup. Exit status is 0 for successful
 export, 1 for timeout/cancellation/interruption and 2 for setup, input, limit or
 export failure. No physical instrument was used to qualify this workflow.
+
+## One-shot MIDI 1 MTS dump queries
+
+Rust `tuning_query::Query` and Python `tuning.Query` combine the existing MTS
+request codecs, ReplyTracker and decoder. Construction requires one typed
+BulkDumpRequest or BankedDumpRequest, an input stream and a positive timeout_ns.
+Broadcast device ID 127 is rejected; device IDs are 0..126, programs/banks 0..127.
+Banked requests match either KeyBasedDump or ScaleOctaveDump using the existing
+tracker's device/bank/program rules. Ordinary requests match BulkDump. No new MTS
+wire format, generic transaction engine or instrument configuration write is added.
+
+`prepare(now_ns)` reserves the only send and returns its ordinary SysEx request.
+It starts the overall deadline before the caller attempts transport handoff;
+overflow fails without starting. `confirm(now_ns)` records a successful whole
+message handoff and enters waiting, or timed_out if the send consumed the deadline.
+`poll(now_ns)` checks expiry while sending/waiting. All time comes from one
+caller-supplied unsigned, nondecreasing host clock, independent of event timestamps.
+`feed(item, now_ns)` requires a confirmed send and checks expiry before accepting
+an Event/StreamDiagnostic. A reply at or after the deadline cannot complete.
+Invalid operations/clock regression raise without silently restarting the query.
+
+All decoder diagnostics, wrong-source events, UMP/compound events and recognized
+malformed MTS messages fail the query. Unrelated well-formed MIDI 1 events/SysEx
+and nonmatching decoded MTS increment ignored_events without retaining history.
+Only one matching raw SysEx and its decoded MTS value are retained. The existing
+supported dump layouts bound retained reply content; this does not bound caller
+input, packet queues, decoder working data, metadata or copies. Input adapters
+must use the existing bounded decoder and queue settings.
+
+A matching original BulkDump with LegacyMismatch completes and retains both its
+original checksum bytes and the decoder's explicit status. Modern malformed or
+bad-checksum banked dumps still fail under existing decoder rules. Export never
+re-encodes the decoded tuning value: doing so could normalize the checksum and
+change the received message. Success establishes a matching observed declaration,
+not authenticity, device health, physical receipt of the request or tuning state.
+MTS has no transaction ID; an identical unsolicited or late dump can match.
+
+`fail(reason)` and `cancel(reason)` stop ready/sending/waiting queries, preserving
+the first terminal outcome. Frozen independent Python QueryReport snapshots
+contain status (`ready`, `sending`, `waiting`, `completed`, `failed`, `cancelled`,
+`timed_out`), request_sent, uncertain_send, ignored_events, deadline_ns, optional
+reply/decoded and a reason capped at 1024 Unicode characters. request_sent means
+a confirmed transport handoff, not acknowledgement. uncertain_send is set on a
+terminal outcome reached with a send pending; it is conservative even if a test
+transport happens to know acceptance. Nothing retries or resumes a terminal query.
+A known handoff followed by input failure remains request_sent=true without
+inventing send uncertainty. `write` requires completed status, writes the original
+reply using the existing SYX writer and flushes. Rust accepts a caller-owned writer;
+Python paths use exclusive creation and binary streams remain open. Final write
+errors may leave a partial file; flush is not fsync or power-loss durability.
+
+`meedee.tuning_live.run(query, receiver, output, cancel=None)` drives a fresh query
+on the caller thread using existing MIDI 1 queued typed input/output connections.
+The caller supplies the query's selected stream and owns/closes both connections.
+Known loss/failure is checked before sending and before/after receive. Receive
+waits are at most 50 ms, with cancellation/Ctrl-C and uncertain sends represented
+in the supplied query. Unexpected exceptions propagate after retiring an active
+query. No extra decoder, timer, worker or cleanup traffic is created. Already
+queued input is eligible; there is no automatic drain or time alignment. Blocking
+in-process drivers or arbitrary caller code can exceed the observation deadline.
+
+`meedee tuning-preview --device-id ID --program P [--bank B] --timeout-ms MS`
+prints the exact request bytes and deadline duration without importing native MIDI
+or opening ports. `meedee tuning-query DESTINATION` takes those same fields plus
+required `--input-port NAME --output-port NAME`. It uses process isolation by
+default and resolves both exact, unique names before opening either endpoint.
+Only one request is sent, after both connections are ready; no tuning changes,
+program selection, broadcast scan or automatic retry is sent. Both connections
+close before exclusive export. Existing destination files are rejected before
+discovery and files appearing later are preserved by exclusive creation. Setup,
+input and close failures prevent export. Final write/flush failures may leave a
+partial destination. The final text/JSON summary separates query status, known
+handoff, uncertainty, checksum, export and failure evidence.
+
+Exit status is 0 for a saved matching reply with a matching checksum, 1 for saved
+LegacyMismatch or timeout/cancellation/interruption, and 2 for setup, malformed
+input, loss, send, close or export failure. A completed query with exported=false
+is not a saved backup. No physical instrument interoperability is qualified by
+this workflow's device-free tests.

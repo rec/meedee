@@ -14,6 +14,19 @@ pub enum Stream {
     Python(Py<PyAny>),
 }
 impl Stream {
+    pub fn exclusive_output(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if value.hasattr("write")? {
+            Ok(Self::Python(value.clone().unbind()))
+        } else {
+            Ok(Self::File(
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(value.extract::<PathBuf>()?)
+                    .map_err(os_error)?,
+            ))
+        }
+    }
     pub fn input(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if value.hasattr("read")? {
             Ok(Self::Python(value.clone().unbind()))
