@@ -86,12 +86,10 @@ impl VelocityInterpreter {
             note,
             velocity: if zero {
                 0
+            } else if let Some(p) = prefix {
+                (u16::from(velocity) << 7) | u16::from(p.value)
             } else {
-                if let Some(p) = prefix {
-                    (u16::from(velocity) << 7) | u16::from(p.value)
-                } else {
-                    u16::from(velocity)
-                }
+                u16::from(velocity)
             },
             resolution: if prefix.is_some() && !zero { 14 } else { 7 },
             note_on: on && !zero,
