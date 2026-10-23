@@ -78,6 +78,29 @@ pub struct Span {
     pub first_timestamp: Option<Timestamp>,
     pub last_timestamp: Option<Timestamp>,
 }
+impl Span {
+    pub(crate) fn validate(&self, timestamp: Option<&Timestamp>) -> io::Result<()> {
+        if self.first_packet > self.last_packet {
+            return Err(invalid(0, "reversed packet span"));
+        }
+        let clocks = [
+            self.first_timestamp.as_ref(),
+            self.last_timestamp.as_ref(),
+            timestamp,
+        ];
+        let mut first = None;
+        for t in clocks.into_iter().flatten() {
+            if t.clock.mode() == Some(false) {
+                return Err(invalid(0, "disabled clock cannot have span timestamps"));
+            }
+            if first.is_some_and(|c| c != &t.clock) {
+                return Err(invalid(0, "a message cannot span clock generations"));
+            }
+            first = Some(&t.clock);
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Payload {
     Midi1(AnyMessage),
@@ -104,24 +127,7 @@ impl Event {
             return Err(invalid(0, "disabled clock cannot have a timestamp"));
         }
         if let Some(s) = &self.span {
-            if s.first_packet > s.last_packet {
-                return Err(invalid(0, "reversed packet span"));
-            }
-            let clocks = [
-                s.first_timestamp.as_ref(),
-                s.last_timestamp.as_ref(),
-                self.timestamp.as_ref(),
-            ];
-            let mut first = None;
-            for t in clocks.into_iter().flatten() {
-                if t.clock.mode() == Some(false) {
-                    return Err(invalid(0, "disabled clock cannot have span timestamps"));
-                }
-                if first.is_some_and(|c| c != &t.clock) {
-                    return Err(invalid(0, "a message cannot span clock generations"));
-                }
-                first = Some(&t.clock);
-            }
+            s.validate(self.timestamp.as_ref())?;
         }
         Ok(())
     }

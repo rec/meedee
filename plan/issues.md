@@ -67,7 +67,9 @@ Windows native qualification remains open. Windows MIDI Services SDK/tooling
 integration is unfinished and that backend is disabled; requesting it raises a
 capability error. The new WinMM discovery failure/recovery and error-hook tests
 still need Windows compilation and execution in ANSI and Unicode builds.
-The selected Pi image/sysroot and cross-build remain open.
+Linux native backend and runtime qualification remain open. Cross-build evidence,
+when needed for a deployment, requires its matching toolchain/sysroot; no board
+or cross-build is a separate project requirement.
 Device-free native tests and virtual loopbacks do not establish driver-fault
 recovery or physical hardware guarantees.
 
@@ -85,7 +87,7 @@ a required event through history overflow fails explicitly. Two-second waits
 cannot interrupt blocking native calls or establish peer-process visibility.
 Per-parent count limits do not impose a machine-wide memory budget across
 independent applications. Many idle clients can still consume substantial memory,
-threads, handles and scheduling time on a Pi.
+threads, handles and scheduling time on any host.
 
 Native receive admission bounds owned in-flight payloads by bytes. Each isolated
 receive queue has a count limit of 128 and an 8 MiB default payload limit.
@@ -246,7 +248,7 @@ driver fallback time, inaccurate, discontinuous or only completion time. Packet
 spans cannot reconstruct individual-byte timing. Quarter-frame time-code event
 views lack precise first-quarter contributor timing and expose None.
 Fake-device/clock tests and short virtual loopbacks do not qualify scheduling
-under sustained load, physical instruments, OS service crashes or target Pi
+under sustained load, physical instruments, OS service crashes or deployment
 resource behavior.
 
 

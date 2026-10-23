@@ -6,14 +6,19 @@ None.
 
 ## Status and boundaries
 
+meedee targets **macOS, Windows and Linux**, with qualification organized by OS,
+architecture and MIDI backend. Raspberry Pi is simply one possible Linux host;
+there is no required model, board-specific milestone or dependency on its
+availability.
+Earlier Pi-specific project requirements were planning errors.
+
 The owner authorized bounded synthetic workloads, temporary files and exclusively
-test-owned virtual endpoints on the available Mac. The owner has a Pi for later
-testing; no Pi environment/access has been provided yet, nor a Linux/Windows test
-host. Measure a baseline before agreeing acceptance budgets. The selected
-board remains **Pi Zero 2 W with 64-bit Raspberry Pi OS**; the OS release/image,
-libc, Python installation, MIDI endpoint and build sysroot are still unselected.
-Do not substitute an original Pi Zero or claim board qualification from an arm64
-build. No release, hardware probe, physical tuning/reset transmission, OS service restart,
+test-owned virtual endpoints on the available Mac. No Linux/Windows test host
+access has been supplied. Measure a baseline before agreeing application budgets;
+record the actual host and do not extrapolate results across platforms/backends.
+The staged [Linux procedure](linux-qualification.md) applies to an available
+Linux host without requiring a particular machine. No release, hardware
+probe, physical tuning/reset transmission, OS service restart,
 system installation or workflow trigger is authorized by this procedure.
 
 On 2026-10-21 the owner additionally authorized supervised SysEx/MTS workflow
@@ -32,7 +37,7 @@ not collect the measurement files. CI remains published-release-only with Python
 Start from a complete checkout. Record its commit, dirty status and the build
 profile alongside all output. Run on external power, note CPU model, RAM, free
 disk space, storage medium, OS image/build, libc, Rust/C++/CMake/Python versions,
-power/thermal settings and background load. On the Pi also record kernel/ALSA
+power/thermal settings and background load. On Linux also record kernel/ALSA
 versions, device permissions and thermal/throttling state. Do not update the OS
 or tools merely to obtain a result. A missing prerequisite is an open gate.
 
@@ -40,8 +45,9 @@ Use the prerequisites in README.md. Linux builds need ALSA development headers
 and pkg-config; Linux execution needs libasound.so.2. MIDI sequencer I/O needs
 access to /dev/snd/seq. Build inside an MSVC developer environment on Windows.
 All commands below use bash, including Windows Git Bash with the MSVC environment
-already configured. On a small board, start with one build job and observe memory
-and free space. Do not install a swap file or change system settings implicitly.
+already configured. On a resource-constrained host, start with one build job and
+observe memory and free space. Do not install a swap file or change system
+settings implicitly.
 
 ```bash
 mkdir -p target/qualification
@@ -245,19 +251,24 @@ Successful virtual MIDI does not qualify unplug/replug, device reboot, driver
 crash, unresponsive hardware or musical state after uncertain sends. Those need
 named equipment, explicit authorization and a test-specific recovery procedure.
 
-## Pi and desktop build gates
+## Platform and backend qualification gates
 
-Prefer an initial native Linux arm64 build on the actual chosen OS. Until the
-image and ABI are selected there is no reproducible Pi cross-build command.
-Cross-compiling requires a matching Linux aarch64 C++ toolchain/sysroot, ALSA
-headers/libraries/pkg-config configuration and Python target ABI as well as
-Rust's aarch64-unknown-linux-gnu target. The build explicitly requires
-CMAKE_TOOLCHAIN_FILE across targets. A Rust target flag alone is insufficient;
-macOS host libraries must never enter the target link. A native arm64 Linux build
-or successful cross-link is still not a Pi runtime or performance result.
+| Platform | Backend scope | Remaining native evidence |
+| --- | --- | --- |
+| macOS | CoreMIDI MIDI 1 and UMP | Available arm64 Mac software loopbacks pass; other macOS versions/architectures, physical interoperability and faults need their own evidence |
+| Windows | WinMM; Windows MIDI Services remains disabled | Run Windows source/native regressions, installed-wheel checks and an agreed loopback route; Services SDK integration and native UMP remain separate |
+| Linux | ALSA sequencer/raw and compiled UMP variants | Run source/native regressions, installed-wheel checks and separately authorized backend tests on an available Linux host |
 
-For each available desktop, run the source and installed-wheel checks from the
-release workflow without publishing a release. Include the vendored device-free
+No particular Linux machine is required. Prefer a native build on the selected
+test host and record its OS, architecture and ABI. Cross-compiling is optional
+deployment work and requires a matching C++ toolchain/sysroot, ALSA development
+files, pkg-config configuration and Python target ABI as well as a Rust target.
+The build explicitly requires CMAKE_TOOLCHAIN_FILE across targets. A Rust target
+flag alone is insufficient; host libraries must never enter the target link.
+Successful compilation or cross-linking does not qualify target runtime behavior.
+
+For each selected OS/architecture, run the source and installed-wheel checks from
+the release workflow without publishing a release. Include the vendored device-free
 native regression targets and sanitizer settings exactly as configured there.
 Record compiler, OS/architecture, Python endpoint versions, test totals, wheel
 from-sdist result, license/provenance content, external dynamic dependencies and
@@ -293,8 +304,8 @@ installed wheels or repeat the full Python suites. See validation.md for evidenc
 
 ## Acceptance review and remaining gates
 
-After real Pi baseline measurements, agree application budgets for idle and peak
-memory, idle CPU, endpoint/process/thread/handle counts, expected streams and
+After baseline measurements on the relevant hosts, agree application budgets for
+idle and peak memory, idle CPU, endpoint/process/thread/handle counts, expected streams and
 message rates, maximum payload, recording duration/storage and round-trip tail
 latency. Rerun at the agreed normal workload and an explicit overload workload.
 Check loss counters and capture completeness; an incomplete burst is evidence
@@ -305,5 +316,7 @@ Publish separate claims for immutable values/codecs, file fidelity, pure state
 machines, native transport and specific hardware/OS versions. The feature matrix
 and local baseline in validation.md record what is presently demonstrated.
 Qualification is partial until the outstanding native/platform/resource gates
-have evidence. The archive schema and release/publication decision remain
-explicit review gates. No performance acceptance threshold has been invented.
+have evidence. The local archive v1 implementation review is complete; its
+findings and corrective regressions are in archive-format.md and validation.md.
+Format freeze, future compatibility guarantees and release/publication remain
+explicit owner decisions. No performance acceptance threshold has been invented.
