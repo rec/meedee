@@ -371,7 +371,7 @@ range validation and is a measurement control, not a second production API.
 `tracemalloc` does not measure Rust payload allocations or total resident memory.
 Debug and release observations differ substantially; smaller Python allocation
 alone is not evidence of faster construction. These observations qualify
-the representation, not Pi Zero resource budgets or live callback throughput.
+the representation, not Pi 5 resource budgets or live callback throughput.
 Repeat release/Pi and stream measurements when the real core and target board
 are available; do not add timing thresholds to unit tests.
 
@@ -383,7 +383,7 @@ are available; do not add timing thresholds to unit tests.
 - Add production Event/clock types, complete MIDI 1.0 types and wire fixtures
   in their planned slices rather than publishing placeholder classes.
 - Qualify libremidi's C boundary and build before backend replacement.
-- Select the exact Pi Zero model/image/ABI before board performance claims.
+- Record the Pi 5 image/ABI and hardware configuration before board performance claims.
 - Verify MIDI 2.0 group numbering, attribute fields and unsupported/opaque packet
   policy before its API slice; prototype types do not guess these choices.
 

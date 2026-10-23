@@ -278,6 +278,7 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "crates/meedee/src/event_views.rs",
                 "crates/meedee/tests/files.rs",
                 "crates/meedee/tests/archive.rs",
+                "crates/meedee/tests/fixtures/archive-v1.txt",
                 "crates/meedee/tests/live.rs",
                 "crates/meedee/tests/file_timing.rs",
                 "crates/meedee/tests/event_views.rs",

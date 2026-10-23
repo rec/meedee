@@ -1099,7 +1099,7 @@ No toolchain/dependency versions, CI triggers or public APIs were changed.
 | Typed capture/playback | Fake transport, cancellation/fault tests; four-recording software workload | Real libremidi loopback still unqualified |
 | MIDI-CI | Implemented management subset, bounded sessions and shared vectors | Profiles/Property Exchange deferred; Process Inquiry engines deferred; no claim of complete CI |
 | macOS arm64 | Source/package tests and sanitized device-free C++ regressions | CoreMIDI client creation fails with 268435459 in this tool environment |
-| Linux x86/arm64, Pi Zero 2 W | Procedures and release-only CI configuration | No target run here; Pi OS/image/sysroot and endpoint selection still open |
+| Linux x86/arm64, Pi 5 | Procedures and release-only CI configuration | No target run here; the earlier Pi Zero assumption was corrected on 2026-10-23; Pi OS/image/ABI and endpoint selection remain open |
 | Windows and macOS Intel | Existing release-only CI configuration and target-specific fixtures | No target run here; Windows capability-query risk and SDK integration remain open |
 
 The Rust release example and opt-in Python suite cover dense CC, NRPN expansion,
@@ -2191,3 +2191,80 @@ this compiler, installed release artifacts or resource budgets. No Python source
 changed, full Python suites were not repeated, no MIDI endpoint was opened and
 no release or CI workflow was triggered. Pi image/access, provisioning, MIDI
 route and workload choices remain to be agreed before target qualification.
+
+## Local readiness review and Pi 5 handoff, 2026-10-23
+
+The owner authorized four local slices: correct target/status documentation,
+review archive v1, verify Rust 1.87 release artifacts on the available Mac and
+prepare Pi qualification without connecting the board. The target is **Pi 5**;
+the earlier Pi Zero selection was an incorrect planning assumption. Its OS,
+ABI, RAM/storage, access and equipment remain unknown. The owner may use the
+board for another project. No Pi connection or provisioning was attempted.
+
+The archive review compared the documented fields with the encoder/decoder and
+Python bridge, plus existing fault/recovery tests. Independent binary examples
+confirmed three preservation-mode gaps: reserved record 0 was accepted despite
+being unwritable, and future Events bypassed stream/span validation. The owner
+approved fixing these before the wheel builds. The reader now rejects reserved
+0 and checks the known envelope even for an unknown representation or command.
+Existing span validation is shared with that path. Valid v1 framing, field widths,
+IDs and bytes remain unchanged; no version bump, migration, dependency or new
+public API was added. Format freeze and future compatibility remain owner decisions.
+
+The shared archive-v1.txt fixture contains 14 independently framed cases. Both
+Rust and Python verify exact rewriting of every record family, all nine commands,
+signed timestamps, optional fields and full-width UMP values. Future representation
+and command cases cover valid preservation, undeclared streams, reversed packet
+spans, disabled clocks, mismatched stream clocks and cross-clock spans. Recovery
+does not mark those malformed captures complete. The three original independent
+failure examples now pass, along with 12 focused Rust and 11 focused Python checks.
+
+On macOS 14.5 (23F79), arm64, with Apple clang 16.0.0, CMake 4.4.4,
+Rust/Cargo 1.87.0 and maturin 1.15.0:
+
+- The full Python 3.11 source suite passes **404 tests, two optional module skips**.
+  This includes the bounded callback/finalization harness against Rust 1.87.
+- Locked, offline Rust workspace tests pass **151 tests per interpreter** with
+  CPython 3.11.7 and 3.15.0, plus successful doctest runs. Five deliberate cases
+  remain ignored per Cargo run: two live endpoint and three standalone finalization
+  tests. Source Python's harness covers the latter separately on 3.11.
+- Workspace/all-target Clippy with -D warnings passes with both interpreters,
+  without warning exceptions. Cargo formatting, Ruff, Python formatting, ty for
+  both actual environments, pyupgrade and whitespace checks pass.
+- Both optimized wheels build from the source distribution using the isolated
+  Rust 1.87 installation, --release --locked --offline --sdist, and deployment
+  target 11.0. That tag is not evidence of execution on macOS 11.
+- Fresh installed environments pass dependency checks. Frozen CLI dependencies
+  are installed on both, with the frozen uFor dependencies on 3.15. From outside
+  the checkout, isolated interpreter mode passes **403 installed tests on 3.11**
+  and **428 on 3.15**, each with two expected skips. On 3.11 these are the two
+  unsupported uFor modules; on 3.15 these are the two Python-floor error checks.
+  Only the source-only Cargo callback-build test is excluded from installed runs;
+  it is covered by the source suite above.
+- Both distribution checks pass, including the new fixture, typing, version/extra
+  metadata and license inventory. otool shows only system C++/iconv/System libraries
+  and CoreMIDI/CoreAudio/CoreFoundation frameworks beyond the extension's own ID;
+  no Homebrew dynamic library path or libpython link is present.
+
+The build uses base 7cb8722 with this batch's library/tests/README and Pi procedure.
+This evidence entry is appended after the artifact tests. Package code and tested
+fixtures did not change afterward. Local artifacts are:
+
+| File in dist/ | Bytes | SHA-256 |
+| --- | --- | --- |
+| meedee-0.2.0-cp311-cp311-macosx_11_0_arm64.whl | 1971360 | 3bcc169cb4223759602c4517b30da13d84c84af764ee6db4462893222cb838bd |
+| meedee-0.2.0-cp315-cp315-macosx_11_0_arm64.whl | 1943901 | c051d2ddd2fcf754f5373d2153d7dea017aeaad094617dd3449cb28f7fb39f09 |
+| meedee-0.2.0.tar.gz | 883314 | 649f1a3120010d247bf3d8956e2ff0aaa62da65b99158c8489d5e26795a27bd5 |
+
+Build, source/installed test logs, toolchain details, installed locations,
+dynamic-library reports and checksums remain under ignored
+target/qualification/20261023-release/. No release or CI workflow was triggered.
+No new native MIDI workload ran; the device-free archive changes do not qualify
+physical MIDI, faults, Windows/Linux/Pi execution or child-inclusive resources.
+
+The staged pi-qualification.md handoff provides read-only inventory, prerequisites,
+separate environments, one-job native builds, bounded device-free checks, the
+supervised MIDI 1 selection and an evidence/acceptance checklist. Its shell blocks
+pass bash -n only; they have not executed on Linux/Pi. Missing prerequisites,
+installations, virtual endpoints and named physical equipment each retain their
+explicit approval gate. The board may remain occupied until that later session.

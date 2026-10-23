@@ -43,8 +43,9 @@ workspace restructuring are proposed here.
 
 CLI, TUI, GUI and notebook tools may present the same underlying operations.
 Start with whichever interface serves a selected workflow; there is no need to
-build every interface. A Pi Zero 2 W remains a useful headless target, while
-heavier visualization can run on a desktop.
+build every interface. The owner's Pi 5 is the future headless qualification
+target; its OS and application workload remain to be selected. Heavier
+visualization can run on a desktop.
 
 ## Independent meedee features
 
@@ -393,7 +394,7 @@ clock relationships, security and recovery, rather than part of these integratio
 | Implemented in siblings | arpeg MIDI hosts, enge performance conversion/input, enveLFO MIDI mapping | Existing owners supply musical execution; do not duplicate them |
 | Implemented | uFor bulk tuning preview/export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in meedee |
 | Implemented foundation | Static routing, polling topology, bounded diagnostics and in-memory transports | Recovery and ownership cleanup are not implied |
-| Qualification gates | Windows/Pi/native physical behavior and resource budgets | Build/software-loopback evidence cannot replace target evidence |
+| Qualification gates | Windows/Pi 5/native physical behavior and resource budgets | Build/software-loopback evidence cannot replace target evidence |
 | Standards gates | Deferred CI Profiles/Property Exchange, selected machine control | Acquire normative documents before dependent protocol implementation |
 | Optional proposals | Scoped cleanup, reconnect, interactive interfaces and audition | Require their own ownership, recovery or product decisions |
 

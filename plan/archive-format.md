@@ -22,6 +22,7 @@ u32 byte length plus bytes; `string` is a UTF-8 blob. A boolean/optional presenc
 flag is one byte, exactly 0 or 1. Optional fields include their value only when
 present. Lengths are checked against the configurable payload limit (default
 1 MiB) before allocation. Nested fields cannot exceed the containing frame.
+Record kind 0 is reserved and rejected, including when preserving unknown records.
 
 | ID | Fields after kind |
 | --- | --- |
@@ -88,6 +89,10 @@ malformed records, undeclared references and unknown kinds. `preserve_unknown`
 retains unknown kinds or unsupported message representations as Opaque records,
 including the original kind and bytes. Such records are storage, not executable
 messages. This is not permission to ignore malformed known layouts.
+An unsupported command ID also preserves its complete Event record. The known
+Event envelope is still checked: the stream and timestamp clocks must be declared,
+stream clock associations must match, disabled clocks cannot carry timestamps,
+and packet spans must be ordered and remain within one clock generation.
 
 `recover=True` stops at the first failure and exposes verified complete prefix
 records, `complete=False` and a problem string with record/byte location. It
@@ -105,3 +110,34 @@ Streaming bounds working record/descriptor storage, not returned records,
 caller-held objects, allocator overhead, OS buffers or CPU use. File errors
 must be handled even when the source is local. Blocking filesystems remain a
 liveness risk outside native MIDI isolation.
+
+## Local format review, 2026-10-23
+
+The review compared this layout with the Rust encoder/decoder, Python bridge,
+existing corruption/recovery checks and independent byte vectors. Header/version,
+integer widths/endianness, record/command IDs, timestamp absence, signed ticks,
+CRC framing and completion counts agree. The new shared fixture
+`crates/meedee/tests/fixtures/archive-v1.txt` is framed independently using fixed
+field values, struct packing and the standard CRC implementation, rather than
+meedee's writer. Rust and Python read the same vectors and rewrite valid inputs
+byte for byte, including all nine commands and future Event representations/IDs.
+
+The review found and corrected malformed-input acceptance in preservation mode:
+reserved record 0 could be read but not rewritten, and future Events bypassed
+known envelope checks. Regressions cover both unknown representations and unknown
+commands with undeclared streams, reversed spans, disabled timestamps, stream
+clock mismatches and cross-clock spans. Strict reading still rejects future
+representations; recovery stops at the bad record without claiming completion.
+Valid v1 bytes, IDs and framing are unchanged. No migration path or parallel
+decoder was added.
+
+Current compatibility behavior is explicit: readers reject other header versions;
+within v1, unknown records/message representations require preservation opt-in.
+Known record layouts are checked rather than treated as opaque on any parse error.
+Archive metadata cannot authorize MIDI output, and successful completion remains
+structural rather than a claim of capture quality or durable media storage.
+
+This completes the local implementation review, not publication or a permanent
+compatibility promise. Version 1 remains unpublished. Freezing the wire format,
+future compatibility guarantees and release/publication remain owner decisions.
+Target resource limits and platform qualification remain separate gates.

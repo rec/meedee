@@ -43,6 +43,40 @@ struct Registry {
     records: u64,
 }
 impl Registry {
+    fn check_event_header(
+        &self,
+        stream: &str,
+        timestamp: Option<&Timestamp>,
+        span: Option<&Span>,
+    ) -> io::Result<()> {
+        if !self.streams.contains_key(stream) {
+            return Err(invalid(0, "event stream is undeclared"));
+        }
+        if let Some(s) = span {
+            s.validate(timestamp)?;
+        }
+        for t in timestamp.into_iter().chain(
+            span.into_iter()
+                .flat_map(|s| s.first_timestamp.iter().chain(s.last_timestamp.iter())),
+        ) {
+            if t.clock.mode() == Some(false) {
+                return Err(invalid(0, "disabled clock cannot have a timestamp"));
+            }
+            if self
+                .streams
+                .get(stream)
+                .and_then(|s| s.1.as_ref())
+                .is_some_and(|id| id != t.clock.identity())
+            {
+                return Err(invalid(0, "event clock differs from its stream descriptor"));
+            }
+            if self.clocks.get(t.clock.identity()) != Some(&t.clock) {
+                return Err(invalid(0, "timestamp clock is undeclared or inconsistent"));
+            }
+        }
+        Ok(())
+    }
+
     fn check(&mut self, r: &Record) -> io::Result<()> {
         match r {
             Record::Clock(c) => {
@@ -88,27 +122,7 @@ impl Registry {
                     .insert(id.clone(), (label.clone(), clock_identity.clone()));
             }
             Record::Event(e) => {
-                e.validate()?;
-                if !self.streams.contains_key(&e.stream) {
-                    return Err(invalid(0, "event stream is undeclared"));
-                }
-                for t in e.timestamp.iter().chain(
-                    e.span
-                        .iter()
-                        .flat_map(|s| s.first_timestamp.iter().chain(s.last_timestamp.iter())),
-                ) {
-                    if self
-                        .streams
-                        .get(&e.stream)
-                        .and_then(|s| s.1.as_ref())
-                        .is_some_and(|id| id != t.clock.identity())
-                    {
-                        return Err(invalid(0, "event clock differs from its stream descriptor"));
-                    }
-                    if self.clocks.get(t.clock.identity()) != Some(&t.clock) {
-                        return Err(invalid(0, "timestamp clock is undeclared or inconsistent"));
-                    }
-                }
+                self.check_event_header(&e.stream, e.timestamp.as_ref(), e.span.as_ref())?;
             }
             Record::Metadata {
                 stream, timestamp, ..
@@ -397,10 +411,11 @@ impl<'a> Fields<'a> {
         Ok(())
     }
 }
-fn decode(body: &[u8], clocks: &BTreeMap<String, Clock>, preserve: bool) -> io::Result<Record> {
+fn decode(body: &[u8], registry: &Registry, preserve: bool) -> io::Result<Record> {
     let mut f = Fields::new(body);
     let kind = u16::from_be_bytes(f.source.array()?);
     let r = match kind {
+        0 => return Err(invalid(0, "reserved record kind")),
         1 => {
             let id = f.string()?;
             let n = f.u64()?;
@@ -439,19 +454,26 @@ fn decode(body: &[u8], clocks: &BTreeMap<String, Clock>, preserve: bool) -> io::
         }
         3 => {
             let stream = f.string()?;
-            let timestamp = f.timestamp(clocks)?;
+            let timestamp = f.timestamp(&registry.clocks)?;
             let span = if f.flag()? {
                 Some(Span {
                     first_packet: f.u64()?,
                     last_packet: f.u64()?,
-                    first_timestamp: f.timestamp(clocks)?,
-                    last_timestamp: f.timestamp(clocks)?,
+                    first_timestamp: f.timestamp(&registry.clocks)?,
+                    last_timestamp: f.timestamp(&registry.clocks)?,
                 })
             } else {
                 None
             };
             let tag = f.byte()?;
             let data = f.rest()?;
+            let preserve_event = || {
+                registry.check_event_header(&stream, timestamp.as_ref(), span.as_ref())?;
+                Ok(Record::Opaque {
+                    kind: 3,
+                    data: body[2..].to_vec(),
+                })
+            };
             let message = match tag {
                 1 => {
                     let mut d = crate::codecs::Decoder::new(data.len().max(1))
@@ -475,19 +497,13 @@ fn decode(body: &[u8], clocks: &BTreeMap<String, Clock>, preserve: bool) -> io::
                 3 => match decode_command(&data) {
                     Ok(v) => Payload::Command(v),
                     Err(e) if preserve && e.kind() == io::ErrorKind::Unsupported => {
-                        return Ok(Record::Opaque {
-                            kind: 3,
-                            data: body[2..].to_vec(),
-                        })
+                        return preserve_event();
                     }
                     Err(e) => return Err(e),
                 },
                 _ => {
                     if preserve {
-                        return Ok(Record::Opaque {
-                            kind: 3,
-                            data: body[2..].to_vec(),
-                        });
+                        return preserve_event();
                     }
                     return Err(invalid(0, "unknown message representation"));
                 }
@@ -506,7 +522,7 @@ fn decode(body: &[u8], clocks: &BTreeMap<String, Clock>, preserve: bool) -> io::
         },
         5 => {
             let stream = if f.flag()? { Some(f.string()?) } else { None };
-            let timestamp = f.timestamp(clocks)?;
+            let timestamp = f.timestamp(&registry.clocks)?;
             Record::Metadata {
                 stream,
                 timestamp,
@@ -764,7 +780,7 @@ impl<R: Read> Reader<R> {
             self.stopped = true;
             return Ok(None);
         }
-        let r = decode(&body, &self.registry.clocks, self.preserve)?;
+        let r = decode(&body, &self.registry, self.preserve)?;
         self.registry.check(&r)?;
         Ok(Some(r))
     }

@@ -4,6 +4,7 @@ import struct
 import zlib
 from collections.abc import Sequence
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 
@@ -135,3 +136,56 @@ def test_clock_units_and_checked_values_are_distinct_from_raw_nanoseconds() -> N
     )
     with pytest.raises(ValueError, match="disabled"):
         events.Timestamp(ticks=1, clock=off)
+
+
+def test_v1_independent_vectors_check_future_headers_and_preserve_exact_bytes() -> None:
+    fixture = (
+        Path(__file__).resolve().parents[1]
+        / "crates/meedee/tests/fixtures/archive-v1.txt"
+    )
+    for line in fixture.read_text().splitlines():
+        if line.startswith("#"):
+            continue
+        name, expected, encoded = line.split("|")
+        data = bytes.fromhex(encoded)
+        reader = archive.Reader(BytesIO(data), preserve_unknown=True)
+        if expected != "valid":
+            with pytest.raises(OSError, match=expected):
+                list(reader)
+            assert not reader.complete
+            recovery = archive.Reader(
+                BytesIO(data), preserve_unknown=True, recover=True
+            )
+            list(recovery)
+            assert not recovery.complete and expected in str(recovery.problem)
+            continue
+        restored = list(reader)
+        assert reader.complete and reader.problem is None, name
+        assert save(restored) == data, name
+        if name.startswith("future-"):
+            assert isinstance(restored[-1], archive.Opaque)
+            assert restored[-1].kind == 3
+            with pytest.raises(OSError, match="unknown"):
+                list(archive.Reader(BytesIO(data)))
+            continue
+        assert len(restored) == 19
+        clock = restored[0]
+        assert isinstance(clock, events.Clock)
+        assert clock.tick_numerator == 1001 and clock.tick_denominator == 30000
+        assert clock.backend == midi.Backend.CoreMidi
+        assert clock.mode == midi.TimestampMode.Absolute and clock.resolution_ticks == 1
+        note = restored[2]
+        assert isinstance(note, events.Event) and note.timestamp is not None
+        assert note.timestamp.ticks == -(2**63)
+        assert note.message == messages.NoteOn(channel=16, note=127, velocity=127)
+        assert note.span is not None and note.span.last_timestamp is not None
+        assert note.span.first_packet == 1 and note.span.last_packet == 2
+        assert note.span.last_timestamp.ticks == -1
+        wide = restored[4]
+        assert isinstance(wide, events.Event)
+        assert wide.message == ump.Midi2ControlChange(
+            group=16, channel=16, controller=7, value=0xFEDCBA98
+        )
+        assert [r.message for r in restored[5:14] if isinstance(r, events.Event)] == [
+            r.message for r in values()[4:13] if isinstance(r, events.Event)
+        ]

@@ -7,7 +7,7 @@ native MIDI transport. The design starts from musical concepts and the MIDI stan
 It has no interface-compatibility requirement with another Python MIDI library.
 
 The toolkit targets Linux, macOS, and Windows, including resource-conscious
-Linux applications on the Pi Zero. Rust users need no Python interpreter.
+Linux applications on the Pi 5. Rust users need no Python interpreter.
 Python users receive the same musical semantics through a binding, rather than
 a separately implemented parser, tuning engine, or file format.
 
@@ -43,7 +43,9 @@ The source pin and selected build requirements are recorded below.
 The owner selected bundled, statically linked sources with CMake; native OS
 backends only; MIDI 1.0 packets by default with explicit UMP selection; and
 Absolute input timestamps by default with explicit capture disabling. The Pi
-target is Zero 2 W with 64-bit Raspberry Pi OS. The selected vendored source is
+target is Pi 5, as corrected by the owner on 2026-10-23; its OS image and ABI
+have not been selected. The earlier Pi Zero selection was a planning error.
+The selected vendored source is
 now the owner's fork at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`, including
 two separately committed CoreMIDI property fixes and checked input teardown
 for CoreMIDI and Windows, checked CoreMIDI output disposal and initialized
@@ -595,13 +597,13 @@ applicable binding-level tests and guarantees.
 Process isolation does not repair a shared OS MIDI service, unsafe native
 rollback, or native assembly that occurs before our admission limits.
 
-## 14. Cross-platform and Pi Zero requirements
+## 14. Cross-platform and Pi 5 requirements
 
-Use standard Rust on Linux, macOS, and Windows. Pi Zero deployment requires
+Use standard Rust on Linux, macOS, and Windows. Pi 5 deployment requires
 Linux/ALSA, not bare-metal firmware or `no_std`. Build libremidi with a compatible
 C++20 toolchain and verify linking, required system libraries, license notices,
-and wheel packaging on all three platforms. Confirm original Pi Zero versus
-Zero 2, OS image, ABI/bitness, compiler target, libc, Python installation, and
+and wheel packaging on all three platforms. Record the Pi 5's RAM/storage,
+OS image, ABI/bitness, compiler target, libc, Python installation, and
 chosen MIDI endpoint before selecting build commands or claiming hardware support.
 
 Keep short message values compact and avoid per-message heap allocation in the
@@ -836,8 +838,8 @@ Decisions to settle before dependent implementation:
 - Public namespace is `meedee.messages`, `meedee.events`, and `meedee.midi`,
   without top-level re-exports. Current transport can be replaced without
   compatibility aliases; keep `__init__.py` empty.
-- Pi Zero 2 W and a 64-bit Raspberry Pi OS ABI are selected; establish the exact
-  image/sysroot and acceptable workloads before cross-build and performance claims.
+- Pi 5 is the hardware target; establish its exact OS image/ABI and acceptable
+  workloads before build and performance claims. No OS or sysroot is selected.
 - Fine-control/parameter observation policies and initial MTS/GM2/CI subscopes,
   after access to the detailed normative documents.
 - Canonical custom file choice: proposed binary first versus text instead;

@@ -7,13 +7,16 @@ None.
 ## Status and boundaries
 
 The owner authorized bounded synthetic workloads, temporary files and exclusively
-test-owned virtual endpoints on the available Mac. The owner has a Pi for later
-testing; no Pi environment/access has been provided yet, nor a Linux/Windows test
-host. Measure a baseline before agreeing acceptance budgets. The selected
-board remains **Pi Zero 2 W with 64-bit Raspberry Pi OS**; the OS release/image,
-libc, Python installation, MIDI endpoint and build sysroot are still unselected.
-Do not substitute an original Pi Zero or claim board qualification from an arm64
-build. No release, hardware probe, physical tuning/reset transmission, OS service restart,
+test-owned virtual endpoints on the available Mac. On 2026-10-23 the owner
+corrected the target to **Pi 5**; the earlier Pi Zero references were an incorrect
+planning assumption, not a hardware selection. The Pi 5 is occupied by another
+project and no target access has been supplied. Its RAM, storage, OS image,
+ABI/bitness, libc, Python installation and MIDI endpoint remain unselected.
+There is also no Linux/Windows test host available here. Measure a baseline
+before agreeing acceptance budgets. Do not claim board qualification from an
+arm64 build. The staged [Pi 5 procedure](pi-qualification.md) prepares later
+qualification without reserving or modifying the board. No release, hardware
+probe, physical tuning/reset transmission, OS service restart,
 system installation or workflow trigger is authorized by this procedure.
 
 On 2026-10-21 the owner additionally authorized supervised SysEx/MTS workflow
@@ -305,5 +308,7 @@ Publish separate claims for immutable values/codecs, file fidelity, pure state
 machines, native transport and specific hardware/OS versions. The feature matrix
 and local baseline in validation.md record what is presently demonstrated.
 Qualification is partial until the outstanding native/platform/resource gates
-have evidence. The archive schema and release/publication decision remain
-explicit review gates. No performance acceptance threshold has been invented.
+have evidence. The local archive v1 implementation review is complete; its
+findings and corrective regressions are in archive-format.md and validation.md.
+Format freeze, future compatibility guarantees and release/publication remain
+explicit owner decisions. No performance acceptance threshold has been invented.

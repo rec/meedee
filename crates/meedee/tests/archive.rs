@@ -136,3 +136,50 @@ fn rational_arithmetic_and_rounding_never_use_floating_seconds() {
     );
     assert!(Rational::new(i128::MAX, 1).unwrap().multiply(2, 1).is_err());
 }
+
+#[test]
+fn independent_v1_vectors_validate_future_headers_and_preserve_exact_bytes() {
+    for line in include_str!("fixtures/archive-v1.txt").lines() {
+        if line.starts_with('#') {
+            continue;
+        }
+        let fields: Vec<_> = line.split('|').collect();
+        let (name, expected, encoded) = (fields[0], fields[1], fields[2]);
+        let bytes: Vec<_> = (0..encoded.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&encoded[i..i + 2], 16).unwrap())
+            .collect();
+        let mut reader = archive::Reader::new(Cursor::new(&bytes), 4096, false, true).unwrap();
+        let result = reader.by_ref().collect::<io::Result<Vec<_>>>();
+        if expected != "valid" {
+            assert!(result.unwrap_err().to_string().contains(expected), "{name}");
+            assert!(!reader.complete);
+            let mut recovery = archive::Reader::new(Cursor::new(&bytes), 4096, true, true).unwrap();
+            assert!(recovery.by_ref().collect::<io::Result<Vec<_>>>().is_ok());
+            assert!(!recovery.complete);
+            assert!(recovery.problem.unwrap().contains(expected), "{name}");
+            continue;
+        }
+        let records = result.unwrap();
+        assert!(reader.complete && reader.problem.is_none(), "{name}");
+        let mut rewritten = vec![];
+        let mut writer = archive::Writer::new(&mut rewritten, 4096).unwrap();
+        for record in &records {
+            writer.write(record).unwrap();
+        }
+        writer.finish(true, "").unwrap();
+        assert_eq!(rewritten, bytes, "{name}");
+        if name.starts_with("future-") {
+            assert!(matches!(
+                records.last(),
+                Some(Record::Opaque { kind: 3, .. })
+            ));
+            assert!(
+                archive::Reader::new(Cursor::new(&bytes), 4096, false, false)
+                    .unwrap()
+                    .collect::<io::Result<Vec<_>>>()
+                    .is_err()
+            );
+        }
+    }
+}

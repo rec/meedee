@@ -58,6 +58,12 @@ decisions. `syx` handles concatenated SysEx dumps; `clip` handles MIDI Clip 1.0.
 File writers require `finish()`. Readers have `close()`; borrowed streams remain
 open. No codec starts MIDI workers. See [the API contract](plan/api.md).
 
+The [archive v1 layout and local review](plan/archive-format.md) document exact
+clock/record encoding and verified-prefix recovery. Unknown content requires
+explicit preservation; known Event headers are validated even for future message
+representations. Version 1 remains unpublished, with format freeze and future
+compatibility guarantees still owner decisions.
+
 `midi.TypedInput` and `midi.TypedOutput` use the existing raw transport, including
 its default Python process isolation. Input connections provide either a callback
 or `receive(timeout=..., cancel=...)`, returning an immutable `events.Event` or
@@ -695,6 +701,9 @@ synthetic workloads and supervised test-owned virtual-port measurements in Rust
 and Python. Mac software baselines do not establish Pi performance, physical
 device behavior or live MIDI 2.0 support. See the
 [feature matrix and evidence](plan/validation.md).
+The [Pi 5 handoff](plan/pi-qualification.md) separates inventory, device-free
+builds, authorized software loopback and later physical qualification. Its OS
+image and configuration remain unselected; no Pi qualification has run.
 
 ```sh
 uv run --frozen pytest
