@@ -6,8 +6,9 @@ Create a new Rust MIDI toolkit and a matching Python API, using libremidi for
 native MIDI transport. The design starts from musical concepts and the MIDI standards.
 It has no interface-compatibility requirement with another Python MIDI library.
 
-The toolkit targets Linux, macOS, and Windows, including resource-conscious
-Linux applications on the Pi 5. Rust users need no Python interpreter.
+The toolkit targets macOS, Windows and Linux. Raspberry Pi systems are included
+as Linux hosts; no particular board is a project target or completion gate.
+Rust users need no Python interpreter.
 Python users receive the same musical semantics through a binding, rather than
 a separately implemented parser, tuning engine, or file format.
 
@@ -42,10 +43,9 @@ The source pin and selected build requirements are recorded below.
 
 The owner selected bundled, statically linked sources with CMake; native OS
 backends only; MIDI 1.0 packets by default with explicit UMP selection; and
-Absolute input timestamps by default with explicit capture disabling. The Pi
-target is Pi 5, as corrected by the owner on 2026-10-23; its OS image and ABI
-have not been selected. The earlier Pi Zero selection was a planning error.
-The selected vendored source is
+Absolute input timestamps by default with explicit capture disabling.
+Qualification is organized by OS, architecture and MIDI backend, not by a
+selected board. The selected vendored source is
 now the owner's fork at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`, including
 two separately committed CoreMIDI property fixes and checked input teardown
 for CoreMIDI and Windows, checked CoreMIDI output disposal and initialized
@@ -79,8 +79,8 @@ unsupported per-note/group features must not disappear silently.
 
 **Live MIDI 2.0 remains a required qualification gate.** libremidi is the chosen
 implementation route, not proof that every deployment supports UMP. Verify
-byte and UMP I/O separately on each target platform, including the selected
-Pi image. Report missing capabilities without silently switching protocols
+byte and UMP I/O separately on macOS, Windows and Linux with the corresponding
+backends. Report missing capabilities without silently switching protocols
 or introducing another transport library.
 
 Pin the normative specification revisions before implementing codecs. The
@@ -217,7 +217,7 @@ keyword-only and reject coercion, including booleans for integer fields.
 Wrong types raise `TypeError`; invalid values raise `ValueError`.
 The slice-1 [API contract and prototype](api.md) verifies the base/subclass
 contract and records construction/memory observations. Production module
-integration and stream/Pi measurements remain later qualification gates.
+integration and stream/resource measurements remain later qualification gates.
 
 Immutability must be deep. A frozen model containing a list or dict still has
 mutable contents. SysEx payloads use immutable bytes. Tuning/other aggregates
@@ -462,7 +462,7 @@ mapping, including uncertainty; never subtract unrelated clock ticks.
 
 Playback uses relative times anchored to a selected monotonic playback clock.
 Reject an unmapped multi-clock recording instead of merging it with arbitrary
-origins. OS scheduling and Pi load affect actual delivery. Do not promise
+origins. OS scheduling and host load affect actual delivery. Do not promise
 sample-accurate or hard-real-time execution from timestamp precision alone.
 
 ## 11. Standard file interoperability
@@ -482,7 +482,7 @@ SMF support includes its applicable file types, variable-length values, running
 status, metadata, SysEx handling, and deterministic event ordering. File
 read/write APIs accept streams as well as paths; caller-owned streams remain
 caller-owned. Offer iterator-based reading where the format permits it rather
-than requiring a whole large file to fit in Pi memory.
+than requiring a whole large file to fit in memory.
 
 High-resolution controllers/MTS/GM commands are represented by their appropriate
 MIDI 1.0 sequence in a conventional MIDI file. Standard MIDI Files do not
@@ -502,7 +502,8 @@ normalizes wire encoding or preserves an original packet representation.
 
 The owner selected a versioned binary `.meedee` archive, implemented in slice 9.
 The exact schema, CRC-32 and completion/recovery rules are in
-[archive-format.md](archive-format.md). This favors compact streaming on the Pi.
+[archive-format.md](archive-format.md). This supports compact streaming on all
+platforms.
 There is one canonical format; no separate evolving text format is implemented.
 
 Its version-1 schema must contain only information needed for lossless event
@@ -566,8 +567,8 @@ not imply scheduled send; scheduling is a separate operation with a selected
 clock and cancellation policy.
 
 Retain meedee's existing default Python process isolation and its in-process
-option while evaluating Pi costs. Rust-only I/O initially runs natively with
-clear native-hang limitations. It must not launch a Python interpreter as its
+option while evaluating their resource costs. Rust-only I/O initially runs
+natively with clear native-hang limitations. It must not launch a Python interpreter as its
 isolation mechanism. A Rust helper process would be a separate architecture
 choice, not an assumed fourth executable.
 
@@ -597,14 +598,15 @@ applicable binding-level tests and guarantees.
 Process isolation does not repair a shared OS MIDI service, unsafe native
 rollback, or native assembly that occurs before our admission limits.
 
-## 14. Cross-platform and Pi 5 requirements
+## 14. Cross-platform requirements
 
-Use standard Rust on Linux, macOS, and Windows. Pi 5 deployment requires
-Linux/ALSA, not bare-metal firmware or `no_std`. Build libremidi with a compatible
-C++20 toolchain and verify linking, required system libraries, license notices,
-and wheel packaging on all three platforms. Record the Pi 5's RAM/storage,
-OS image, ABI/bitness, compiler target, libc, Python installation, and
-chosen MIDI endpoint before selecting build commands or claiming hardware support.
+Use standard Rust on macOS, Windows and Linux with their native MIDI backends;
+bare-metal firmware and `no_std` are outside scope. Build libremidi with a
+compatible C++20 toolchain and verify linking, required system libraries, license
+notices and wheel packaging on all three platforms. Record each test host's
+OS/version, architecture/ABI, hardware, compiler, Python installation and chosen
+MIDI backend/endpoint before making runtime or performance claims. A particular
+Linux board, OS image or cross-build is not a separate project milestone.
 
 Keep short message values compact and avoid per-message heap allocation in the
 Rust path where possible. SysEx/tuning/file aggregates use checked owned storage.
@@ -616,13 +618,14 @@ Measure resident and peak memory, startup/import time, binary/wheel size, idle
 CPU, process/thread/handle count, throughput, overflow, and latency distributions
 for Rust native, Python native, and Python isolated operation. Include dense CC,
 NRPN sequences, tuning dumps, long SysEx, UMP files, and multi-stream recording.
-Publish workload sizes and set budgets from real Pi measurements with the owner.
+Publish workload sizes and agree deployment budgets from measurements on
+relevant hosts.
 Cross-compilation success is not proof of runtime performance or ALSA permissions.
 
 Python's supported-version floor remains 3.11 unless changed explicitly. Release
 CI continues to run only on published releases and tests oldest/newest versions,
-currently 3.11 and 3.15, across existing desktop platforms. Pi build/run artifacts
-and native UMP transport qualification are additional distinct validation gates.
+currently 3.11 and 3.15, across macOS, Windows and Linux. Native backend/UMP
+qualification and deployment-specific resource budgets remain distinct from CI.
 No toolchain or dependency changes are made by this planning request.
 
 ## 15. Proposed slices and completion gates
@@ -632,7 +635,7 @@ and wire evidence before stateful interpretation or live writes.
 
 1. **Specification/API prototype (completed).** Obtain normative revisions; define value
    types, deep immutability, message hierarchy, units, errors, namespace, and
-   language mappings. Prototype Python subclass/field behavior and Pi-relevant
+   language mappings. Prototype Python subclass/field behavior and per-value
    object overhead. Gate: no unacknowledged dependency or transport assumption.
    Evidence: [API contract](api.md), [specification baselines](specifications.md),
    and the native representation contract. Slice 2 promotes NoteOn and SysEx
@@ -647,7 +650,7 @@ and wire evidence before stateful interpretation or live writes.
    pinned C++ source. Its byte/UMP FFI paths have device-free macOS fixture tests;
    Mac virtual I/O and the persistent-notification runtime pass production
    reopen qualification: three cycles per protocol/process-mode combination,
-   including full-width MIDI 2 delivery. Windows/Services and Pi qualification
+   including full-width MIDI 2 delivery. Windows/Services and Linux qualification
    remain open.
    Python transport now uses this wrapper for both isolated and in-process I/O;
    midir and its old filtering/naming/ID-lookup API have been removed.
@@ -659,7 +662,7 @@ and wire evidence before stateful interpretation or live writes.
    transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.
    Gate: Rust use requires no Python; FFI ownership, shutdown, byte/UMP capability
-   detection, Python 3.11/3.15 builds, and selected Pi cross-build checks pass.
+   detection, Python 3.11/3.15 builds, and platform/backend checks pass.
 3. **MIDI 1.0 values and byte codec (implemented).** Implement base message families, validated
    encoding, incremental parsing, running status, and bounded SysEx. Gate:
    immutable Rust/Python values, exact wire fixtures, malformed-input recovery.
@@ -774,7 +777,7 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
     Fake transport/clock, resource/fault and packaging evidence is recorded in
     validation.md. Authorized CoreMIDI virtual testing was attempted but client
     creation failed with 268435459, leaving successful native capture/replay open.
-    Windows and Pi qualification remain open. No physical instruments were used.
+    Windows and Linux qualification remain open. No physical instruments were used.
 11. **MIDI-CI management implemented; broader exchanges and native qualification
     open (2026-10-15).** The accessible 1.2.1 base supports management codecs and
     bounded caller-driven discovery/endpoint/invalidation/ACK/NAK sessions in
@@ -784,18 +787,18 @@ events and timing; slice 12 qualifies their selected platform/resource workloads
     deferred. See ci.md/specifications.md/validation.md. Actual native UMP evidence
     on chosen platforms is still required before advertising live MIDI 2.0 support;
     unsupported deployments remain explicit.
-12. **Qualification tools and Mac software baseline delivered; native/board gates
+12. **Qualification tools and Mac software baseline delivered; platform/backend gates
     open (2026-10-15).** Opt-in bounded workloads compare Rust and Python codecs,
     exercise four-stream recording saturation, and supervise Rust/Python native
     virtual-endpoint attempts separately. See qualification.md for reproducible
-    Linux/Windows/Pi procedures and validation.md for measurements and the feature
+    macOS/Windows/Linux procedures and validation.md for measurements and the feature
     matrix. A follow-up in the owner's Terminal passes all three Mac MIDI 1
     virtual loopbacks, typed capture/replay/cancellation and a CoreMIDI UMP SysEx7
     CI exchange. A direct Apple API probe distinguishes the agent-context failure
-    from working Terminal access. Pi/Linux/Windows runs, full process-tree resource
-    totals and physical fault recovery remain open. Select the Pi image/environment, run target workloads
-    and agree budgets from those results before claiming complete qualification
-    or making a separately authorized release. CI remains release-only.
+    from working Terminal access. Linux/Windows runs, full process-tree resource
+    totals and physical fault recovery remain open. Run workloads on the relevant
+    platform/backend and agree deployment budgets before claiming complete
+    qualification or making a separately authorized release. CI remains release-only.
 
 A release can be staged, but its feature matrix must state what works as values,
 codecs, files, and live transport. The custom format must not be frozen with
@@ -834,12 +837,12 @@ Decisions to settle before dependent implementation:
   coverage, offline native build/packaging inputs, and byte/UMP backends on each
   platform. Codec/file support alone does not meet the live MIDI 2.0 requirement.
 - Native frozen Python representation is selected; integrate it into the
-  production modules and qualify stream/Pi costs using the prototype evidence.
+  production modules and qualify stream/resource costs using the prototype evidence.
 - Public namespace is `meedee.messages`, `meedee.events`, and `meedee.midi`,
   without top-level re-exports. Current transport can be replaced without
   compatibility aliases; keep `__init__.py` empty.
-- Pi 5 is the hardware target; establish its exact OS image/ABI and acceptable
-  workloads before build and performance claims. No OS or sysroot is selected.
+- Qualify macOS, Windows and Linux backends independently. Record test-host
+  OS/architecture, ABI and workloads; no particular hardware model is required.
 - Fine-control/parameter observation policies and initial MTS/GM2/CI subscopes,
   after access to the detailed normative documents.
 - Canonical custom file choice: proposed binary first versus text instead;

@@ -55,7 +55,7 @@ Resource follow-up approved 2026-10-15: each parent Python process admits at mos
 Each isolated Input/Output constructor consumes one slot, including discovery-only
 clients. Starts in progress and retiring processes count until exit is confirmed;
 admission raises ResourceError before spawning at capacity. Failed starts release
-their reservations. This is a count limit, not a machine-wide memory/Pi budget.
+their reservations. This is a count limit, not a machine-wide memory budget.
 Closing a connection restores its reusable client and does not terminate that
 client's worker. Connections retain their clients; drop those references when
 the client is no longer needed, and allow asynchronous retirement to complete.
@@ -371,8 +371,8 @@ range validation and is a measurement control, not a second production API.
 `tracemalloc` does not measure Rust payload allocations or total resident memory.
 Debug and release observations differ substantially; smaller Python allocation
 alone is not evidence of faster construction. These observations qualify
-the representation, not Pi 5 resource budgets or live callback throughput.
-Repeat release/Pi and stream measurements when the real core and target board
+the representation, not host resource budgets or live callback throughput.
+Repeat release and stream measurements when the real core and test host
 are available; do not add timing thresholds to unit tests.
 
 ## Remaining implementation gates
@@ -383,7 +383,7 @@ are available; do not add timing thresholds to unit tests.
 - Add production Event/clock types, complete MIDI 1.0 types and wire fixtures
   in their planned slices rather than publishing placeholder classes.
 - Qualify libremidi's C boundary and build before backend replacement.
-- Record the Pi 5 image/ABI and hardware configuration before board performance claims.
+- Record each test host's OS/architecture, ABI and hardware before performance claims.
 - Verify MIDI 2.0 group numbering, attribute fields and unsupported/opaque packet
   policy before its API slice; prototype types do not guess these choices.
 
@@ -810,7 +810,7 @@ lateness reporting and stops on send failure without retry. Missing times,
 unmapped clocks and unresolved discontinuities require explicit caller policy.
 No automatic silencing, reset, connection close or restoration on cancellation.
 Only supervised temporary virtual CoreMIDI endpoint tests are authorized; physical
-instruments, Windows native validation and Pi qualification remain open.
+instruments and Windows/Linux native validation remain open.
 
 
 ## Final slices 8–10 contracts

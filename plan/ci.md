@@ -164,7 +164,7 @@ explicit routes/groups, deadline/send-result handling, collision recovery at
 capacity and known-loss reset. Pure module imports must not start MIDI workers.
 The opt-in native fixture uses only its own temporary UMP virtual endpoints,
 experimental manufacturer identity and freshly randomized test MUIDs. It sends
-only management discovery/reply, with zero optional capabilities. Windows, Pi and
+only management discovery/reply, with zero optional capabilities. Windows, Linux and
 physical UMP qualification remain open; see validation.md for the actual outcome.
 
 ## One-scan management browser

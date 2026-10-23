@@ -43,9 +43,9 @@ workspace restructuring are proposed here.
 
 CLI, TUI, GUI and notebook tools may present the same underlying operations.
 Start with whichever interface serves a selected workflow; there is no need to
-build every interface. The owner's Pi 5 is the future headless qualification
-target; its OS and application workload remain to be selected. Heavier
-visualization can run on a desktop.
+build every interface. meedee targets macOS, Windows and Linux; headless and
+interactive applications share the same core. No particular board or machine
+is a project requirement.
 
 ## Independent meedee features
 
@@ -250,7 +250,7 @@ histograms and exact aggregates with bounded memory. Queued and in-flight writes
 both count toward recording pressure. Process-tree resources and native/physical
 qualification remain separate.
 
-**Use:** Establish whether a particular Pi, interface and application can handle
+**Use:** Establish whether a particular host, interface and application can handle
 a workload before a performance.
 
 Make suitable qualification measurements reusable: throughput, queue occupancy,
@@ -261,7 +261,7 @@ the latter needs additional instrumentation or a justified clock relationship.
 Reuse arpeg/enveLFO performance work for their engines. meedee should measure
 its transport and integration contribution. Any emitted MIDI needs explicitly
 selected destinations and bounded runs. This does not replace open Windows,
-Pi or physical-fault qualification.
+Linux or physical-fault qualification.
 
 ## Integration work
 
@@ -394,7 +394,7 @@ clock relationships, security and recovery, rather than part of these integratio
 | Implemented in siblings | arpeg MIDI hosts, enge performance conversion/input, enveLFO MIDI mapping | Existing owners supply musical execution; do not duplicate them |
 | Implemented | uFor bulk tuning preview/export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in meedee |
 | Implemented foundation | Static routing, polling topology, bounded diagnostics and in-memory transports | Recovery and ownership cleanup are not implied |
-| Qualification gates | Windows/Pi 5/native physical behavior and resource budgets | Build/software-loopback evidence cannot replace target evidence |
+| Qualification gates | macOS/Windows/Linux backends, physical behavior and resource budgets | Build/software-loopback evidence cannot replace platform/backend evidence |
 | Standards gates | Deferred CI Profiles/Property Exchange, selected machine control | Acquire normative documents before dependent protocol implementation |
 | Optional proposals | Scoped cleanup, reconnect, interactive interfaces and audition | Require their own ownership, recovery or product decisions |
 

@@ -6,6 +6,12 @@ Slices 7 and 8 add native check fixtures, CI, distribution checks, and usage
 documentation. Build artifacts remain candidates for validation. Publication
 and a release tag are separate decisions.
 
+Project scope is macOS, Windows and Linux. Qualification is tracked by OS,
+architecture and MIDI backend, as in [qualification.md](qualification.md).
+Raspberry Pi is one possible Linux host, with no required model or separate
+completion gate. Earlier references to a selected Pi were planning errors;
+the correction does not change the recorded test results or artifact provenance.
+
 Additional work beyond the prompt
 
 None.
@@ -492,7 +498,7 @@ strict `-D warnings` fails at that unchanged line. No new Clippy findings appear
 Native values use less Python-tracked memory than the minimal slotted dataclass
 baseline; optimized construction also measured faster on this host. Results do
 not measure Rust heap payload allocations, total resident memory, real stream
-load or Pi performance. No MIDI clients or endpoints were opened.
+load or deployment performance. No MIDI clients or endpoints were opened.
 
 Git staging initially failed because the session denied creation of
 `.git/index.lock`, independently of GitHub authentication. The permission
@@ -603,7 +609,7 @@ This does not compile the Windows MIDI Services backend. That separate gate
 requires the pinned Services SDK headers and C++/WinRT tooling, with build-time
 downloads disabled or pinned. Do not infer native UMP qualification from a
 successful WinMM build. Integration of the dedicated client thread, safe native
-wrapper, transport replacement and Pi cross-build are still unfinished.
+wrapper, transport replacement and Linux qualification are still unfinished.
 
 ## Slice 2: Rust wrapper and macOS integration, 2026-10-14
 
@@ -671,7 +677,7 @@ could leave those structures unwritten. The two output fixes above do not resolv
 this separate path; Windows compilation alone would not certify it.
 
 Remaining slice-2 work includes Python transport replacement, real macOS I/O,
-Windows/Services qualification and the selected Pi cross-build. The completion
+Windows/Services and Linux qualification. The completion
 reminder to submit fork patches upstream remains in plan/meedee.md.
 
 ## Python transport replacement, 2026-10-14
@@ -712,7 +718,7 @@ bundling ALSA, matching libremidi's dynamic loading behavior.
 The authorized, supervised real macOS virtual-port check again returned
 OSStatus 268435459 at client creation, before creating an endpoint. It returned
 promptly; no hardware was selected. Real macOS byte/UMP I/O remains unqualified.
-Windows/Services and the selected Pi cross-build also remain open. The
+Windows/Services and Linux qualification also remain open. The
 release-only trigger, Python 3.11/3.15 matrix and workflow shell syntax were
 verified locally; no release was created and CI has not run.
 
@@ -751,7 +757,7 @@ installed codec tests; its published-release-only trigger, Python 3.11/3.15
 matrix and shell syntax pass local checks. CI has not run.
 
 This slice needs no hardware access and no new native runtime flow was run.
-The real macOS I/O, Windows/Services and selected Pi qualification gaps from
+The real macOS I/O, Windows/Services and Linux qualification gaps from
 slice 2 remain open. Passing pure codec checks does not close those gates.
 
 ## Slice 4 fine controls and RPN/NRPN, 2026-10-14
@@ -800,7 +806,7 @@ tests and shared command vectors. The release-only trigger, endpoint Python
 matrix and workflow shell syntax were verified; no release/CI run was created.
 
 No new hardware/native-service flow was run. Real macOS I/O, Windows/Services,
-physical failure scenarios and selected Pi qualification remain open. Per-client
+physical failure scenarios and Linux qualification remain open. Per-client
 serialization and software fixtures do not prove atomicity against other
 applications, physical delivery, parameter-specific units or native-driver
 liveness. Selection release and exact progress cannot be guaranteed after a
@@ -845,7 +851,7 @@ Release CI includes the installed tuning tests; its trigger remains published
 releases only and its Python endpoints remain 3.11/3.15. No CI run was triggered.
 
 No instrument operation or new native-service flow was run. Windows/Services,
-real macOS I/O, physical failure scenarios and selected Pi qualification remain
+real macOS I/O, physical failure scenarios and Linux qualification remain
 open. Codec/state-machine evidence does not qualify device tuning behavior or
 change the transport's delivery, native-driver or liveness guarantees.
 
@@ -880,7 +886,7 @@ and Python endpoints 3.11/3.15. No release or CI run was triggered.
 
 The approved deferrals are recorded in meedee.md and api.md. No hardware or new
 native-service flow was run. Windows/Services, physical device behavior, real
-macOS I/O and selected Pi qualification remain open. GM2 message completeness,
+macOS I/O and Linux qualification remain open. GM2 message completeness,
 MPE voice/expression engines, quarter-frame locking and instrument timing or
 capability guarantees are not claimed.
 
@@ -952,7 +958,7 @@ still runs only for published releases, testing Python 3.11 and 3.15. No release
 or CI run was triggered.
 
 These are software/unit and packaging checks, not live MIDI 2.0 qualification.
-Windows native validation, the selected Pi build/sysroot and physical UMP device
+Windows/Linux native validation and physical UMP device
 behavior remain open. MDS support is packet-level; translation deliberately
 requires missing source/profile context rather than pretending to implement a
 complete stateful default translator. Typed/timed transport integration and
@@ -1033,7 +1039,7 @@ capture/replay on macOS, but CoreMIDI client creation failed with **268435459**.
 Checked cleanup reported retention rather than releasing potentially active
 resources. No hardware endpoint was selected, and no tuning/reset message was
 sent. Successful native capture/replay, in-process loopback, physical behavior,
-Windows, the selected Pi image/sysroot and live UMP qualification remain open.
+Windows/Linux native backends and live UMP qualification remain open.
 The opt-in fixture is test/native/meedee_typed_loopback.py. Software/fault and
 packaging results do not substitute for those native/platform gates.
 
@@ -1071,7 +1077,7 @@ virtual endpoints, using randomized test MUIDs and zero optional capabilities.
 CoreMIDI rejected creation of the first UMP client with **268435459**. Checked
 cleanup reported retained native resources until process exit; the supervisor
 returned without a hang. No hardware endpoint was selected or sent messages.
-Successful native UMP exchange, Windows/Pi qualification, physical device behavior
+Successful native UMP exchange, Windows/Linux qualification, physical device behavior
 and full MIDI-CI profile/property conformance remain open. This is management
 software coverage, not a claim of complete slice 11 or live MIDI 2.0 qualification.
 
@@ -1085,10 +1091,11 @@ checkout suites. The new management code adds no runtime/build dependencies.
 ## Slice 12 qualification, 2026-10-15
 
 Delivered opt-in qualification tools and a Mac software baseline. This is partial
-qualification, not certification of all targets. The owner has no Pi available,
-selected baseline-first budgeting and authorized bounded synthetic/test-owned
+qualification, not certification of all platforms/backends. No Linux/Windows
+host access was supplied. The owner selected baseline-first budgeting and
+authorized bounded synthetic/test-owned
 virtual workloads on this Mac. The reproducible procedure, workload sizes,
-interpretation limits and Linux/Windows/Pi handoff are in qualification.md.
+interpretation limits and macOS/Windows/Linux procedures are in qualification.md.
 No toolchain/dependency versions, CI triggers or public APIs were changed.
 
 | Capability | Software evidence | Native/platform qualification |
@@ -1099,7 +1106,7 @@ No toolchain/dependency versions, CI triggers or public APIs were changed.
 | Typed capture/playback | Fake transport, cancellation/fault tests; four-recording software workload | Real libremidi loopback still unqualified |
 | MIDI-CI | Implemented management subset, bounded sessions and shared vectors | Profiles/Property Exchange deferred; Process Inquiry engines deferred; no claim of complete CI |
 | macOS arm64 | Source/package tests and sanitized device-free C++ regressions | CoreMIDI client creation fails with 268435459 in this tool environment |
-| Linux x86/arm64, Pi 5 | Procedures and release-only CI configuration | No target run here; the earlier Pi Zero assumption was corrected on 2026-10-23; Pi OS/image/ABI and endpoint selection remain open |
+| Linux x86/arm64 | Procedures and release-only CI configuration | No Linux host run here; native backend/runtime qualification remains open, without a required board |
 | Windows and macOS Intel | Existing release-only CI configuration and target-specific fixtures | No target run here; Windows capability-query risk and SDK integration remain open |
 
 The Rust release example and opt-in Python suite cover dense CC, NRPN expansion,
@@ -1122,7 +1129,7 @@ Unix RSS measurement uses process lifetime high-water marks and includes native
 allocations, but excludes children. Fresh import is measured in a separate
 interpreter. Windows RSS is absent, not zero. OS process inspection is denied
 here, so there are no measured process/thread/handle totals or whole-tree idle
-budgets. Source-build size and performance must not be extrapolated to the Pi.
+budgets. Source-build size and performance must not be extrapolated to other hosts.
 The synthetic recorder burst explicitly exercises queue exhaustion and marks
 captures incomplete; that offered burst rate is not a supported capture rate.
 
@@ -1143,7 +1150,7 @@ The measured release wheel uses CPython 3.11.7 and was built from the source
 distribution. The source base is 5665214 plus the accompanying slice 12
 qualification tools; production library code is unchanged. Runs are short and
 host CPU model, power/thermal state and background load were not controlled.
-These are observations, not throughput promises or Pi budgets. Raw batch samples
+These are observations, not throughput promises or deployment budgets. Raw batch samples
 are preserved in qualification-macos-python311.jsonl and
 qualification-macos-rust.jsonl. Cold first batches are included.
 
@@ -1174,7 +1181,7 @@ baseline above. The installed macOS extension links system C++/CoreMIDI/CoreAudi
 CoreFoundation/iconv/libSystem libraries, with no separate libremidi dylib.
 
 No issue was closed merely by measuring or documenting it. Physical recovery,
-backend safety gaps, full resource profiling, Linux/Windows/Pi runs, native UMP
+backend safety gaps, full resource profiling, Linux/Windows runs, native UMP
 and successful CoreMIDI transport remain open in issues.md. No release or CI run
 was created, and the workflow remains unchanged: published releases only,
 Python 3.11 and 3.15.
@@ -1324,7 +1331,7 @@ weak-reference disappearance, connection close nor a kill request releases it.
 A failed communication-thread setup still counts its created child until exit
 is confirmed. Overflow raises the existing ResourceError before another spawn.
 The limit is independent of native-client/connection counts and of other parent
-processes; it is not a total-memory, CPU or safe-Pi-workload guarantee. CoreMIDI's
+processes; it is not a total-memory, CPU or safe-workload guarantee. CoreMIDI's
 private process-lifetime keeper remains an additional resource in each child.
 Retaining closed connections can retain their reusable clients/workers, so
 applications must release those references when finished.
@@ -1370,7 +1377,7 @@ a passing result by suppressing discovery errors or adding an unexplained retry.
 No implementation changed in this follow-up. JSON records were parsed and
 their case statuses checked; documentation passed `git diff --check`. Python
 suites were not rerun for this documentation/evidence-only update. Windows,
-Linux/Pi, physical fault recovery and workload budgets remain open.
+Linux, physical fault recovery and workload budgets remain open.
 
 ### Standalone reopen follow-up
 
@@ -1608,7 +1615,7 @@ has been removed from `issues.md`.
 
 Account for one additional thread/client and the bounded history in every
 MIDI-using process, including isolated children. These changes do not qualify
-Pi budgets, physical faults, other MIDI libraries' initialization choices, or
+deployment budgets, physical faults, other MIDI libraries' initialization choices, or
 recovery from MIDI-server restart. CI stays published-release-only with Python
 3.11 and 3.15; no Actions run or release was initiated. No dependencies changed.
 
@@ -2135,7 +2142,7 @@ historical evidence rather than being overwritten by this run.
 
 Remaining gates include physical unplug/replug, device/driver/service faults,
 real instrument interoperability, Windows native qualification and disabled
-Windows MIDI Services integration, Linux/Pi target image/ABI/runtime evidence,
+Windows MIDI Services integration, Linux OS/ABI/backend runtime evidence,
 child-inclusive resource budgets and actual Rust 1.87 qualification. Deferred CI
 Profiles/Property Exchange and selected machine control still require normative
 sources and their own implementation decisions. Optional cleanup ownership,
@@ -2186,20 +2193,20 @@ The exact check procedure is in qualification.md. Local ignored logs are:
 - target/qualification/20261021-rust187-tests315.log
 
 This supersedes the earlier open **local** Rust 1.87 gate. It does not qualify
-Windows or Linux/Pi builds, physical hardware, native endpoint behavior under
+Windows or Linux builds, physical hardware, native endpoint behavior under
 this compiler, installed release artifacts or resource budgets. No Python source
 changed, full Python suites were not repeated, no MIDI endpoint was opened and
-no release or CI workflow was triggered. Pi image/access, provisioning, MIDI
-route and workload choices remain to be agreed before target qualification.
+no release or CI workflow was triggered. Test-host access, provisioning, MIDI
+route and workload choices remain to be agreed before native platform qualification.
 
-## Local readiness review and Pi 5 handoff, 2026-10-23
+## Local readiness review and qualification preparation, 2026-10-23
 
-The owner authorized four local slices: correct target/status documentation,
+The owner authorized four local slices: correct scope/status documentation,
 review archive v1, verify Rust 1.87 release artifacts on the available Mac and
-prepare Pi qualification without connecting the board. The target is **Pi 5**;
-the earlier Pi Zero selection was an incorrect planning assumption. Its OS,
-ABI, RAM/storage, access and equipment remain unknown. The owner may use the
-board for another project. No Pi connection or provisioning was attempted.
+prepare later qualification. The earlier preparation incorrectly made a Pi 5
+a project target. The owner clarified that meedee targets macOS, Windows and
+Linux; a Pi is merely one possible Linux host. No host connection or provisioning
+was attempted. The correction below supersedes that hardware-specific plan.
 
 The archive review compared the documented fields with the encoder/decoder and
 Python bridge, plus existing fault/recovery tests. Independent binary examples
@@ -2246,7 +2253,8 @@ Rust/Cargo 1.87.0 and maturin 1.15.0:
   and CoreMIDI/CoreAudio/CoreFoundation frameworks beyond the extension's own ID;
   no Homebrew dynamic library path or libpython link is present.
 
-The build uses base 7cb8722 with this batch's library/tests/README and Pi procedure.
+The build uses base 7cb8722 with this batch's library/tests/README and the then
+Pi-specific procedure, before the platform-scope correction.
 This evidence entry is appended after the artifact tests. Package code and tested
 fixtures did not change afterward. Local artifacts are:
 
@@ -2260,11 +2268,26 @@ Build, source/installed test logs, toolchain details, installed locations,
 dynamic-library reports and checksums remain under ignored
 target/qualification/20261023-release/. No release or CI workflow was triggered.
 No new native MIDI workload ran; the device-free archive changes do not qualify
-physical MIDI, faults, Windows/Linux/Pi execution or child-inclusive resources.
+physical MIDI, faults, Windows/Linux execution or child-inclusive resources.
 
-The staged pi-qualification.md handoff provides read-only inventory, prerequisites,
+The staged [Linux procedure](linux-qualification.md) now provides read-only inventory, prerequisites,
 separate environments, one-job native builds, bounded device-free checks, the
 supervised MIDI 1 selection and an evidence/acceptance checklist. Its shell blocks
-pass bash -n only; they have not executed on Linux/Pi. Missing prerequisites,
+pass bash -n only; they have not executed on Linux. Missing prerequisites,
 installations, virtual endpoints and named physical equipment each retain their
-explicit approval gate. The board may remain occupied until that later session.
+explicit approval gate. No particular Linux host needs to be reserved.
+
+## Cross-platform scope correction, 2026-10-23
+
+The owner clarified that the project targets macOS, Windows and Linux. A
+Raspberry Pi is included as a Linux system, not a special project target,
+resource budget, cross-build requirement or release milestone. Pi availability
+does not block project work. Architecture, API, feature, issue and qualification
+documents now use platform/backend and deployment-specific claims throughout.
+The hardware-specific handoff is renamed linux-qualification.md and applies to
+an available Linux host. Qualification.md tracks CoreMIDI, WinMM/disabled Windows
+MIDI Services and ALSA variants separately.
+
+This correction changes Markdown only. Existing test counts, binary artifacts
+and their checksums above remain historical evidence; none were rebuilt or
+rerun, and no runtime, host connection, dependency or CI change was made.

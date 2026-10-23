@@ -1,7 +1,7 @@
 # meedee
 
-A Rust MIDI toolkit with matching Python bindings, using vendored
-[libremidi](https://github.com/celtera/libremidi) for native transport. Python
+A Rust MIDI toolkit with matching Python bindings for macOS, Windows and Linux,
+using vendored [libremidi](https://github.com/celtera/libremidi) for native transport. Python
 imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
 `meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`,
 `meedee.timecode`, `meedee.ump`, `meedee.smf`, `meedee.syx`, `meedee.clip` and
@@ -613,7 +613,7 @@ pair uses two. Starts in progress and retiring children count until process exit
 is confirmed. At the limit construction raises ResourceError before starting
 another child. Startup failures release their reservation. These counts are
 separate from native-client/connection limits and are not a machine-wide memory
-budget or a guarantee that 32 workers fit on a Pi.
+budget or a guarantee that 32 workers fit on any particular host.
 Closing a connection preserves its reusable client and worker. Release unneeded
 clients and references from their connections when finished; asynchronous worker
 cleanup may keep a slot occupied briefly afterward.
@@ -677,7 +677,7 @@ loopbacks pass in Rust and both Python modes, along with typed capture/replay/
 cancellation and a CoreMIDI UMP SysEx7 discovery/reply exchange. These passed in
 the owner's Terminal; a direct Apple API probe isolates the agent's first-call
 failure to its execution context. Physical hardware, fault recovery, Windows
-and Pi qualification remain open. See [validation](plan/validation.md).
+and Linux qualification remain open. See [validation](plan/validation.md).
 
 CoreMIDI retains one additional native client and notification-loop thread per
 MIDI-using process until exit, avoiding Apple's last-client disposal/reopen hazard
@@ -698,12 +698,13 @@ Configured jobs are not evidence of a passing release run.
 
 The opt-in [qualification procedure](plan/qualification.md) provides bounded
 synthetic workloads and supervised test-owned virtual-port measurements in Rust
-and Python. Mac software baselines do not establish Pi performance, physical
-device behavior or live MIDI 2.0 support. See the
+and Python. Mac software baselines do not establish Windows/Linux performance,
+physical device behavior or live MIDI 2.0 support on other backends. See the
 [feature matrix and evidence](plan/validation.md).
-The [Pi 5 handoff](plan/pi-qualification.md) separates inventory, device-free
-builds, authorized software loopback and later physical qualification. Its OS
-image and configuration remain unselected; no Pi qualification has run.
+meedee targets macOS, Windows and Linux. Raspberry Pi systems are ordinary Linux
+hosts, with no separate project milestone or required model. The
+[Linux qualification procedure](plan/linux-qualification.md) separates host
+inventory, device-free builds, authorized software loopback and physical tests.
 
 ```sh
 uv run --frozen pytest
