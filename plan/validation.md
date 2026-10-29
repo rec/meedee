@@ -2291,3 +2291,20 @@ MIDI Services and ALSA variants separately.
 This correction changes Markdown only. Existing test counts, binary artifacts
 and their checksums above remain historical evidence; none were rebuilt or
 rerun, and no runtime, host connection, dependency or CI change was made.
+
+## Local Rust compatibility policy, 2026-10-29
+
+The owner directed that older Rust versions are never tested locally for
+compatibility. Local development, tests, wheel builds and native qualification
+use the current installed Rust compiler. Release-only CI retains its existing
+Rust 1.87 setup and performs the minimum-version check when a release is published.
+While the project is in stealth, a failure there can be addressed in a follow-up
+release, including updating the declared minimum if needed. This does not
+authorize a release or change the current manifests, lockfiles or CI configuration.
+
+The earlier local Rust 1.87 runs and artifact results above remain historical
+evidence. Their compiler installation, download/extraction and separate build
+outputs under target/ are not required local setup and need not be recreated.
+No target/ files were deleted as part of recording this policy; preservation
+and disposal are still being reviewed with the owner. Only documentation changed,
+so no compiler, application or test run was performed for this update.

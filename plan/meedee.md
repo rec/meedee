@@ -626,6 +626,11 @@ Python's supported-version floor remains 3.11 unless changed explicitly. Release
 CI continues to run only on published releases and tests oldest/newest versions,
 currently 3.11 and 3.15, across macOS, Windows and Linux. Native backend/UMP
 qualification and deployment-specific resource budgets remain distinct from CI.
+Local Rust work uses the current installed compiler; older-toolchain compatibility
+is tested only in release CI, not by maintaining local compiler installations.
+While in stealth, compatibility failures found on release may be resolved in a
+follow-up release, including raising the declared minimum when appropriate.
+Keep version declarations unchanged until an actual release/version decision.
 No toolchain or dependency changes are made by this planning request.
 
 ## 15. Proposed slices and completion gates

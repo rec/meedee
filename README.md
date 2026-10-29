@@ -696,6 +696,14 @@ and 3.15 on Linux, macOS arm64/Intel and Windows. It includes native regression
 checks, Rust/Python checks, source/wheel builds and installed-package tests.
 Configured jobs are not evidence of a passing release run.
 
+Local Rust development and tests use the current installed toolchain. Do not
+install or test older Rust versions locally for compatibility; release CI owns
+the minimum-version check. While the project is in stealth, compatibility
+failures found there can be addressed in a follow-up release, including updating
+the declared minimum when necessary. Existing version declarations and the
+release-only CI configuration remain in effect. No persistent compiler
+installation under the disposable target/ directory is required.
+
 The opt-in [qualification procedure](plan/qualification.md) provides bounded
 synthetic workloads and supervised test-owned virtual-port measurements in Rust
 and Python. Mac software baselines do not establish Windows/Linux performance,
