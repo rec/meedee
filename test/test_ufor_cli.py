@@ -1,13 +1,10 @@
 """Optional offline tuning sources, diagnostics and exclusive bulk SYX export."""
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
-if sys.version_info < (3, 13):
-    pytest.skip("uFor workflow requires Python 3.13+", allow_module_level=True)
 pytest.importorskip("ufor", reason="install meedee[ufor]")
 pytest.importorskip("tyro", reason="install meedee[cli]")
 

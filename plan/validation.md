@@ -8,6 +8,8 @@ and a release tag are separate decisions.
 
 Project scope is macOS, Windows and Linux. Qualification is tracked by OS,
 architecture and MIDI backend, as in [qualification.md](qualification.md).
+Python 3.13 is the only supported minor version as of 2026-10-29; results for
+other interpreters below remain historical evidence, not the current CI matrix.
 Raspberry Pi is one possible Linux host, with no required model or separate
 completion gate. Earlier references to a selected Pi were planning errors;
 the correction does not change the recorded test results or artifact provenance.
@@ -2343,3 +2345,31 @@ No Python environments remain under target/. Qualification instructions no
 longer depend on the removed api-python315 environment. Existing historical
 results remain recorded; no compiler, application or test run was needed, and
 no source, dependency, manifest or CI configuration changed.
+
+## Python 3.13 standardization, 2026-10-29
+
+The owner selected Python 3.13 only to align the projects. Package metadata now
+requires ==3.13.*, .python-version pins 3.13, and Ruff/ty target that version.
+Release-only CI now tests 3.13 on its existing OS matrix with CLI and uFor extras.
+Rust minimum-version checks remain in release CI; no older Rust compiler ran
+locally. The package version and native backend configuration are unchanged.
+
+uv regenerated the lock for the new Python range, retaining the existing package
+versions and Git revisions while removing other-interpreter resolution branches
+and wheels. The main .venv was recreated with CPython 3.13.12 and all 27 packages
+reinstalled, including development tools and both extras. No additional target/
+Python environment was created. Lock and installed-dependency checks pass.
+
+The dependency/configuration commit passes 429 source tests with two obsolete
+pre-3.13 tests skipped. The follow-up removes the now-unreachable uFor interpreter
+guards and those tests; all **429 tests pass without skips** on Python 3.13.
+The required pyupgrade pass also removes pre-3.13 guards in the optional module
+and its tests. Ruff, formatting, ty, pyupgrade and whitespace checks pass.
+
+A fresh optimized macOS arm64 CPython 3.13 wheel builds from the source
+distribution with the current system Rust compiler. Both distribution checks
+pass against these fresh artifacts, including Requires-Python ==3.13.* and the
+existing optional-dependency/typing/license inventory. Checks use a temporary
+directory outside the checkout so old dist/ artifacts are not treated as current
+Python 3.13 outputs. No installed-wheel environment, hardware flow, release or
+CI run was started. Historical artifact hashes and test records above are unchanged.

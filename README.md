@@ -125,7 +125,7 @@ users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
 ## Offline uFor tuning
 
-Python 3.13+ users with `meedee[cli,ufor]` can run `meedee ufor-preview` and
+Python 3.13 users with `meedee[cli,ufor]` can run `meedee ufor-preview` and
 `meedee ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
 root note/frequency. Export creates an ordinary or banked bulk `.syx` file without
 overwriting; sending remains a separate `transfer-send` action. See the
@@ -371,7 +371,7 @@ for units, names, checksum behavior and request tracking.
 
 ## Optional uFor tuning bridge
 
-On Python 3.13+, install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
+Install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
 `meedee.ufor_tuning.preview(source, notes=[...])` resolves an existing uFor
 `Tuning`, retaining exact frequencies where available, encoded pitches and signed
 MTS rounding errors. Finite-source gaps and evaluation/range failures stay
@@ -380,8 +380,8 @@ device/program/bank and real-time settings. They open no ports and send nothing.
 Unmapped keys require deliberate `preserve_unmapped=True`; invalid pitches always
 block generation. See the [bridge contract](plan/ufor-tuning.md).
 
-Ordinary meedee installs retain Python 3.11 support and no runtime dependencies.
-The optional module explains its Python requirement when imported on 3.11/3.12.
+meedee supports Python 3.13 only, including patch releases. Ordinary installs
+have no runtime dependencies; uFor remains an optional extra.
 
 ## General MIDI and profile helpers
 
@@ -661,7 +661,10 @@ Python, subinterpreters and forking with imported/live MIDI state are unsupporte
 private `meedee._core` extension. Rust use requires no Python. Both languages
 use the same libremidi implementation; midir has been removed.
 
-Source builds require Rust 1.87+, CMake 3.22+, a C++20 toolchain and CPython 3.11+.
+Source builds require Rust 1.87+, CMake 3.22+, a C++20 toolchain and CPython 3.13.
+Both the package metadata and .python-version select Python 3.13; newer minor
+versions are not implicitly supported. To recreate the development environment
+with all optional dependencies, run `uv sync --locked --all-extras`.
 Native libremidi sources are pinned and statically linked with no production
 build-time download. macOS requires Command Line Tools and macOS 11+; Windows
 requires the MSVC C++ tools. Linux requires ALSA development headers and
@@ -691,8 +694,8 @@ not initialize this runtime. This is not recovery from a crashed/restarted MIDI 
 default isolation permits replacing the affected child, while in-process use
 may require restarting the application. Observer disposal failures remain open.
 
-Release CI remains triggered only by a published release, testing Python 3.11
-and 3.15 on Linux, macOS arm64/Intel and Windows. It includes native regression
+Release CI remains triggered only by a published release, testing Python 3.13
+on Linux, macOS arm64/Intel and Windows. It includes native regression
 checks, Rust/Python checks, source/wheel builds and installed-package tests.
 Configured jobs are not evidence of a passing release run.
 

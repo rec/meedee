@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 from enum import StrEnum, auto
 from math import isfinite
 
-if sys.version_info < (3, 13):
-    raise ImportError("meedee.ufor_tuning requires Python 3.13 or newer")
-else:
-    from ufor.base import Model
-    from ufor.number import PitchNumber
-    from ufor.tuning import FrequencyTable, IntervalPattern, RatioTable, Tuning
+from ufor.base import Model
+from ufor.number import PitchNumber
+from ufor.tuning import FrequencyTable, IntervalPattern, RatioTable, Tuning
 
 from . import codecs, messages, transfer, tuning
 

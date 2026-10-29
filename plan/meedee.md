@@ -622,16 +622,18 @@ Publish workload sizes and agree deployment budgets from measurements on
 relevant hosts.
 Cross-compilation success is not proof of runtime performance or ALSA permissions.
 
-Python's supported-version floor remains 3.11 unless changed explicitly. Release
-CI continues to run only on published releases and tests oldest/newest versions,
-currently 3.11 and 3.15, across macOS, Windows and Linux. Native backend/UMP
+Python 3.13 is the only supported minor version, selected explicitly on
+2026-10-29 in package metadata, the uv pin and development tools. Release CI
+continues to run only on published releases and tests Python 3.13 across
+macOS, Windows and Linux. Native backend/UMP
 qualification and deployment-specific resource budgets remain distinct from CI.
 Local Rust work uses the current installed compiler; older-toolchain compatibility
 is tested only in release CI, not by maintaining local compiler installations.
 While in stealth, compatibility failures found on release may be resolved in a
 follow-up release, including raising the declared minimum when appropriate.
 Keep version declarations unchanged until an actual release/version decision.
-No toolchain or dependency changes are made by this planning request.
+The Python version selection leaves the Rust minimum and native backend
+configuration unchanged.
 
 ## 15. Proposed slices and completion gates
 
@@ -667,7 +669,7 @@ and wire evidence before stateful interpretation or live writes.
    transport path.
    Retain applicable lifecycle checks and revalidate callback/clock assumptions.
    Gate: Rust use requires no Python; FFI ownership, shutdown, byte/UMP capability
-   detection, Python 3.11/3.15 builds, and platform/backend checks pass.
+   detection, Python 3.13 builds, and platform/backend checks pass.
 3. **MIDI 1.0 values and byte codec (implemented).** Implement base message families, validated
    encoding, incremental parsing, running status, and bounded SysEx. Gate:
    immutable Rust/Python values, exact wire fixtures, malformed-input recovery.

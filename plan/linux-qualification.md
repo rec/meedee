@@ -22,7 +22,7 @@ Before starting, obtain:
    build on that image first. This procedure does not select an OS release,
    reimage storage, cross-build sysroot, upgrade tools or modify unrelated projects.
 3. Permission for a separate checkout, build/test storage and missing prerequisites.
-   Identify missing tools before proposing installations. Python 3.11/3.15
+   Identify missing tools before proposing installations. Python 3.13
    availability is a gate, not permission to download interpreters automatically.
 4. A test scope: device-free baseline first, then separately authorized test-owned
    ALSA sequencer endpoints. Physical interface/cable tests require exact named
@@ -78,7 +78,7 @@ assumed here.
 
 Only after prerequisites, disk space and build activity are approved, use one
 build job initially. Do not reuse unrelated projects' environments. These
-commands require an already available Python 3.11 and populated build inputs;
+commands require an already available Python 3.13 and populated build inputs;
 missing inputs stop the run for an explicit provisioning decision. `--frozen`
 preserves dependency selections but may still fetch missing locked packages.
 Use the current installed Rust compiler. Do not install or test an older compiler
@@ -91,8 +91,8 @@ export CARGO_HOME="$PWD/target/cargo-home"
 export CARGO_TARGET_DIR="$PWD/target"
 export CARGO_BUILD_JOBS=1
 export UV_PYTHON_DOWNLOADS=never
-export UV_PROJECT_ENVIRONMENT="$qualification_run/python311"
-timeout --kill-after=10s 30m uv sync --frozen --python 3.11 --extra cli
+export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+timeout --kill-after=10s 30m uv sync --frozen --python 3.13 --all-extras
 export PYO3_PYTHON="$UV_PROJECT_ENVIRONMENT/bin/python"
 timeout --kill-after=10s 5m cargo fmt --all --check
 timeout --kill-after=10s 30m cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -100,7 +100,7 @@ timeout --kill-after=10s 30m cargo test --locked --workspace -- --test-threads=1
 timeout --kill-after=10s 30m uv run --frozen --no-sync pytest -q
 timeout --kill-after=10s 30m cargo build --locked --release -p meedee --examples
 timeout --kill-after=10s 5m target/release/examples/qualification > "$qualification_run/rust.jsonl"
-timeout --kill-after=10s 5m uv run --frozen --no-sync pytest -q -s test/qualification/measure.py -k 'not native' --junitxml="$qualification_run/python311.xml" > "$qualification_run/python311.log" 2>&1
+timeout --kill-after=10s 5m uv run --frozen --no-sync pytest -q -s test/qualification/measure.py -k 'not native' --junitxml="$qualification_run/python313.xml" > "$qualification_run/python313.log" 2>&1
 ```
 
 Capture build/test stdout, stderr and each exit code in the evidence directory.
@@ -110,9 +110,8 @@ failure threshold or permission to change system settings. Record cold build
 costs separately from steady workloads. Do not compare a debug Python extension
 with optimized Rust as a language-overhead benchmark.
 
-Repeat supported-endpoint checks with an independent Python 3.15 environment
-only when that interpreter is available and approved. The optional uFor workflow
-requires Python 3.13+; test it on 3.15 with the frozen optional dependencies.
+Only Python 3.13 is supported; use the main project environment, including the
+frozen optional dependencies for uFor checks. Do not create a version matrix.
 Build wheels from the source distribution and run installed-package checks
 outside the checkout using the release workflow, adapting the native Linux
 wheel tag to the actual image. A locally linked wheel is not automatically a
