@@ -105,7 +105,7 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             assert "meedee=meedee.cli:main" in entry_points.replace(" ", "")
             assert metadata["Name"] == "meedee"
             assert metadata["Version"] == version
-            assert metadata["Requires-Python"] == ">=3.11"
+            assert metadata["Requires-Python"] == "==3.13.*"
             requirements = [
                 Requirement(r) for r in metadata.get_all("Requires-Dist", [])
             ]

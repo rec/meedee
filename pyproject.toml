@@ -7,7 +7,7 @@ name = "meedee"
 dynamic = ["version"]
 description = "Python bindings for the meedee Rust MIDI toolkit"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = "==3.13.*"
 dependencies = []
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "third_party/libremidi/LICENSE.md"]
@@ -16,11 +16,7 @@ classifiers = [
     "Programming Language :: Rust",
     "Typing :: Typed",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-    "Programming Language :: Python :: 3.15",
 ]
 
 [project.optional-dependencies]
@@ -75,7 +71,7 @@ cache-keys = [
 testpaths = ["test"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py313"
 
 [tool.ty.environment]
-python-version = "3.11"
+python-version = "3.13"
