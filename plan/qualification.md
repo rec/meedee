@@ -176,16 +176,13 @@ virtual inputs; no device state, acknowledgement protocol or interoperability is
 inferred. One standard-library worker serves the peer, and the outer
 supervisor remains the deadline for a stalled native call or worker teardown.
 
-The latest available-Mac matrix uses these standalone commands from the project
-root. The second interpreter is the existing isolated Python 3.15 environment;
-the Rust example is interpreter-independent and is therefore run only once.
-JUnit captures per-case stdout, stderr, process-resource observations and native
-child output; artifacts remain under ignored target/qualification/.
-
-```bash
-uv run --frozen pytest -q test/qualification/measure.py -k native --junitxml=target/qualification/20261021-native311.xml -o junit_logging=all
-uv run --frozen --no-sync target/api-python315/bin/python -m pytest -q test/qualification/measure.py -k 'native and not rust' --junitxml=target/qualification/20261021-native315.xml -o junit_logging=all
-```
+The recorded 2026-10-21 available-Mac matrix used separate Python 3.11 and 3.15
+environments, with the interpreter-independent Rust example run only once.
+Those disposable environments were removed on 2026-10-29; they are not local
+prerequisites. Use the supervised command above with the selected development
+environment for future authorized native checks. JUnit captures per-case stdout,
+stderr, process-resource observations and native child output; the historical
+native results remain under ignored target/qualification/ and in validation.md.
 
 Names are unique to each run, and discovery must match exactly one test-created
 virtual destination. No pre-existing destination is selected. The latency

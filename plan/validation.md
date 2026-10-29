@@ -2328,3 +2328,18 @@ Normal target/debug/ and target/release/, the main .venv, other qualification
 material and dist/ artifacts were left intact. Historical results in this file
 remain; no old compiler is needed locally. No application or test run was required
 for this cleanup, and no manifest, dependency or CI configuration changed.
+
+## Extra Python environments and version-specific caches removed, 2026-10-29
+
+The owner authorized removing the remaining temporary Python environments and
+old version-specific Rust build caches. Removed all 13 target/ environments:
+api-python315, python-3.12/3.13/3.14, ufor-py313/py315, inspection-wheel311/315,
+ufor-wheel311/315, meedee-wheel-env, qualification-wheel and wheel-check. Also
+removed the separate check-3.12, check-3.13 and check-3.14 Rust build trees.
+Their combined directory footprint before removal was approximately 1.15 GiB.
+
+The main .venv and normal target/debug/ and target/release/ remain intact.
+No Python environments remain under target/. Qualification instructions no
+longer depend on the removed api-python315 environment. Existing historical
+results remain recorded; no compiler, application or test run was needed, and
+no source, dependency, manifest or CI configuration changed.
