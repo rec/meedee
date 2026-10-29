@@ -8,17 +8,16 @@ composes these existing models and codecs as described below.
 
 ## Installation and compatibility
 
-The bridge requires Python 3.13+ and the `ufor` extra. In this checkout:
+The bridge requires the `ufor` extra on the project's Python 3.13. In this checkout:
 
 ```bash
 uv sync --extra ufor --python 3.13
 ```
 
 The uFor and reccy source declarations track HTTPS/main; frozen uv commands use
-the recorded lockfile revisions. The ordinary meedee installation still supports
-Python 3.11+ without runtime dependencies. The extra's dependency marker applies
-only on Python 3.13+; on 3.11/3.12 importing the bridge raises a clear ImportError.
-Installing the extra on an older interpreter does not make uFor available.
+the recorded lockfile revisions. meedee supports only Python 3.13; the ordinary
+installation has no runtime dependencies. uFor remains optional and is not
+imported by ordinary MIDI workflows.
 
 No optional module is imported or re-exported by `meedee.__init__`. Existing
 message, MTS and transport APIs retain their current dependencies and behavior.
@@ -149,10 +148,9 @@ coverage, evaluation failures, guarded NoChange, both bulk formats, both note-ch
 formats, 128-key splitting and native byte-codec round trips. No ports, MIDI sends
 or audio playback are involved.
 
-Python 3.11 release checks exercise the dependency-free core and the unsupported-
-version explanation. Python 3.15 checks additionally install the optional extra,
-run the bridge tests and verify the installed wheel. The workflow remains
-release-only and retains the oldest/newest Python matrix.
+Release checks use Python 3.13 with the optional extra, run the bridge tests and
+verify the installed wheel. The workflow remains release-only; other Python
+minor versions are outside the package's declared support range.
 
 ## Additional work beyond the prompt
 
@@ -174,10 +172,9 @@ makes no capability, delivery or tuning-program-selection claim.
 
 ## Offline file workflow
 
-On Python 3.13+, install the existing extras with `meedee[cli,ufor]`. No new
-mandatory dependency is introduced. Other commands continue to work on Python
-3.11+ without importing uFor. Selecting these commands on an older interpreter
-returns an explicit Python requirement error before reading the source.
+Install the existing extras with `meedee[cli,ufor]`. No new mandatory dependency
+is introduced. Other commands continue to work without importing uFor. All
+commands use the project's Python 3.13 requirement.
 
 ```bash
 meedee ufor-preview tuning.json --source-format tuning-json

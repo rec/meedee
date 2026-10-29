@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import sys
-
 from . import syx
 from ._cli import UforExport, UforPreview, emit
 
 
 def run_ufor(config: UforPreview) -> int:
-    if sys.version_info < (3, 13):
-        raise ValueError(
-            "uFor tuning commands require Python 3.13+ and meedee[cli,ufor]"
-        )
     try:
         from ufor import scala
         from ufor.tuning import Tuning

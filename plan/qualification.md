@@ -30,7 +30,8 @@ Native results remain software-loopback evidence, not hardware qualification.
 The tools deliberately have no new runtime dependencies or command parser. They
 use the existing pytest runner and standalone Rust examples. Default pytest does
 not collect the measurement files. CI remains published-release-only with Python
-3.11/3.15; these opt-in native workloads are not added to unattended CI.
+3.13; these opt-in native workloads are not added to unattended CI. Older
+interpreter results below are historical evidence, not the current support policy.
 
 ## Rust toolchain policy, 2026-10-29
 
@@ -68,7 +69,7 @@ settings implicitly.
 mkdir -p target/qualification
 export CARGO_HOME="$PWD/target/cargo-home"
 export CARGO_BUILD_JOBS=1
-uv sync --frozen --python 3.11
+uv sync --frozen --python 3.13 --all-extras
 export PYO3_PYTHON="$PWD/.venv/bin/python"
 # On Windows use: export PYO3_PYTHON="$PWD/.venv/Scripts/python.exe"
 git rev-parse HEAD > target/qualification/revision.txt
@@ -82,10 +83,9 @@ uv run --frozen pytest -q -s test/qualification/measure.py -k 'not native' \
   --junitxml=target/qualification/python.xml > target/qualification/python.log 2>&1
 ```
 
-Repeat the Python measurements with 3.15 in a separate environment, using
-`UV_PROJECT_ENVIRONMENT=target/qualification-python315` and
-`uv run --frozen --python 3.15 ...`. Record which interpreter/build each output
-belongs to. First-run costs are retained; the seven batch samples are not a
+Use the project's Python 3.13 environment and record its exact patch version
+and build with each output. No local interpreter matrix is required. First-run
+costs are retained; the seven batch samples are not a
 claim of statistical significance or comparable warm/cold CPU state. Repeat on
 an otherwise idle target before setting a budget. Do not compare debug and
 release builds as language overhead.

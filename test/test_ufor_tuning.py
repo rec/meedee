@@ -1,12 +1,8 @@
 """Optional source resolution and MTS generation, with no MIDI transport."""
 
-import sys
 from fractions import Fraction
 
 import pytest
-
-if sys.version_info < (3, 13):
-    pytest.skip("uFor integration requires Python 3.13+", allow_module_level=True)
 
 pytest.importorskip("ufor", reason="install meedee[ufor] for tuning integration tests")
 

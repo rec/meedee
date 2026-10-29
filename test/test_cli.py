@@ -1,7 +1,6 @@
 """Exercise CLI parsing and file operations without launching a MIDI runtime."""
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -143,24 +142,6 @@ def test_cli_identity_maps_and_quality_verdict(
         )
     assert result.value.code == 1
     assert json.loads(capsys.readouterr().out)["quality_problems"]["lost_events"] == 1
-
-
-@pytest.mark.skipif(sys.version_info >= (3, 13), reason="checks unsupported Python")
-def test_ufor_command_explains_python_requirement_before_reading_source(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as result:
-        cli.main(
-            [
-                "ufor-preview",
-                str(tmp_path / "absent.json"),
-                "--source-format",
-                "tuning-json",
-            ]
-        )
-    assert result.value.code == 2
-    assert "Python 3.13+" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

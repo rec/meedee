@@ -1,5 +1,4 @@
 import sys
-from importlib import import_module
 from importlib.metadata import version
 from importlib.resources import files
 from pathlib import Path
@@ -74,11 +73,3 @@ def test_client_rejects_positional_arguments_before_native_initialization(
 ) -> None:
     with pytest.raises(TypeError):
         client(37)  # ty: ignore[too-many-positional-arguments]
-
-
-@pytest.mark.skipif(
-    sys.version_info >= (3, 13), reason="bridge is supported on Python 3.13+"
-)
-def test_optional_ufor_bridge_explains_its_python_requirement() -> None:
-    with pytest.raises(ImportError, match="Python 3.13"):
-        import_module("meedee.ufor_tuning")
