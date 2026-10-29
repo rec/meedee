@@ -2373,3 +2373,23 @@ existing optional-dependency/typing/license inventory. Checks use a temporary
 directory outside the checkout so old dist/ artifacts are not treated as current
 Python 3.13 outputs. No installed-wheel environment, hardware flow, release or
 CI run was started. Historical artifact hashes and test records above are unchanged.
+
+## Scratch libremidi source checkout preserved and removed, 2026-10-29
+
+The owner requested keeping target/specifications/ and checking source work was
+committed before deleting the scratch checkout. target/libremidi-fork/ had no
+uncommitted tracked changes; its only untracked files were generated property-test
+build trees. Commit 46853bd6b0e53e25d918076fca9752552fe49414 (Read CoreMIDI names
+with checked UTF-8 conversion) was committed locally but absent from published
+branch history. A revised implementation already exists as bf6f3cb in the fork.
+
+Before removal, the exact local commit was pushed to rec/libremidi branch
+codex/archive-coremidi-properties-46853bd and its remote SHA verified with
+git ls-remote. No new source commit, merge, rebase or branch switch was needed.
+The scratch checkout had no linked worktrees and was then deleted, removing
+approximately 429 MiB including its generated build trees.
+
+target/specifications/ remains intact. The main /Users/tom/code/libremidi
+checkout, target/libremidi-teardown/, other audit material, normal debug/release
+outputs and vendored source were left unchanged. No local application or test
+run was required for this source-preservation and cleanup operation.
