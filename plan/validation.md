@@ -2185,12 +2185,16 @@ binding tests, and doctests complete successfully. Five cases remain deliberatel
 ignored in each run: two live CoreMIDI endpoint tests and three interpreter
 finalization tests requiring a standalone process. These were not run here.
 
-The exact check procedure is in qualification.md. Local ignored logs are:
+Local ignored logs were originally recorded as:
 
 - target/qualification/20261021-rust187-clippy311.log
 - target/qualification/20261021-rust187-tests311.log
 - target/qualification/20261021-rust187-clippy315.log
 - target/qualification/20261021-rust187-tests315.log
+
+These logs and the temporary compiler/build directories were removed on
+2026-10-29 after minimum-version checks were delegated to release CI. The
+results above remain the historical record; this is not current local setup.
 
 This supersedes the earlier open **local** Rust 1.87 gate. It does not qualify
 Windows or Linux builds, physical hardware, native endpoint behavior under
@@ -2265,8 +2269,10 @@ fixtures did not change afterward. Local artifacts are:
 | meedee-0.2.0.tar.gz | 883314 | 649f1a3120010d247bf3d8956e2ff0aaa62da65b99158c8489d5e26795a27bd5 |
 
 Build, source/installed test logs, toolchain details, installed locations,
-dynamic-library reports and checksums remain under ignored
-target/qualification/20261023-release/. No release or CI workflow was triggered.
+dynamic-library reports and checksums were originally retained under ignored
+target/qualification/20261023-release/. That one-off check directory was removed
+on 2026-10-29; the results and artifact hashes above remain the historical record.
+No release or CI workflow was triggered.
 No new native MIDI workload ran; the device-free archive changes do not qualify
 physical MIDI, faults, Windows/Linux execution or child-inclusive resources.
 
@@ -2308,3 +2314,17 @@ outputs under target/ are not required local setup and need not be recreated.
 No target/ files were deleted as part of recording this policy; preservation
 and disposal are still being reviewed with the owner. Only documentation changed,
 so no compiler, application or test run was performed for this update.
+
+## Retired local Rust 1.87 setup removed, 2026-10-29
+
+The owner authorized removing the old-compiler qualification material while
+keeping normal debug builds. Removed target/qualification/rust187/,
+rust187-download/, rust187-build/ and 20261023-release/, including the temporary
+compiler, installer/extraction, dedicated build outputs, one-off wheel-check
+environments and their local reports. The four 20261021-rust187 log files were
+also removed. The directories accounted for approximately 3.8 GiB before removal.
+
+Normal target/debug/ and target/release/, the main .venv, other qualification
+material and dist/ artifacts were left intact. Historical results in this file
+remain; no old compiler is needed locally. No application or test run was required
+for this cleanup, and no manifest, dependency or CI configuration changed.
