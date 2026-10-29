@@ -81,8 +81,9 @@ build job initially. Do not reuse unrelated projects' environments. These
 commands require an already available Python 3.11 and populated build inputs;
 missing inputs stop the run for an explicit provisioning decision. `--frozen`
 preserves dependency selections but may still fetch missing locked packages.
-Use Rust 1.87.0 for the minimum-version checks; if it is unavailable, agree its
-installation rather than treating a newer compiler as minimum-version evidence.
+Use the current installed Rust compiler. Do not install or test an older compiler
+locally; minimum-version compatibility is checked by release CI. Record the
+compiler used for Linux runtime results without making minimum-version claims.
 
 ```bash
 set -e

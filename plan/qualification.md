@@ -32,6 +32,21 @@ use the existing pytest runner and standalone Rust examples. Default pytest does
 not collect the measurement files. CI remains published-release-only with Python
 3.11/3.15; these opt-in native workloads are not added to unattended CI.
 
+## Rust toolchain policy, 2026-10-29
+
+Use the current installed Rust toolchain for local development, tests and native
+qualification. Do not install or test older Rust versions locally to verify
+compatibility. Release CI installs the declared minimum toolchain and owns that
+check. This applies to local wheel builds too; do not reproduce the release CI
+compiler matrix locally.
+
+While the project remains in stealth, a compatibility failure found by release
+CI may be addressed in a follow-up release, including raising the declared
+minimum when needed. This policy does not itself change version declarations,
+CI triggers or authorize publication. Previous local Rust 1.87 results are
+historical evidence, not a recurring local gate. Treat target/ as disposable;
+local setup must not depend on retaining a compiler installation there.
+
 ## Reproduce a software baseline
 
 Start from a complete checkout. Record its commit, dirty status and the build
@@ -272,35 +287,20 @@ the release workflow without publishing a release. Include the vendored device-f
 native regression targets and sanitizer settings exactly as configured there.
 Record compiler, OS/architecture, Python endpoint versions, test totals, wheel
 from-sdist result, license/provenance content, external dynamic dependencies and
-all skips. Keep Windows SDK integration, WinMM discovery test qualification and Rust
-1.87 validation distinct from compilation with a newer compiler. The available
-Mac now passes the Rust 1.87 checks below; Windows/Linux target qualification
-remains separate. See issues.md.
+all skips. Keep Windows SDK integration and WinMM discovery qualification distinct
+from compilation. Use the current local Rust compiler; release CI handles the
+minimum-version check. Windows/Linux native qualification remains separate from
+compiler compatibility. See issues.md.
 
-### Rust 1.87 on the available Mac
+### Historical Rust 1.87 evidence on the available Mac
 
-The 2026-10-21 check uses the official Rust 1.87.0 aarch64-apple-darwin
-distribution, verified against its published SHA-256 checksum and installed
-locally under ignored target/qualification/rust187/. It does not replace the
-system compiler or change the declared minimum version. With that installation:
-
-```bash
-export PATH="$PWD/target/qualification/rust187/bin:$PATH"
-export CARGO_HOME="$PWD/target/cargo-home"
-export CARGO_TARGET_DIR="$PWD/target/qualification/rust187-build"
-export PYO3_PYTHON="$PWD/.venv/bin/python"
-cargo fmt --all --check
-cargo clippy --locked --offline --workspace --all-targets -- -D warnings
-cargo test --locked --offline --workspace -- --test-threads=1
-```
-
-Repeat Clippy and tests sequentially with PYO3_PYTHON pointing to the existing
-target/api-python315/bin/python. Offline mode uses the already populated frozen
-Cargo cache. Both Python 3.11.7 and 3.15.0 pass: 150 tests per interpreter,
-five deliberately ignored tests, no failures, and no Clippy warning exceptions.
-The ignored cases comprise two live CoreMIDI endpoint tests and three standalone
-interpreter-finalization cases. This run does not execute those cases, rebuild
-installed wheels or repeat the full Python suites. See validation.md for evidence.
+The 2026-10-21 local check used Rust 1.87.0 with Python 3.11.7 and 3.15.0:
+150 tests passed per interpreter, with five deliberate ignores and no Clippy
+warning exceptions. The 2026-10-23 archive corrections subsequently passed
+151 tests per interpreter and installed-wheel checks. See validation.md for
+the recorded setup, results and limits. These runs predate the CI-only policy
+above; their temporary compiler and environments need not be retained or
+recreated for local work.
 
 ## Acceptance review and remaining gates
 
