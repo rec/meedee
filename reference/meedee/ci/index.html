@@ -1,0 +1,7398 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python bindings for the meedee Rust MIDI toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://rec.github.io/meedee/reference/meedee/ci/">
+      
+      
+      
+        <link rel="prev" href="../archive/">
+      
+      
+        <link rel="next" href="../ci_live/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.72">
+    
+    
+      
+        <title>ci - meedee</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="meedee" class="md-header__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            meedee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ci
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="meedee" class="md-nav__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    meedee
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  meedee
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ten practical Python MIDI projects
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  API Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  archive
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.BROADCAST_MUID" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BROADCAST_MUID
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.MAX_MUID" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MAX_MUID
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Address" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Address
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Address">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.GROUP" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GROUP
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.FUNCTION_BLOCK" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        FUNCTION_BLOCK
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.channel_number" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel_number
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Header
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Header">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.source_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        source_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.destination_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        destination_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.version" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        version
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.address" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        address
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Identity
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.manufacturer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        manufacturer
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.family" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        family
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        model
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.revision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        revision
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        DiscoveryInfo
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DiscoveryInfo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        identity
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        capabilities
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.max_sysex" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        max_sysex
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.output_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        output_path
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Notice" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Notice
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.original" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        original
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.status_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status_data
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.details" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        details
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.message_text" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message_text
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Discovery
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Discovery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        info
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        DiscoveryReply
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DiscoveryReply">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        info
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.function_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        function_block
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EndpointInquiry
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EndpointInquiry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EndpointReply
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EndpointReply">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.product_instance_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        product_instance_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        InvalidateMuid
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InvalidateMuid">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.target" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        target
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Ack" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ack
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ack">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.notice" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        notice
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Nak" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Nak
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nak">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.notice" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        notice
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Route
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Route">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.input" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        input
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        output
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.group" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        group
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Peer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Peer
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Peer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.version" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        version
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        info
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.function_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        function_block
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.product_instance_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        product_instance_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Action" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Action
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Action.token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Action.route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        route
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Action.message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Observation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Observation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        kind
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.peer_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peer_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Session" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Session
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Session">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.local_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        local_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.active" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        active
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        route
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.peers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peers
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.pending_count" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pending_count
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.discover" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        discover
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.inquire_endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        inquire_endpoint
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.report_send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        report_send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reset
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        restart
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.respond" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        respond
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Browser
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Browser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        route
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        start
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.report_send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        report_send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stop
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        snapshot
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BrowseReport
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BrowseReport">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.local_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        local_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.peers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peers
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.confirmed_actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        confirmed_actions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.uncertain_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        uncertain_token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.pending_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pending_tokens
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        diagnostics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.omitted_diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        omitted_diagnostics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.problems" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        problems
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BrowseDiagnostic
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BrowseDiagnostic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        kind
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.peer_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peer_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        decode
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  clip
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../codecs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  codecs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  gm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inspection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../messages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  metrics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../midi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mpe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  mpe
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  notes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  smf
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../syx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  syx
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timecode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timecode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  topology
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_input
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_output
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ufor_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ufor_tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ump
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  universal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.BROADCAST_MUID" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BROADCAST_MUID
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.MAX_MUID" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MAX_MUID
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Address" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Address
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Address">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.GROUP" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GROUP
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.FUNCTION_BLOCK" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        FUNCTION_BLOCK
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.channel_number" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel_number
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Address.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Header
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Header">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.source_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        source_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.destination_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        destination_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.version" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        version
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.address" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        address
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Header.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Identity
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Identity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.manufacturer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        manufacturer
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.family" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        family
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        model
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.revision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        revision
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Identity.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        DiscoveryInfo
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DiscoveryInfo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        identity
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        capabilities
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.max_sysex" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        max_sysex
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.output_path" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        output_path
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryInfo.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Notice" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Notice
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.original" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        original
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.status_data" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status_data
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.details" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        details
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.message_text" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message_text
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Notice.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Discovery
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Discovery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        info
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Discovery.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        DiscoveryReply
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DiscoveryReply">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        info
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.function_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        function_block
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.DiscoveryReply.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EndpointInquiry
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EndpointInquiry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointInquiry.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EndpointReply
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EndpointReply">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.product_instance_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        product_instance_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.EndpointReply.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        InvalidateMuid
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InvalidateMuid">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.target" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        target
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.InvalidateMuid.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Ack" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ack
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ack">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.notice" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        notice
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Ack.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Nak" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Nak
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Nak">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.header" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        header
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.notice" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        notice
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Nak.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Route
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Route">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.input" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        input
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        output
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.group" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        group
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Route.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Peer" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Peer
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Peer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.version" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        version
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.info" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        info
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.function_block" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        function_block
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Peer.product_instance_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        product_instance_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Action" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Action
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Action">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Action.token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Action.route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        route
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Action.message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Observation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Observation
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Observation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        kind
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.peer_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peer_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Observation.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Session" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Session
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Session">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.local_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        local_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.active" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        active
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        route
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.peers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peers
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.pending_count" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pending_count
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.discover" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        discover
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.inquire_endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        inquire_endpoint
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.report_send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        report_send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reset
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        restart
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Session.respond" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        respond
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.Browser" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Browser
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Browser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.route" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        route
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        start
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.report_send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        report_send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stop
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.Browser.snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        snapshot
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BrowseReport
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BrowseReport">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.local_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        local_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.peers" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peers
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.confirmed_actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        confirmed_actions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.uncertain_token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        uncertain_token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.pending_tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pending_tokens
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        diagnostics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.omitted_diagnostics" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        omitted_diagnostics
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.problems" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        problems
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseReport.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BrowseDiagnostic
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BrowseDiagnostic">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        kind
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.peer_muid" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        peer_muid
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.token" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        token
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.ci.BrowseDiagnostic.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci.decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        decode
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h1 id="meedee.ci" class="doc doc-heading">
+            <code>meedee.ci</code>
+
+
+<a href="#meedee.ci" class="headerlink" title="Permanent link">&para;</a></h1>
+
+    <div class="doc doc-contents first">
+
+        <p>Explicit MIDI-CI management codecs and caller-driven sessions. No MIDI startup.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="meedee.ci.BROADCAST_MUID" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">BROADCAST_MUID</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#meedee.ci.BROADCAST_MUID" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="meedee.ci.MAX_MUID" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">MAX_MUID</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#meedee.ci.MAX_MUID" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Address" class="doc doc-heading">
+            <code>Address</code>
+
+
+<a href="#meedee.ci.Address" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Address.GROUP" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">GROUP</span><span class="p">:</span> <span class="n">Address</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.ci.Address.GROUP" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Address.FUNCTION_BLOCK" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">FUNCTION_BLOCK</span><span class="p">:</span> <span class="n">Address</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.ci.Address.FUNCTION_BLOCK" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Address.channel_number" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel_number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Address.channel_number" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Address.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Address</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#meedee.ci.Address.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Header" class="doc doc-heading">
+            <code>Header</code>
+
+
+<a href="#meedee.ci.Header" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Header.source_muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">source_muid</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Header.source_muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Header.destination_muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">destination_muid</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Header.destination_muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Header.version" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">version</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Header.version" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Header.address" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">address</span><span class="p">:</span> <span class="n">Address</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Header.address" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Header.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Header</span></code>
+
+<a href="#meedee.ci.Header.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Identity" class="doc doc-heading">
+            <code>Identity</code>
+
+
+<a href="#meedee.ci.Identity" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Identity.manufacturer" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">manufacturer</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Identity.manufacturer" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Identity.family" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">family</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Identity.family" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Identity.model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">model</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Identity.model" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Identity.revision" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">revision</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Identity.revision" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Identity.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Identity</span></code>
+
+<a href="#meedee.ci.Identity.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.DiscoveryInfo" class="doc doc-heading">
+            <code>DiscoveryInfo</code>
+
+
+<a href="#meedee.ci.DiscoveryInfo" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryInfo.identity" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">identity</span><span class="p">:</span> <span class="n">Identity</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryInfo.identity" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryInfo.capabilities" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">capabilities</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryInfo.capabilities" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryInfo.max_sysex" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">max_sysex</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryInfo.max_sysex" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryInfo.output_path" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">output_path</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryInfo.output_path" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.DiscoveryInfo.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DiscoveryInfo</span></code>
+
+<a href="#meedee.ci.DiscoveryInfo.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Notice" class="doc doc-heading">
+            <code>Notice</code>
+
+
+<a href="#meedee.ci.Notice" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Notice.original" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">original</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Notice.original" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Notice.status" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">status</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Notice.status" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Notice.status_data" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">status_data</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Notice.status_data" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Notice.details" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">details</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Notice.details" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Notice.message_text" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">message_text</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Notice.message_text" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Notice.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Notice</span></code>
+
+<a href="#meedee.ci.Notice.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Discovery" class="doc doc-heading">
+            <code>Discovery</code>
+
+
+<a href="#meedee.ci.Discovery" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Discovery.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Discovery.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Discovery.info" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">info</span><span class="p">:</span> <span class="n">DiscoveryInfo</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Discovery.info" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Discovery.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Discovery.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Discovery.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Discovery</span></code>
+
+<a href="#meedee.ci.Discovery.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.DiscoveryReply" class="doc doc-heading">
+            <code>DiscoveryReply</code>
+
+
+<a href="#meedee.ci.DiscoveryReply" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryReply.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryReply.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryReply.info" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">info</span><span class="p">:</span> <span class="n">DiscoveryInfo</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryReply.info" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryReply.function_block" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">function_block</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryReply.function_block" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.DiscoveryReply.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.DiscoveryReply.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.DiscoveryReply.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DiscoveryReply</span></code>
+
+<a href="#meedee.ci.DiscoveryReply.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.EndpointInquiry" class="doc doc-heading">
+            <code>EndpointInquiry</code>
+
+
+<a href="#meedee.ci.EndpointInquiry" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.EndpointInquiry.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.EndpointInquiry.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.EndpointInquiry.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.EndpointInquiry.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.EndpointInquiry.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EndpointInquiry</span></code>
+
+<a href="#meedee.ci.EndpointInquiry.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.EndpointReply" class="doc doc-heading">
+            <code>EndpointReply</code>
+
+
+<a href="#meedee.ci.EndpointReply" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.EndpointReply.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.EndpointReply.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.EndpointReply.product_instance_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">product_instance_id</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.EndpointReply.product_instance_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.EndpointReply.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.EndpointReply.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.EndpointReply.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EndpointReply</span></code>
+
+<a href="#meedee.ci.EndpointReply.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.InvalidateMuid" class="doc doc-heading">
+            <code>InvalidateMuid</code>
+
+
+<a href="#meedee.ci.InvalidateMuid" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.InvalidateMuid.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.InvalidateMuid.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.InvalidateMuid.target" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">target</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.InvalidateMuid.target" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.InvalidateMuid.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.InvalidateMuid.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.InvalidateMuid.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">InvalidateMuid</span></code>
+
+<a href="#meedee.ci.InvalidateMuid.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Ack" class="doc doc-heading">
+            <code>Ack</code>
+
+
+<a href="#meedee.ci.Ack" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Ack.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Ack.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Ack.notice" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">notice</span><span class="p">:</span> <span class="n">Notice</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Ack.notice" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Ack.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Ack.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Ack.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Ack</span></code>
+
+<a href="#meedee.ci.Ack.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Nak" class="doc doc-heading">
+            <code>Nak</code>
+
+
+<a href="#meedee.ci.Nak" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Nak.header" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">header</span><span class="p">:</span> <span class="n">Header</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Nak.header" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Nak.notice" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">notice</span><span class="p">:</span> <span class="n">Notice</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Nak.notice" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Nak.extensions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">extensions</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Nak.extensions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Nak.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Nak</span></code>
+
+<a href="#meedee.ci.Nak.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Route" class="doc doc-heading">
+            <code>Route</code>
+
+
+<a href="#meedee.ci.Route" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Route.input" class="doc doc-heading">
+            <code class="highlight language-python"><span class="nb">input</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Route.input" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Route.output" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">output</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Route.output" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Route.group" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">group</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Route.group" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Route.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">**</span><span class="n">changes</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Route</span></code>
+
+<a href="#meedee.ci.Route.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Peer" class="doc doc-heading">
+            <code>Peer</code>
+
+
+<a href="#meedee.ci.Peer" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Peer.muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">muid</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Peer.muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Peer.version" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">version</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Peer.version" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Peer.info" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">info</span><span class="p">:</span> <span class="n">DiscoveryInfo</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Peer.info" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Peer.function_block" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">function_block</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Peer.function_block" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Peer.product_instance_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">product_instance_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Peer.product_instance_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Action" class="doc doc-heading">
+            <code>Action</code>
+
+
+<a href="#meedee.ci.Action" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Action.token" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">token</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Action.token" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Action.route" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">route</span><span class="p">:</span> <span class="n">Route</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Action.route" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Action.message" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">message</span><span class="p">:</span> <span class="n">Message</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Action.message" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Observation" class="doc doc-heading">
+            <code>Observation</code>
+
+
+<a href="#meedee.ci.Observation" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Observation.kind" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">kind</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Observation.kind" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Observation.peer_muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">peer_muid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Observation.peer_muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Observation.token" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">token</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Observation.token" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Observation.message" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">message</span><span class="p">:</span> <span class="n">Message</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Observation.message" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Observation.reason" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Observation.reason" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Session" class="doc doc-heading">
+            <code>Session</code>
+
+
+<a href="#meedee.ci.Session" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Session.local_muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">local_muid</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Session.local_muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Session.active" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">active</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Session.active" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Session.route" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">route</span><span class="p">:</span> <span class="n">Route</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Session.route" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Session.peers" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">peers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Peer</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Session.peers" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Session.pending_count" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">pending_count</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Session.pending_count" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.discover" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">discover</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">timeout_ns</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3000000000</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Action</span></code>
+
+<a href="#meedee.ci.Session.discover" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.inquire_endpoint" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">inquire_endpoint</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">peer_muid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">timeout_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Action</span></code>
+
+<a href="#meedee.ci.Session.inquire_endpoint" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.report_send" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">report_send</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sent</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span> <span class="o">|</span> <span class="n">Observation</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Session.report_send" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.feed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">feed</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">Message</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span> <span class="o">|</span> <span class="n">Observation</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Session.feed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.poll" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">poll</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span> <span class="o">|</span> <span class="n">Observation</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Session.poll" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.reset" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reset</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span> <span class="o">|</span> <span class="n">Observation</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Session.reset" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.restart" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">restart</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">local_muid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.ci.Session.restart" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Session.respond" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">respond</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">Message</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">timeout_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Action</span></code>
+
+<a href="#meedee.ci.Session.respond" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.Browser" class="doc doc-heading">
+            <code>Browser</code>
+
+
+<a href="#meedee.ci.Browser" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.Browser.route" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">route</span><span class="p">:</span> <span class="n">Route</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.Browser.route" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Browser.start" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">start</span><span class="p">(</span><span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Browser.start" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Browser.poll" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">poll</span><span class="p">(</span><span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Browser.poll" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Browser.feed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">feed</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">Message</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">input</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Browser.feed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Browser.report_send" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">report_send</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sent</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Action</span><span class="p">]</span></code>
+
+<a href="#meedee.ci.Browser.report_send" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Browser.stop" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">stop</span><span class="p">(</span><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.ci.Browser.stop" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.ci.Browser.snapshot" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">snapshot</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">BrowseReport</span></code>
+
+<a href="#meedee.ci.Browser.snapshot" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.BrowseReport" class="doc doc-heading">
+            <code>BrowseReport</code>
+
+
+<a href="#meedee.ci.BrowseReport" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.status" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">status</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.status" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.local_muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">local_muid</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.local_muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.peers" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">peers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Peer</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.peers" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.confirmed_actions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">confirmed_actions</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.confirmed_actions" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.uncertain_token" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">uncertain_token</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.uncertain_token" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.pending_tokens" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">pending_tokens</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.pending_tokens" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.diagnostics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">diagnostics</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BrowseDiagnostic</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.diagnostics" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.omitted_diagnostics" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">omitted_diagnostics</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.omitted_diagnostics" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.problems" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">problems</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.problems" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseReport.reason" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseReport.reason" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.ci.BrowseDiagnostic" class="doc doc-heading">
+            <code>BrowseDiagnostic</code>
+
+
+<a href="#meedee.ci.BrowseDiagnostic" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseDiagnostic.kind" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">kind</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseDiagnostic.kind" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseDiagnostic.peer_muid" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">peer_muid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseDiagnostic.peer_muid" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseDiagnostic.token" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">token</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseDiagnostic.token" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.ci.BrowseDiagnostic.reason" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.ci.BrowseDiagnostic.reason" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="meedee.ci.decode" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">decode</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">SysEx</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Discovery</span> <span class="o">|</span> <span class="n">DiscoveryReply</span> <span class="o">|</span> <span class="n">EndpointInquiry</span> <span class="o">|</span> <span class="n">EndpointReply</span> <span class="o">|</span> <span class="n">InvalidateMuid</span> <span class="o">|</span> <span class="n">Ack</span> <span class="o">|</span> <span class="n">Nak</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+<a href="#meedee.ci.decode" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      
+    
+  </body>
+</html>

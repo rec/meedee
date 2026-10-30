@@ -1,0 +1,5058 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python bindings for the meedee Rust MIDI toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://rec.github.io/meedee/reference/meedee/midi/">
+      
+      
+      
+        <link rel="prev" href="../metrics/">
+      
+      
+        <link rel="next" href="../mpe/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.72">
+    
+    
+      
+        <title>midi - meedee</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="meedee" class="md-header__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            meedee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              midi
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="meedee" class="md-nav__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    meedee
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  meedee
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ten practical Python MIDI projects
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  API Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  archive
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  clip
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../codecs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  codecs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  gm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inspection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../messages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  metrics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Protocol
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Protocol">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Protocol.Midi1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Midi1
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Protocol.Ump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ump
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Backend
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.CoreMidi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CoreMidi
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.CoreMidiUmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CoreMidiUmp
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaSeq" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaSeq
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaSeqUmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaSeqUmp
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaRaw" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaRaw
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaRawUmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaRawUmp
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.WinMm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WinMm
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.WindowsMidiServices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WindowsMidiServices
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.TimestampMode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TimestampMode
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TimestampMode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TimestampMode.Absolute" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Absolute
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TimestampMode.Off" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Off
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.UmpPacket" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        UmpPacket
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UmpPacket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.UmpPacket.words" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        words
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.MidiError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MidiError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.CapabilityError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CapabilityError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.InitError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        InitError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.PortInfoError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PortInfoError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.ConnectError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ConnectError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.SendError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SendError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.CompoundSendError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CompoundSendError
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CompoundSendError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.CompoundSendError.completed_messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        completed_messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.CompoundSendError.total_messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        total_messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.StateError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        StateError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.CallbackThreadError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CallbackThreadError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.NativePanicError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NativePanicError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.ResourceError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ResourceError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.WorkerError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WorkerError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.WorkerTimeoutError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WorkerTimeoutError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Port" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Port
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Port">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Port.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Port.backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        backend
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Port.backend_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        backend_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Input" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Input
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ports
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        connect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.create_virtual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        create_virtual
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Output
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ports
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        connect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.create_virtual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        create_virtual
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        InputConnection
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InputConnection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        clock
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.dropped_packets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        dropped_packets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.last_message_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        last_message_time
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        close
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        OutputConnection
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OutputConnection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.play" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        play
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        close
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TypedInput
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TypedInput">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput.ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ports
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput.connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        connect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput.create_virtual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        create_virtual
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TypedInputConnection
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TypedInputConnection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stream
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        clock
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.dropped_packets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        dropped_packets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.recording_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        recording_report
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.receive" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        receive
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.start_recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        start_recording
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.stop_recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stop_recording
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        close
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.compiled_backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        compiled_backends
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mpe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  mpe
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  notes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  smf
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../syx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  syx
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timecode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timecode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  topology
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_input
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_output
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ufor_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ufor_tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ump
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  universal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Protocol
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Protocol">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Protocol.Midi1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Midi1
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Protocol.Ump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ump
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Backend
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.CoreMidi" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CoreMidi
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.CoreMidiUmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CoreMidiUmp
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaSeq" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaSeq
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaSeqUmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaSeqUmp
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaRaw" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaRaw
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.AlsaRawUmp" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        AlsaRawUmp
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.WinMm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WinMm
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Backend.WindowsMidiServices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WindowsMidiServices
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.TimestampMode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TimestampMode
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TimestampMode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TimestampMode.Absolute" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Absolute
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TimestampMode.Off" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Off
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.UmpPacket" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        UmpPacket
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UmpPacket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.UmpPacket.words" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        words
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.MidiError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        MidiError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.CapabilityError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CapabilityError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.InitError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        InitError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.PortInfoError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PortInfoError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.ConnectError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ConnectError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.SendError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SendError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.CompoundSendError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CompoundSendError
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CompoundSendError">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.CompoundSendError.completed_messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        completed_messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.CompoundSendError.total_messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        total_messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.StateError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        StateError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.CallbackThreadError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        CallbackThreadError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.NativePanicError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NativePanicError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.ResourceError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ResourceError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.WorkerError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WorkerError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.WorkerTimeoutError" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        WorkerTimeoutError
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Port" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Port
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Port">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Port.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Port.backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        backend
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Port.backend_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        backend_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Input" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Input
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Input">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ports
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        connect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Input.create_virtual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        create_virtual
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.Output" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Output
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ports
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        connect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.Output.create_virtual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        create_virtual
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        InputConnection
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="InputConnection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        clock
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.dropped_packets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        dropped_packets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.last_message_time" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        last_message_time
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.InputConnection.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        close
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        OutputConnection
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OutputConnection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.worker_failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        worker_failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.play" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        play
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.OutputConnection.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        close
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TypedInput
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TypedInput">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput.ports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ports
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput.connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        connect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInput.create_virtual" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        create_virtual
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TypedInputConnection
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TypedInputConnection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stream
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.clock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        clock
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        closed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.dropped_packets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        dropped_packets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.failure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        failure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.recording_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        recording_report
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.receive" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        receive
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.start_recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        start_recording
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.stop_recording" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        stop_recording
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.midi.TypedInputConnection.close" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        close
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.midi.compiled_backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        compiled_backends
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h1 id="meedee.midi" class="doc doc-heading">
+            <code>meedee.midi</code>
+
+
+<a href="#meedee.midi" class="headerlink" title="Permanent link">&para;</a></h1>
+
+    <div class="doc doc-contents first">
+
+        <p>Native MIDI transport registered by the private extension.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.Protocol" class="doc doc-heading">
+            <code>Protocol</code>
+
+
+<a href="#meedee.midi.Protocol" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Protocol.Midi1" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Midi1</span><span class="p">:</span> <span class="n">Protocol</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Protocol.Midi1" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Protocol.Ump" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Ump</span><span class="p">:</span> <span class="n">Protocol</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Protocol.Ump" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.Backend" class="doc doc-heading">
+            <code>Backend</code>
+
+
+<a href="#meedee.midi.Backend" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.CoreMidi" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">CoreMidi</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.CoreMidi" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.CoreMidiUmp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">CoreMidiUmp</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.CoreMidiUmp" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.AlsaSeq" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">AlsaSeq</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.AlsaSeq" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.AlsaSeqUmp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">AlsaSeqUmp</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.AlsaSeqUmp" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.AlsaRaw" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">AlsaRaw</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.AlsaRaw" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.AlsaRawUmp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">AlsaRawUmp</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.AlsaRawUmp" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.WinMm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">WinMm</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.WinMm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Backend.WindowsMidiServices" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">WindowsMidiServices</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.Backend.WindowsMidiServices" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.TimestampMode" class="doc doc-heading">
+            <code>TimestampMode</code>
+
+
+<a href="#meedee.midi.TimestampMode" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TimestampMode.Absolute" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Absolute</span><span class="p">:</span> <span class="n">TimestampMode</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.TimestampMode.Absolute" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TimestampMode.Off" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Off</span><span class="p">:</span> <span class="n">TimestampMode</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+  </span>
+
+<a href="#meedee.midi.TimestampMode.Off" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.UmpPacket" class="doc doc-heading">
+            <code>UmpPacket</code>
+
+
+<a href="#meedee.midi.UmpPacket" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.UmpPacket.words" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">words</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.UmpPacket.words" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.MidiError" class="doc doc-heading">
+            <code>MidiError</code>
+
+
+<a href="#meedee.midi.MidiError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.CapabilityError" class="doc doc-heading">
+            <code>CapabilityError</code>
+
+
+<a href="#meedee.midi.CapabilityError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="MidiError (meedee.midi.MidiError)" href="./#meedee.midi.MidiError">MidiError</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.InitError" class="doc doc-heading">
+            <code>InitError</code>
+
+
+<a href="#meedee.midi.InitError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="MidiError (meedee.midi.MidiError)" href="./#meedee.midi.MidiError">MidiError</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.PortInfoError" class="doc doc-heading">
+            <code>PortInfoError</code>
+
+
+<a href="#meedee.midi.PortInfoError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="MidiError (meedee.midi.MidiError)" href="./#meedee.midi.MidiError">MidiError</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.ConnectError" class="doc doc-heading">
+            <code>ConnectError</code>
+
+
+<a href="#meedee.midi.ConnectError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="MidiError (meedee.midi.MidiError)" href="./#meedee.midi.MidiError">MidiError</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.SendError" class="doc doc-heading">
+            <code>SendError</code>
+
+
+<a href="#meedee.midi.SendError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="MidiError (meedee.midi.MidiError)" href="./#meedee.midi.MidiError">MidiError</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.CompoundSendError" class="doc doc-heading">
+            <code>CompoundSendError</code>
+
+
+<a href="#meedee.midi.CompoundSendError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="SendError (meedee.midi.SendError)" href="./#meedee.midi.SendError">SendError</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.CompoundSendError.completed_messages" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">completed_messages</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.CompoundSendError.completed_messages" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.CompoundSendError.total_messages" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">total_messages</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.CompoundSendError.total_messages" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.StateError" class="doc doc-heading">
+            <code>StateError</code>
+
+
+<a href="#meedee.midi.StateError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.CallbackThreadError" class="doc doc-heading">
+            <code>CallbackThreadError</code>
+
+
+<a href="#meedee.midi.CallbackThreadError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.NativePanicError" class="doc doc-heading">
+            <code>NativePanicError</code>
+
+
+<a href="#meedee.midi.NativePanicError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.ResourceError" class="doc doc-heading">
+            <code>ResourceError</code>
+
+
+<a href="#meedee.midi.ResourceError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.WorkerError" class="doc doc-heading">
+            <code>WorkerError</code>
+
+
+<a href="#meedee.midi.WorkerError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.WorkerTimeoutError" class="doc doc-heading">
+            <code>WorkerTimeoutError</code>
+
+
+<a href="#meedee.midi.WorkerTimeoutError" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="TimeoutError">TimeoutError</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.Port" class="doc doc-heading">
+            <code>Port</code>
+
+
+<a href="#meedee.midi.Port" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Port.name" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">name</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.Port.name" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Port.backend" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">backend</span><span class="p">:</span> <span class="n">Backend</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.Port.backend" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Port.backend_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">backend_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.Port.backend_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.Input" class="doc doc-heading">
+            <code>Input</code>
+
+
+<a href="#meedee.midi.Input" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Input.worker_failure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">worker_failure</span><span class="p">:</span> <span class="ne">Exception</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.Input.worker_failure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.Input.ports" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ports</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Port</span><span class="p">]</span></code>
+
+<a href="#meedee.midi.Input.ports" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.Input.connect" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">connect</span><span class="p">(</span><span class="n">port</span><span class="p">:</span> <span class="n">Port</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">events</span><span class="o">.</span><span class="n">ReceivedPacket</span><span class="p">],</span> <span class="nb">object</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">InputConnection</span></code>
+
+<a href="#meedee.midi.Input.connect" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.Input.create_virtual" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">create_virtual</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">events</span><span class="o">.</span><span class="n">ReceivedPacket</span><span class="p">],</span> <span class="nb">object</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">InputConnection</span></code>
+
+<a href="#meedee.midi.Input.create_virtual" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.Output" class="doc doc-heading">
+            <code>Output</code>
+
+
+<a href="#meedee.midi.Output" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.Output.worker_failure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">worker_failure</span><span class="p">:</span> <span class="ne">Exception</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.Output.worker_failure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.Output.ports" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ports</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Port</span><span class="p">]</span></code>
+
+<a href="#meedee.midi.Output.ports" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.Output.connect" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">connect</span><span class="p">(</span><span class="n">port</span><span class="p">:</span> <span class="n">Port</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputConnection</span></code>
+
+<a href="#meedee.midi.Output.connect" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.Output.create_virtual" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">create_virtual</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputConnection</span></code>
+
+<a href="#meedee.midi.Output.create_virtual" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.InputConnection" class="doc doc-heading">
+            <code>InputConnection</code>
+
+
+<a href="#meedee.midi.InputConnection" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.InputConnection.clock" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">clock</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Clock</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.InputConnection.clock" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.InputConnection.dropped_packets" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">dropped_packets</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.InputConnection.dropped_packets" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.InputConnection.last_message_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">last_message_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.InputConnection.last_message_time" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.InputConnection.worker_failure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">worker_failure</span><span class="p">:</span> <span class="ne">Exception</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.InputConnection.worker_failure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.InputConnection.closed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">closed</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.InputConnection.closed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.InputConnection.close" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">close</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.midi.InputConnection.close" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.OutputConnection" class="doc doc-heading">
+            <code>OutputConnection</code>
+
+
+<a href="#meedee.midi.OutputConnection" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.OutputConnection.worker_failure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">worker_failure</span><span class="p">:</span> <span class="ne">Exception</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.OutputConnection.worker_failure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.OutputConnection.closed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">closed</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.OutputConnection.closed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.OutputConnection.play" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">play</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">object</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Timestamp</span><span class="p">,</span> <span class="n">mappings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">events</span><span class="o">.</span><span class="n">ClockMapping</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">events</span><span class="o">.</span><span class="n">ClockMapping</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">allow_rounding</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">events</span><span class="o">.</span><span class="n">PlaybackReport</span></code>
+
+<a href="#meedee.midi.OutputConnection.play" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.OutputConnection.send" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">send</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">messages</span><span class="o">.</span><span class="n">Message</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span> <span class="o">|</span> <span class="nb">memoryview</span> <span class="o">|</span> <span class="n">UmpPacket</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.midi.OutputConnection.send" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.OutputConnection.close" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">close</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.midi.OutputConnection.close" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.TypedInput" class="doc doc-heading">
+            <code>TypedInput</code>
+
+
+<a href="#meedee.midi.TypedInput" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInput.ports" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ports</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Port</span><span class="p">]</span></code>
+
+<a href="#meedee.midi.TypedInput.ports" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInput.connect" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">connect</span><span class="p">(</span><span class="n">port</span><span class="p">:</span> <span class="n">Port</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">events</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">],</span> <span class="nb">object</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TypedInputConnection</span></code>
+
+<a href="#meedee.midi.TypedInput.connect" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInput.create_virtual" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">create_virtual</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">events</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">],</span> <span class="nb">object</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TypedInputConnection</span></code>
+
+<a href="#meedee.midi.TypedInput.create_virtual" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.midi.TypedInputConnection" class="doc doc-heading">
+            <code>TypedInputConnection</code>
+
+
+<a href="#meedee.midi.TypedInputConnection" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TypedInputConnection.stream" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">stream</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.TypedInputConnection.stream" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TypedInputConnection.clock" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">clock</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Clock</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.TypedInputConnection.clock" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TypedInputConnection.closed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">closed</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.TypedInputConnection.closed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TypedInputConnection.dropped_packets" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">dropped_packets</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.TypedInputConnection.dropped_packets" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TypedInputConnection.failure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">failure</span><span class="p">:</span> <span class="ne">Exception</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.TypedInputConnection.failure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.midi.TypedInputConnection.recording_report" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">recording_report</span><span class="p">:</span> <span class="n">archive</span><span class="o">.</span><span class="n">RecordingReport</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.midi.TypedInputConnection.recording_report" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInputConnection.receive" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">receive</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">events</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+<a href="#meedee.midi.TypedInputConnection.receive" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInputConnection.start_recording" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">start_recording</span><span class="p">(</span><span class="n">destination</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">''</span><span class="p">,</span> <span class="n">best_effort</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">payload_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span> <span class="n">record_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span> <span class="n">byte_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8388608</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">archive</span><span class="o">.</span><span class="n">Recorder</span></code>
+
+<a href="#meedee.midi.TypedInputConnection.start_recording" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInputConnection.stop_recording" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">stop_recording</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">archive</span><span class="o">.</span><span class="n">RecordingReport</span></code>
+
+<a href="#meedee.midi.TypedInputConnection.stop_recording" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.midi.TypedInputConnection.close" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">close</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.midi.TypedInputConnection.close" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="meedee.midi.compiled_backends" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">compiled_backends</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Backend</span><span class="p">]</span></code>
+
+<a href="#meedee.midi.compiled_backends" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      
+    
+  </body>
+</html>

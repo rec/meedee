@@ -1,0 +1,6930 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python bindings for the meedee Rust MIDI toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://rec.github.io/meedee/reference/meedee/tuning/">
+      
+      
+      
+        <link rel="prev" href="../transfer_output/">
+      
+      
+        <link rel="next" href="../tuning_live/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.72">
+    
+    
+      
+        <title>tuning - meedee</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="meedee" class="md-header__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            meedee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              tuning
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="meedee" class="md-nav__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    meedee
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  meedee
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ten practical Python MIDI projects
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  API Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  archive
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  clip
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../codecs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  codecs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  gm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inspection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../messages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  metrics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../midi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mpe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  mpe
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  notes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  smf
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../syx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  syx
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timecode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timecode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  topology
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_input
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_output
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pitch
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pitch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.semitone" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        semitone
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.fraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        fraction
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.frequency_hz" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        frequency_hz
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.from_frequency" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        from_frequency
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.from_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        from_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.NoChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoChange
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.TuningTable" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TuningTable
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TuningTable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.TuningTable.values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.TuningTable.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoteTuning
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NoteTuning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning.pitch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pitch
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleOffsets
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleOffsets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        resolution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.from_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        from_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.PitchConversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PitchConversion
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PitchConversion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.PitchConversion.pitch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pitch
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.PitchConversion.error_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        error_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleConversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleConversion
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleConversion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleConversion.offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        offsets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleConversion.error_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        error_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BulkDumpRequest
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BulkDumpRequest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BankedDumpRequest
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BankedDumpRequest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BulkDump
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BulkDump">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        table
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        KeyBasedDump
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="KeyBasedDump">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        table
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleOctaveDump
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleOctaveDump">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        offsets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SingleNoteChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SingleNoteChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BankedNoteChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BankedNoteChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.realtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        realtime
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleOctaveChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleOctaveChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.realtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        realtime
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channels
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        offsets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ChecksumStatus
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ChecksumStatus">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus.NotPresent" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NotPresent
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus.Matches" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Matches
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus.LegacyMismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        LegacyMismatch
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.Decoded" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Decoded
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decoded">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Decoded.message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Decoded.checksum" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        checksum
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RequestStatus
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RequestStatus">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.Pending" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pending
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.Completed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Completed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.TimedOut" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TimedOut
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.Cancelled" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cancelled
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ReplyTracker
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ReplyTracker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.deadline_ns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        deadline_ns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.cancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        cancel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.observe" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        observe
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EventDecoder
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EventDecoder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder.feed_assembled" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed_assembled
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder.reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reset
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        QueryReport
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="QueryReport">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.request_sent" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        request_sent
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.uncertain_send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        uncertain_send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.ignored_events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ignored_events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.deadline_ns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        deadline_ns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.reply" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reply
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.decoded" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        decoded
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.Query" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Query
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Query">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.prepare" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        prepare
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.confirm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        confirm
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.fail" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        fail
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.cancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        cancel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        snapshot
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.write" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        write
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        decode
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ufor_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ufor_tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ump
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  universal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pitch
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pitch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.semitone" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        semitone
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.fraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        fraction
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.frequency_hz" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        frequency_hz
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.from_frequency" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        from_frequency
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.from_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        from_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Pitch.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.NoChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoChange
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.TuningTable" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TuningTable
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TuningTable">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.TuningTable.values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.TuningTable.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoteTuning
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NoteTuning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning.pitch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pitch
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.NoteTuning.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleOffsets
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleOffsets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        resolution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.values" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        values
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.from_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        from_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOffsets.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.PitchConversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PitchConversion
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PitchConversion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.PitchConversion.pitch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pitch
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.PitchConversion.error_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        error_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleConversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleConversion
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleConversion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleConversion.offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        offsets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleConversion.error_cents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        error_cents
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BulkDumpRequest
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BulkDumpRequest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDumpRequest.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BankedDumpRequest
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BankedDumpRequest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedDumpRequest.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BulkDump
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BulkDump">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        table
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BulkDump.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        KeyBasedDump
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="KeyBasedDump">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        table
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.KeyBasedDump.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleOctaveDump
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleOctaveDump">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        name
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        offsets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveDump.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SingleNoteChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SingleNoteChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.SingleNoteChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        BankedNoteChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BankedNoteChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.bank" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        bank
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.realtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        realtime
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.BankedNoteChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ScaleOctaveChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ScaleOctaveChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.device_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        device_id
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.realtime" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        realtime
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.channels" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channels
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.offsets" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        offsets
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ScaleOctaveChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ChecksumStatus
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ChecksumStatus">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus.NotPresent" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NotPresent
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus.Matches" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Matches
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ChecksumStatus.LegacyMismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        LegacyMismatch
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.Decoded" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Decoded
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decoded">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Decoded.message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Decoded.checksum" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        checksum
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RequestStatus
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RequestStatus">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.Pending" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pending
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.Completed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Completed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.TimedOut" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TimedOut
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.RequestStatus.Cancelled" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cancelled
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ReplyTracker
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ReplyTracker">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.deadline_ns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        deadline_ns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.cancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        cancel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.ReplyTracker.observe" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        observe
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        EventDecoder
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EventDecoder">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder.feed_assembled" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed_assembled
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.EventDecoder.reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reset
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        QueryReport
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="QueryReport">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        status
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.request_sent" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        request_sent
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.uncertain_send" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        uncertain_send
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.ignored_events" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ignored_events
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.deadline_ns" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        deadline_ns
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.reply" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reply
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.decoded" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        decoded
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.QueryReport.reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reason
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.Query" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Query
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Query">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.prepare" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        prepare
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.confirm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        confirm
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.poll" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        poll
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.feed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        feed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.fail" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        fail
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.cancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        cancel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        snapshot
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.tuning.Query.write" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        write
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.tuning.decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        decode
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h1 id="meedee.tuning" class="doc doc-heading">
+            <code>meedee.tuning</code>
+
+
+<a href="#meedee.tuning" class="headerlink" title="Permanent link">&para;</a></h1>
+
+    <div class="doc doc-contents first">
+
+        <p>MIDI Tuning Standard values, explicit SysEx interpretation and reply tracking.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.Pitch" class="doc doc-heading">
+            <code>Pitch</code>
+
+
+<a href="#meedee.tuning.Pitch" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>meedee/tuning.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#meedee.tuning.Pitch--source--__codelineno-0-9">9</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.tuning.Pitch--source--__span-0-9"><a id="meedee.tuning.Pitch--source--__codelineno-0-9" name="meedee.tuning.Pitch--source--__codelineno-0-9"></a><span class="k">del</span> <span class="n">sys</span><span class="p">,</span> <span class="n">_core</span><span class="p">,</span> <span class="n">messages</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.Pitch.semitone" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">semitone</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.Pitch.semitone" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.Pitch.fraction" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fraction</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.Pitch.fraction" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.Pitch.frequency_hz" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">frequency_hz</span><span class="p">:</span> <span class="nb">float</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.Pitch.frequency_hz" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Pitch.from_frequency" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">from_frequency</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">frequency_hz</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PitchConversion</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#meedee.tuning.Pitch.from_frequency" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Pitch.from_cents" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">from_cents</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">cents</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PitchConversion</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#meedee.tuning.Pitch.from_cents" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Pitch.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">semitone</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">fraction</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Pitch</span></code>
+
+<a href="#meedee.tuning.Pitch.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.NoChange" class="doc doc-heading">
+            <code>NoChange</code>
+
+
+<a href="#meedee.tuning.NoChange" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.TuningTable" class="doc doc-heading">
+            <code>TuningTable</code>
+
+
+<a href="#meedee.tuning.TuningTable" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.TuningTable.values" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">values</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Pitch</span> <span class="o">|</span> <span class="n">NoChange</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.TuningTable.values" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.TuningTable.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Pitch</span> <span class="o">|</span> <span class="n">NoChange</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Pitch</span> <span class="o">|</span> <span class="n">NoChange</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningTable</span></code>
+
+<a href="#meedee.tuning.TuningTable.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.NoteTuning" class="doc doc-heading">
+            <code>NoteTuning</code>
+
+
+<a href="#meedee.tuning.NoteTuning" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.NoteTuning.note" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">note</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.NoteTuning.note" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.NoteTuning.pitch" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">pitch</span><span class="p">:</span> <span class="n">Pitch</span> <span class="o">|</span> <span class="n">NoChange</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.NoteTuning.pitch" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.NoteTuning.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">pitch</span><span class="p">:</span> <span class="n">Pitch</span> <span class="o">|</span> <span class="n">NoChange</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NoteTuning</span></code>
+
+<a href="#meedee.tuning.NoteTuning.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.ScaleOffsets" class="doc doc-heading">
+            <code>ScaleOffsets</code>
+
+
+<a href="#meedee.tuning.ScaleOffsets" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOffsets.resolution" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOffsets.resolution" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOffsets.values" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">values</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOffsets.values" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ScaleOffsets.from_cents" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">from_cents</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">cents</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ScaleConversion</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOffsets.from_cents" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ScaleOffsets.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScaleOffsets</span></code>
+
+<a href="#meedee.tuning.ScaleOffsets.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.PitchConversion" class="doc doc-heading">
+            <code>PitchConversion</code>
+
+
+<a href="#meedee.tuning.PitchConversion" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.PitchConversion.pitch" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">pitch</span><span class="p">:</span> <span class="n">Pitch</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.PitchConversion.pitch" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.PitchConversion.error_cents" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_cents</span><span class="p">:</span> <span class="nb">float</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.PitchConversion.error_cents" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.ScaleConversion" class="doc doc-heading">
+            <code>ScaleConversion</code>
+
+
+<a href="#meedee.tuning.ScaleConversion" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleConversion.offsets" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">offsets</span><span class="p">:</span> <span class="n">ScaleOffsets</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleConversion.offsets" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleConversion.error_cents" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">error_cents</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleConversion.error_cents" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.BulkDumpRequest" class="doc doc-heading">
+            <code>BulkDumpRequest</code>
+
+
+<a href="#meedee.tuning.BulkDumpRequest" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BulkDumpRequest.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BulkDumpRequest.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BulkDumpRequest.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BulkDumpRequest.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.BulkDumpRequest.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BulkDumpRequest</span></code>
+
+<a href="#meedee.tuning.BulkDumpRequest.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.BankedDumpRequest" class="doc doc-heading">
+            <code>BankedDumpRequest</code>
+
+
+<a href="#meedee.tuning.BankedDumpRequest" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedDumpRequest.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedDumpRequest.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedDumpRequest.bank" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bank</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedDumpRequest.bank" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedDumpRequest.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedDumpRequest.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.BankedDumpRequest.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">bank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BankedDumpRequest</span></code>
+
+<a href="#meedee.tuning.BankedDumpRequest.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.BulkDump" class="doc doc-heading">
+            <code>BulkDump</code>
+
+
+<a href="#meedee.tuning.BulkDump" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BulkDump.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BulkDump.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BulkDump.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BulkDump.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BulkDump.name" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">name</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BulkDump.name" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BulkDump.table" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">table</span><span class="p">:</span> <span class="n">TuningTable</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BulkDump.table" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.BulkDump.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="n">TuningTable</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BulkDump</span></code>
+
+<a href="#meedee.tuning.BulkDump.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.KeyBasedDump" class="doc doc-heading">
+            <code>KeyBasedDump</code>
+
+
+<a href="#meedee.tuning.KeyBasedDump" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.KeyBasedDump.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.KeyBasedDump.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.KeyBasedDump.bank" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bank</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.KeyBasedDump.bank" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.KeyBasedDump.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.KeyBasedDump.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.KeyBasedDump.name" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">name</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.KeyBasedDump.name" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.KeyBasedDump.table" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">table</span><span class="p">:</span> <span class="n">TuningTable</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.KeyBasedDump.table" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.KeyBasedDump.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">bank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">table</span><span class="p">:</span> <span class="n">TuningTable</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">KeyBasedDump</span></code>
+
+<a href="#meedee.tuning.KeyBasedDump.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.ScaleOctaveDump" class="doc doc-heading">
+            <code>ScaleOctaveDump</code>
+
+
+<a href="#meedee.tuning.ScaleOctaveDump" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveDump.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveDump.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveDump.bank" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bank</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveDump.bank" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveDump.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveDump.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveDump.name" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">name</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveDump.name" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveDump.offsets" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">offsets</span><span class="p">:</span> <span class="n">ScaleOffsets</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveDump.offsets" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ScaleOctaveDump.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">bank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">offsets</span><span class="p">:</span> <span class="n">ScaleOffsets</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScaleOctaveDump</span></code>
+
+<a href="#meedee.tuning.ScaleOctaveDump.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.SingleNoteChange" class="doc doc-heading">
+            <code>SingleNoteChange</code>
+
+
+<a href="#meedee.tuning.SingleNoteChange" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.SingleNoteChange.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.SingleNoteChange.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.SingleNoteChange.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.SingleNoteChange.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.SingleNoteChange.changes" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">changes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NoteTuning</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.SingleNoteChange.changes" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.SingleNoteChange.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">changes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">NoteTuning</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NoteTuning</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SingleNoteChange</span></code>
+
+<a href="#meedee.tuning.SingleNoteChange.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.BankedNoteChange" class="doc doc-heading">
+            <code>BankedNoteChange</code>
+
+
+<a href="#meedee.tuning.BankedNoteChange" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedNoteChange.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedNoteChange.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedNoteChange.bank" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">bank</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedNoteChange.bank" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedNoteChange.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedNoteChange.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedNoteChange.realtime" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedNoteChange.realtime" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.BankedNoteChange.changes" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">changes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NoteTuning</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.BankedNoteChange.changes" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.BankedNoteChange.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">bank</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">changes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">NoteTuning</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NoteTuning</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BankedNoteChange</span></code>
+
+<a href="#meedee.tuning.BankedNoteChange.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.ScaleOctaveChange" class="doc doc-heading">
+            <code>ScaleOctaveChange</code>
+
+
+<a href="#meedee.tuning.ScaleOctaveChange" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="../messages/#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveChange.device_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveChange.device_id" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveChange.realtime" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveChange.realtime" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveChange.channels" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channels</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveChange.channels" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ScaleOctaveChange.offsets" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">offsets</span><span class="p">:</span> <span class="n">ScaleOffsets</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ScaleOctaveChange.offsets" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ScaleOctaveChange.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">device_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">realtime</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">channels</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">offsets</span><span class="p">:</span> <span class="n">ScaleOffsets</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScaleOctaveChange</span></code>
+
+<a href="#meedee.tuning.ScaleOctaveChange.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.ChecksumStatus" class="doc doc-heading">
+            <code>ChecksumStatus</code>
+
+
+<a href="#meedee.tuning.ChecksumStatus" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ChecksumStatus.NotPresent" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">NotPresent</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.ChecksumStatus.NotPresent" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ChecksumStatus.Matches" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Matches</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.ChecksumStatus.Matches" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ChecksumStatus.LegacyMismatch" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">LegacyMismatch</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.ChecksumStatus.LegacyMismatch" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.Decoded" class="doc doc-heading">
+            <code>Decoded</code>
+
+
+<a href="#meedee.tuning.Decoded" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.Decoded.message" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">message</span><span class="p">:</span> <span class="n">BulkDumpRequest</span> <span class="o">|</span> <span class="n">BankedDumpRequest</span> <span class="o">|</span> <span class="n">BulkDump</span> <span class="o">|</span> <span class="n">KeyBasedDump</span> <span class="o">|</span> <span class="n">ScaleOctaveDump</span> <span class="o">|</span> <span class="n">SingleNoteChange</span> <span class="o">|</span> <span class="n">BankedNoteChange</span> <span class="o">|</span> <span class="n">ScaleOctaveChange</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.Decoded.message" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.Decoded.checksum" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">checksum</span><span class="p">:</span> <span class="n">ChecksumStatus</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.Decoded.checksum" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.RequestStatus" class="doc doc-heading">
+            <code>RequestStatus</code>
+
+
+<a href="#meedee.tuning.RequestStatus" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.RequestStatus.Pending" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Pending</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.RequestStatus.Pending" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.RequestStatus.Completed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Completed</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.RequestStatus.Completed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.RequestStatus.TimedOut" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">TimedOut</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.RequestStatus.TimedOut" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.RequestStatus.Cancelled" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">Cancelled</span> <span class="o">=</span> <span class="o">...</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#meedee.tuning.RequestStatus.Cancelled" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.ReplyTracker" class="doc doc-heading">
+            <code>ReplyTracker</code>
+
+
+<a href="#meedee.tuning.ReplyTracker" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ReplyTracker.status" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">status</span><span class="p">:</span> <span class="n">RequestStatus</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ReplyTracker.status" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.ReplyTracker.deadline_ns" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">deadline_ns</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.ReplyTracker.deadline_ns" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ReplyTracker.poll" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">poll</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RequestStatus</span></code>
+
+<a href="#meedee.tuning.ReplyTracker.poll" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ReplyTracker.cancel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cancel</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">RequestStatus</span></code>
+
+<a href="#meedee.tuning.ReplyTracker.cancel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.ReplyTracker.observe" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">observe</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">BulkDumpRequest</span> <span class="o">|</span> <span class="n">BankedDumpRequest</span> <span class="o">|</span> <span class="n">BulkDump</span> <span class="o">|</span> <span class="n">KeyBasedDump</span> <span class="o">|</span> <span class="n">ScaleOctaveDump</span> <span class="o">|</span> <span class="n">SingleNoteChange</span> <span class="o">|</span> <span class="n">BankedNoteChange</span> <span class="o">|</span> <span class="n">ScaleOctaveChange</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span></code>
+
+<a href="#meedee.tuning.ReplyTracker.observe" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.EventDecoder" class="doc doc-heading">
+            <code>EventDecoder</code>
+
+
+<a href="#meedee.tuning.EventDecoder" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.EventDecoder.feed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">feed</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">events</span><span class="o">.</span><span class="n">Observation</span><span class="p">]</span></code>
+
+<a href="#meedee.tuning.EventDecoder.feed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.EventDecoder.feed_assembled" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">feed_assembled</span><span class="p">(</span><span class="n">observation</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Observation</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">events</span><span class="o">.</span><span class="n">Observation</span><span class="p">]</span></code>
+
+<a href="#meedee.tuning.EventDecoder.feed_assembled" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.EventDecoder.reset" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reset</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.EventDecoder.reset" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.QueryReport" class="doc doc-heading">
+            <code>QueryReport</code>
+
+
+<a href="#meedee.tuning.QueryReport" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.status" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">status</span><span class="p">:</span> <span class="nb">str</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.status" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.request_sent" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">request_sent</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.request_sent" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.uncertain_send" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">uncertain_send</span><span class="p">:</span> <span class="nb">bool</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.uncertain_send" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.ignored_events" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ignored_events</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.ignored_events" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.deadline_ns" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">deadline_ns</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.deadline_ns" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.reply" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reply</span><span class="p">:</span> <span class="n">messages</span><span class="o">.</span><span class="n">SysEx</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.reply" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.decoded" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">decoded</span><span class="p">:</span> <span class="n">Decoded</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.decoded" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.tuning.QueryReport.reason" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.tuning.QueryReport.reason" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.tuning.Query" class="doc doc-heading">
+            <code>Query</code>
+
+
+<a href="#meedee.tuning.Query" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.prepare" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">prepare</span><span class="p">(</span><span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">messages</span><span class="o">.</span><span class="n">SysEx</span></code>
+
+<a href="#meedee.tuning.Query.prepare" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.confirm" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">confirm</span><span class="p">(</span><span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.Query.confirm" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.poll" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">poll</span><span class="p">(</span><span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.Query.poll" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.feed" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">feed</span><span class="p">(</span><span class="n">item</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">,</span> <span class="n">now_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.Query.feed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.fail" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fail</span><span class="p">(</span><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.Query.fail" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.cancel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">cancel</span><span class="p">(</span><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.Query.cancel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.snapshot" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">snapshot</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">QueryReport</span></code>
+
+<a href="#meedee.tuning.Query.snapshot" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.tuning.Query.write" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">write</span><span class="p">(</span><span class="n">destination</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.Query.write" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="meedee.tuning.decode" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">decode</span><span class="p">(</span><span class="n">message</span><span class="p">:</span> <span class="n">messages</span><span class="o">.</span><span class="n">SysEx</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Decoded</span> <span class="o">|</span> <span class="kc">None</span></code>
+
+<a href="#meedee.tuning.decode" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      
+    
+  </body>
+</html>

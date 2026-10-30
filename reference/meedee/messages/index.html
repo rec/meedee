@@ -1,0 +1,6217 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python bindings for the meedee Rust MIDI toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://rec.github.io/meedee/reference/meedee/messages/">
+      
+      
+      
+        <link rel="prev" href="../inspection/">
+      
+      
+        <link rel="next" href="../metrics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.72">
+    
+    
+      
+        <title>messages - meedee</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="meedee" class="md-header__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            meedee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              messages
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="meedee" class="md-nav__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    meedee
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  meedee
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ten practical Python MIDI projects
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  API Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  archive
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  clip
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../codecs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  codecs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  gm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inspection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Message
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoteOn
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NoteOn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.velocity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        velocity
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SysEx" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SysEx
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SysEx">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SysEx.data" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        data
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SysEx.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoteOff
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NoteOff">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.velocity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        velocity
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PolyPressure
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PolyPressure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pressure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ControlChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ControlChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        controller
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ProgramChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ProgramChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ChannelPressure
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ChannelPressure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure.pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pressure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PitchBend
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PitchBend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        QuarterFrame
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="QuarterFrame">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame.message_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message_type
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SongPosition" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SongPosition
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SongPosition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongPosition.position" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        position
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongPosition.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SongSelect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SongSelect
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SongSelect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongSelect.song" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        song
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongSelect.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.TuneRequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TuneRequest
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TuneRequest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.TuneRequest.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.TimingClock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TimingClock
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TimingClock">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.TimingClock.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Start
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.Start.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Continue" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Continue
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Continue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.Continue.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stop
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.Stop.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ActiveSensing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ActiveSensing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ActiveSensing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ActiveSensing.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SystemReset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SystemReset
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SystemReset">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SystemReset.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ControlChange14
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ControlChange14">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        controller
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RpnSet
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RpnSet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        resolution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NrpnSet
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NrpnSet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        resolution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RpnIncrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RpnIncrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RpnDecrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RpnDecrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NrpnIncrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NrpnIncrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NrpnDecrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NrpnDecrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  metrics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../midi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mpe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  mpe
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  notes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  smf
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../syx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  syx
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timecode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timecode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  topology
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_input
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_output
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ufor_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ufor_tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ump
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  universal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Message
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoteOn
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NoteOn">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.velocity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        velocity
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOn.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SysEx" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SysEx
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SysEx">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SysEx.data" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        data
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SysEx.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NoteOff
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NoteOff">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.velocity" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        velocity
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NoteOff.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PolyPressure
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PolyPressure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        note
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pressure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PolyPressure.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ControlChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ControlChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        controller
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ProgramChange
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ProgramChange">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange.program" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        program
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ProgramChange.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ChannelPressure
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ChannelPressure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure.pressure" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        pressure
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ChannelPressure.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        PitchBend
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PitchBend">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.PitchBend.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        QuarterFrame
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="QuarterFrame">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame.message_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        message_type
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.QuarterFrame.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SongPosition" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SongPosition
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SongPosition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongPosition.position" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        position
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongPosition.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SongSelect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SongSelect
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SongSelect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongSelect.song" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        song
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SongSelect.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.TuneRequest" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TuneRequest
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TuneRequest">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.TuneRequest.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.TimingClock" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        TimingClock
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TimingClock">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.TimingClock.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Start" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Start
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.Start.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Continue" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Continue
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Continue">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.Continue.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.Stop" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stop
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Stop">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.Stop.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ActiveSensing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ActiveSensing
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ActiveSensing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ActiveSensing.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.SystemReset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SystemReset
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SystemReset">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.SystemReset.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        ControlChange14
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ControlChange14">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.controller" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        controller
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.ControlChange14.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RpnSet
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RpnSet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        resolution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnSet.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NrpnSet
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NrpnSet">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        value
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        resolution
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnSet.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RpnIncrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RpnIncrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnIncrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        RpnDecrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RpnDecrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.RpnDecrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NrpnIncrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NrpnIncrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnIncrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        NrpnDecrement
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="NrpnDecrement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement.channel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        channel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement.parameter" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        parameter
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#meedee.messages.NrpnDecrement.replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        replace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h1 id="meedee.messages" class="doc doc-heading">
+            <code>meedee.messages</code>
+
+
+<a href="#meedee.messages" class="headerlink" title="Permanent link">&para;</a></h1>
+
+    <div class="doc doc-contents first">
+
+        <p>Immutable musical messages registered by the private extension.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.Message" class="doc doc-heading">
+            <code>Message</code>
+
+
+<a href="#meedee.messages.Message" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Abstract native base. Direct construction is rejected.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>meedee/messages.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#meedee.messages.Message--source--__codelineno-0-3">3</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.messages.Message--source--__span-0-3"><a id="meedee.messages.Message--source--__codelineno-0-3" name="meedee.messages.Message--source--__codelineno-0-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.NoteOn" class="doc doc-heading">
+            <code>NoteOn</code>
+
+
+<a href="#meedee.messages.NoteOn" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>meedee/messages.py</code></summary>
+                <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#meedee.messages.NoteOn--source--__codelineno-0-6">6</a></span>
+<span class="normal"><a href="#meedee.messages.NoteOn--source--__codelineno-0-7">7</a></span>
+<span class="normal"><a href="#meedee.messages.NoteOn--source--__codelineno-0-8">8</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.messages.NoteOn--source--__span-0-6"><a id="meedee.messages.NoteOn--source--__codelineno-0-6" name="meedee.messages.NoteOn--source--__codelineno-0-6"></a><span class="n">_core</span><span class="o">.</span><span class="n">populate_messages</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">[</span><span class="vm">__name__</span><span class="p">])</span>
+</span><span id="meedee.messages.NoteOn--source--__span-0-7"><a id="meedee.messages.NoteOn--source--__codelineno-0-7" name="meedee.messages.NoteOn--source--__codelineno-0-7"></a>
+</span><span id="meedee.messages.NoteOn--source--__span-0-8"><a id="meedee.messages.NoteOn--source--__codelineno-0-8" name="meedee.messages.NoteOn--source--__codelineno-0-8"></a><span class="k">del</span> <span class="n">sys</span><span class="p">,</span> <span class="n">_core</span>
+</span></code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NoteOn.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NoteOn.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NoteOn.note" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">note</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NoteOn.note" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NoteOn.velocity" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">velocity</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NoteOn.velocity" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.NoteOn.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">velocity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NoteOn</span></code>
+
+<a href="#meedee.messages.NoteOn.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.SysEx" class="doc doc-heading">
+            <code>SysEx</code>
+
+
+<a href="#meedee.messages.SysEx" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.SysEx.data" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.SysEx.data" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.SysEx.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span> <span class="o">|</span> <span class="nb">memoryview</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SysEx</span></code>
+
+<a href="#meedee.messages.SysEx.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.NoteOff" class="doc doc-heading">
+            <code>NoteOff</code>
+
+
+<a href="#meedee.messages.NoteOff" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NoteOff.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NoteOff.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NoteOff.note" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">note</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NoteOff.note" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NoteOff.velocity" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">velocity</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NoteOff.velocity" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.NoteOff.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">velocity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NoteOff</span></code>
+
+<a href="#meedee.messages.NoteOff.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.PolyPressure" class="doc doc-heading">
+            <code>PolyPressure</code>
+
+
+<a href="#meedee.messages.PolyPressure" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.PolyPressure.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.PolyPressure.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.PolyPressure.note" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">note</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.PolyPressure.note" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.PolyPressure.pressure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">pressure</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.PolyPressure.pressure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.PolyPressure.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">pressure</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PolyPressure</span></code>
+
+<a href="#meedee.messages.PolyPressure.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.ControlChange" class="doc doc-heading">
+            <code>ControlChange</code>
+
+
+<a href="#meedee.messages.ControlChange" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ControlChange.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ControlChange.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ControlChange.controller" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">controller</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ControlChange.controller" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ControlChange.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ControlChange.value" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.ControlChange.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">controller</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlChange</span></code>
+
+<a href="#meedee.messages.ControlChange.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.ProgramChange" class="doc doc-heading">
+            <code>ProgramChange</code>
+
+
+<a href="#meedee.messages.ProgramChange" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ProgramChange.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ProgramChange.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ProgramChange.program" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">program</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ProgramChange.program" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.ProgramChange.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">program</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ProgramChange</span></code>
+
+<a href="#meedee.messages.ProgramChange.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.ChannelPressure" class="doc doc-heading">
+            <code>ChannelPressure</code>
+
+
+<a href="#meedee.messages.ChannelPressure" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ChannelPressure.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ChannelPressure.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ChannelPressure.pressure" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">pressure</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ChannelPressure.pressure" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.ChannelPressure.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">pressure</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ChannelPressure</span></code>
+
+<a href="#meedee.messages.ChannelPressure.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.PitchBend" class="doc doc-heading">
+            <code>PitchBend</code>
+
+
+<a href="#meedee.messages.PitchBend" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.PitchBend.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.PitchBend.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.PitchBend.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.PitchBend.value" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.PitchBend.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PitchBend</span></code>
+
+<a href="#meedee.messages.PitchBend.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.QuarterFrame" class="doc doc-heading">
+            <code>QuarterFrame</code>
+
+
+<a href="#meedee.messages.QuarterFrame" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.QuarterFrame.message_type" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">message_type</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.QuarterFrame.message_type" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.QuarterFrame.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.QuarterFrame.value" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.QuarterFrame.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">message_type</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuarterFrame</span></code>
+
+<a href="#meedee.messages.QuarterFrame.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.SongPosition" class="doc doc-heading">
+            <code>SongPosition</code>
+
+
+<a href="#meedee.messages.SongPosition" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.SongPosition.position" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">position</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.SongPosition.position" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.SongPosition.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">position</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SongPosition</span></code>
+
+<a href="#meedee.messages.SongPosition.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.SongSelect" class="doc doc-heading">
+            <code>SongSelect</code>
+
+
+<a href="#meedee.messages.SongSelect" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.SongSelect.song" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">song</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.SongSelect.song" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.SongSelect.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">song</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SongSelect</span></code>
+
+<a href="#meedee.messages.SongSelect.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.TuneRequest" class="doc doc-heading">
+            <code>TuneRequest</code>
+
+
+<a href="#meedee.messages.TuneRequest" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.TuneRequest.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">TuneRequest</span></code>
+
+<a href="#meedee.messages.TuneRequest.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.TimingClock" class="doc doc-heading">
+            <code>TimingClock</code>
+
+
+<a href="#meedee.messages.TimingClock" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.TimingClock.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">TimingClock</span></code>
+
+<a href="#meedee.messages.TimingClock.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.Start" class="doc doc-heading">
+            <code>Start</code>
+
+
+<a href="#meedee.messages.Start" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.Start.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Start</span></code>
+
+<a href="#meedee.messages.Start.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.Continue" class="doc doc-heading">
+            <code>Continue</code>
+
+
+<a href="#meedee.messages.Continue" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.Continue.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Continue</span></code>
+
+<a href="#meedee.messages.Continue.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.Stop" class="doc doc-heading">
+            <code>Stop</code>
+
+
+<a href="#meedee.messages.Stop" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.Stop.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Stop</span></code>
+
+<a href="#meedee.messages.Stop.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.ActiveSensing" class="doc doc-heading">
+            <code>ActiveSensing</code>
+
+
+<a href="#meedee.messages.ActiveSensing" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.ActiveSensing.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">ActiveSensing</span></code>
+
+<a href="#meedee.messages.ActiveSensing.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.SystemReset" class="doc doc-heading">
+            <code>SystemReset</code>
+
+
+<a href="#meedee.messages.SystemReset" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.SystemReset.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">SystemReset</span></code>
+
+<a href="#meedee.messages.SystemReset.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.ControlChange14" class="doc doc-heading">
+            <code>ControlChange14</code>
+
+
+<a href="#meedee.messages.ControlChange14" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ControlChange14.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ControlChange14.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ControlChange14.controller" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">controller</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ControlChange14.controller" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.ControlChange14.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.ControlChange14.value" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.ControlChange14.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">controller</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlChange14</span></code>
+
+<a href="#meedee.messages.ControlChange14.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.RpnSet" class="doc doc-heading">
+            <code>RpnSet</code>
+
+
+<a href="#meedee.messages.RpnSet" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnSet.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnSet.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnSet.parameter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnSet.parameter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnSet.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnSet.value" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnSet.resolution" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnSet.resolution" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.RpnSet.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RpnSet</span></code>
+
+<a href="#meedee.messages.RpnSet.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.NrpnSet" class="doc doc-heading">
+            <code>NrpnSet</code>
+
+
+<a href="#meedee.messages.NrpnSet" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnSet.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnSet.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnSet.parameter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnSet.parameter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnSet.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnSet.value" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnSet.resolution" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnSet.resolution" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.NrpnSet.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NrpnSet</span></code>
+
+<a href="#meedee.messages.NrpnSet.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.RpnIncrement" class="doc doc-heading">
+            <code>RpnIncrement</code>
+
+
+<a href="#meedee.messages.RpnIncrement" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnIncrement.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnIncrement.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnIncrement.parameter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnIncrement.parameter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.RpnIncrement.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RpnIncrement</span></code>
+
+<a href="#meedee.messages.RpnIncrement.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.RpnDecrement" class="doc doc-heading">
+            <code>RpnDecrement</code>
+
+
+<a href="#meedee.messages.RpnDecrement" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnDecrement.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnDecrement.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.RpnDecrement.parameter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.RpnDecrement.parameter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.RpnDecrement.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RpnDecrement</span></code>
+
+<a href="#meedee.messages.RpnDecrement.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.NrpnIncrement" class="doc doc-heading">
+            <code>NrpnIncrement</code>
+
+
+<a href="#meedee.messages.NrpnIncrement" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnIncrement.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnIncrement.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnIncrement.parameter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnIncrement.parameter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.NrpnIncrement.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NrpnIncrement</span></code>
+
+<a href="#meedee.messages.NrpnIncrement.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="meedee.messages.NrpnDecrement" class="doc doc-heading">
+            <code>NrpnDecrement</code>
+
+
+<a href="#meedee.messages.NrpnDecrement" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Message (meedee.messages.Message)" href="./#meedee.messages.Message">Message</a></code></p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnDecrement.channel" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">channel</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnDecrement.channel" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="meedee.messages.NrpnDecrement.parameter" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#meedee.messages.NrpnDecrement.parameter" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="meedee.messages.NrpnDecrement.replace" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">replace</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">parameter</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NrpnDecrement</span></code>
+
+<a href="#meedee.messages.NrpnDecrement.replace" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      
+    
+  </body>
+</html>

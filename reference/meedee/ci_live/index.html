@@ -1,0 +1,1737 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python bindings for the meedee Rust MIDI toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://rec.github.io/meedee/reference/meedee/ci_live/">
+      
+      
+      
+        <link rel="prev" href="../ci/">
+      
+      
+        <link rel="next" href="../cli/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.72">
+    
+    
+      
+        <title>ci_live - meedee</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="meedee" class="md-header__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            meedee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ci_live
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="meedee" class="md-nav__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    meedee
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  meedee
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Ten practical Python MIDI projects
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  API Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_3_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  archive
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci_live.run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  clip
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../codecs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  codecs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../gm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  gm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inspection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../messages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  metrics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../midi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mpe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  mpe
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  notes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../smf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  smf
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../syx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  syx
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../timecode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timecode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  topology
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_input
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../transfer_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_output
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tuning_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ufor_tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ufor_tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ump
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../universal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  universal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#meedee.ci_live.run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h1 id="meedee.ci_live" class="doc doc-heading">
+            <code>meedee.ci_live</code>
+
+
+<a href="#meedee.ci_live" class="headerlink" title="Permanent link">&para;</a></h1>
+
+    <div class="doc doc-contents first">
+
+        <p>One caller-thread CI management scan through existing typed connections.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="meedee.ci_live.run" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">browser</span><span class="p">:</span> <span class="n">ci</span><span class="o">.</span><span class="n">Browser</span><span class="p">,</span> <span class="n">receiver</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">TypedInputConnection</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">OutputConnection</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">message_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span> <span class="n">byte_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8388608</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ci</span><span class="o">.</span><span class="n">BrowseReport</span></code>
+
+<a href="#meedee.ci_live.run" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Run a fresh browser; callers own connections and serialize all access.</p>
+<p>A group-less route uses MIDI 1 bytes; an explicit group uses UMP SysEx7.
+Full-action handoffs are counted, and a partial/interrupted action is uncertain.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>meedee/ci_live.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-15"> 15</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-16"> 16</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-17"> 17</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-18"> 18</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-19"> 19</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-20"> 20</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-21"> 21</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-22"> 22</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-23"> 23</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-24"> 24</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-25"> 25</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-26"> 26</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-27"> 27</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-28"> 28</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-29"> 29</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-30"> 30</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-31"> 31</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-32"> 32</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-33"> 33</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-34"> 34</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-35"> 35</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-36"> 36</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-37"> 37</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-38"> 38</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-39"> 39</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-40"> 40</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-41"> 41</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-42"> 42</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-43"> 43</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-44"> 44</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-45"> 45</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-46"> 46</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-47"> 47</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-48"> 48</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-49"> 49</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-50"> 50</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-51"> 51</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-52"> 52</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-53"> 53</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-54"> 54</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-55"> 55</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-56"> 56</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-57"> 57</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-58"> 58</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-59"> 59</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-60"> 60</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-61"> 61</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-62"> 62</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-63"> 63</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-64"> 64</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-65"> 65</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-66"> 66</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-67"> 67</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-68"> 68</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-69"> 69</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-70"> 70</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-71"> 71</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-72"> 72</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-73"> 73</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-74"> 74</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-75"> 75</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-76"> 76</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-77"> 77</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-78"> 78</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-79"> 79</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-80"> 80</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-81"> 81</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-82"> 82</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-83"> 83</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-84"> 84</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-85"> 85</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-86"> 86</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-87"> 87</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-88"> 88</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-89"> 89</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-90"> 90</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-91"> 91</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-92"> 92</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-93"> 93</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-94"> 94</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-95"> 95</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-96"> 96</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-97"> 97</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-98"> 98</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-99"> 99</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-100">100</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-101">101</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-102">102</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-103">103</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-104">104</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-105">105</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-106">106</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-107">107</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-108">108</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-118">118</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-119">119</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-120">120</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-125">125</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-126">126</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-127">127</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-128">128</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-129">129</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-130">130</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-131">131</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-132">132</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-133">133</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-134">134</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-135">135</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-136">136</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-137">137</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-138">138</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-139">139</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-140">140</a></span>
+<span class="normal"><a href="#meedee.ci_live.run--source--__codelineno-0-141">141</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.ci_live.run--source--__span-0-15"><a id="meedee.ci_live.run--source--__codelineno-0-15" name="meedee.ci_live.run--source--__codelineno-0-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-16"><a id="meedee.ci_live.run--source--__codelineno-0-16" name="meedee.ci_live.run--source--__codelineno-0-16"></a>    <span class="n">browser</span><span class="p">:</span> <span class="n">ci</span><span class="o">.</span><span class="n">Browser</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-17"><a id="meedee.ci_live.run--source--__codelineno-0-17" name="meedee.ci_live.run--source--__codelineno-0-17"></a>    <span class="n">receiver</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">TypedInputConnection</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-18"><a id="meedee.ci_live.run--source--__codelineno-0-18" name="meedee.ci_live.run--source--__codelineno-0-18"></a>    <span class="n">output</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">OutputConnection</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-19"><a id="meedee.ci_live.run--source--__codelineno-0-19" name="meedee.ci_live.run--source--__codelineno-0-19"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-20"><a id="meedee.ci_live.run--source--__codelineno-0-20" name="meedee.ci_live.run--source--__codelineno-0-20"></a>    <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-21"><a id="meedee.ci_live.run--source--__codelineno-0-21" name="meedee.ci_live.run--source--__codelineno-0-21"></a>    <span class="n">message_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1_048_576</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-22"><a id="meedee.ci_live.run--source--__codelineno-0-22" name="meedee.ci_live.run--source--__codelineno-0-22"></a>    <span class="n">byte_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8_388_608</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-23"><a id="meedee.ci_live.run--source--__codelineno-0-23" name="meedee.ci_live.run--source--__codelineno-0-23"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ci</span><span class="o">.</span><span class="n">BrowseReport</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-24"><a id="meedee.ci_live.run--source--__codelineno-0-24" name="meedee.ci_live.run--source--__codelineno-0-24"></a><span class="w">    </span><span class="sd">"""Run a fresh browser; callers own connections and serialize all access.</span>
+</span><span id="meedee.ci_live.run--source--__span-0-25"><a id="meedee.ci_live.run--source--__codelineno-0-25" name="meedee.ci_live.run--source--__codelineno-0-25"></a>
+</span><span id="meedee.ci_live.run--source--__span-0-26"><a id="meedee.ci_live.run--source--__codelineno-0-26" name="meedee.ci_live.run--source--__codelineno-0-26"></a><span class="sd">    A group-less route uses MIDI 1 bytes; an explicit group uses UMP SysEx7.</span>
+</span><span id="meedee.ci_live.run--source--__span-0-27"><a id="meedee.ci_live.run--source--__codelineno-0-27" name="meedee.ci_live.run--source--__codelineno-0-27"></a><span class="sd">    Full-action handoffs are counted, and a partial/interrupted action is uncertain.</span>
+</span><span id="meedee.ci_live.run--source--__span-0-28"><a id="meedee.ci_live.run--source--__codelineno-0-28" name="meedee.ci_live.run--source--__codelineno-0-28"></a><span class="sd">    """</span>
+</span><span id="meedee.ci_live.run--source--__span-0-29"><a id="meedee.ci_live.run--source--__codelineno-0-29" name="meedee.ci_live.run--source--__codelineno-0-29"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">midi</span>
+</span><span id="meedee.ci_live.run--source--__span-0-30"><a id="meedee.ci_live.run--source--__codelineno-0-30" name="meedee.ci_live.run--source--__codelineno-0-30"></a>
+</span><span id="meedee.ci_live.run--source--__span-0-31"><a id="meedee.ci_live.run--source--__codelineno-0-31" name="meedee.ci_live.run--source--__codelineno-0-31"></a>    <span class="n">route</span> <span class="o">=</span> <span class="n">browser</span><span class="o">.</span><span class="n">route</span>
+</span><span id="meedee.ci_live.run--source--__span-0-32"><a id="meedee.ci_live.run--source--__codelineno-0-32" name="meedee.ci_live.run--source--__codelineno-0-32"></a>    <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">input</span> <span class="o">!=</span> <span class="n">receiver</span><span class="o">.</span><span class="n">stream</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-33"><a id="meedee.ci_live.run--source--__codelineno-0-33" name="meedee.ci_live.run--source--__codelineno-0-33"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"browser route must match the receiver stream"</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-34"><a id="meedee.ci_live.run--source--__codelineno-0-34" name="meedee.ci_live.run--source--__codelineno-0-34"></a>    <span class="n">assembler</span> <span class="o">=</span> <span class="n">ump</span><span class="o">.</span><span class="n">EventAssembler</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-35"><a id="meedee.ci_live.run--source--__codelineno-0-35" name="meedee.ci_live.run--source--__codelineno-0-35"></a>        <span class="n">message_limit</span><span class="o">=</span><span class="n">message_limit</span><span class="p">,</span> <span class="n">total_limit</span><span class="o">=</span><span class="n">byte_limit</span><span class="p">,</span> <span class="n">max_streams</span><span class="o">=</span><span class="mi">1</span>
+</span><span id="meedee.ci_live.run--source--__span-0-36"><a id="meedee.ci_live.run--source--__codelineno-0-36" name="meedee.ci_live.run--source--__codelineno-0-36"></a>    <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-37"><a id="meedee.ci_live.run--source--__codelineno-0-37" name="meedee.ci_live.run--source--__codelineno-0-37"></a>    <span class="n">queue</span><span class="p">:</span> <span class="n">deque</span><span class="p">[</span><span class="n">ci</span><span class="o">.</span><span class="n">Action</span><span class="p">]</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+</span><span id="meedee.ci_live.run--source--__span-0-38"><a id="meedee.ci_live.run--source--__codelineno-0-38" name="meedee.ci_live.run--source--__codelineno-0-38"></a>    <span class="n">sending</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="meedee.ci_live.run--source--__span-0-39"><a id="meedee.ci_live.run--source--__codelineno-0-39" name="meedee.ci_live.run--source--__codelineno-0-39"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-40"><a id="meedee.ci_live.run--source--__codelineno-0-40" name="meedee.ci_live.run--source--__codelineno-0-40"></a>        <span class="n">queue</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">browser</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">monotonic_ns</span><span class="p">()))</span>
+</span><span id="meedee.ci_live.run--source--__span-0-41"><a id="meedee.ci_live.run--source--__codelineno-0-41" name="meedee.ci_live.run--source--__codelineno-0-41"></a>        <span class="k">while</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">status</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"discovering"</span><span class="p">,</span> <span class="s2">"inquiring"</span><span class="p">,</span> <span class="s2">"stopping"</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-42"><a id="meedee.ci_live.run--source--__codelineno-0-42" name="meedee.ci_live.run--source--__codelineno-0-42"></a>            <span class="k">if</span> <span class="n">cancel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cancel</span><span class="o">.</span><span class="n">cancelled</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-43"><a id="meedee.ci_live.run--source--__codelineno-0-43" name="meedee.ci_live.run--source--__codelineno-0-43"></a>                <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"cancelled by caller"</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-44"><a id="meedee.ci_live.run--source--__codelineno-0-44" name="meedee.ci_live.run--source--__codelineno-0-44"></a>                <span class="k">break</span>
+</span><span id="meedee.ci_live.run--source--__span-0-45"><a id="meedee.ci_live.run--source--__codelineno-0-45" name="meedee.ci_live.run--source--__codelineno-0-45"></a>            <span class="k">if</span> <span class="n">receiver</span><span class="o">.</span><span class="n">dropped_packets</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-46"><a id="meedee.ci_live.run--source--__codelineno-0-46" name="meedee.ci_live.run--source--__codelineno-0-46"></a>                <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"input packet loss reported by transport counter"</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-47"><a id="meedee.ci_live.run--source--__codelineno-0-47" name="meedee.ci_live.run--source--__codelineno-0-47"></a>                <span class="k">break</span>
+</span><span id="meedee.ci_live.run--source--__span-0-48"><a id="meedee.ci_live.run--source--__codelineno-0-48" name="meedee.ci_live.run--source--__codelineno-0-48"></a>            <span class="k">if</span> <span class="p">(</span><span class="n">error</span> <span class="o">:=</span> <span class="n">receiver</span><span class="o">.</span><span class="n">failure</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-49"><a id="meedee.ci_live.run--source--__codelineno-0-49" name="meedee.ci_live.run--source--__codelineno-0-49"></a>                <span class="k">raise</span> <span class="n">error</span>
+</span><span id="meedee.ci_live.run--source--__span-0-50"><a id="meedee.ci_live.run--source--__codelineno-0-50" name="meedee.ci_live.run--source--__codelineno-0-50"></a>            <span class="n">queue</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">browser</span><span class="o">.</span><span class="n">poll</span><span class="p">(</span><span class="n">monotonic_ns</span><span class="p">()))</span>
+</span><span id="meedee.ci_live.run--source--__span-0-51"><a id="meedee.ci_live.run--source--__codelineno-0-51" name="meedee.ci_live.run--source--__codelineno-0-51"></a>            <span class="n">pending</span> <span class="o">=</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">pending_tokens</span>
+</span><span id="meedee.ci_live.run--source--__span-0-52"><a id="meedee.ci_live.run--source--__codelineno-0-52" name="meedee.ci_live.run--source--__codelineno-0-52"></a>            <span class="n">queue</span> <span class="o">=</span> <span class="n">deque</span><span class="p">(</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">queue</span> <span class="k">if</span> <span class="n">a</span><span class="o">.</span><span class="n">token</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-53"><a id="meedee.ci_live.run--source--__codelineno-0-53" name="meedee.ci_live.run--source--__codelineno-0-53"></a>            <span class="k">if</span> <span class="n">queue</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-54"><a id="meedee.ci_live.run--source--__codelineno-0-54" name="meedee.ci_live.run--source--__codelineno-0-54"></a>                <span class="n">action</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
+</span><span id="meedee.ci_live.run--source--__span-0-55"><a id="meedee.ci_live.run--source--__codelineno-0-55" name="meedee.ci_live.run--source--__codelineno-0-55"></a>                <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-56"><a id="meedee.ci_live.run--source--__codelineno-0-56" name="meedee.ci_live.run--source--__codelineno-0-56"></a>                    <span class="n">packets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">messages</span><span class="o">.</span><span class="n">Message</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">action</span><span class="o">.</span><span class="n">message</span><span class="p">]</span>
+</span><span id="meedee.ci_live.run--source--__span-0-57"><a id="meedee.ci_live.run--source--__codelineno-0-57" name="meedee.ci_live.run--source--__codelineno-0-57"></a>                <span class="k">else</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-58"><a id="meedee.ci_live.run--source--__codelineno-0-58" name="meedee.ci_live.run--source--__codelineno-0-58"></a>                    <span class="n">wire</span> <span class="o">=</span> <span class="n">codecs</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-59"><a id="meedee.ci_live.run--source--__codelineno-0-59" name="meedee.ci_live.run--source--__codelineno-0-59"></a>                    <span class="n">packets</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-60"><a id="meedee.ci_live.run--source--__codelineno-0-60" name="meedee.ci_live.run--source--__codelineno-0-60"></a>                        <span class="n">ump</span><span class="o">.</span><span class="n">packetize_sysex7</span><span class="p">(</span><span class="n">group</span><span class="o">=</span><span class="n">route</span><span class="o">.</span><span class="n">group</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">wire</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+</span><span id="meedee.ci_live.run--source--__span-0-61"><a id="meedee.ci_live.run--source--__codelineno-0-61" name="meedee.ci_live.run--source--__codelineno-0-61"></a>                    <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-62"><a id="meedee.ci_live.run--source--__codelineno-0-62" name="meedee.ci_live.run--source--__codelineno-0-62"></a>                <span class="k">for</span> <span class="n">packet</span> <span class="ow">in</span> <span class="n">packets</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-63"><a id="meedee.ci_live.run--source--__codelineno-0-63" name="meedee.ci_live.run--source--__codelineno-0-63"></a>                    <span class="k">if</span> <span class="n">receiver</span><span class="o">.</span><span class="n">dropped_packets</span> <span class="ow">or</span> <span class="n">receiver</span><span class="o">.</span><span class="n">failure</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-64"><a id="meedee.ci_live.run--source--__codelineno-0-64" name="meedee.ci_live.run--source--__codelineno-0-64"></a>                        <span class="k">raise</span> <span class="n">midi</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-65"><a id="meedee.ci_live.run--source--__codelineno-0-65" name="meedee.ci_live.run--source--__codelineno-0-65"></a>                            <span class="s2">"input failed or lost packets during management send"</span>
+</span><span id="meedee.ci_live.run--source--__span-0-66"><a id="meedee.ci_live.run--source--__codelineno-0-66" name="meedee.ci_live.run--source--__codelineno-0-66"></a>                        <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-67"><a id="meedee.ci_live.run--source--__codelineno-0-67" name="meedee.ci_live.run--source--__codelineno-0-67"></a>                    <span class="k">if</span> <span class="n">cancel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cancel</span><span class="o">.</span><span class="n">cancelled</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-68"><a id="meedee.ci_live.run--source--__codelineno-0-68" name="meedee.ci_live.run--source--__codelineno-0-68"></a>                        <span class="k">raise</span> <span class="ne">KeyboardInterrupt</span>
+</span><span id="meedee.ci_live.run--source--__span-0-69"><a id="meedee.ci_live.run--source--__codelineno-0-69" name="meedee.ci_live.run--source--__codelineno-0-69"></a>                    <span class="n">sending</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">token</span>
+</span><span id="meedee.ci_live.run--source--__span-0-70"><a id="meedee.ci_live.run--source--__codelineno-0-70" name="meedee.ci_live.run--source--__codelineno-0-70"></a>                    <span class="n">output</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">packet</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-71"><a id="meedee.ci_live.run--source--__codelineno-0-71" name="meedee.ci_live.run--source--__codelineno-0-71"></a>                <span class="n">queue</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-72"><a id="meedee.ci_live.run--source--__codelineno-0-72" name="meedee.ci_live.run--source--__codelineno-0-72"></a>                    <span class="n">browser</span><span class="o">.</span><span class="n">report_send</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-73"><a id="meedee.ci_live.run--source--__codelineno-0-73" name="meedee.ci_live.run--source--__codelineno-0-73"></a>                        <span class="n">token</span><span class="o">=</span><span class="n">action</span><span class="o">.</span><span class="n">token</span><span class="p">,</span> <span class="n">sent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">now_ns</span><span class="o">=</span><span class="n">monotonic_ns</span><span class="p">()</span>
+</span><span id="meedee.ci_live.run--source--__span-0-74"><a id="meedee.ci_live.run--source--__codelineno-0-74" name="meedee.ci_live.run--source--__codelineno-0-74"></a>                    <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-75"><a id="meedee.ci_live.run--source--__codelineno-0-75" name="meedee.ci_live.run--source--__codelineno-0-75"></a>                <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-76"><a id="meedee.ci_live.run--source--__codelineno-0-76" name="meedee.ci_live.run--source--__codelineno-0-76"></a>                <span class="n">sending</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="meedee.ci_live.run--source--__span-0-77"><a id="meedee.ci_live.run--source--__codelineno-0-77" name="meedee.ci_live.run--source--__codelineno-0-77"></a>                <span class="k">continue</span>
+</span><span id="meedee.ci_live.run--source--__span-0-78"><a id="meedee.ci_live.run--source--__codelineno-0-78" name="meedee.ci_live.run--source--__codelineno-0-78"></a>            <span class="k">if</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">status</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"discovering"</span><span class="p">,</span> <span class="s2">"inquiring"</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-79"><a id="meedee.ci_live.run--source--__codelineno-0-79" name="meedee.ci_live.run--source--__codelineno-0-79"></a>                <span class="k">continue</span>
+</span><span id="meedee.ci_live.run--source--__span-0-80"><a id="meedee.ci_live.run--source--__codelineno-0-80" name="meedee.ci_live.run--source--__codelineno-0-80"></a>            <span class="n">item</span> <span class="o">=</span> <span class="n">receiver</span><span class="o">.</span><span class="n">receive</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-81"><a id="meedee.ci_live.run--source--__codelineno-0-81" name="meedee.ci_live.run--source--__codelineno-0-81"></a>            <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-82"><a id="meedee.ci_live.run--source--__codelineno-0-82" name="meedee.ci_live.run--source--__codelineno-0-82"></a>                <span class="k">continue</span>
+</span><span id="meedee.ci_live.run--source--__span-0-83"><a id="meedee.ci_live.run--source--__codelineno-0-83" name="meedee.ci_live.run--source--__codelineno-0-83"></a>            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-84"><a id="meedee.ci_live.run--source--__codelineno-0-84" name="meedee.ci_live.run--source--__codelineno-0-84"></a>                <span class="n">assembler</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+</span><span id="meedee.ci_live.run--source--__span-0-85"><a id="meedee.ci_live.run--source--__codelineno-0-85" name="meedee.ci_live.run--source--__codelineno-0-85"></a>                <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-86"><a id="meedee.ci_live.run--source--__codelineno-0-86" name="meedee.ci_live.run--source--__codelineno-0-86"></a>                <span class="k">break</span>
+</span><span id="meedee.ci_live.run--source--__span-0-87"><a id="meedee.ci_live.run--source--__codelineno-0-87" name="meedee.ci_live.run--source--__codelineno-0-87"></a>            <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">stream</span> <span class="o">!=</span> <span class="n">route</span><span class="o">.</span><span class="n">input</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-88"><a id="meedee.ci_live.run--source--__codelineno-0-88" name="meedee.ci_live.run--source--__codelineno-0-88"></a>                <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"received event from an unrelated stream"</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-89"><a id="meedee.ci_live.run--source--__codelineno-0-89" name="meedee.ci_live.run--source--__codelineno-0-89"></a>                <span class="k">break</span>
+</span><span id="meedee.ci_live.run--source--__span-0-90"><a id="meedee.ci_live.run--source--__codelineno-0-90" name="meedee.ci_live.run--source--__codelineno-0-90"></a>            <span class="k">if</span> <span class="n">route</span><span class="o">.</span><span class="n">group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-91"><a id="meedee.ci_live.run--source--__codelineno-0-91" name="meedee.ci_live.run--source--__codelineno-0-91"></a>                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="n">messages</span><span class="o">.</span><span class="n">SysEx</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-92"><a id="meedee.ci_live.run--source--__codelineno-0-92" name="meedee.ci_live.run--source--__codelineno-0-92"></a>                    <span class="n">queue</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-93"><a id="meedee.ci_live.run--source--__codelineno-0-93" name="meedee.ci_live.run--source--__codelineno-0-93"></a>                        <span class="n">browser</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-94"><a id="meedee.ci_live.run--source--__codelineno-0-94" name="meedee.ci_live.run--source--__codelineno-0-94"></a>                            <span class="n">item</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="n">route</span><span class="o">.</span><span class="n">input</span><span class="p">,</span> <span class="n">now_ns</span><span class="o">=</span><span class="n">monotonic_ns</span><span class="p">()</span>
+</span><span id="meedee.ci_live.run--source--__span-0-95"><a id="meedee.ci_live.run--source--__codelineno-0-95" name="meedee.ci_live.run--source--__codelineno-0-95"></a>                        <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-96"><a id="meedee.ci_live.run--source--__codelineno-0-96" name="meedee.ci_live.run--source--__codelineno-0-96"></a>                    <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-97"><a id="meedee.ci_live.run--source--__codelineno-0-97" name="meedee.ci_live.run--source--__codelineno-0-97"></a>            <span class="k">elif</span> <span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-98"><a id="meedee.ci_live.run--source--__codelineno-0-98" name="meedee.ci_live.run--source--__codelineno-0-98"></a>                <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="n">ump</span><span class="o">.</span><span class="n">SysEx7Packet</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-99"><a id="meedee.ci_live.run--source--__codelineno-0-99" name="meedee.ci_live.run--source--__codelineno-0-99"></a>                <span class="ow">and</span> <span class="n">item</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">group</span> <span class="o">==</span> <span class="n">route</span><span class="o">.</span><span class="n">group</span>
+</span><span id="meedee.ci_live.run--source--__span-0-100"><a id="meedee.ci_live.run--source--__codelineno-0-100" name="meedee.ci_live.run--source--__codelineno-0-100"></a>            <span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-101"><a id="meedee.ci_live.run--source--__codelineno-0-101" name="meedee.ci_live.run--source--__codelineno-0-101"></a>                <span class="k">for</span> <span class="n">observation</span> <span class="ow">in</span> <span class="n">assembler</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-102"><a id="meedee.ci_live.run--source--__codelineno-0-102" name="meedee.ci_live.run--source--__codelineno-0-102"></a>                    <span class="n">value</span> <span class="o">=</span> <span class="n">observation</span><span class="o">.</span><span class="n">value</span>
+</span><span id="meedee.ci_live.run--source--__span-0-103"><a id="meedee.ci_live.run--source--__codelineno-0-103" name="meedee.ci_live.run--source--__codelineno-0-103"></a>                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">ump</span><span class="o">.</span><span class="n">AssembledData</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-104"><a id="meedee.ci_live.run--source--__codelineno-0-104" name="meedee.ci_live.run--source--__codelineno-0-104"></a>                        <span class="n">queue</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-105"><a id="meedee.ci_live.run--source--__codelineno-0-105" name="meedee.ci_live.run--source--__codelineno-0-105"></a>                            <span class="n">browser</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-106"><a id="meedee.ci_live.run--source--__codelineno-0-106" name="meedee.ci_live.run--source--__codelineno-0-106"></a>                                <span class="n">messages</span><span class="o">.</span><span class="n">SysEx</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">data</span><span class="p">),</span>
+</span><span id="meedee.ci_live.run--source--__span-0-107"><a id="meedee.ci_live.run--source--__codelineno-0-107" name="meedee.ci_live.run--source--__codelineno-0-107"></a>                                <span class="nb">input</span><span class="o">=</span><span class="n">route</span><span class="o">.</span><span class="n">input</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-108"><a id="meedee.ci_live.run--source--__codelineno-0-108" name="meedee.ci_live.run--source--__codelineno-0-108"></a>                                <span class="n">group</span><span class="o">=</span><span class="n">route</span><span class="o">.</span><span class="n">group</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-109"><a id="meedee.ci_live.run--source--__codelineno-0-109" name="meedee.ci_live.run--source--__codelineno-0-109"></a>                                <span class="n">now_ns</span><span class="o">=</span><span class="n">monotonic_ns</span><span class="p">(),</span>
+</span><span id="meedee.ci_live.run--source--__span-0-110"><a id="meedee.ci_live.run--source--__codelineno-0-110" name="meedee.ci_live.run--source--__codelineno-0-110"></a>                            <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-111"><a id="meedee.ci_live.run--source--__codelineno-0-111" name="meedee.ci_live.run--source--__codelineno-0-111"></a>                        <span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-112"><a id="meedee.ci_live.run--source--__codelineno-0-112" name="meedee.ci_live.run--source--__codelineno-0-112"></a>                    <span class="k">else</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-113"><a id="meedee.ci_live.run--source--__codelineno-0-113" name="meedee.ci_live.run--source--__codelineno-0-113"></a>                        <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"UMP SysEx7 assembly diagnostic: "</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+</span><span id="meedee.ci_live.run--source--__span-0-114"><a id="meedee.ci_live.run--source--__codelineno-0-114" name="meedee.ci_live.run--source--__codelineno-0-114"></a>    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-115"><a id="meedee.ci_live.run--source--__codelineno-0-115" name="meedee.ci_live.run--source--__codelineno-0-115"></a>        <span class="k">if</span> <span class="n">sending</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sending</span> <span class="ow">in</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">pending_tokens</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-116"><a id="meedee.ci_live.run--source--__codelineno-0-116" name="meedee.ci_live.run--source--__codelineno-0-116"></a>            <span class="n">browser</span><span class="o">.</span><span class="n">report_send</span><span class="p">(</span><span class="n">token</span><span class="o">=</span><span class="n">sending</span><span class="p">,</span> <span class="n">sent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">now_ns</span><span class="o">=</span><span class="n">monotonic_ns</span><span class="p">())</span>
+</span><span id="meedee.ci_live.run--source--__span-0-117"><a id="meedee.ci_live.run--source--__codelineno-0-117" name="meedee.ci_live.run--source--__codelineno-0-117"></a>            <span class="n">sending</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="meedee.ci_live.run--source--__span-0-118"><a id="meedee.ci_live.run--source--__codelineno-0-118" name="meedee.ci_live.run--source--__codelineno-0-118"></a>        <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"interrupted"</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-119"><a id="meedee.ci_live.run--source--__codelineno-0-119" name="meedee.ci_live.run--source--__codelineno-0-119"></a>    <span class="k">except</span> <span class="p">(</span>
+</span><span id="meedee.ci_live.run--source--__span-0-120"><a id="meedee.ci_live.run--source--__codelineno-0-120" name="meedee.ci_live.run--source--__codelineno-0-120"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">MidiError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-121"><a id="meedee.ci_live.run--source--__codelineno-0-121" name="meedee.ci_live.run--source--__codelineno-0-121"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">StateError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-122"><a id="meedee.ci_live.run--source--__codelineno-0-122" name="meedee.ci_live.run--source--__codelineno-0-122"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">CallbackThreadError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-123"><a id="meedee.ci_live.run--source--__codelineno-0-123" name="meedee.ci_live.run--source--__codelineno-0-123"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">NativePanicError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-124"><a id="meedee.ci_live.run--source--__codelineno-0-124" name="meedee.ci_live.run--source--__codelineno-0-124"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">ResourceError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-125"><a id="meedee.ci_live.run--source--__codelineno-0-125" name="meedee.ci_live.run--source--__codelineno-0-125"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-126"><a id="meedee.ci_live.run--source--__codelineno-0-126" name="meedee.ci_live.run--source--__codelineno-0-126"></a>        <span class="n">midi</span><span class="o">.</span><span class="n">WorkerTimeoutError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-127"><a id="meedee.ci_live.run--source--__codelineno-0-127" name="meedee.ci_live.run--source--__codelineno-0-127"></a>        <span class="ne">OSError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-128"><a id="meedee.ci_live.run--source--__codelineno-0-128" name="meedee.ci_live.run--source--__codelineno-0-128"></a>        <span class="ne">ValueError</span><span class="p">,</span>
+</span><span id="meedee.ci_live.run--source--__span-0-129"><a id="meedee.ci_live.run--source--__codelineno-0-129" name="meedee.ci_live.run--source--__codelineno-0-129"></a>    <span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-130"><a id="meedee.ci_live.run--source--__codelineno-0-130" name="meedee.ci_live.run--source--__codelineno-0-130"></a>        <span class="k">if</span> <span class="n">sending</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sending</span> <span class="ow">in</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">pending_tokens</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-131"><a id="meedee.ci_live.run--source--__codelineno-0-131" name="meedee.ci_live.run--source--__codelineno-0-131"></a>            <span class="n">browser</span><span class="o">.</span><span class="n">report_send</span><span class="p">(</span><span class="n">token</span><span class="o">=</span><span class="n">sending</span><span class="p">,</span> <span class="n">sent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">now_ns</span><span class="o">=</span><span class="n">monotonic_ns</span><span class="p">())</span>
+</span><span id="meedee.ci_live.run--source--__span-0-132"><a id="meedee.ci_live.run--source--__codelineno-0-132" name="meedee.ci_live.run--source--__codelineno-0-132"></a>            <span class="n">sending</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="meedee.ci_live.run--source--__span-0-133"><a id="meedee.ci_live.run--source--__codelineno-0-133" name="meedee.ci_live.run--source--__codelineno-0-133"></a>        <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span>
+</span><span id="meedee.ci_live.run--source--__span-0-134"><a id="meedee.ci_live.run--source--__codelineno-0-134" name="meedee.ci_live.run--source--__codelineno-0-134"></a>        <span class="k">raise</span>
+</span><span id="meedee.ci_live.run--source--__span-0-135"><a id="meedee.ci_live.run--source--__codelineno-0-135" name="meedee.ci_live.run--source--__codelineno-0-135"></a>    <span class="k">finally</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-136"><a id="meedee.ci_live.run--source--__codelineno-0-136" name="meedee.ci_live.run--source--__codelineno-0-136"></a>        <span class="k">if</span> <span class="n">sending</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sending</span> <span class="ow">in</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">pending_tokens</span><span class="p">:</span>
+</span><span id="meedee.ci_live.run--source--__span-0-137"><a id="meedee.ci_live.run--source--__codelineno-0-137" name="meedee.ci_live.run--source--__codelineno-0-137"></a>            <span class="n">browser</span><span class="o">.</span><span class="n">report_send</span><span class="p">(</span><span class="n">token</span><span class="o">=</span><span class="n">sending</span><span class="p">,</span> <span class="n">sent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">now_ns</span><span class="o">=</span><span class="n">monotonic_ns</span><span class="p">())</span>
+</span><span id="meedee.ci_live.run--source--__span-0-138"><a id="meedee.ci_live.run--source--__codelineno-0-138" name="meedee.ci_live.run--source--__codelineno-0-138"></a>        <span class="n">assembler</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+</span><span id="meedee.ci_live.run--source--__span-0-139"><a id="meedee.ci_live.run--source--__codelineno-0-139" name="meedee.ci_live.run--source--__codelineno-0-139"></a>        <span class="k">if</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">status</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"discovering"</span><span class="p">,</span> <span class="s2">"inquiring"</span><span class="p">,</span> <span class="s2">"stopping"</span><span class="p">):</span>
+</span><span id="meedee.ci_live.run--source--__span-0-140"><a id="meedee.ci_live.run--source--__codelineno-0-140" name="meedee.ci_live.run--source--__codelineno-0-140"></a>            <span class="n">browser</span><span class="o">.</span><span class="n">stop</span><span class="p">(</span><span class="s2">"scan did not complete"</span><span class="p">)</span>
+</span><span id="meedee.ci_live.run--source--__span-0-141"><a id="meedee.ci_live.run--source--__codelineno-0-141" name="meedee.ci_live.run--source--__codelineno-0-141"></a>    <span class="k">return</span> <span class="n">browser</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      
+    
+  </body>
+</html>
