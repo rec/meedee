@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import inspect
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import partial
 from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, gm, messages, midi, mpe
+from . import _native, events, messages, midi
 from ._errors import CompoundSendError
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
 from .events import Clock, ReceivedPacket
@@ -107,6 +107,8 @@ class Input:
 
 
 class Output:
+    """Discover MIDI destinations and open message/packet output connections."""
+
     __slots__ = ("_native", "_context", "_protocol")
 
     def __init__(
@@ -271,6 +273,8 @@ class InputConnection:
 
 
 class OutputConnection:
+    """An open destination for messages, encoded packets and timed playback."""
+
     __slots__ = ("_client", "_native", "_closed", "_generation", "__weakref__")
 
     def __init__(self) -> None:
@@ -287,11 +291,60 @@ class OutputConnection:
         )
         return connection
 
-    def send(self, packet: bytes | bytearray | memoryview | midi.UmpPacket) -> None:
+    def play(
+        self,
+        source: Iterable[object],
+        *,
+        origin: events.Timestamp,
+        mappings: list[events.ClockMapping]
+        | tuple[events.ClockMapping, ...]
+        | None = None,
+        cancel: events.Cancellation | None = None,
+        allow_rounding: bool = False,
+        metrics: bool = False,
+    ) -> events.PlaybackReport:
+        """Play timestamped events on the caller's thread, stopping on failure."""
+        return _native.play(
+            self,
+            source,
+            origin=origin,
+            mappings=mappings,
+            cancel=cancel,
+            allow_rounding=allow_rounding,
+            metrics=metrics,
+        )
+
+    def send(
+        self, value: messages.Message | bytes | bytearray | memoryview | midi.UmpPacket
+    ) -> None:
+        """Send a message, compound command or encoded packet immediately.
+
+        Compound operations serialize their entire expansion on this connection.
+        CompoundSendError reports known progress when part of an operation fails.
+        Protocol conversion is never implicit.
+        """
         _native.check_thread()
-        packet = _native.prepare_send(self._client._protocol, packet)
-        if self._native is not None:
-            self._native.send(packet)
+        prepared = _native.prepare_output(self._client._protocol, value)
+        if isinstance(prepared, tuple):
+            total = prepared[2]
+            try:
+                if self._native is not None:
+                    self._native.send_command(value)
+                else:
+                    if self.closed:
+                        raise _native.StateError("MIDI connection is closed or failed")
+                    assert self._client._context is not None
+                    self._client._context.request(
+                        "send_command", [prepared, self._generation], serial=True
+                    )
+            except (
+                _native.WorkerError,
+                _native.WorkerTimeoutError,
+                _native.NativePanicError,
+            ) as error:
+                raise CompoundSendError(str(error), None, total) from error
+        elif self._native is not None:
+            self._native.send(prepared)
         else:
             if self.closed:
                 raise _native.StateError("MIDI connection is closed or failed")
@@ -299,43 +352,13 @@ class OutputConnection:
             self._client._context.request(
                 "send",
                 [
-                    packet.words if isinstance(packet, midi.UmpPacket) else packet,
+                    prepared.words
+                    if isinstance(prepared, midi.UmpPacket)
+                    else prepared,
                     self._generation,
                 ],
                 serial=True,
             )
-
-    def send_command(
-        self,
-        command: messages.ControlChange14
-        | messages.RpnSet
-        | messages.NrpnSet
-        | messages.RpnIncrement
-        | messages.RpnDecrement
-        | messages.NrpnIncrement
-        | messages.NrpnDecrement
-        | gm.BankProgramSelect
-        | mpe.ZoneConfiguration,
-    ) -> None:
-        _native.check_thread()
-        wire = _native.prepare_command(self._client._protocol, command)
-        total = wire[2]
-        try:
-            if self._native is not None:
-                self._native.send_command(command)
-            else:
-                if self.closed:
-                    raise _native.StateError("MIDI connection is closed or failed")
-                assert self._client._context is not None
-                self._client._context.request(
-                    "send_command", [wire, self._generation], serial=True
-                )
-        except (
-            _native.WorkerError,
-            _native.WorkerTimeoutError,
-            _native.NativePanicError,
-        ) as error:
-            raise CompoundSendError(str(error), None, total) from error
 
     @property
     def closed(self) -> bool:

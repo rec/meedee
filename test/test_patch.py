@@ -92,7 +92,7 @@ class Output:
     def __exit__(self, *args: object) -> None:
         self.closed = True
 
-    def send_message(self, message: messages.Message) -> None:
+    def send(self, message: messages.Message) -> None:
         if self.error is not None:
             raise self.error
         self.sent.append(message)
@@ -111,7 +111,7 @@ def install(
     def input_client(**kwargs: object) -> Input:
         return source
 
-    monkeypatch.setattr(midi, "TypedOutput", output_client)
+    monkeypatch.setattr(midi, "Output", output_client)
     monkeypatch.setattr(midi, "TypedInput", input_client)
 
 

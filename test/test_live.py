@@ -77,10 +77,10 @@ def test_ump_framing_and_typed_send_never_downgrade_or_send_opaque_values() -> N
     )
     assert value.span is not None and value.span.first_packet == 0
     with pytest.raises(midi.CapabilityError):
-        _native.prepare_message(midi.Protocol.Midi1, value.message)
+        _native.prepare_output(midi.Protocol.Midi1, value.message)
     opaque = ump.decode((0x60000000,), preserve_unknown=True)
     with pytest.raises(midi.CapabilityError, match="opaque"):
-        _native.prepare_message(midi.Protocol.Ump, opaque)
+        _native.prepare_output(midi.Protocol.Ump, opaque)
 
 
 def test_clock_mapping_and_rounding_require_explicit_policy() -> None:
@@ -110,13 +110,10 @@ class Sink:
         self.sent: list[messages.Message] = []
         self.fail_at = fail_at
 
-    def send_message(self, message: messages.Message) -> None:
+    def send(self, message: messages.Message) -> None:
         if len(self.sent) == self.fail_at:
             raise midi.SendError("device failed")
         self.sent.append(message)
-
-    def send_command(self, command: messages.Message) -> None:
-        self.send_message(command)
 
 
 def test_playback_cancellation_and_partial_failure_do_not_send_cleanup() -> None:

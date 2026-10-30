@@ -172,10 +172,9 @@ fn play(
     let source = Source {
         iterator: source.try_iter()?.into_any().unbind(),
     };
-    let send_message = output.getattr("send_message")?.unbind();
-    let send_command = output.getattr("send_command")?.unbind();
-    if !send_message.bind(py).is_callable() || !send_command.bind(py).is_callable() {
-        return Err(PyTypeError::new_err("typed MIDI output required"));
+    let send = output.getattr("send")?.unbind();
+    if !send.bind(py).is_callable() {
+        return Err(PyTypeError::new_err("MIDI output with callable send required"));
     }
     let result = py.detach(move || {
         model::play(
@@ -185,12 +184,7 @@ fn play(
             &cancel,
             |message| {
                 Python::attach(|py| {
-                    let callable = if matches!(message, meedee::events::Payload::Command(_)) {
-                        &send_command
-                    } else {
-                        &send_message
-                    };
-                    callable
+                    send
                         .bind(py)
                         .call1((payload_python(py, message.clone())?,))?;
                     Ok::<(), PyErr>(())

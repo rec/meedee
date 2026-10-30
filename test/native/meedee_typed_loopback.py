@@ -11,7 +11,7 @@ from meedee import archive, events, messages, midi
 def exercise(isolated: bool, destination: Path) -> None:
     name = f"meedee-typed-test-{uuid4().hex}"
     with midi.TypedInput(isolated=isolated).create_virtual(name) as receiver:
-        sender = midi.TypedOutput(isolated=isolated)
+        sender = midi.Output(isolated=isolated)
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
         with sender.connect(matches[0]) as output:
@@ -21,7 +21,7 @@ def exercise(isolated: bool, destination: Path) -> None:
                 messages.NoteOff(channel=1, note=60, velocity=0),
             ]
             for n in notes:
-                output.send_message(n)
+                output.send(n)
             received = [receiver.receive(timeout=3) for _ in notes]
             assert all(isinstance(e, events.Event) for e in received), received
             assert [e.message for e in received if isinstance(e, events.Event)] == notes

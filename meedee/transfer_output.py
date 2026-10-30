@@ -1,4 +1,4 @@
-"""Caller-thread SysEx delivery through an existing MIDI 1 typed output."""
+"""Caller-thread SysEx delivery through an existing MIDI 1 output."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def run(
     session: transfer.Session,
-    output: midi.TypedOutputConnection,
+    output: midi.OutputConnection,
     *,
     cancel: events.Cancellation | None = None,
 ) -> transfer.Report:
@@ -38,7 +38,7 @@ def run(
                 sleep(min(0.05, max(0, deadline - now) / 1_000_000_000))
                 continue
             try:
-                output.send_message(step.message)
+                output.send(step.message)
             except (
                 midi.MidiError,
                 midi.StateError,

@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meedee import gm, messages, midi, mpe
+from meedee import events, gm, messages, midi, mpe, ump
 from meedee._native import CallbackBridge
 from meedee._transport import (
     RECEIVE_CAPACITY,
@@ -1066,7 +1066,7 @@ def test_compound_failure_preserves_progress_through_the_worker_pipe(
     connection = source.connect(source.ports()[0])
     command = messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
     with pytest.raises(midi.CompoundSendError, match="device disconnected") as error:
-        connection.send_command(command)
+        connection.send(command)
     assert isinstance(error.value, midi.SendError)
     assert error.value.completed_messages == accepted
     assert error.value.total_messages == 6
@@ -1085,9 +1085,7 @@ def test_compound_worker_loss_reports_unknown_progress(
     source = output_client(mode, timeout=1)
     connection = source.connect(source.ports()[0])
     with pytest.raises(midi.CompoundSendError) as error:
-        connection.send_command(
-            messages.ControlChange14(channel=1, controller=7, value=10000)
-        )
+        connection.send(messages.ControlChange14(channel=1, controller=7, value=10000))
     assert error.value.completed_messages is None
     assert error.value.total_messages == 2
     assert connection.closed
@@ -1100,8 +1098,8 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     source = output_client("check_command")
     connection = source.connect(source.ports()[0])
     with pytest.raises(TypeError):
-        connection.send_command(b"\xb0\x07\x01")  # ty: ignore[invalid-argument-type]
-    connection.send_command(
+        connection.send(object())  # ty: ignore[invalid-argument-type]
+    connection.send(
         messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
     )
     connection.close()
@@ -1109,7 +1107,7 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     ump = output_client("healthy", protocol=midi.Protocol.Ump)
     with ump.connect(ump.ports()[0]) as connection:
         with pytest.raises(midi.CapabilityError):
-            connection.send_command(
+            connection.send(
                 messages.ControlChange14(channel=1, controller=7, value=10000)
             )
         assert not connection.closed
@@ -1128,7 +1126,7 @@ def test_worker_failure_after_command_acknowledgment_preserves_complete_progress
 
     with patch.object(context.replies, "get", side_effect=acknowledged):
         with pytest.raises(midi.CompoundSendError) as error:
-            connection.send_command(
+            connection.send(
                 messages.ControlChange14(channel=1, controller=7, value=10000)
             )
     assert error.value.completed_messages == error.value.total_messages == 2
@@ -1200,11 +1198,11 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
     )
     if mode == "partial_command_2":
         with pytest.raises(midi.CompoundSendError) as error:
-            connection.send_command(command)
+            connection.send(command)
         assert (error.value.completed_messages, error.value.total_messages) == (2, 3)
         assert connection.closed
     else:
-        connection.send_command(command)
+        connection.send(command)
         assert not connection.closed
         connection.close()
 
@@ -1278,16 +1276,48 @@ def test_typed_receive_wakes_on_cancellation_and_close(
 def test_typed_callback_retains_the_blocking_operation_guard(
     workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from meedee import events
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "early")
     called = Event()
 
     def callback(value: events.Event | events.StreamDiagnostic) -> None:
         with pytest.raises(midi.CallbackThreadError):
-            midi.TypedOutput(timeout=1)
+            midi.Output(timeout=1)
         called.set()
 
     source = midi.TypedInput(timeout=1)
     with source.connect(source.ports()[0], callback):
         assert called.wait(2)
+
+
+def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
+    workers: list[Popen[bytes]],
+) -> None:
+    client = output_client("check_note")
+    note = messages.NoteOn(channel=1, note=60, velocity=100)
+    clock = events.Clock(identity="output-test")
+    origin = events.Timestamp(ticks=0, clock=clock)
+    with client.connect(client.ports()[0]) as output:
+        output.send(b"\x90\x3c\x64")
+        output.send(note)
+        output.send(messages.ControlChange14(channel=1, controller=7, value=128))
+        report = output.play(
+            [
+                events.Event(stream="test", timestamp=origin, message=note),
+                events.Event(
+                    stream="test",
+                    timestamp=origin,
+                    message=messages.ControlChange14(
+                        channel=1, controller=7, value=128
+                    ),
+                ),
+            ],
+            origin=origin,
+            metrics=True,
+        )
+        assert report.sent_events == 2 and not report.cancelled
+        assert report.lateness is not None and report.lateness.count == 2
+        with pytest.raises(midi.CapabilityError, match="protocols differ"):
+            output.send(ump.Midi1Packet(group=1, message=note))
+        assert not output.closed and output.worker_failure is None
+    assert output.closed

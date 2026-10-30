@@ -33,7 +33,7 @@ from meedee import events, messages, midi
 
 
 def main() -> None:
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     for port in ports:
         print(port.name)
@@ -75,9 +75,7 @@ def main() -> None:
         finally:
             if not finished:
                 for note in notes:
-                    output.send_message(
-                        messages.NoteOff(channel=1, note=note, velocity=0)
-                    )
+                    output.send(messages.NoteOff(channel=1, note=note, velocity=0))
     print("Melody finished.")
 
 
@@ -174,7 +172,7 @@ from meedee import events, messages, midi
 
 def main() -> None:
     inputs = midi.TypedInput()
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     sources = inputs.ports()
     destinations = outputs.ports()
     print("Inputs:", [p.name for p in sources])
@@ -202,13 +200,13 @@ def main() -> None:
                 message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
             ):
                 if message.channel == 1 and message.note + 12 <= 127:
-                    output.send_message(message.replace(note=message.note + 12))
+                    output.send(message.replace(note=message.note + 12))
             elif isinstance(message, messages.ControlChange):
                 if message.channel == 1 and message.controller < 120:
-                    output.send_message(message)
+                    output.send(message)
             elif isinstance(message, (messages.ChannelPressure, messages.PitchBend)):
                 if message.channel == 1:
-                    output.send_message(message)
+                    output.send(message)
     print("Transposer stopped.")
 
 
@@ -241,7 +239,7 @@ from meedee import events, messages, midi
 
 def main() -> None:
     inputs = midi.TypedInput()
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     sources = inputs.ports()
     destinations = outputs.ports()
     print("Inputs:", [p.name for p in sources])
@@ -252,8 +250,8 @@ def main() -> None:
     (destination,) = [p for p in destinations if p.name == destination_name]
 
     with inputs.connect(source) as receiver, outputs.connect(destination) as output:
-        output.send_message(messages.ProgramChange(channel=2, program=34))
-        output.send_message(messages.ProgramChange(channel=3, program=81))
+        output.send(messages.ProgramChange(channel=2, program=34))
+        output.send(messages.ProgramChange(channel=3, program=81))
         print("Split at C4 for 60 seconds. Release keys and pedals before it ends.")
         deadline = monotonic() + 60
         while monotonic() < deadline:
@@ -272,15 +270,15 @@ def main() -> None:
             ):
                 if message.channel == 1:
                     channel = 2 if message.note < 60 else 3
-                    output.send_message(message.replace(channel=channel))
+                    output.send(message.replace(channel=channel))
             elif isinstance(message, messages.ControlChange):
                 if message.channel == 1 and message.controller in (1, 7, 11, 64):
                     for channel in [2, 3]:
-                        output.send_message(message.replace(channel=channel))
+                        output.send(message.replace(channel=channel))
             elif isinstance(message, (messages.PitchBend, messages.ChannelPressure)):
                 if message.channel == 1:
                     for channel in [2, 3]:
-                        output.send_message(message.replace(channel=channel))
+                        output.send(message.replace(channel=channel))
     print("Keyboard split stopped.")
 
 
@@ -348,7 +346,7 @@ def main() -> None:
     if origin is None:
         raise RuntimeError("No timestamped events were recorded.")
 
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     ports = outputs.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("Synth input port for replay: ")
@@ -495,7 +493,7 @@ def restore(path: Path) -> None:
     gap_ms = float(input("Minimum gap after each message, in milliseconds: "))
     plan = transfer.read_file(path, gap_ns=int(gap_ms * 1_000_000))
     print(f"Ready to send {plan.message_count} messages, {plan.wire_bytes} bytes.")
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("Instrument input port to restore: ")
@@ -596,15 +594,15 @@ def main() -> None:
             ]
         )
 
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("MTS synth input port: ")
     (port,) = [p for p in ports if p.name == name]
     with client.connect(port) as output:
-        output.send_message(raw)
+        output.send(raw)
         input("Wait for the synth to finish loading, then press Enter to audition: ")
-        output.send_command(controls.tuning_program(channel=1, program=2))
+        output.send(controls.tuning_program(channel=1, program=2))
         finished = False
         try:
             print("Auditioning keys 69, 70, 71, 70, 69 with 600 ms per note.")
@@ -617,9 +615,7 @@ def main() -> None:
         finally:
             if not finished:
                 for note in [69, 70, 71]:
-                    output.send_message(
-                        messages.NoteOff(channel=1, note=note, velocity=0)
-                    )
+                    output.send(messages.NoteOff(channel=1, note=note, velocity=0))
     print("Audition finished; tuning program 2 remains loaded and selected.")
 
 
@@ -649,7 +645,7 @@ from meedee import controls, events, messages, midi, mpe
 
 
 def main() -> None:
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("MPE synth input port: ")
@@ -713,9 +709,9 @@ def main() -> None:
     )
 
     with client.connect(port) as output:
-        output.send_command(zone)
+        output.send(zone)
         for voice in [root, moving]:
-            output.send_command(
+            output.send(
                 controls.pitch_bend_sensitivity(
                     channel=voice.channel, semitones=48, cents=0
                 )
@@ -734,7 +730,7 @@ def main() -> None:
         finally:
             if not finished:
                 for message in ending:
-                    output.send_message(message)
+                    output.send(message)
     print("MPE phrase finished.")
 
 
@@ -778,7 +774,7 @@ def main() -> None:
         manufacturer=manufacturer, family=family, model=model, revision=revision
     )
     inputs = midi.TypedInput()
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     sources = inputs.ports()
     destinations = outputs.ports()
     print("Inputs:", [p.name for p in sources])

@@ -128,7 +128,6 @@ fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>
         .collect()
 }
 
-#[pyfunction]
 pub fn prepare_command(
     protocol: crate::packets::Protocol,
     command: &Bound<'_, PyAny>,

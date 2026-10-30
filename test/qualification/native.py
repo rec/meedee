@@ -16,7 +16,7 @@ def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
     name = f"meedee-qualification-{uuid4().hex}"
     start = perf_counter_ns()
     with midi.TypedInput(isolated=isolated).create_virtual(name) as receiver:
-        sender = midi.TypedOutput(isolated=isolated)
+        sender = midi.Output(isolated=isolated)
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
         with sender.connect(matches[0]) as output:
@@ -37,7 +37,7 @@ def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
             for n in range(256):
                 value = messages.ControlChange(channel=1, controller=7, value=n % 128)
                 start = perf_counter_ns()
-                output.send_message(value)
+                output.send(value)
                 received = receiver.receive(timeout=2)
                 assert isinstance(received, events.Event), received
                 assert received.message == value

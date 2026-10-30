@@ -61,13 +61,10 @@ class Sink:
         self.sent = 0
         self.fail = fail
 
-    def send_message(self, message: messages.Message) -> None:
+    def send(self, message: messages.Message) -> None:
         if self.fail and self.sent == 1:
             raise midi.SendError("simulated send failure")
         self.sent += 1
-
-    def send_command(self, message: messages.Message) -> None:
-        raise AssertionError("this test sends primitives only")
 
 
 def test_playback_metrics_are_opt_in_and_cover_only_successful_handoffs() -> None:

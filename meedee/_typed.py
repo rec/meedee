@@ -1,10 +1,10 @@
-"""Typed lifecycle adapters over the sole raw transport implementation."""
+"""Typed input adapters over the sole transport implementation."""
 
 from __future__ import annotations
 
 import math
 from _thread import LockType
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from os import PathLike
 from queue import Empty, Full
 from threading import Lock
@@ -12,12 +12,10 @@ from time import monotonic
 from types import TracebackType
 from uuid import uuid4
 
-from . import _native, archive, events, messages, midi
+from . import _native, archive, events, midi
 from ._clients import (
     Input,
     InputConnection,
-    Output,
-    OutputConnection,
     close_context,
     validate_open,
 )
@@ -363,93 +361,3 @@ class TypedInputConnection:
             bridge.retire()
         if (recorder := getattr(self, "_recorder", None)) is not None:
             recorder.fail("input was abandoned during recording")
-
-
-class TypedOutput:
-    def __init__(
-        self,
-        *,
-        protocol: midi.Protocol = midi.Protocol.Midi1,
-        backend: midi.Backend | None = None,
-        isolated: bool = True,
-        timeout: float = 5.0,
-    ) -> None:
-        self._protocol = protocol
-        self._client = Output(
-            protocol=protocol, backend=backend, isolated=isolated, timeout=timeout
-        )
-
-    def ports(self) -> list[midi.Port]:
-        return self._client.ports()
-
-    def connect(self, port: midi.Port) -> TypedOutputConnection:
-        return TypedOutputConnection._create(self._client.connect(port), self._protocol)
-
-    def create_virtual(self, name: str) -> TypedOutputConnection:
-        return TypedOutputConnection._create(
-            self._client.create_virtual(name), self._protocol
-        )
-
-
-class TypedOutputConnection:
-    _raw: OutputConnection
-    _protocol: midi.Protocol
-
-    def __init__(self) -> None:
-        raise TypeError("connection handles are created by TypedOutput")
-
-    @classmethod
-    def _create(
-        cls, raw: OutputConnection, protocol: midi.Protocol
-    ) -> TypedOutputConnection:
-        connection = object.__new__(cls)
-        connection._raw = raw
-        connection._protocol = protocol
-        return connection
-
-    def send_message(self, message: messages.Message) -> None:
-        self._raw.send(_native.prepare_message(self._protocol, message))
-
-    def play(
-        self,
-        source: Iterable[object],
-        *,
-        origin: events.Timestamp,
-        mappings: list[events.ClockMapping]
-        | tuple[events.ClockMapping, ...]
-        | None = None,
-        cancel: events.Cancellation | None = None,
-        allow_rounding: bool = False,
-        metrics: bool = False,
-    ) -> events.PlaybackReport:
-        return _native.play(
-            self,
-            source,
-            origin=origin,
-            mappings=mappings,
-            cancel=cancel,
-            allow_rounding=allow_rounding,
-            metrics=metrics,
-        )
-
-    def send_command(self, command: messages.Message) -> None:
-        self._raw.send_command(command)  # ty: ignore[invalid-argument-type]
-
-    @property
-    def closed(self) -> bool:
-        return self._raw.closed
-
-    def close(self) -> None:
-        self._raw.close()
-
-    def __enter__(self) -> TypedOutputConnection:
-        self._raw.__enter__()
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        close_context(self.close, exc_value)

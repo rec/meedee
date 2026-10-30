@@ -63,7 +63,7 @@ def run_query(config: TuningPreview) -> int:
             None if config.backend is None else getattr(midi.Backend, config.backend)
         )
         with ExitStack() as stack:
-            output_client = midi.TypedOutput(
+            output_client = midi.Output(
                 protocol=midi.Protocol.Midi1, backend=backend, isolated=config.isolated
             )
             input_client = midi.TypedInput(

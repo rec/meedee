@@ -8,13 +8,13 @@ from meedee import ci, codecs, events, messages, midi, ump
 
 
 def dispatch(
-    session: ci.Session, action: ci.Action, output: midi.TypedOutputConnection
+    session: ci.Session, action: ci.Action, output: midi.OutputConnection
 ) -> None:
     assert action.route.group is not None
     wire = codecs.encode(action.message)
     try:
         for p in ump.packetize_sysex7(group=action.route.group, data=wire[1:-1]):
-            output.send_message(p)
+            output.send(p)
     except midi.MidiError:
         session.report_send(token=action.token, sent=False, now_ns=monotonic_ns())
         raise
@@ -34,8 +34,8 @@ def receive(
                 return messages.SysEx(data=data.data)
 
 
-def connect(name: str) -> midi.TypedOutputConnection:
-    client = midi.TypedOutput(protocol=midi.Protocol.Ump)
+def connect(name: str) -> midi.OutputConnection:
+    client = midi.Output(protocol=midi.Protocol.Ump)
     matches = [p for p in client.ports() if p.name == name]
     assert len(matches) == 1, "test-owned destination was not discovered uniquely"
     return client.connect(matches[0])

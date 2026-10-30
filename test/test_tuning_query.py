@@ -166,7 +166,7 @@ def test_fault_at_final_receive_or_during_send_cannot_complete_a_query(
             return events.Event(stream="s", message=messages.SysEx(data=reply()[1:-1]))
 
     class Output:
-        def send_message(self, message: messages.Message) -> None:
+        def send(self, message: messages.Message) -> None:
             if fault == "interrupt":
                 raise KeyboardInterrupt
 

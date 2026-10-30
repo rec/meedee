@@ -4,7 +4,7 @@ use crate::files::{limit, os_error, uint};
 use crate::packets::{Protocol, ReceivedPacket, UmpPacket};
 use meedee::{events::Payload, live as model};
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyTuple};
 #[pyclass(frozen, module = "meedee.events")]
 pub struct StreamDiagnostic {
     pub value: model::Diagnostic,
@@ -112,7 +112,23 @@ pub(crate) fn item(py: Python<'_>, v: model::Item) -> PyResult<Py<PyAny>> {
     }
 }
 #[pyfunction]
-pub fn prepare_message(
+pub fn prepare_output(
+    py: Python<'_>,
+    protocol: Protocol,
+    message: &Bound<'_, PyAny>,
+) -> PyResult<Py<PyAny>> {
+    if !message.is_instance_of::<crate::messages::Message>() {
+        return crate::packets::prepare_send(py, protocol, message);
+    }
+    let prepared = prepare_message(py, protocol, message)?;
+    if prepared.bind(py).is_instance_of::<PyTuple>() {
+        Ok(prepared)
+    } else {
+        crate::packets::prepare_send(py, protocol, prepared.bind(py))
+    }
+}
+
+fn prepare_message(
     py: Python<'_>,
     protocol: Protocol,
     message: &Bound<'_, PyAny>,
@@ -157,9 +173,10 @@ pub fn prepare_message(
                 .into_any());
             }
             (_, Payload::Command(_)) => {
-                return Err(crate::errors::CapabilityError::new_err(
-                    "use send_command for compound commands",
-                ))
+                return Ok(crate::codecs::prepare_command(protocol, message)?
+                    .into_pyobject(py)?
+                    .into_any()
+                    .unbind());
             }
             _ => {
                 return Err(crate::errors::CapabilityError::new_err(

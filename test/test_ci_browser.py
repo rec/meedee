@@ -131,7 +131,7 @@ class Output:
         self.assembler = ump.Assembler()
         self.closed = False
 
-    def send_message(self, message: messages.Message) -> None:
+    def send(self, message: messages.Message) -> None:
         self.sent.append(message)
         if self.fail and len(self.sent) == 2:
             raise midi.SendError("second packet may have been sent")
@@ -188,7 +188,7 @@ def run(
     return ci_live.run(
         b,
         cast(midi.TypedInputConnection, receiver),
-        cast(midi.TypedOutputConnection, output),
+        cast(midi.OutputConnection, output),
         cancel=cancel,
     )
 
@@ -266,7 +266,7 @@ def test_cli_requires_identity_and_explicit_ump_group_before_transport(
     def forbidden(**kwargs: object) -> None:
         pytest.fail("transport constructed for invalid CLI configuration")
 
-    monkeypatch.setattr(midi, "TypedOutput", forbidden)
+    monkeypatch.setattr(midi, "Output", forbidden)
     for extra in [
         [],
         [
@@ -321,7 +321,7 @@ def test_cli_uses_fresh_muid_and_closes_both_connections(
             return self.connection
 
     monkeypatch.setattr(midi, "TypedInput", lambda **kwargs: Client(receiver, "in"))
-    monkeypatch.setattr(midi, "TypedOutput", lambda **kwargs: Client(output, "out"))
+    monkeypatch.setattr(midi, "Output", lambda **kwargs: Client(output, "out"))
     with pytest.raises(SystemExit) as result:
         cli.main(
             [
