@@ -25,12 +25,11 @@ on the platform and build.
 **Result:** the selected instrument plays an ascending C-major scale.
 
 **You need:** a hardware synth or software instrument listening on MIDI channel
-1. Select a playable sound on the instrument first. Save as `melody.py`.
+1. Select a playable sound and reserve channel 1 for this example. Save as
+`melody.py`.
 
 ```python
-from time import sleep
-
-from meedee import messages, midi
+from meedee import events, messages, midi
 
 
 def main() -> None:
@@ -41,15 +40,44 @@ def main() -> None:
     name = input("Synth input port: ")
     (port,) = [p for p in ports if p.name == name]
 
+    # One tick is one millisecond; every event has a deadline from the same zero.
+    clock = events.Clock(identity="melody", tick_numerator=1, tick_denominator=1000)
+    origin = events.Timestamp(ticks=0, clock=clock)
+    notes = [60, 62, 64, 65, 67, 69, 71, 72]
+    sequence: list[events.Event] = []
+    for index, note in enumerate(notes):
+        start = index * 350
+        sequence.extend(
+            [
+                events.Event(
+                    stream="melody",
+                    timestamp=events.Timestamp(ticks=start, clock=clock),
+                    message=messages.NoteOn(channel=1, note=note, velocity=90),
+                ),
+                events.Event(
+                    stream="melody",
+                    timestamp=events.Timestamp(ticks=start + 300, clock=clock),
+                    message=messages.NoteOff(channel=1, note=note, velocity=0),
+                ),
+            ]
+        )
+
     with client.connect(port) as output:
-        for note in [60, 62, 64, 65, 67, 69, 71, 72]:
-            print(f"Playing MIDI note {note}")
-            try:
-                output.send_message(messages.NoteOn(channel=1, note=note, velocity=90))
-                sleep(0.3)
-            finally:
-                output.send_message(messages.NoteOff(channel=1, note=note, velocity=0))
-            sleep(0.05)
+        finished = False
+        try:
+            print("Playing the scale with 300 ms notes and 50 ms gaps.")
+            report = output.play(sequence, origin=origin, metrics=True)
+            finished = not report.cancelled
+            print(
+                f"Sent {report.sent_events} events; "
+                f"max lateness={report.max_lateness_ns} ns"
+            )
+        finally:
+            if not finished:
+                for note in notes:
+                    output.send_message(
+                        messages.NoteOff(channel=1, note=note, velocity=0)
+                    )
     print("Melody finished.")
 
 
@@ -58,9 +86,15 @@ if __name__ == "__main__":
 ```
 
 Message constructors use channels 1..16 and MIDI 1 notes/velocities 0..127.
-The `finally` block attempts to release each note even after interruption. A
-failed send still leaves device state uncertain; closing a port does not silence
-an instrument. No bank or program changes are needed for this first example.
+`output.play()` schedules the timestamped sequence against one monotonic origin,
+so send overhead does not accumulate into later note deadlines. The timestamps
+are exact musical intentions; operating-system timing and output handoff can
+still be late. Metrics report host lateness, not physical audio latency.
+
+The sequence includes its NoteOffs. If playback is interrupted, the `finally`
+block attempts releases for the phrase's keys on the reserved channel. A failed
+send still leaves device state uncertain; closing a port does not silence an
+instrument. No bank or program changes are needed for this first example.
 
 ## 2. See what your keyboard is sending
 
@@ -514,12 +548,11 @@ back up that program first if needed. Save as `audition_tuning.py`.
 
 ```python
 from pathlib import Path
-from time import sleep
 from uuid import uuid4
 
 from ufor.tuning import RatioTable, Tuning
 
-from meedee import codecs, controls, messages, midi, syx, tuning, ufor_tuning
+from meedee import codecs, controls, events, messages, midi, syx, ufor_tuning
 
 
 def main() -> None:
@@ -543,6 +576,26 @@ def main() -> None:
         syx.write(stream, [raw])
     print(f"Saved tuning dump to {path}.")
 
+    clock = events.Clock(identity="audition", tick_numerator=1, tick_denominator=1000)
+    origin = events.Timestamp(ticks=0, clock=clock)
+    sequence: list[events.Event] = []
+    for index, note in enumerate([69, 70, 71, 70, 69]):
+        start = index * 600
+        sequence.extend(
+            [
+                events.Event(
+                    stream="audition",
+                    timestamp=events.Timestamp(ticks=start, clock=clock),
+                    message=messages.NoteOn(channel=1, note=note, velocity=90),
+                ),
+                events.Event(
+                    stream="audition",
+                    timestamp=events.Timestamp(ticks=start + 600, clock=clock),
+                    message=messages.NoteOff(channel=1, note=note, velocity=0),
+                ),
+            ]
+        )
+
     client = midi.TypedOutput()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
@@ -552,14 +605,21 @@ def main() -> None:
         output.send_message(raw)
         input("Wait for the synth to finish loading, then press Enter to audition: ")
         output.send_command(controls.tuning_program(channel=1, program=2))
-        for note in [69, 70, 71, 70, 69]:
-            converted = tuning.Pitch.from_frequency(frequency_hz=float(source(note)))
-            print(f"Playing key {note}: encoded {converted.pitch.frequency_hz:.3f} Hz")
-            try:
-                output.send_message(messages.NoteOn(channel=1, note=note, velocity=90))
-                sleep(0.6)
-            finally:
-                output.send_message(messages.NoteOff(channel=1, note=note, velocity=0))
+        finished = False
+        try:
+            print("Auditioning keys 69, 70, 71, 70, 69 with 600 ms per note.")
+            report = output.play(sequence, origin=origin, metrics=True)
+            finished = not report.cancelled
+            print(
+                f"Sent {report.sent_events} events; "
+                f"max lateness={report.max_lateness_ns} ns"
+            )
+        finally:
+            if not finished:
+                for note in [69, 70, 71]:
+                    output.send_message(
+                        messages.NoteOff(channel=1, note=note, velocity=0)
+                    )
     print("Audition finished; tuning program 2 remains loaded and selected.")
 
 
@@ -571,6 +631,8 @@ Unselected keys are explicitly preserved with NoChange. MTS tuning programs are
 0..127, unlike ordinary `ProgramChange.program`, which is 1..128. The library can
 construct and send the tuning but cannot establish that an instrument applied it.
 The wait is for the operator to confirm readiness, not an inferred acknowledgement.
+Reserve channel 1 for the audition. As in example 1, playback schedules both
+attacks and releases, with explicit release attempts if the sequence is interrupted.
 
 ## 9. Bend one note in a chord with MPE
 
@@ -583,9 +645,7 @@ semitones and leaves that configuration in place. Use these channels exclusively
 for the example. Save as `mpe_expression.py`.
 
 ```python
-from time import sleep
-
-from meedee import controls, messages, midi, mpe
+from meedee import controls, events, messages, midi, mpe
 
 
 def main() -> None:
@@ -599,6 +659,59 @@ def main() -> None:
     root = allocator.allocate(note=60, velocity=90)
     moving = allocator.allocate(note=64, velocity=90)
 
+    clock = events.Clock(identity="mpe-phrase", tick_numerator=1, tick_denominator=1000)
+    origin = events.Timestamp(ticks=0, clock=clock)
+    sequence: list[events.Event] = []
+    for voice in [root, moving]:
+        initial = [
+            messages.PitchBend(channel=voice.channel, value=0),
+            messages.ChannelPressure(channel=voice.channel, pressure=0),
+            messages.ControlChange(channel=voice.channel, controller=74, value=64),
+            voice.note_on,
+        ]
+        sequence.extend(
+            events.Event(
+                stream="mpe",
+                timestamp=origin,
+                message=m,
+            )
+            for m in initial
+        )
+    for step in range(41):
+        changes = [
+            messages.PitchBend(
+                channel=moving.channel, value=round(8192 * 2 / 48 * step / 40)
+            ),
+            messages.ChannelPressure(
+                channel=moving.channel, pressure=round(127 * step / 40)
+            ),
+            messages.ControlChange(
+                channel=moving.channel, controller=74, value=64 + round(63 * step / 40)
+            ),
+        ]
+        sequence.extend(
+            events.Event(
+                stream="mpe",
+                timestamp=events.Timestamp(ticks=step * 50, clock=clock),
+                message=m,
+            )
+            for m in changes
+        )
+    # Build releases from the allocator's voice tokens before playing the phrase.
+    releases = [allocator.release(voice_id=v.id, velocity=0) for v in [root, moving]]
+    ending: list[messages.Message] = [*releases]
+    ending.extend(
+        messages.PitchBend(channel=v.channel, value=0) for v in [root, moving]
+    )
+    sequence.extend(
+        events.Event(
+            stream="mpe",
+            timestamp=events.Timestamp(ticks=2500, clock=clock),
+            message=m,
+        )
+        for m in ending
+    )
+
     with client.connect(port) as output:
         output.send_command(zone)
         for voice in [root, moving]:
@@ -607,45 +720,21 @@ def main() -> None:
                     channel=voice.channel, semitones=48, cents=0
                 )
             )
+        finished = False
         try:
-            for voice in [root, moving]:
-                output.send_message(messages.PitchBend(channel=voice.channel, value=0))
-                output.send_message(
-                    messages.ChannelPressure(channel=voice.channel, pressure=0)
-                )
-                output.send_message(
-                    messages.ControlChange(
-                        channel=voice.channel, controller=74, value=64
-                    )
-                )
-                output.send_message(voice.note_on)
             print(
                 "Holding C while E bends upward with independent pressure and timbre."
             )
-            for step in range(41):
-                output.send_message(
-                    messages.PitchBend(
-                        channel=moving.channel, value=round(8192 * 2 / 48 * step / 40)
-                    )
-                )
-                output.send_message(
-                    messages.ChannelPressure(
-                        channel=moving.channel, pressure=round(127 * step / 40)
-                    )
-                )
-                output.send_message(
-                    messages.ControlChange(
-                        channel=moving.channel,
-                        controller=74,
-                        value=64 + round(63 * step / 40),
-                    )
-                )
-                sleep(0.05)
-            sleep(0.5)
+            report = output.play(sequence, origin=origin, metrics=True)
+            finished = not report.cancelled
+            print(
+                f"Sent {report.sent_events} events; "
+                f"max lateness={report.max_lateness_ns} ns"
+            )
         finally:
-            for voice in [root, moving]:
-                output.send_message(allocator.release(voice_id=voice.id, velocity=0))
-                output.send_message(messages.PitchBend(channel=voice.channel, value=0))
+            if not finished:
+                for message in ending:
+                    output.send_message(message)
     print("MPE phrase finished.")
 
 
@@ -654,10 +743,14 @@ if __name__ == "__main__":
 ```
 
 The allocator assigns separate member channels and returns voice tokens used to
-release the correct voices. The receiving preset decides how pressure and CC74
+construct the correct releases. The sequence schedules expression changes every
+50 ms through 2 seconds, then releases the chord at 2.5 seconds. Events sharing a
+timestamp retain list order. The receiving preset decides how pressure and CC74
 sound. A successful send does not prove it accepted the MPE configuration or
-bend range. Cleanup here releases this program's own voices, without issuing a
-global All Notes Off or reset; a transport failure can still prevent release.
+bend range. NoteOffs and bend resets are scheduled in the phrase; interrupted
+playback attempts that same ending immediately. Cleanup affects this program's
+reserved member channels, without issuing a global All Notes Off or reset; a
+transport failure can still prevent release.
 
 ## 10. Inventory MIDI-CI devices on a connection
 
