@@ -7,7 +7,7 @@ from playing a melody to managing tuning, expression and device discovery.
 Use Python 3.13. In this checkout, install with `uv sync --locked`, save a code
 block as a `.py` file, and run it with `uv run your_example.py`. Example 8 also
 needs `uv sync --locked --extra ufor`. Source-build requirements are in
-[README.md](../README.md#build-and-qualification).
+[README.md](https://github.com/rec/meedee/blob/main/README.md#build-and-qualification).
 
 The live examples list ports and ask for exact names. An input is a source your
 program receives from; an output is a destination it sends to. Names must match
@@ -343,7 +343,7 @@ silence. Capture timestamps retain relative timing, not a promise of physical
 latency. Playback can include controllers and SysEx received from the keyboard.
 Stopping playback or reaching the end of a take does not generate missing
 NoteOffs. Archive v1 is currently unpublished; see
-[the format contract](../plan/archive-format.md).
+[the format contract](https://github.com/rec/meedee/blob/main/plan/archive-format.md).
 
 ## 6. Export a transposed MIDI file
 
@@ -741,4 +741,5 @@ group) to `ci.Route`. The same browser adapter handles SysEx7 packetization and
 assembly. Native UMP availability depends on the selected backend.
 
 For ownership, bounds and failure details, consult
-[the API contract](../plan/api.md) and [the MIDI-CI contract](../plan/ci.md).
+[the API contract](https://github.com/rec/meedee/blob/main/plan/api.md) and
+[the MIDI-CI contract](https://github.com/rec/meedee/blob/main/plan/ci.md).
