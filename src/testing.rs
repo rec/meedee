@@ -217,7 +217,7 @@ impl Output {
             protocol: parse_protocol(protocol)?,
         })
     }
-    fn send(&mut self, packet: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn send_packet(&mut self, packet: &Bound<'_, PyAny>) -> PyResult<()> {
         self.value.send(extract_packet(packet)?).map_err(error)
     }
     fn send_message(&mut self, py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<()> {

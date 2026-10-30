@@ -190,13 +190,15 @@ class OutputConnection:
             raise midi.SendError("device disconnected")
         if self.mode == "check_bytes" and packet != b"\xf0\x7d\x00\xff\xf7":
             raise midi.SendError("bytes changed in transport")
+        if self.mode == "check_note" and packet != b"\x90\x3c\x64":
+            raise midi.SendError("note bytes changed in transport")
 
     def send_command(self, command: object) -> None:
         packets = [codecs.encode(p) for p in codecs.expand(command)]  # ty: ignore[invalid-argument-type]
         if self.mode.startswith("partial_command_"):
             accepted = int(self.mode.rpartition("_")[2])
             raise midi.CompoundSendError("device disconnected", accepted, len(packets))
-        if self.mode in ("check_command", "check_bank", "check_mpe"):
+        if self.mode in ("check_command", "check_bank", "check_mpe", "check_note"):
             expected = bytes.fromhex(
                 {
                     "check_command": (
@@ -204,6 +206,7 @@ class OutputConnection:
                     ),
                     "check_bank": "bf 00 79 bf 20 03 cf 7f",
                     "check_mpe": "bf 65 00 bf 64 06 bf 06 0f bf 65 7f bf 64 7f",
+                    "check_note": "b0 07 01 b0 27 00",
                 }[self.mode]
             )
             if b"".join(packets) != expected:

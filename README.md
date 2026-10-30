@@ -43,7 +43,7 @@ reader.close()
 
 score = smf.TimedReader("song.mid", stream="score")
 origin = score.origin  # Explicit zero preserves any leading silence.
-# With an opened TypedOutputConnection:
+# With an opened OutputConnection:
 # output.play(score, origin=origin)
 score.close()
 ```
@@ -64,9 +64,12 @@ explicit preservation; known Event headers are validated even for future message
 representations. Version 1 remains unpublished, with format freeze and future
 compatibility guarantees still owner decisions.
 
-`midi.TypedInput` and `midi.TypedOutput` use the existing raw transport, including
-its default Python process isolation. Input connections provide either a callback
-or `receive(timeout=..., cancel=...)`, returning an immutable `events.Event` or
+`midi.TypedInput` decodes received packets into events. `midi.Output` opens one
+`OutputConnection` supporting `send_message()` for message objects,
+`send_packet()` for encoded bytes/UMP packets, `send_command()` for compound
+operations and `play()` for timestamped events. Both use the same native
+transport and default Python process isolation. Typed input connections provide
+either a callback or `receive(timeout=..., cancel=...)`, returning an immutable `events.Event` or
 `events.StreamDiagnostic`. Events preserve primitive messages, the completion
 packet's timestamp and their contributing packet span. Optional `EventInterpreter`,
 `EventVelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
@@ -461,7 +464,8 @@ observations = [o for m in primitives for o in interpreter.feed(m)]
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
-identifier. Raw `send()` and primitive `encode()` remain unchanged; use `expand`
+identifier. Use `send_packet()` for encoded packets and primitive `encode()` for
+byte encoding; use `expand`
 to inspect commands and `send_command` to serialize their complete sequence.
 UMP outputs reject these MIDI 1.0 commands rather than translating silently.
 
@@ -520,10 +524,10 @@ dataset transfer/assembly is not provided.
 Translation is explicit and stateless. It reports exact, quantized, unsupported,
 profile-dependent and context-required cases. Bank/RPN/velocity-prefix input
 sequences require source context and are not guessed. Returned primitive lists
-are not atomic live sends; typed output requires an explicit send operation.
+are not atomic live sends; output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
-negotiation runs automatically. Raw output still takes meedee.midi.UmpPacket;
+negotiation runs automatically. `OutputConnection.send_packet()` takes `midi.UmpPacket`;
 construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
 has passed between test-owned virtual peers. Other native backends and physical
 MIDI 2.0 device compatibility remain unqualified.
@@ -537,8 +541,8 @@ output = Output()
 ports = output.ports()
 # Select an endpoint deliberately from this snapshot, for example ports[index].
 # with output.connect(ports[index]) as connection:
-#     connection.send(bytes([0x90, 60, 100]))
-#     connection.send(bytes([0x80, 60, 0]))
+#     connection.send_packet(bytes([0x90, 60, 100]))
+#     connection.send_packet(bytes([0x80, 60, 0]))
 ```
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
@@ -571,8 +575,8 @@ Nanosecond storage does not promise nanosecond accuracy.
 
 Receive packets are raw transport chunks, including partial SysEx or multiple
 UMPs. The binding does not assemble unfinished SysEx or apply `Ignore` filters.
-Use the pure byte codec explicitly for framing; typed transport/timestamps and
-receive filters remain later work. `send()` accepts unsigned-byte buffers,
+Use `TypedInput` for decoded events or the pure byte codec explicitly for framing.
+`OutputConnection.send_packet()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.

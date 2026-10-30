@@ -33,7 +33,7 @@ from meedee import events, messages, midi
 
 
 def main() -> None:
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     for port in ports:
         print(port.name)
@@ -174,7 +174,7 @@ from meedee import events, messages, midi
 
 def main() -> None:
     inputs = midi.TypedInput()
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     sources = inputs.ports()
     destinations = outputs.ports()
     print("Inputs:", [p.name for p in sources])
@@ -241,7 +241,7 @@ from meedee import events, messages, midi
 
 def main() -> None:
     inputs = midi.TypedInput()
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     sources = inputs.ports()
     destinations = outputs.ports()
     print("Inputs:", [p.name for p in sources])
@@ -348,7 +348,7 @@ def main() -> None:
     if origin is None:
         raise RuntimeError("No timestamped events were recorded.")
 
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     ports = outputs.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("Synth input port for replay: ")
@@ -495,7 +495,7 @@ def restore(path: Path) -> None:
     gap_ms = float(input("Minimum gap after each message, in milliseconds: "))
     plan = transfer.read_file(path, gap_ns=int(gap_ms * 1_000_000))
     print(f"Ready to send {plan.message_count} messages, {plan.wire_bytes} bytes.")
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("Instrument input port to restore: ")
@@ -596,7 +596,7 @@ def main() -> None:
             ]
         )
 
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("MTS synth input port: ")
@@ -649,7 +649,7 @@ from meedee import controls, events, messages, midi, mpe
 
 
 def main() -> None:
-    client = midi.TypedOutput()
+    client = midi.Output()
     ports = client.ports()
     print("Outputs:", [p.name for p in ports])
     name = input("MPE synth input port: ")
@@ -778,7 +778,7 @@ def main() -> None:
         manufacturer=manufacturer, family=family, model=model, revision=revision
     )
     inputs = midi.TypedInput()
-    outputs = midi.TypedOutput()
+    outputs = midi.Output()
     sources = inputs.ports()
     destinations = outputs.ports()
     print("Inputs:", [p.name for p in sources])

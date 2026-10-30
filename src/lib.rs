@@ -184,12 +184,7 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module.add(name, class)?;
     }
     let typed = PyModule::import(py, "meedee._typed")?;
-    for name in [
-        "TypedInput",
-        "TypedOutput",
-        "TypedInputConnection",
-        "TypedOutputConnection",
-    ] {
+    for name in ["TypedInput", "TypedInputConnection"] {
         let class = typed.getattr(name)?;
         class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;

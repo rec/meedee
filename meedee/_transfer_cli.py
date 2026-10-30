@@ -65,7 +65,7 @@ def run_transfer(config: TransferPreview) -> int:
         backend = (
             None if config.backend is None else getattr(midi.Backend, config.backend)
         )
-        client = midi.TypedOutput(
+        client = midi.Output(
             protocol=midi.Protocol.Midi1, backend=backend, isolated=config.isolated
         )
         port = select_port(client.ports(), config.port, direction="output")

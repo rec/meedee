@@ -1,4 +1,4 @@
-"""One MIDI 1 MTS dump query through caller-owned typed connections."""
+"""One MIDI 1 MTS dump query through caller-owned MIDI connections."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 def run(
     query: tuning.Query,
     receiver: midi.TypedInputConnection,
-    output: midi.TypedOutputConnection,
+    output: midi.OutputConnection,
     *,
     cancel: events.Cancellation | None = None,
 ) -> tuning.QueryReport:

@@ -66,7 +66,7 @@ def run_browse(config: CiBrowse) -> int:
             None if config.backend is None else getattr(midi.Backend, config.backend)
         )
         with ExitStack() as stack:
-            output_client = midi.TypedOutput(
+            output_client = midi.Output(
                 protocol=protocol, backend=backend, isolated=config.isolated
             )
             input_client = midi.TypedInput(

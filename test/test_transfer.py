@@ -102,7 +102,7 @@ def test_output_waits_from_send_completion_and_never_retries(
     monkeypatch.setattr(transfer_output, "sleep", advance)
     output = Output(clock, midi.SendError("failed"))
     s = transfer.Session(plan())
-    r = transfer_output.run(s, cast(midi.TypedOutputConnection, output))
+    r = transfer_output.run(s, cast(midi.OutputConnection, output))
     assert output.sent == [
         (0, bytes.fromhex("f0 01 f7")),
         (110, bytes.fromhex("f0 02 03 f7")),
@@ -111,8 +111,7 @@ def test_output_waits_from_send_completion_and_never_retries(
         r.status == "failed" and r.confirmed_messages == 1 and r.uncertain_message == 1
     )
     assert (
-        transfer_output.run(s, cast(midi.TypedOutputConnection, output)).status
-        == "failed"
+        transfer_output.run(s, cast(midi.OutputConnection, output)).status == "failed"
     )
     assert len(output.sent) == 2
 
@@ -124,7 +123,7 @@ def test_cancellation_before_or_during_send_keeps_uncertainty_visible(
     token.cancel()
     output = Output([0])
     r = transfer_output.run(
-        transfer.Session(plan()), cast(midi.TypedOutputConnection, output), cancel=token
+        transfer.Session(plan()), cast(midi.OutputConnection, output), cancel=token
     )
     assert r.status == "cancelled" and r.uncertain_message is None and output.sent == []
     clock = [0]
@@ -136,7 +135,7 @@ def test_cancellation_before_or_during_send_keeps_uncertainty_visible(
     monkeypatch.setattr(transfer_output, "sleep", advance)
     output = Output(clock, KeyboardInterrupt())
     r = transfer_output.run(
-        transfer.Session(plan()), cast(midi.TypedOutputConnection, output)
+        transfer.Session(plan()), cast(midi.OutputConnection, output)
     )
     assert (
         r.status == "cancelled"
@@ -161,7 +160,7 @@ def test_cancellation_during_gap_does_not_reserve_the_next_message(
     output = Output(clock)
     r = transfer_output.run(
         transfer.Session(plan(1_000_000_000)),
-        cast(midi.TypedOutputConnection, output),
+        cast(midi.OutputConnection, output),
         cancel=token,
     )
     assert waits == [0.05] and len(output.sent) == 1
@@ -178,6 +177,6 @@ def test_unexpected_sender_failure_propagates_with_inspectable_uncertainty(
     output = Output([0], LookupError("caller bug"))
     s = transfer.Session(plan(0))
     with pytest.raises(LookupError, match="caller bug"):
-        transfer_output.run(s, cast(midi.TypedOutputConnection, output))
+        transfer_output.run(s, cast(midi.OutputConnection, output))
     assert s.snapshot().status == "failed" and s.snapshot().uncertain_message == 1
     assert s.snapshot().confirmed_messages == 1

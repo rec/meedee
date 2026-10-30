@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import inspect
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from functools import partial
 from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, gm, messages, midi, mpe
+from . import _native, events, gm, messages, midi, mpe
 from ._errors import CompoundSendError
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
 from .events import Clock, ReceivedPacket
@@ -107,6 +107,8 @@ class Input:
 
 
 class Output:
+    """Discover MIDI destinations and open message/packet output connections."""
+
     __slots__ = ("_native", "_context", "_protocol")
 
     def __init__(
@@ -271,6 +273,8 @@ class InputConnection:
 
 
 class OutputConnection:
+    """An open destination for messages, encoded packets and timed playback."""
+
     __slots__ = ("_client", "_native", "_closed", "_generation", "__weakref__")
 
     def __init__(self) -> None:
@@ -287,7 +291,37 @@ class OutputConnection:
         )
         return connection
 
-    def send(self, packet: bytes | bytearray | memoryview | midi.UmpPacket) -> None:
+    def send_message(self, message: messages.Message) -> None:
+        """Encode and immediately send a message in the connection's protocol."""
+        self.send_packet(_native.prepare_message(self._client._protocol, message))
+
+    def play(
+        self,
+        source: Iterable[object],
+        *,
+        origin: events.Timestamp,
+        mappings: list[events.ClockMapping]
+        | tuple[events.ClockMapping, ...]
+        | None = None,
+        cancel: events.Cancellation | None = None,
+        allow_rounding: bool = False,
+        metrics: bool = False,
+    ) -> events.PlaybackReport:
+        """Play timestamped events on the caller's thread, stopping on failure."""
+        return _native.play(
+            self,
+            source,
+            origin=origin,
+            mappings=mappings,
+            cancel=cancel,
+            allow_rounding=allow_rounding,
+            metrics=metrics,
+        )
+
+    def send_packet(
+        self, packet: bytes | bytearray | memoryview | midi.UmpPacket
+    ) -> None:
+        """Immediately send encoded MIDI 1 bytes or one UMP packet."""
         _native.check_thread()
         packet = _native.prepare_send(self._client._protocol, packet)
         if self._native is not None:

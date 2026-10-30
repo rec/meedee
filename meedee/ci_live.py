@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 def run(
     browser: ci.Browser,
     receiver: midi.TypedInputConnection,
-    output: midi.TypedOutputConnection,
+    output: midi.OutputConnection,
     *,
     cancel: events.Cancellation | None = None,
     message_limit: int = 1_048_576,

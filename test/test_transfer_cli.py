@@ -50,7 +50,7 @@ def install(
             actions.append("connected")
             return connection
 
-    monkeypatch.setattr(midi, "TypedOutput", Client)
+    monkeypatch.setattr(midi, "Output", Client)
     return actions
 
 

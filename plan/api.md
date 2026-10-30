@@ -239,7 +239,7 @@ expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
 `OutputConnection.send_command(command)` accepts these commands on MIDI 1.0
-outputs, rejecting UMP before sending. Raw `send` remains unchanged. One native
+outputs, rejecting UMP before sending. Encoded packets use `send_packet`. One native
 owner-thread operation and the existing connection serialization cover the whole
 sequence, including release; raw sends, other commands and close cannot run
 between its steps on that connection. This is not atomicity against other
@@ -429,7 +429,7 @@ Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
 
 All these messages implement Rust PrimitiveMessage and Python Message, and work
-with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
+with `codecs.encode`. Raw output uses `connection.send_packet(codecs.encode(message))`;
 there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
 ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
 containing `message` and `checksum`, or None for unrelated/unsupported forms;
@@ -798,8 +798,12 @@ completion; recovery is explicit and returns only verified complete records.
 Native clock values and absent timestamps remain exact, with rational units and
 stable record IDs. Unknown records may be retained opaquely without execution.
 
-TypedInput/TypedOutput wrap the existing transport, preserving raw access and
-isolation. Input selects callbacks or a bounded receive queue at connection time.
+TypedInput wraps the existing input transport. Python Output opens one
+OutputConnection with send_message for message objects, send_packet for encoded
+packets, send_command for compound operations and play for timestamped events.
+Message and packet operations share connection ownership and process isolation;
+protocol conversion remains explicit. Input selects callbacks or a bounded
+receive queue at connection time.
 Events use completion-packet time with first/last contributing packet spans;
 primitive messages remain evidence and semantic observations remain separate.
 Recording uses one bounded writer thread (128 records and 8 MiB payload by
@@ -817,8 +821,9 @@ instruments and Windows/Linux native validation remain open.
 
 Rust modules smf/syx/clip/archive/events/live/recording/playback/file_timing and
 source-scoped event_views contain the shared logic. Python uses the same native
-implementations through focused modules; typed transport is composition over the
-sole raw transport implementation. No implicit MIDI 2 downgrade or group collapse
+implementations through focused modules; typed input composes the sole input
+transport, and output unifies packet/message access on the same connection.
+No implicit MIDI 2 downgrade or group collapse
 is introduced. Rust native typed callbacks are available through connect_typed
 and create_virtual_typed; Rust applications compose Decoder/Recorder/playback as
 needed without starting Python. Rust transport remains in-process.
@@ -1186,7 +1191,7 @@ handoff does not establish that bytes reached the wire or that an instrument
 accepted, applied or persisted the dump.
 
 `transfer_output.run(session, output, cancel=None)` is a synchronous Python
-adapter for an existing MIDI 1 `TypedOutputConnection`. It uses monotonic time,
+adapter for an existing MIDI 1 `OutputConnection`. It uses monotonic time,
 checks the existing `events.Cancellation` between sends and at most every 50 ms
 while waiting, and does not own/close the output. Native calls cannot be forcibly
 interrupted. Operational send failures return a failed report; Ctrl-C returns a
@@ -1272,7 +1277,8 @@ Already queued input/loss can be drained before receive raises that failure.
 is idempotent. Counters and failure evidence survive close. Context exit closes.
 
 `Output(protocol=..., packet_limit=128, byte_limit=8_388_608)` records accepted
-packets without connecting them to any input automatically. `send` uses existing
+packets without connecting them to any input automatically. Python `send_packet`
+(Rust `send`) uses existing
 raw transport validation; `send_message` uses the existing typed-send preparation,
 including rejection of implicit protocol translation/compound commands. Capacity
 exhaustion rejects without accepting or discarding a packet. `take_packet()`

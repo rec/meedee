@@ -70,7 +70,7 @@ def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
             if protocol == midi.Protocol.Midi1
             else midi.UmpPacket(words=[0x40903C00, 0xFFFFFFFF])
         )
-        outgoing.send(data)
+        outgoing.send_packet(data)
         packet = receiver.packets.get(timeout=5)
         assert packet.packet == data
         assert packet.clock == incoming.clock
@@ -107,7 +107,7 @@ def test_successful_close_restores_client_and_reopen_uses_a_new_clock() -> None:
             port = next(p for p in target.ports() if p.name == token)
             with pytest.raises(ValueError, match="body error"):
                 with target.connect(port) as outgoing:
-                    outgoing.send(b"\xf8")
+                    outgoing.send_packet(b"\xf8")
                     assert receiver.bytes_until(1) == b"\xf8"
                     raise ValueError("body error")
             assert outgoing.closed
@@ -130,7 +130,7 @@ def test_disappeared_endpoint_fails_open_and_requires_a_fresh_client() -> None:
         fresh = midi.Output()
         port = next(p for p in fresh.ports() if p.name == token)
         with fresh.connect(port) as outgoing:
-            outgoing.send(b"\x90\x3c\x7f")
+            outgoing.send_packet(b"\x90\x3c\x7f")
             assert receiver.bytes_until(3) == b"\x90\x3c\x7f"
 
 
@@ -147,7 +147,7 @@ def test_sysex_byte_stream_preserves_fragments_without_assembling_in_the_binding
     with source.create_virtual(token, receiver):
         port = next(p for p in target.ports() if p.name == token)
         with target.connect(port) as outgoing:
-            outgoing.send(message)
+            outgoing.send_packet(message)
             assert receiver.bytes_until(size) == message
 
 
@@ -162,7 +162,7 @@ def test_burst_preserves_raw_byte_stream() -> None:
         port = next(p for p in target.ports() if p.name == token)
         with target.connect(port) as outgoing:
             for m in messages:
-                outgoing.send(m)
+                outgoing.send_packet(m)
             assert receiver.bytes_until(3000) == b"".join(messages)
         assert incoming.dropped_packets == 0
 

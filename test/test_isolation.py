@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meedee import gm, messages, midi, mpe
+from meedee import events, gm, messages, midi, mpe, ump
 from meedee._native import CallbackBridge
 from meedee._transport import (
     RECEIVE_CAPACITY,
@@ -230,7 +230,7 @@ def test_native_failure_invalidates_only_its_worker_and_requires_a_fresh_client(
     )
     started = monotonic()
     with pytest.raises(error):
-        bad_connection.send(b"\xf8")
+        bad_connection.send_packet(b"\xf8")
     assert monotonic() - started < 3
     assert bad_connection.closed
     assert isinstance(broken.worker_failure, error)
@@ -241,13 +241,13 @@ def test_native_failure_invalidates_only_its_worker_and_requires_a_fresh_client(
         broken.ports()
     with pytest.raises(RuntimeError, match="new client"):
         bad_connection.close()
-    good_connection.send(b"\xf8")
+    good_connection.send_packet(b"\xf8")
     good_connection.close()
     workers[0].wait(timeout=3)
     assert workers[1].poll() is None
     fresh = output_client("fresh")
     with fresh.connect(fresh.ports()[0]) as connection:
-        connection.send(b"\xf8")
+        connection.send_packet(b"\xf8")
 
 
 @pytest.mark.parametrize("isolated", [True, False])
@@ -289,7 +289,7 @@ def test_send_snapshots_mutable_and_strided_buffers(
     with patch("meedee._native.Output", LocalClient):
         output = output_client("check_bytes", isolated=isolated)
         connection = output.connect(output.ports()[0])
-        connection.send(message)
+        connection.send_packet(message)
         connection.close()
 
 
@@ -781,7 +781,7 @@ def test_callback_and_error_hook_cannot_start_or_send_native_work(
     def receive(packet: ReceivedPacket) -> None:
         message = packet.packet
         assert isinstance(message, bytes)
-        target.send(message)
+        target.send_packet(message)
 
     def error_hook(event: UnraisableEvent) -> None:
         assert event.object is receive
@@ -800,7 +800,7 @@ def test_callback_and_error_hook_cannot_start_or_send_native_work(
     assert len(errors) == 1
     assert "callback" in errors[0]
     assert len(workers) == 2
-    target.send(b"\xf8")
+    target.send_packet(b"\xf8")
     target.close()
 
 
@@ -887,9 +887,9 @@ def test_isolated_snapshots_disambiguate_duplicate_ids_and_do_not_rediscover_on_
     assert first != second
     assert first.name == "output port"
     with output.connect(second) as connection:
-        connection.send(b"\xf8")
+        connection.send_packet(b"\xf8")
     with output.connect(first) as connection:
-        connection.send(b"\xf8")
+        connection.send_packet(b"\xf8")
 
 
 @pytest.mark.parametrize("direction", ["input", "output"])
@@ -988,7 +988,7 @@ def test_interrupted_worker_request_discards_uncertain_ownership(
                 output.connect(port)
             elif operation == "send":
                 assert connection is not None
-                connection.send(b"\xf8")
+                connection.send_packet(b"\xf8")
             else:
                 assert connection is not None
                 connection.close()
@@ -1278,16 +1278,41 @@ def test_typed_receive_wakes_on_cancellation_and_close(
 def test_typed_callback_retains_the_blocking_operation_guard(
     workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from meedee import events
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "early")
     called = Event()
 
     def callback(value: events.Event | events.StreamDiagnostic) -> None:
         with pytest.raises(midi.CallbackThreadError):
-            midi.TypedOutput(timeout=1)
+            midi.Output(timeout=1)
         called.set()
 
     source = midi.TypedInput(timeout=1)
     with source.connect(source.ports()[0], callback):
         assert called.wait(2)
+
+
+def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
+    workers: list[Popen[bytes]],
+) -> None:
+    client = output_client("check_note")
+    note = messages.NoteOn(channel=1, note=60, velocity=100)
+    clock = events.Clock(identity="output-test")
+    origin = events.Timestamp(ticks=0, clock=clock)
+    with client.connect(client.ports()[0]) as output:
+        output.send_packet(b"\x90\x3c\x64")
+        output.send_message(note)
+        output.send_command(
+            messages.ControlChange14(channel=1, controller=7, value=128)
+        )
+        report = output.play(
+            [events.Event(stream="test", timestamp=origin, message=note)],
+            origin=origin,
+            metrics=True,
+        )
+        assert report.sent_events == 1 and not report.cancelled
+        assert report.lateness is not None and report.lateness.count == 1
+        with pytest.raises(midi.CapabilityError, match="protocols differ"):
+            output.send_message(ump.Midi1Packet(group=1, message=note))
+        assert not output.closed and output.worker_failure is None
+    assert output.closed

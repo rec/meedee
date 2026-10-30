@@ -121,17 +121,17 @@ def test_send_failure_records_explicit_sink_effect_without_claiming_a_returned_h
     assert o.take_packet() == (b"\xf8" if accepted else None)
     assert o.snapshot().accepted == int(accepted)
     with pytest.raises(midi.StateError):
-        o.send(b"\xf8")
+        o.send_packet(b"\xf8")
 
 
 def test_output_capacity_never_discards_accepted_evidence() -> None:
     o = testing.Output(protocol="midi1", packet_limit=1, byte_limit=3)
-    o.send(b"\x90\x3c\x64")
+    o.send_packet(b"\x90\x3c\x64")
     with pytest.raises(midi.ResourceError):
-        o.send(b"\x80\x3c\x00")
+        o.send_packet(b"\x80\x3c\x00")
     assert o.snapshot().attempts == 2 and o.snapshot().accepted == 1
     assert o.take_packet() == b"\x90\x3c\x64"
-    o.send(b"\x80\x3c\x00")
+    o.send_packet(b"\x80\x3c\x00")
     assert o.snapshot().accepted == 2
 
 
@@ -204,7 +204,7 @@ def test_transfer_conformance_retains_known_handoffs_and_uncertain_sink_effects(
     o.send_message(first.message)
     session.confirm(first.index, time.now_ns)
     o.fail_next_send(accepted=True)
-    report = transfer_output.run(session, cast(midi.TypedOutputConnection, o))
+    report = transfer_output.run(session, cast(midi.OutputConnection, o))
     assert report.confirmed_messages == 1 and report.uncertain_message == 1
     assert time.now_ns == 10 and o.snapshot().accepted == 2
     assert o.take_packet() == bytes.fromhex("f0 7d 01 f7")
@@ -239,7 +239,7 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
 
     def send(action: ci.Action) -> None:
         for p in packets(action.message):
-            o.send(p)
+            o.send_packet(p)
         assert b.report_send(token=action.token, sent=True, now_ns=time.now_ns) == []
 
     def receive(message: messages.Message) -> list[ci.Action]:

@@ -19,9 +19,9 @@ def run_patch(config: Patch) -> int:
     data: dict[str, object]
     try:
         with ExitStack() as stack:
-            outputs: dict[str, midi.TypedOutputConnection] = {}
+            outputs: dict[str, midi.OutputConnection] = {}
             for name in config.destinations:
-                client = midi.TypedOutput(
+                client = midi.Output(
                     protocol=protocol, backend=backend, isolated=config.isolated
                 )
                 port = select_port(client.ports(), name, direction="output")
@@ -90,7 +90,7 @@ def run_patch(config: Patch) -> int:
 
 def forward(
     connection: midi.TypedInputConnection,
-    outputs: dict[str, midi.TypedOutputConnection],
+    outputs: dict[str, midi.OutputConnection],
     router: routing.Router,
     duration: float | None,
 ) -> None:

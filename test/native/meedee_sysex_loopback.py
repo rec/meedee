@@ -18,8 +18,8 @@ from meedee import (
 )
 
 
-def connect(name: str, isolated: bool) -> midi.TypedOutputConnection:
-    client = midi.TypedOutput(isolated=isolated)
+def connect(name: str, isolated: bool) -> midi.OutputConnection:
+    client = midi.Output(isolated=isolated)
     matches = [p for p in client.ports() if p.name == name]
     assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
     return client.connect(matches[0])
@@ -27,7 +27,7 @@ def connect(name: str, isolated: bool) -> midi.TypedOutputConnection:
 
 def respond(
     receiver: midi.TypedInputConnection,
-    output: midi.TypedOutputConnection,
+    output: midi.OutputConnection,
     request: tuning.BulkDumpRequest | tuning.BankedDumpRequest,
     reply: messages.SysEx,
 ) -> None:

@@ -138,6 +138,19 @@ class InputConnection:
     ) -> None: ...
 
 class OutputConnection:
+    def play(
+        self,
+        source: Iterable[object],
+        *,
+        origin: events.Timestamp,
+        mappings: list[events.ClockMapping]
+        | tuple[events.ClockMapping, ...]
+        | None = None,
+        cancel: events.Cancellation | None = None,
+        allow_rounding: bool = False,
+        metrics: bool = False,
+    ) -> events.PlaybackReport: ...
+    def send_message(self, message: messages.Message) -> None: ...
     def send_command(
         self,
         command: messages.ControlChange14
@@ -150,7 +163,9 @@ class OutputConnection:
         | gm.BankProgramSelect
         | mpe.ZoneConfiguration,
     ) -> None: ...
-    def send(self, packet: bytes | bytearray | memoryview | UmpPacket) -> None: ...
+    def send_packet(
+        self, packet: bytes | bytearray | memoryview | UmpPacket
+    ) -> None: ...
     @property
     def worker_failure(self) -> Exception | None: ...
     @property
@@ -221,45 +236,6 @@ class TypedInputConnection:
     def stop_recording(self, *, timeout: float = 5.0) -> archive.RecordingReport: ...
     def close(self) -> None: ...
     def __enter__(self) -> TypedInputConnection: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None: ...
-
-class TypedOutput:
-    def __init__(
-        self,
-        *,
-        protocol: Protocol = Protocol.Midi1,
-        backend: Backend | None = None,
-        isolated: bool = True,
-        timeout: float = 5.0,
-    ) -> None: ...
-    def ports(self) -> list[Port]: ...
-    def connect(self, port: Port) -> TypedOutputConnection: ...
-    def create_virtual(self, name: str) -> TypedOutputConnection: ...
-
-class TypedOutputConnection:
-    def play(
-        self,
-        source: Iterable[object],
-        *,
-        origin: events.Timestamp,
-        mappings: list[events.ClockMapping]
-        | tuple[events.ClockMapping, ...]
-        | None = None,
-        cancel: events.Cancellation | None = None,
-        allow_rounding: bool = False,
-        metrics: bool = False,
-    ) -> events.PlaybackReport: ...
-    def send_message(self, message: messages.Message) -> None: ...
-    def send_command(self, command: messages.Message) -> None: ...
-    @property
-    def closed(self) -> bool: ...
-    def close(self) -> None: ...
-    def __enter__(self) -> TypedOutputConnection: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,

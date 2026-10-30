@@ -92,7 +92,7 @@ def install(
             return Output()
 
     monkeypatch.setattr(midi, "TypedInput", InputClient)
-    monkeypatch.setattr(midi, "TypedOutput", OutputClient)
+    monkeypatch.setattr(midi, "Output", OutputClient)
     ticks = iter([0, 0])
     monkeypatch.setattr(
         tuning_live,
@@ -133,7 +133,7 @@ def test_preview_and_argument_rejection_open_no_ports(
         raise AssertionError("preview must not construct transports")
 
     monkeypatch.setattr(midi, "TypedInput", forbidden)
-    monkeypatch.setattr(midi, "TypedOutput", forbidden)
+    monkeypatch.setattr(midi, "Output", forbidden)
     args = [
         "tuning-preview",
         "--device-id",
@@ -210,7 +210,7 @@ def test_setup_interrupt_is_reported_without_a_send_or_file(
     def interrupt(**kwargs: object) -> None:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(midi, "TypedOutput", interrupt)
+    monkeypatch.setattr(midi, "Output", interrupt)
     path = tmp_path / "interrupted.syx"
     assert invoke(arguments(path)) == 1
     assert json.loads(capsys.readouterr().out)["interrupted"] and not path.exists()

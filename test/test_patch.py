@@ -111,7 +111,7 @@ def install(
     def input_client(**kwargs: object) -> Input:
         return source
 
-    monkeypatch.setattr(midi, "TypedOutput", output_client)
+    monkeypatch.setattr(midi, "Output", output_client)
     monkeypatch.setattr(midi, "TypedInput", input_client)
 
 
