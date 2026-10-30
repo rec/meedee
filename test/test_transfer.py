@@ -83,7 +83,7 @@ class Output:
         self.error = error
         self.sent: list[tuple[int, bytes]] = []
 
-    def send_message(self, message: messages.SysEx) -> None:
+    def send(self, message: messages.SysEx) -> None:
         self.sent.append((self.clock[0], codecs.encode(message)))
         self.clock[0] += 100
         if self.error is not None and len(self.sent) == 2:

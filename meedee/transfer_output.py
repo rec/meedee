@@ -38,7 +38,7 @@ def run(
                 sleep(min(0.05, max(0, deadline - now) / 1_000_000_000))
                 continue
             try:
-                output.send_message(step.message)
+                output.send(step.message)
             except (
                 midi.MidiError,
                 midi.StateError,

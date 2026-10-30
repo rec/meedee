@@ -4,7 +4,7 @@ use crate::packets::{extract_packet, Clock, Protocol, UmpPacket};
 use meedee::{testing, transport};
 use pyo3::exceptions::{PyInterruptedError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyBytes, PyInt};
+use pyo3::types::{PyBool, PyBytes, PyInt, PyTuple};
 
 #[pyclass(module = "meedee.testing")]
 struct ManualClock {
@@ -217,11 +217,23 @@ impl Output {
             protocol: parse_protocol(protocol)?,
         })
     }
-    fn send_packet(&mut self, packet: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.value.send(extract_packet(packet)?).map_err(error)
-    }
-    fn send_message(&mut self, py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<()> {
-        let packet = crate::live::prepare_message(py, self.protocol, message)?;
+    fn send(&mut self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<()> {
+        let packet = crate::live::prepare_output(py, self.protocol, value)?;
+        if packet.bind(py).is_instance_of::<PyTuple>() {
+            let command = crate::messages::extract_command(value)?;
+            let packets = meedee::codecs::expand(&command);
+            use meedee::messages::PrimitiveMessage;
+            for (index, message) in packets.iter().enumerate() {
+                if let Err(cause) = self.value.send(transport::Packet::Bytes(message.encode())) {
+                    return Err(error(transport::Error::CompoundSend {
+                        completed_messages: Some(index),
+                        total_messages: packets.len(),
+                        cause: Box::new(cause),
+                    }));
+                }
+            }
+            return Ok(());
+        }
         self.value
             .send(extract_packet(packet.bind(py))?)
             .map_err(error)

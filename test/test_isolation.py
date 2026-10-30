@@ -230,7 +230,7 @@ def test_native_failure_invalidates_only_its_worker_and_requires_a_fresh_client(
     )
     started = monotonic()
     with pytest.raises(error):
-        bad_connection.send_packet(b"\xf8")
+        bad_connection.send(b"\xf8")
     assert monotonic() - started < 3
     assert bad_connection.closed
     assert isinstance(broken.worker_failure, error)
@@ -241,13 +241,13 @@ def test_native_failure_invalidates_only_its_worker_and_requires_a_fresh_client(
         broken.ports()
     with pytest.raises(RuntimeError, match="new client"):
         bad_connection.close()
-    good_connection.send_packet(b"\xf8")
+    good_connection.send(b"\xf8")
     good_connection.close()
     workers[0].wait(timeout=3)
     assert workers[1].poll() is None
     fresh = output_client("fresh")
     with fresh.connect(fresh.ports()[0]) as connection:
-        connection.send_packet(b"\xf8")
+        connection.send(b"\xf8")
 
 
 @pytest.mark.parametrize("isolated", [True, False])
@@ -289,7 +289,7 @@ def test_send_snapshots_mutable_and_strided_buffers(
     with patch("meedee._native.Output", LocalClient):
         output = output_client("check_bytes", isolated=isolated)
         connection = output.connect(output.ports()[0])
-        connection.send_packet(message)
+        connection.send(message)
         connection.close()
 
 
@@ -781,7 +781,7 @@ def test_callback_and_error_hook_cannot_start_or_send_native_work(
     def receive(packet: ReceivedPacket) -> None:
         message = packet.packet
         assert isinstance(message, bytes)
-        target.send_packet(message)
+        target.send(message)
 
     def error_hook(event: UnraisableEvent) -> None:
         assert event.object is receive
@@ -800,7 +800,7 @@ def test_callback_and_error_hook_cannot_start_or_send_native_work(
     assert len(errors) == 1
     assert "callback" in errors[0]
     assert len(workers) == 2
-    target.send_packet(b"\xf8")
+    target.send(b"\xf8")
     target.close()
 
 
@@ -887,9 +887,9 @@ def test_isolated_snapshots_disambiguate_duplicate_ids_and_do_not_rediscover_on_
     assert first != second
     assert first.name == "output port"
     with output.connect(second) as connection:
-        connection.send_packet(b"\xf8")
+        connection.send(b"\xf8")
     with output.connect(first) as connection:
-        connection.send_packet(b"\xf8")
+        connection.send(b"\xf8")
 
 
 @pytest.mark.parametrize("direction", ["input", "output"])
@@ -988,7 +988,7 @@ def test_interrupted_worker_request_discards_uncertain_ownership(
                 output.connect(port)
             elif operation == "send":
                 assert connection is not None
-                connection.send_packet(b"\xf8")
+                connection.send(b"\xf8")
             else:
                 assert connection is not None
                 connection.close()
@@ -1066,7 +1066,7 @@ def test_compound_failure_preserves_progress_through_the_worker_pipe(
     connection = source.connect(source.ports()[0])
     command = messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
     with pytest.raises(midi.CompoundSendError, match="device disconnected") as error:
-        connection.send_command(command)
+        connection.send(command)
     assert isinstance(error.value, midi.SendError)
     assert error.value.completed_messages == accepted
     assert error.value.total_messages == 6
@@ -1085,9 +1085,7 @@ def test_compound_worker_loss_reports_unknown_progress(
     source = output_client(mode, timeout=1)
     connection = source.connect(source.ports()[0])
     with pytest.raises(midi.CompoundSendError) as error:
-        connection.send_command(
-            messages.ControlChange14(channel=1, controller=7, value=10000)
-        )
+        connection.send(messages.ControlChange14(channel=1, controller=7, value=10000))
     assert error.value.completed_messages is None
     assert error.value.total_messages == 2
     assert connection.closed
@@ -1100,8 +1098,8 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     source = output_client("check_command")
     connection = source.connect(source.ports()[0])
     with pytest.raises(TypeError):
-        connection.send_command(b"\xb0\x07\x01")  # ty: ignore[invalid-argument-type]
-    connection.send_command(
+        connection.send(object())  # ty: ignore[invalid-argument-type]
+    connection.send(
         messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
     )
     connection.close()
@@ -1109,7 +1107,7 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     ump = output_client("healthy", protocol=midi.Protocol.Ump)
     with ump.connect(ump.ports()[0]) as connection:
         with pytest.raises(midi.CapabilityError):
-            connection.send_command(
+            connection.send(
                 messages.ControlChange14(channel=1, controller=7, value=10000)
             )
         assert not connection.closed
@@ -1128,7 +1126,7 @@ def test_worker_failure_after_command_acknowledgment_preserves_complete_progress
 
     with patch.object(context.replies, "get", side_effect=acknowledged):
         with pytest.raises(midi.CompoundSendError) as error:
-            connection.send_command(
+            connection.send(
                 messages.ControlChange14(channel=1, controller=7, value=10000)
             )
     assert error.value.completed_messages == error.value.total_messages == 2
@@ -1200,11 +1198,11 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
     )
     if mode == "partial_command_2":
         with pytest.raises(midi.CompoundSendError) as error:
-            connection.send_command(command)
+            connection.send(command)
         assert (error.value.completed_messages, error.value.total_messages) == (2, 3)
         assert connection.closed
     else:
-        connection.send_command(command)
+        connection.send(command)
         assert not connection.closed
         connection.close()
 
@@ -1300,19 +1298,26 @@ def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
     clock = events.Clock(identity="output-test")
     origin = events.Timestamp(ticks=0, clock=clock)
     with client.connect(client.ports()[0]) as output:
-        output.send_packet(b"\x90\x3c\x64")
-        output.send_message(note)
-        output.send_command(
-            messages.ControlChange14(channel=1, controller=7, value=128)
-        )
+        output.send(b"\x90\x3c\x64")
+        output.send(note)
+        output.send(messages.ControlChange14(channel=1, controller=7, value=128))
         report = output.play(
-            [events.Event(stream="test", timestamp=origin, message=note)],
+            [
+                events.Event(stream="test", timestamp=origin, message=note),
+                events.Event(
+                    stream="test",
+                    timestamp=origin,
+                    message=messages.ControlChange14(
+                        channel=1, controller=7, value=128
+                    ),
+                ),
+            ],
             origin=origin,
             metrics=True,
         )
-        assert report.sent_events == 1 and not report.cancelled
-        assert report.lateness is not None and report.lateness.count == 1
+        assert report.sent_events == 2 and not report.cancelled
+        assert report.lateness is not None and report.lateness.count == 2
         with pytest.raises(midi.CapabilityError, match="protocols differ"):
-            output.send_message(ump.Midi1Packet(group=1, message=note))
+            output.send(ump.Midi1Packet(group=1, message=note))
         assert not output.closed and output.worker_failure is None
     assert output.closed

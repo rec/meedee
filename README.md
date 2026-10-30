@@ -17,8 +17,9 @@ UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
 tracked in [the plan](plan/meedee.md).
-Encode primitive messages for raw transport; use `send_command` for compound
-control, bank/program and MPE configuration commands.
+`OutputConnection.send()` accepts message objects, compound control/bank/MPE
+commands and encoded bytes or UMP packets. Encoding and expansion are handled
+internally; protocol conversion remains explicit.
 
 ## Files, typed I/O and exact time
 
@@ -65,13 +66,12 @@ representations. Version 1 remains unpublished, with format freeze and future
 compatibility guarantees still owner decisions.
 
 `midi.TypedInput` decodes received packets into events. `midi.Output` opens one
-`OutputConnection` supporting `send_message()` for message objects,
-`send_packet()` for encoded bytes/UMP packets, `send_command()` for compound
-operations and `play()` for timestamped events. Both use the same native
-transport and default Python process isolation. Typed input connections provide
-either a callback or `receive(timeout=..., cancel=...)`, returning an immutable `events.Event` or
-`events.StreamDiagnostic`. Events preserve primitive messages, the completion
-packet's timestamp and their contributing packet span. Optional `EventInterpreter`,
+`OutputConnection` supporting `send()` for messages, compound operations and
+encoded bytes/UMP packets, and `play()` for timestamped events. Both use the same
+native transport and default Python process isolation. Typed input connections
+provide either a callback or `receive(timeout=..., cancel=...)`, returning an
+immutable `events.Event` or `events.StreamDiagnostic`. Events preserve primitive
+messages, the completion packet's timestamp and their contributing packet span. Optional `EventInterpreter`,
 `EventVelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
@@ -400,7 +400,7 @@ selection = gm.BankProgramSelect(
 packets = [codecs.encode(p) for p in codecs.expand(selection)]
 volume = controls.Controller.ChannelVolume.message(channel=1, value=100)
 zone = mpe.ZoneConfiguration(manager_channel=1, members=7)
-# An open MIDI 1.0 output can explicitly send selection or zone with send_command().
+# An open MIDI 1.0 output can explicitly send selection or zone with send().
 ```
 
 Rust owns the GM1 instrument/family and percussion maps, all 256 GM2 melodic
@@ -457,19 +457,18 @@ primitives = expand(command)
 interpreter = Interpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
 # An open MIDI 1.0 output can send the whole command:
-# connection.send_command(command)
+# connection.send(command)
 ```
 
 `ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
-identifier. Use `send_packet()` for encoded packets and primitive `encode()` for
-byte encoding; use `expand`
-to inspect commands and `send_command` to serialize their complete sequence.
+identifier. Use `send()` for messages, compound commands or encoded packets.
+Use primitive `encode()` for byte encoding and `expand()` to inspect commands.
 UMP outputs reject these MIDI 1.0 commands rather than translating silently.
 
-`send_command` prevents interleaving on its connection. `CompoundSendError`
+`send` prevents interleaving on its connection. `CompoundSendError`
 reports the known completed-message prefix and total count. A failed message
 may already have effects; worker loss or timeout reports unknown progress
 (`completed_messages=None`). It never retries or sends more cleanup after an
@@ -527,7 +526,7 @@ sequences require source context and are not guessed. Returned primitive lists
 are not atomic live sends; output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
-negotiation runs automatically. `OutputConnection.send_packet()` takes `midi.UmpPacket`;
+negotiation runs automatically. `OutputConnection.send()` takes `midi.UmpPacket`;
 construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
 has passed between test-owned virtual peers. Other native backends and physical
 MIDI 2.0 device compatibility remain unqualified.
@@ -541,8 +540,8 @@ output = Output()
 ports = output.ports()
 # Select an endpoint deliberately from this snapshot, for example ports[index].
 # with output.connect(ports[index]) as connection:
-#     connection.send_packet(bytes([0x90, 60, 100]))
-#     connection.send_packet(bytes([0x80, 60, 0]))
+#     connection.send(bytes([0x90, 60, 100]))
+#     connection.send(bytes([0x80, 60, 0]))
 ```
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
@@ -576,7 +575,7 @@ Nanosecond storage does not promise nanosecond accuracy.
 Receive packets are raw transport chunks, including partial SysEx or multiple
 UMPs. The binding does not assemble unfinished SysEx or apply `Ignore` filters.
 Use `TypedInput` for decoded events or the pure byte codec explicitly for framing.
-`OutputConnection.send_packet()` accepts unsigned-byte buffers,
+`OutputConnection.send()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.
@@ -932,7 +931,7 @@ event = receiver.receive()  # Decoded by the production packet decoder.
 
 sink = testing.Output(protocol="midi1")
 if isinstance(event, events.Event):
-    sink.send_message(event.message)
+    sink.send(event.message)
 assert sink.take_packet() == b"\x90\x3c\x64"
 ```
 

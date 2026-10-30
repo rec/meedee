@@ -5,7 +5,7 @@ from os import PathLike
 from types import TracebackType
 from typing import ClassVar
 
-from . import archive, events, gm, messages, mpe
+from . import archive, events, messages
 
 __version__: str
 
@@ -150,21 +150,8 @@ class OutputConnection:
         allow_rounding: bool = False,
         metrics: bool = False,
     ) -> events.PlaybackReport: ...
-    def send_message(self, message: messages.Message) -> None: ...
-    def send_command(
-        self,
-        command: messages.ControlChange14
-        | messages.RpnSet
-        | messages.NrpnSet
-        | messages.RpnIncrement
-        | messages.RpnDecrement
-        | messages.NrpnIncrement
-        | messages.NrpnDecrement
-        | gm.BankProgramSelect
-        | mpe.ZoneConfiguration,
-    ) -> None: ...
-    def send_packet(
-        self, packet: bytes | bytearray | memoryview | UmpPacket
+    def send(
+        self, value: messages.Message | bytes | bytearray | memoryview | UmpPacket
     ) -> None: ...
     @property
     def worker_failure(self) -> Exception | None: ...

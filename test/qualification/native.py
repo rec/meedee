@@ -37,7 +37,7 @@ def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
             for n in range(256):
                 value = messages.ControlChange(channel=1, controller=7, value=n % 128)
                 start = perf_counter_ns()
-                output.send_message(value)
+                output.send(value)
                 received = receiver.receive(timeout=2)
                 assert isinstance(received, events.Event), received
                 assert received.message == value

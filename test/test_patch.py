@@ -92,7 +92,7 @@ class Output:
     def __exit__(self, *args: object) -> None:
         self.closed = True
 
-    def send_message(self, message: messages.Message) -> None:
+    def send(self, message: messages.Message) -> None:
         if self.error is not None:
             raise self.error
         self.sent.append(message)

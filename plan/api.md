@@ -238,8 +238,8 @@ subtrait. Free `codecs::encode` retains its behavior. `Command: Message` exposes
 expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
-`OutputConnection.send_command(command)` accepts these commands on MIDI 1.0
-outputs, rejecting UMP before sending. Encoded packets use `send_packet`. One native
+`OutputConnection.send(command)` accepts these commands on MIDI 1.0
+outputs, rejecting UMP before sending. Encoded packets use `send`. One native
 owner-thread operation and the existing connection serialization cover the whole
 sequence, including release; raw sends, other commands and close cannot run
 between its steps on that connection. This is not atomicity against other
@@ -429,7 +429,7 @@ Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
 
 All these messages implement Rust PrimitiveMessage and Python Message, and work
-with `codecs.encode`. Raw output uses `connection.send_packet(codecs.encode(message))`;
+with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
 there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
 ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
 containing `message` and `checksum`, or None for unrelated/unsupported forms;
@@ -517,11 +517,11 @@ The approved Rust change makes `Command.expand()` and `codecs::expand()` return
 Vec<AnyMessage>, replacing the CC-only vector throughout. Python expand returns
 a fresh list of primitive Messages; existing CC commands produce the same CC
 objects and bytes. AnyCommand additionally carries BankProgramSelect and
-mpe::ZoneConfiguration. `send_command` accepts both types through the same
+mpe::ZoneConfiguration. `send` accepts both types through the same
 in-process owner-thread operation or isolated worker protocol. Serialization,
 known completed-prefix/unknown-progress reporting and no retries are unchanged;
-there is no extra command-sending path. Raw send and primitive encode remain
-separate. A command may partially select a bank or partially configure a zone
+there is no extra command-sending path. Explicit encoding through codecs.encode
+remains independent of transmission. A command may partially select a bank or configure a zone
 before failing. Other applications can interleave on the device, and backend
 acceptance is not physical acknowledgment. UMP outputs reject these commands
 without implicit translation.
@@ -799,8 +799,8 @@ Native clock values and absent timestamps remain exact, with rational units and
 stable record IDs. Unknown records may be retained opaquely without execution.
 
 TypedInput wraps the existing input transport. Python Output opens one
-OutputConnection with send_message for message objects, send_packet for encoded
-packets, send_command for compound operations and play for timestamped events.
+OutputConnection with send for message objects, compound operations and encoded
+packets, and play for timestamped events.
 Message and packet operations share connection ownership and process isolation;
 protocol conversion remains explicit. Input selects callbacks or a bounded
 receive queue at connection time.
@@ -1277,10 +1277,10 @@ Already queued input/loss can be drained before receive raises that failure.
 is idempotent. Counters and failure evidence survive close. Context exit closes.
 
 `Output(protocol=..., packet_limit=128, byte_limit=8_388_608)` records accepted
-packets without connecting them to any input automatically. Python `send_packet`
-(Rust `send`) uses existing
-raw transport validation; `send_message` uses the existing typed-send preparation,
-including rejection of implicit protocol translation/compound commands. Capacity
+packets without connecting them to any input automatically. Python `send` accepts
+message objects, compound commands and encoded packets with the same preparation
+as live output. It rejects implicit protocol translation. Compound failures raise
+CompoundSendError with the known completed prefix and total message count. Capacity
 exhaustion rejects without accepting or discarding a packet. `take_packet()`
 returns the oldest recorded raw packet, releasing its capacity, or None.
 `fail_next_send(accepted=False, reason=...)` arms one fault for the next otherwise

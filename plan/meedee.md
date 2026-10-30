@@ -682,7 +682,7 @@ and wire evidence before stateful interpretation or live writes.
 4. **Fine CC and RPN/NRPN (implemented).** Add compound output and source/channel stateful
    interpretation. Gate: split/reordered/missing pairs, relative updates,
    resets/loss, selector changes, and partial sends have defined tested results.
-   Seven frozen commands expand into primitive CCs; send_command serializes all
+   Seven frozen commands expand into primitive CCs; send serializes all
    steps including RPN-null release and reports known/unknown progress without
    retries. The optional pure interpreter has one fixed 16-channel state table
    per source, indexed immutable observations, conservative fresh selector halves

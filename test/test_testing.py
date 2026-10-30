@@ -78,7 +78,7 @@ def test_decoded_overflow_and_explicit_loss_reset_interpretation() -> None:
 def test_ump_values_keep_native_width_and_protocol_mismatches_are_rejected() -> None:
     message = ump.Midi2ControlChange(group=4, channel=2, controller=7, value=0xFEDCBA98)
     o = testing.Output(protocol="ump")
-    o.send_message(message)
+    o.send(message)
     packet = o.take_packet()
     assert isinstance(packet, midi.UmpPacket)
     i = testing.Input(stream="s", protocol="ump")
@@ -88,7 +88,7 @@ def test_ump_values_keep_native_width_and_protocol_mismatches_are_rejected() -> 
     with pytest.raises(ValueError):
         i.inject(b"\xf8", clock=clock())
     with pytest.raises(midi.CapabilityError):
-        o.send_message(messages.TimingClock())
+        o.send(messages.TimingClock())
 
 
 def test_worker_failure_is_visible_and_close_retires_input_without_devices() -> None:
@@ -114,24 +114,24 @@ def test_send_failure_records_explicit_sink_effect_without_claiming_a_returned_h
     o = testing.Output(protocol="midi1")
     o.fail_next_send(accepted=accepted, reason="uncertain")
     with pytest.raises(midi.SendError, match="uncertain"):
-        o.send_message(messages.TimingClock())
+        o.send(messages.TimingClock())
     report = o.snapshot()
     assert report.attempts == 1 and report.accepted == int(accepted)
     o.close()
     assert o.take_packet() == (b"\xf8" if accepted else None)
     assert o.snapshot().accepted == int(accepted)
     with pytest.raises(midi.StateError):
-        o.send_packet(b"\xf8")
+        o.send(b"\xf8")
 
 
 def test_output_capacity_never_discards_accepted_evidence() -> None:
     o = testing.Output(protocol="midi1", packet_limit=1, byte_limit=3)
-    o.send_packet(b"\x90\x3c\x64")
+    o.send(b"\x90\x3c\x64")
     with pytest.raises(midi.ResourceError):
-        o.send_packet(b"\x80\x3c\x00")
+        o.send(b"\x80\x3c\x00")
     assert o.snapshot().attempts == 2 and o.snapshot().accepted == 1
     assert o.take_packet() == b"\x90\x3c\x64"
-    o.send_packet(b"\x80\x3c\x00")
+    o.send(b"\x80\x3c\x00")
     assert o.snapshot().accepted == 2
 
 
@@ -172,7 +172,7 @@ def test_routing_conformance_uses_shared_injected_decode_and_recorded_output() -
     router.feed(event)
     delivery = router.peek()
     assert delivery is not None
-    o.send_message(delivery.event.message)
+    o.send(delivery.event.message)
     router.confirm(delivery.id)
     assert o.take_packet() == b"\x91\x3c\x64" and router.snapshot().confirmed == 1
     i.lose(1)
@@ -201,7 +201,7 @@ def test_transfer_conformance_retains_known_handoffs_and_uncertain_sink_effects(
     o = testing.Output(protocol="midi1")
     first = session.prepare(time.now_ns)
     assert first is not None
-    o.send_message(first.message)
+    o.send(first.message)
     session.confirm(first.index, time.now_ns)
     o.fail_next_send(accepted=True)
     report = transfer_output.run(session, cast(midi.OutputConnection, o))
@@ -239,7 +239,7 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
 
     def send(action: ci.Action) -> None:
         for p in packets(action.message):
-            o.send_packet(p)
+            o.send(p)
         assert b.report_send(token=action.token, sent=True, now_ns=time.now_ns) == []
 
     def receive(message: messages.Message) -> list[ci.Action]:
@@ -282,3 +282,28 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
     assert b.snapshot().status == "completed"
     assert b.snapshot().peers[0].product_instance_id == "simulation"
     assert o.snapshot().accepted >= 2
+
+
+def test_output_accepts_messages_packets_and_compound_commands() -> None:
+    output = testing.Output(protocol="midi1")
+    note = messages.NoteOn(channel=1, note=60, velocity=100)
+    output.send(note)
+    output.send(b"\x90\x3c\x64")
+    output.send(messages.ControlChange14(channel=1, controller=7, value=128))
+    assert [output.take_packet() for _ in range(4)] == [
+        b"\x90\x3c\x64",
+        b"\x90\x3c\x64",
+        b"\xb0\x07\x01",
+        b"\xb0\x27\x00",
+    ]
+    assert output.snapshot().accepted == 4
+
+
+def test_compound_output_failure_preserves_prefix_and_reports_progress() -> None:
+    output = testing.Output(protocol="midi1", packet_limit=1)
+    with pytest.raises(midi.CompoundSendError) as failure:
+        output.send(messages.ControlChange14(channel=1, controller=7, value=128))
+    assert failure.value.completed_messages == 1
+    assert failure.value.total_messages == 2
+    assert output.take_packet() == b"\xb0\x07\x01"
+    assert output.take_packet() is None

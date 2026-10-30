@@ -49,11 +49,11 @@ def main() -> None:
         simulated.inject(b"\xf8", clock=synthetic_clock)
         assert isinstance(simulated.receive(), events.Event)
         output = testing.Output(protocol="midi1")
-        output.send_message(messages.TimingClock())
+        output.send(messages.TimingClock())
         assert output.take_packet() == b"\xf8"
         ump_output = testing.Output(protocol="ump")
         ump_input = testing.Input(stream="ump-test", protocol="ump")
-        ump_output.send_message(
+        ump_output.send(
             ump.Midi2ControlChange(group=1, channel=1, controller=7, value=0xFFFFFFFF)
         )
         recorded = ump_output.take_packet()

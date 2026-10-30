@@ -156,7 +156,8 @@ and finish at end of stream. Its strict SysEx policy discards implicit non-F7
 termination with a diagnostic, despite the standard permitting it. Message
 encoding includes explicit statuses and is not Standard MIDI File encoding.
 
-Compound commands require expand/send_command, not primitive encode or raw send.
+Compound commands use send, which expands and serializes them internally;
+primitive encode still requires explicit expansion through expand.
 Their serialization covers one connection, not other clients/applications using
 the device. A completed prefix is backend acceptance, not physical confirmation;
 the failed step may have effects, and process loss/timeouts leave progress unknown.

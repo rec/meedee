@@ -67,7 +67,7 @@ def run(
                     if cancel is not None and cancel.cancelled:
                         raise KeyboardInterrupt
                     sending = action.token
-                    output.send_message(packet)
+                    output.send(packet)
                 queue.extend(
                     browser.report_send(
                         token=action.token, sent=True, now_ns=monotonic_ns()

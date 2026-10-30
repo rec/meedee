@@ -24,7 +24,7 @@ class Connection:
     def __exit__(self, *args: object) -> None:
         self.closed = True
 
-    def send_message(self, message: messages.SysEx) -> None:
+    def send(self, message: messages.SysEx) -> None:
         self.sent.append(codecs.encode(message))
         if self.fail and len(self.sent) == 2:
             raise midi.SendError("uncertain send")

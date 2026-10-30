@@ -122,7 +122,7 @@ def forward(
             if (error := connection.failure) is not None:
                 raise error
             try:
-                outputs[delivery.destination].send_message(delivery.event.message)
+                outputs[delivery.destination].send(delivery.event.message)
                 router.confirm(delivery.id)
             except KeyboardInterrupt:
                 if (pending := router.peek()) is not None and pending.id == delivery.id:

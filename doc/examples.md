@@ -75,9 +75,7 @@ def main() -> None:
         finally:
             if not finished:
                 for note in notes:
-                    output.send_message(
-                        messages.NoteOff(channel=1, note=note, velocity=0)
-                    )
+                    output.send(messages.NoteOff(channel=1, note=note, velocity=0))
     print("Melody finished.")
 
 
@@ -202,13 +200,13 @@ def main() -> None:
                 message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
             ):
                 if message.channel == 1 and message.note + 12 <= 127:
-                    output.send_message(message.replace(note=message.note + 12))
+                    output.send(message.replace(note=message.note + 12))
             elif isinstance(message, messages.ControlChange):
                 if message.channel == 1 and message.controller < 120:
-                    output.send_message(message)
+                    output.send(message)
             elif isinstance(message, (messages.ChannelPressure, messages.PitchBend)):
                 if message.channel == 1:
-                    output.send_message(message)
+                    output.send(message)
     print("Transposer stopped.")
 
 
@@ -252,8 +250,8 @@ def main() -> None:
     (destination,) = [p for p in destinations if p.name == destination_name]
 
     with inputs.connect(source) as receiver, outputs.connect(destination) as output:
-        output.send_message(messages.ProgramChange(channel=2, program=34))
-        output.send_message(messages.ProgramChange(channel=3, program=81))
+        output.send(messages.ProgramChange(channel=2, program=34))
+        output.send(messages.ProgramChange(channel=3, program=81))
         print("Split at C4 for 60 seconds. Release keys and pedals before it ends.")
         deadline = monotonic() + 60
         while monotonic() < deadline:
@@ -272,15 +270,15 @@ def main() -> None:
             ):
                 if message.channel == 1:
                     channel = 2 if message.note < 60 else 3
-                    output.send_message(message.replace(channel=channel))
+                    output.send(message.replace(channel=channel))
             elif isinstance(message, messages.ControlChange):
                 if message.channel == 1 and message.controller in (1, 7, 11, 64):
                     for channel in [2, 3]:
-                        output.send_message(message.replace(channel=channel))
+                        output.send(message.replace(channel=channel))
             elif isinstance(message, (messages.PitchBend, messages.ChannelPressure)):
                 if message.channel == 1:
                     for channel in [2, 3]:
-                        output.send_message(message.replace(channel=channel))
+                        output.send(message.replace(channel=channel))
     print("Keyboard split stopped.")
 
 
@@ -602,9 +600,9 @@ def main() -> None:
     name = input("MTS synth input port: ")
     (port,) = [p for p in ports if p.name == name]
     with client.connect(port) as output:
-        output.send_message(raw)
+        output.send(raw)
         input("Wait for the synth to finish loading, then press Enter to audition: ")
-        output.send_command(controls.tuning_program(channel=1, program=2))
+        output.send(controls.tuning_program(channel=1, program=2))
         finished = False
         try:
             print("Auditioning keys 69, 70, 71, 70, 69 with 600 ms per note.")
@@ -617,9 +615,7 @@ def main() -> None:
         finally:
             if not finished:
                 for note in [69, 70, 71]:
-                    output.send_message(
-                        messages.NoteOff(channel=1, note=note, velocity=0)
-                    )
+                    output.send(messages.NoteOff(channel=1, note=note, velocity=0))
     print("Audition finished; tuning program 2 remains loaded and selected.")
 
 
@@ -713,9 +709,9 @@ def main() -> None:
     )
 
     with client.connect(port) as output:
-        output.send_command(zone)
+        output.send(zone)
         for voice in [root, moving]:
-            output.send_command(
+            output.send(
                 controls.pitch_bend_sensitivity(
                     channel=voice.channel, semitones=48, cents=0
                 )
@@ -734,7 +730,7 @@ def main() -> None:
         finally:
             if not finished:
                 for message in ending:
-                    output.send_message(message)
+                    output.send(message)
     print("MPE phrase finished.")
 
 
