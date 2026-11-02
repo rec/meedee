@@ -1,6 +1,6 @@
 """Decoded or raw MIDI input and callable output over the shared Rust transport."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable, Iterator
 from os import PathLike
 from types import TracebackType
 from typing import ClassVar, Literal, overload
@@ -87,6 +87,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         self: Input[events.ReceivedPacket],
         *,
         raw: Literal[True],
+        channel: int | Iterable[int] | None = None,
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
@@ -101,6 +102,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         self: Input[events.Event | events.StreamDiagnostic],
         *,
         raw: Literal[False] = False,
+        channel: int | Iterable[int] | None = None,
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
@@ -115,6 +117,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         self: Input[events.Event | events.StreamDiagnostic | events.ReceivedPacket],
         *,
         raw: bool,
+        channel: int | Iterable[int] | None = None,
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
@@ -133,6 +136,30 @@ class Input[T = events.Event | events.StreamDiagnostic]:
     def create_virtual(
         self, name: str, callback: Callable[[T], object] | None = None
     ) -> InputConnection[T]: ...
+    def __enter__(self) -> InputConnection[T]: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+    @overload
+    def __iter__(
+        self: Input[events.ReceivedPacket],
+    ) -> Iterator[events.ReceivedPacket]: ...
+    @overload
+    def __iter__(
+        self: Input[events.Event | events.StreamDiagnostic],
+    ) -> Iterator[messages.Message]: ...
+    @overload
+    def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]: ...
+    def with_errors(
+        self,
+    ) -> Generator[
+        messages.Message | events.ReceivedPacket | events.StreamDiagnostic | Exception,
+        None,
+        None,
+    ]: ...
 
 class Output:
     def __init__(
@@ -199,6 +226,23 @@ class OutputConnection:
     ) -> None: ...
 
 class InputConnection[T = events.Event | events.StreamDiagnostic]:
+    @overload
+    def __iter__(
+        self: InputConnection[events.ReceivedPacket],
+    ) -> Iterator[events.ReceivedPacket]: ...
+    @overload
+    def __iter__(
+        self: InputConnection[events.Event | events.StreamDiagnostic],
+    ) -> Iterator[messages.Message]: ...
+    @overload
+    def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]: ...
+    def with_errors(
+        self,
+    ) -> Generator[
+        messages.Message | events.ReceivedPacket | events.StreamDiagnostic | Exception,
+        None,
+        None,
+    ]: ...
     @property
     def stream(self) -> str: ...
     @property

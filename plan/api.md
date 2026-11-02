@@ -1628,3 +1628,23 @@ events. The worker_failure and last_message_time properties remain available.
 
 Type hints infer InputConnection[ReceivedPacket] for raw=True and decoded event
 unions by default; a dynamic boolean yields the union of both modes.
+
+
+### Message iteration and channel selection
+
+`Input()` can be iterated directly, opening the first discovered input and closing
+it when iteration finishes. `with Input() as input` scopes the connection explicitly.
+Decoded iteration yields Message values rather than Event wrappers; full Note
+values are never synthesized. Raw iteration yields ReceivedPacket values.
+`with_errors()` additionally yields StreamDiagnostic and terminal input exceptions.
+Ordinary iteration prints these to stderr, continues after decoder diagnostics,
+and stops after a terminal failure. Setup errors in explicit contexts, invalid
+arguments, close failures and output sends retain their exception behavior. `receive()` retains
+its existing timestamped, checked interface.
+
+`Input(channel=1)` selects one channel; an iterable of integers selects several.
+Only channels 1..16 are valid. With a channel selection, channel-less messages
+are excluded and diagnostics are retained. Filtering applies to polling,
+callbacks, iteration and attached recordings. Raw mode rejects channel selection.
+An output's configured channel fills only an unassigned message channel; routing
+received messages requires explicit replacement of their channel.

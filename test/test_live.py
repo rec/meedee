@@ -346,3 +346,141 @@ def test_raw_receive_queue_is_bounded_and_drains_before_reporting_overflow(
         with pytest.raises(midi.ResourceError, match="overflowed"):
             receiver.receive(timeout=0)
         assert isinstance(receiver.failure, midi.ResourceError)
+
+
+@pytest.fixture
+def iterable_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[Callable[[events.ReceivedPacket], object]]:
+    callbacks: list[Callable[[events.ReceivedPacket], object]] = []
+    capture_clock = clock()
+    port = midi.Port._from_wire(
+        "fixture", 0, 0, "Keyboard", midi.Backend.CoreMidi, 1, True
+    )
+
+    class Connection:
+        closed = False
+        worker_failure = None
+        dropped_packets = 0
+        clock = capture_clock
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def ports(self) -> list[midi.Port]:
+            return [port]
+
+        def connect(
+            self,
+            port: midi.Port,
+            callback: Callable[[events.ReceivedPacket], object],
+            identity: str,
+        ) -> Connection:
+            callbacks.append(callback)
+            callback(packet(b"\x90\x3c\x64", 0, 1))
+            return Connection()
+
+    monkeypatch.setattr(_native, "Input", Client)
+    return callbacks
+
+
+def test_direct_input_iteration_opens_first_port_and_closes_on_generator_close(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+) -> None:
+    client = midi.Input(isolated=False)
+    iterator = client.with_errors()
+    assert next(iterator) == messages.NoteOn(60, 100, 1)
+    iterator.close()
+    # A second context can open after the iterator releases its connection.
+    with client as receiver:
+        assert next(iter(receiver)) == messages.NoteOn(60, 100, 1)
+    assert receiver.closed
+
+
+@pytest.mark.parametrize("channels", [1, [1, 3], (1, 3), {1, 3}, []])
+def test_input_channel_selection_filters_messages_but_keeps_diagnostics(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    channels: int | list[int] | tuple[int, ...] | set[int],
+) -> None:
+    with midi.Input(channel=channels, isolated=False) as receiver:
+        iterable_input[0](packet(b"\x91\x3d\x64\x92\x3e\x64\xf8", 1, 2))
+        iterable_input[0](packet(b"\x90\x3f\x64", 3, 3))
+        receiver.close()
+        items = list(receiver.with_errors())
+    notes = [i.note for i in items if isinstance(i, messages.NoteOn)]
+    assert notes == ([60, 63] if channels == 1 else [60, 62, 63] if channels else [])
+    assert (
+        len(
+            [
+                i
+                for i in items
+                if isinstance(i, events.StreamDiagnostic) and i.kind == "loss"
+            ]
+        )
+        == 1
+    )
+    assert all(isinstance(i, (messages.NoteOn, events.StreamDiagnostic)) for i in items)
+
+
+@pytest.mark.parametrize("include_errors", [False, True])
+def test_input_iteration_reports_diagnostics_and_continues(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    capsys: pytest.CaptureFixture[str],
+    include_errors: bool,
+) -> None:
+    with midi.Input(isolated=False) as receiver:
+        iterable_input[0](packet(b"\x90\x3d\x64", 2, 2))
+        receiver.close()
+        items = list(receiver.with_errors() if include_errors else receiver)
+    assert [i.note for i in items if isinstance(i, messages.NoteOn)] == [60, 61]
+    assert any(isinstance(i, events.StreamDiagnostic) for i in items) is include_errors
+    assert bool(capsys.readouterr().err) is not include_errors
+
+
+def test_input_iteration_drains_then_reports_terminal_overflow(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with midi.Input(isolated=False, event_limit=1) as receiver:
+        iterable_input[0](packet(b"\x90\x3d\x64", 1, 2))
+        assert list(receiver) == [messages.NoteOn(60, 100, 1)]
+    assert "overflowed" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("channel", [0, 17, [1, 17]])
+def test_input_rejects_invalid_channel_selection(channel: int | list[int]) -> None:
+    with pytest.raises(ValueError, match="1..16"):
+        midi.Input(channel=channel, isolated=False)
+
+
+def test_raw_input_rejects_channel_selection() -> None:
+    with pytest.raises(ValueError, match="decoded"):
+        midi.Input(raw=True, channel=1, isolated=False)
+
+
+def test_channel_selection_applies_to_callbacks_and_recordings(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
+) -> None:
+    observed: list[events.Event | events.StreamDiagnostic] = []
+    client = midi.Input(channel=[1], isolated=False)
+    path = tmp_path / "selected.meedee"
+    with client.connect(client.ports()[0], observed.append) as receiver:
+        receiver.start_recording(path)
+        iterable_input[0](packet(b"\x91\x3d\x64\x90\x3e\x64\xf8", 1, 2))
+        report = receiver.stop_recording()
+    assert report.complete
+    assert [i.message for i in observed if isinstance(i, events.Event)] == [
+        messages.NoteOn(60, 100, 1),
+        messages.NoteOn(62, 100, 1),
+    ]
+    reader = archive.Reader(path)
+    try:
+        assert [i.message for i in reader if isinstance(i, events.Event)] == [
+            messages.NoteOn(62, 100, 1)
+        ]
+    finally:
+        reader.close()

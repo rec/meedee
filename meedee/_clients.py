@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import inspect
 import math
+import sys
 from _thread import LockType
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable, Iterator
 from fnmatch import fnmatchcase
 from fractions import Fraction
 from functools import partial
@@ -33,12 +34,15 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         "_event_limit",
         "_sysex_limit",
         "_byte_limit",
+        "_channels",
+        "_connection",
     )
 
     def __init__(
         self,
         *,
         raw: bool = False,
+        channel: int | Iterable[int] | None = None,
         event_limit: int = 128,
         sysex_limit: int | str = 1_048_576,
         protocol: midi.Protocol = midi.Protocol.Midi1,
@@ -65,6 +69,20 @@ class Input[T = events.Event | events.StreamDiagnostic]:
                 raise TypeError("event_limit and sysex_limit must be built-in integers")
             if n <= 0:
                 raise ValueError("event_limit and sysex_limit must be positive")
+        if channel is None:
+            channels = None
+        else:
+            values = [channel] if isinstance(channel, int) else list(channel)
+            for c in values:
+                if type(c) is not int:
+                    raise TypeError("channels must be built-in integers")
+                if not 1 <= c <= 16:
+                    raise ValueError("channels must be in 1..16")
+            channels = frozenset(values)
+        if raw and channels is not None:
+            raise ValueError("channel filtering requires decoded input (raw=False)")
+        self._channels = channels
+        self._connection: InputConnection[T] | None = None
         self._protocol = protocol
         self._raw_mode = raw
         self._event_limit = event_limit
@@ -139,6 +157,52 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         transport._closed = False
         connection._raw = transport
         return connection
+
+    def __enter__(self) -> InputConnection[T]:
+        if self._connection is not None:
+            raise midi.StateError("input context is already open")
+        ports = self.ports()
+        if not ports:
+            raise midi.ConnectError("No MIDI input ports available")
+        self._connection = self.connect(ports[0])
+        return self._connection
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        connection = self._connection
+        self._connection = None
+        if connection is not None:
+            close_context(connection.close, exc_value)
+
+    def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]:
+        for item in self.with_errors():
+            if isinstance(item, (messages.Message, events.ReceivedPacket)):
+                yield item
+            else:
+                print(item, file=sys.stderr)
+
+    def with_errors(
+        self,
+    ) -> Generator[
+        messages.Message | events.ReceivedPacket | events.StreamDiagnostic | Exception,
+    ]:
+        if self._connection is not None:
+            yield from self._connection.with_errors()
+            return
+        connection = None
+        try:
+            connection = self.__enter__()
+            yield from connection.with_errors()
+        except INPUT_ERRORS as error:
+            yield error
+        finally:
+            self._connection = None
+            if connection is not None:
+                connection.close()
 
     def __del__(self) -> None:
         if (context := getattr(self, "_context", None)) is not None:
@@ -590,6 +654,7 @@ class OutputConnection:
 
 class InputConnection[T = events.Event | events.StreamDiagnostic]:
     _raw: _InputTransport[T] | None
+    _channels: frozenset[int] | None
     _stream: str
     _decoder: events.PacketDecoder | None
     _bridge: _native.CallbackBridge | None
@@ -614,6 +679,7 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
     ) -> InputConnection[T]:
         connection = object.__new__(cls)
         connection._raw = None
+        connection._channels = client._channels
         connection._stream = uuid4().hex
         connection._decoder = (
             None
@@ -707,6 +773,13 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
             items: list[
                 events.Event | events.StreamDiagnostic | events.ReceivedPacket
             ] = [packet] if self._decoder is None else list(self._decoder.feed(packet))
+            if self._channels is not None:
+                items = [
+                    i
+                    for i in items
+                    if not isinstance(i, events.Event)
+                    or getattr(i.message, "channel", None) in self._channels
+                ]
             self._accept(items)
         if self._bridge is not None:
             for item in items:
@@ -714,6 +787,39 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
                     self._bridge.deliver(item)
                 else:
                     self._bridge.deliver_typed(item)
+
+    def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]:
+        for item in self.with_errors():
+            if isinstance(item, (messages.Message, events.ReceivedPacket)):
+                yield item
+            else:
+                print(item, file=sys.stderr)
+
+    def with_errors(
+        self,
+    ) -> Generator[
+        messages.Message | events.ReceivedPacket | events.StreamDiagnostic | Exception,
+    ]:
+        if self._bridge is not None:
+            raise midi.StateError("iteration is unavailable in callback mode")
+        reported_lost = 0
+        while True:
+            try:
+                item = self.receive(timeout=0.05)
+            except INPUT_ERRORS as error:
+                if self.failure is not None or not self.closed:
+                    yield error
+                return
+            if isinstance(item, events.Event):
+                yield item.message
+            elif isinstance(item, (events.StreamDiagnostic, events.ReceivedPacket)):
+                yield item
+            lost = self.dropped_packets
+            if lost > max(reported_lost, self._known_lost):
+                yield midi.ResourceError(
+                    f"Input lost {lost - max(reported_lost, self._known_lost)} packets"
+                )
+            reported_lost = max(reported_lost, lost)
 
     def receive(
         self,
@@ -992,3 +1098,14 @@ def input_size(item: object) -> int:
             else len(item.packet)
         )
     return _native.live_size(cast(events.Event | events.StreamDiagnostic, item))
+
+
+INPUT_ERRORS = (
+    _native.MidiError,
+    _native.StateError,
+    _native.NativePanicError,
+    _native.ResourceError,
+    _native.WorkerError,
+    _native.WorkerTimeoutError,
+    OSError,
+)

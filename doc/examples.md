@@ -66,97 +66,110 @@ addressing and does not support these full-note values or automatic cleanup.
 
 ## 3. See what your keyboard sends
 
-Print complete decoded events, including timestamps, for 30 seconds. Use
-`Input(raw=True)` instead to receive unchanged transport packets. Diagnostics
-are printed in decoded mode; terminal output can itself cause input loss.
+Print messages from the first input. Stop with Ctrl-C.
 
 ```python
-from time import monotonic
+from meedee.midi import Input
 
-from meedee import midi
-
-client = midi.Input(isolated=False)
-with client.connect(client.ports()[0]) as receiver:
-    deadline = monotonic() + 30
-    while monotonic() < deadline:
-        if receiver.failure is not None:
-            raise receiver.failure
-        if receiver.dropped_packets:
-            raise RuntimeError("Input lost packets")
-        if (item := receiver.receive(timeout=0.05)) is not None:
-            print(item)
+for message in Input():
+    print(message)
 ```
+
+Iteration yields individual MIDI messages, never `Note` values. Recoverable input
+errors are printed to stderr and reception continues; a terminal input failure
+is reported and ends iteration. Setup, close and output failures still raise.
+Use `receive()` when you need timestamped events, or `Input(raw=True)` for raw
+transport packets.
 
 ## 4. Transpose a keyboard up an octave
 
-Forward channel-1 notes and polyphonic pressure to a synth, one octave higher.
-Notes above 115 are omitted, including their releases. Other traffic is excluded.
-Use separate input and output devices to avoid a feedback loop, and release keys
-before the 60-second window ends.
+Use separate input and output devices to avoid a feedback loop.
 
 ```python
-from time import monotonic
+from meedee.messages import NoteOff, NoteOn
+from meedee.midi import Input, Output
 
-from meedee import events, messages, midi
+with Input() as input, Output() as output:
+    for m in input:
+        if isinstance(m, (NoteOn, NoteOff)):
+            output(m.transpose(12))
+        else:
+            output(m)
+```
 
-inputs = midi.Input(isolated=False)
-outputs = midi.Output()
-with (
-    inputs.connect(inputs.ports()[0]) as receiver,
-    outputs.connect(outputs.ports()[0]) as output,
-):
-    deadline = monotonic() + 60
-    while monotonic() < deadline:
-        if receiver.failure is not None:
-            raise receiver.failure
-        if receiver.dropped_packets:
-            raise RuntimeError("Input loss; forwarding stopped")
-        item = receiver.receive(timeout=0.05)
-        if isinstance(item, events.StreamDiagnostic):
-            raise RuntimeError(item.reason)
-        if isinstance(item, events.Event):
-            message = item.message
-            if isinstance(
-                message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
-            ):
-                if message.channel == 1 and message.note <= 115:
-                    output(message.replace(note=message.note + 12))
+`transpose()` returns a new message and clamps the note to 0..127. To handle
+input diagnostics yourself, use `with_errors()`:
+
+```python
+import sys
+
+from meedee.messages import Message, NoteOff, NoteOn
+from meedee.midi import Input, Output
+
+with Input() as input, Output() as output:
+    for m in input.with_errors():
+        if isinstance(m, (NoteOn, NoteOff)):
+            output(m.transpose(12))
+        elif isinstance(m, Message):
+            output(m)
+        else:
+            print("ERROR", m, file=sys.stderr)
 ```
 
 ## 5. Split a keyboard into bass and lead
 
-On a multitimbral GM synth, send keys below middle C to bass on channel 2 and
-higher keys to lead on channel 3. This example forwards notes only. Context exit releases remaining tracked notes;
-it sends no global reset.
+Receive channel 1 and split at middle C. Other channel messages, such as sustain
+and pitch bend, go to both parts.
 
 ```python
-from time import monotonic
+from meedee.messages import NoteOff, NoteOn, ProgramChange
+from meedee.midi import Input, Output
 
-from meedee import events, messages, midi
+with Input(channel=1) as input, Output() as out:
+    out(ProgramChange(34, channel=2))
+    out(ProgramChange(81, channel=3))
 
-inputs = midi.Input(isolated=False)
-outputs = midi.Output()
-with (
-    inputs.connect(inputs.ports()[0]) as receiver,
-    outputs.connect(outputs.ports()[0]) as output,
-):
-    output(messages.ProgramChange(channel=2, program=34))
-    output(messages.ProgramChange(channel=3, program=81))
-    deadline = monotonic() + 60
-    while monotonic() < deadline:
-        if receiver.failure is not None:
-            raise receiver.failure
-        if receiver.dropped_packets:
-            raise RuntimeError("Input loss; forwarding stopped")
-        item = receiver.receive(timeout=0.05)
-        if isinstance(item, events.StreamDiagnostic):
-            raise RuntimeError(item.reason)
-        if isinstance(item, events.Event):
-            message = item.message
-            if isinstance(message, (messages.NoteOn, messages.NoteOff)):
-                if message.channel == 1:
-                    output(message.replace(channel=2 if message.note < 60 else 3))
+    for m in input:
+        if isinstance(m, (NoteOn, NoteOff)):
+            if m.note < 60:
+                out(m.replace(channel=2))
+            else:
+                out(m.replace(channel=3))
+        else:
+            out(m.replace(channel=2))
+            out(m.replace(channel=3))
 ```
+
+`Input(channel=1)` accepts only channel-1 messages. A container such as
+`Input(channel=[1, 4])` selects several channels. Channel-less traffic is excluded;
+diagnostics are always retained. `replace()` returns a new message.
+
+There is a trap when using two outputs: **an output's channel only supplies an
+unset message channel**. This code does not reroute incoming notes to channels 2
+and 3; received messages already have channels:
+
+```python
+from meedee.messages import NoteOff, NoteOn, ProgramChange
+from meedee.midi import Input, Output
+
+with Input() as input, Output(channel=2) as out2, Output(channel=3) as out3:
+    out2(ProgramChange(34))
+    out3(ProgramChange(81))
+
+    for m in input:
+        if isinstance(m, (NoteOn, NoteOff)):
+            if m.note < 60:
+                out2(m)  # Keeps the keyboard's channel, not channel 2.
+            else:
+                out3(m)  # Keeps the keyboard's channel, not channel 3.
+        else:
+            out2(m)
+            out3(m)
+```
+
+For channel messages, `out2(m.replace(channel=None))` explicitly lets `out2`
+supply its channel. The first version makes the destination channel explicit
+and needs only one output connection.
 
 ## 6. Record and replay a performance
 
