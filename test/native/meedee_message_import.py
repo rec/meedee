@@ -107,7 +107,7 @@ def main() -> None:
         query = tuning.Query(
             request=tuning.BulkDumpRequest(device_id=1, program=0),
             stream="pure",
-            timeout_ns=10,
+            timeout="10 ns",
         )
         query.prepare(0)
         query.confirm(1)
@@ -127,7 +127,7 @@ def main() -> None:
             .channel
             == 2
         )
-        assert not timecode.Assembler(timeout_ns=100).locked
+        assert not timecode.Assembler(timeout="100 ns").locked
         assert controls.VelocityInterpreter().feed(messages.TimingClock()) is None
 
         assert ump.encode(ump.JrClock(ticks=65535)) == (0x0010FFFF,)
@@ -170,10 +170,10 @@ def main() -> None:
         assert router.snapshot().admitted == 1
         tracker = topology.Tracker()
         assert tracker.observe([]).generation == 1
-        plan = transfer.read_file(BytesIO(b"\xf0\x7d\xf7"), gap_ns=0)
+        plan = transfer.read_file(BytesIO(b"\xf0\x7d\xf7"), gap="0 ns")
         assert transfer.Session(plan).snapshot().total_messages == 1
         assert callable(transfer_output.run)
-        capture = transfer.Capture(stream="pure", expected_messages=1, timeout_ns=10)
+        capture = transfer.Capture(stream="pure", expected_messages=1, timeout="10 ns")
         capture.start(0)
         capture.feed(
             events.Event(stream="pure", message=messages.SysEx(data=b"\x7d")), 1

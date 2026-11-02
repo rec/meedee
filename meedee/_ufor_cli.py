@@ -60,7 +60,7 @@ def run_ufor(config: UforPreview) -> int:
         name=config.name,
         bank=config.bank,
         preserve_unmapped=config.preserve_unmapped,
-        gap_ns=0,
+        gap=0,
     )
     with config.destination.open("xb") as destination:
         syx.write(destination, [plan.message(0)])

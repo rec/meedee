@@ -55,11 +55,11 @@ def exercise(isolated: bool, directory: Path) -> None:
             messages.SysEx(data=b"\x7d\x01"),
             messages.SysEx(data=b"\x7d" + bytes(range(128)) * 32),
         ]
-        plan = transfer.Plan(messages_to_capture, gap_ns=1_000_000)
+        plan = transfer.Plan(messages_to_capture, gap="1000000 ns")
         capture = transfer.Capture(
             stream=receiver.stream,
             expected_messages=2,
-            timeout_ns=3_000_000_000,
+            timeout="3000000000 ns",
         )
         delivery = worker.submit(
             transfer_output.run, transfer.Session(plan), peer_output
@@ -107,7 +107,7 @@ def exercise(isolated: bool, directory: Path) -> None:
             reply = messages.SysEx(data=wire[1:-1])
             answer = worker.submit(respond, peer, peer_output, request, reply)
             query = tuning.Query(
-                request=request, stream=receiver.stream, timeout_ns=3_000_000_000
+                request=request, stream=receiver.stream, timeout="3000000000 ns"
             )
             result = tuning_live.run(query, receiver, output)
             answer.result(timeout=4)
@@ -127,7 +127,7 @@ def exercise(isolated: bool, directory: Path) -> None:
 
         silent_request = tuning.BulkDumpRequest(device_id=1, program=3)
         silent = tuning.Query(
-            request=silent_request, stream=receiver.stream, timeout_ns=100_000_000
+            request=silent_request, stream=receiver.stream, timeout="100000000 ns"
         )
         result = tuning_live.run(silent, receiver, output)
         assert (
@@ -141,7 +141,7 @@ def exercise(isolated: bool, directory: Path) -> None:
         token = events.Cancellation()
         token.cancel()
         cancelled = tuning.Query(
-            request=silent_request, stream=receiver.stream, timeout_ns=1_000_000_000
+            request=silent_request, stream=receiver.stream, timeout="1000000000 ns"
         )
         result = tuning_live.run(cancelled, receiver, output, cancel=token)
         assert result.status == "cancelled" and not result.request_sent

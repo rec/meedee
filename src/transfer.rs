@@ -12,17 +12,17 @@ struct Plan {
 #[pymethods]
 impl Plan {
     #[new]
-    #[pyo3(signature=(messages, *, gap_ns, message_limit=256, byte_limit=8_388_608))]
+    #[pyo3(signature=(messages, *, gap, message_limit=256, byte_limit=8_388_608))]
     fn new(
         messages: Vec<PyRef<'_, SysEx>>,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] gap_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] gap: u64,
         #[pyo3(from_py_with=limit)] message_limit: usize,
         #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: transfer::Plan::new(
                 messages.iter().map(|v| Ok(v.value.clone())),
-                gap_ns,
+                gap,
                 message_limit,
                 byte_limit,
             )
@@ -38,8 +38,8 @@ impl Plan {
         self.value.wire_bytes()
     }
     #[getter]
-    fn gap_ns(&self) -> u64 {
-        self.value.gap_ns()
+    fn gap(&self) -> f64 {
+        self.value.gap_ns() as f64 / 1_000_000_000.0
     }
     fn message(
         &self,
@@ -54,11 +54,11 @@ impl Plan {
     }
 }
 #[pyfunction]
-#[pyo3(signature=(source, *, gap_ns, message_limit=256, byte_limit=8_388_608, payload_limit=1_048_576))]
+#[pyo3(signature=(source, *, gap, message_limit=256, byte_limit=8_388_608, payload_limit=1_048_576))]
 fn read_file(
     py: Python<'_>,
     source: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=crate::units::nanoseconds)] gap_ns: u64,
+    #[pyo3(from_py_with=crate::units::duration)] gap: u64,
     #[pyo3(from_py_with=limit)] message_limit: usize,
     #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
     #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
@@ -66,9 +66,7 @@ fn read_file(
     let source = Stream::input(source)?;
     Ok(Plan {
         value: py
-            .detach(|| {
-                transfer::Plan::read(source, gap_ns, message_limit, byte_limit, payload_limit)
-            })
+            .detach(|| transfer::Plan::read(source, gap, message_limit, byte_limit, payload_limit))
             .map_err(os_error)?,
     })
 }
@@ -239,11 +237,11 @@ struct Capture {
 #[pymethods]
 impl Capture {
     #[new]
-    #[pyo3(signature=(*,stream,expected_messages,timeout_ns,byte_limit=8_388_608,payload_limit=1_048_576))]
+    #[pyo3(signature=(*,stream,expected_messages,timeout,byte_limit=8_388_608,payload_limit=1_048_576))]
     fn new(
         stream: String,
         #[pyo3(from_py_with=limit)] expected_messages: usize,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
         #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
         #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
@@ -251,7 +249,7 @@ impl Capture {
             value: transfer::Capture::new(
                 stream,
                 expected_messages,
-                timeout_ns,
+                timeout,
                 byte_limit,
                 payload_limit,
             )

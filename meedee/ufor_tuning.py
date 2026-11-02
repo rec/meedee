@@ -146,7 +146,7 @@ def bulk_plan(
     device_id: int,
     program: int,
     name: str,
-    gap_ns: int,
+    gap: float | str,
     bank: int | None = None,
     preserve_unmapped: bool = False,
 ) -> transfer.Plan:
@@ -162,7 +162,7 @@ def bulk_plan(
     wire = codecs.encode(message)
     return transfer.Plan(
         [messages.SysEx(data=wire[1:-1])],
-        gap_ns=gap_ns,
+        gap=gap,
         message_limit=1,
         byte_limit=len(wire),
     )

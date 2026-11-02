@@ -158,10 +158,10 @@ None.
 
 ## Bounded transfer plans
 
-`bulk_plan(report, *, device_id, program, name, gap_ns, bank=None,
+`bulk_plan(report, *, device_id, program, name, gap, bank=None,
 preserve_unmapped=False)` composes the existing bulk builder and byte codec with
 a `transfer.Plan` containing exactly one SysEx message. Count and byte budgets
-are limited to that generated message. Explicit gap_ns has the existing transfer
+are limited to that generated message. Explicit gap accepts seconds or a unit expression and has the existing transfer
 meaning; it does not create a timer or send. The same coverage/error policy and
 ordinary/banked choice apply. Library device ID 127 remains available as an
 explicit broadcast choice. No per-key transfer-plan factory is added here.
@@ -180,8 +180,8 @@ commands use the project's Python 3.13 requirement.
 meedee ufor-preview tuning.json --source-format tuning-json
 meedee ufor-preview scale.scl --source-format scala --root-note 69 --root-frequency 440
 meedee ufor-export scale.scl dump.syx --source-format scala --root-note 69 --root-frequency 440 --device-id 1 --program 2 --name "My tuning"
-meedee transfer-preview dump.syx --gap-ms 20
-meedee transfer-send dump.syx --port "Synth In" --gap-ms 20
+meedee transfer-preview dump.syx --gap 0.02
+meedee transfer-send dump.syx --port "Synth In" --gap 0.02
 ```
 
 The first three commands are offline. The final command is a separate explicit
@@ -221,7 +221,7 @@ symlinks or files appearing before the open. Writes use the existing SYX writer
 and flush without fsync; a disk/flush failure can leave a partial new file and
 returns 2. Validation failures create no destination. No partial generated plan
 is returned. The exported SYX is readable by existing inspection/transfer tools.
-The offline plan uses gap_ns=0; SYX stores no pacing metadata. Sending requires
+The offline plan uses gap=0; SYX stores no pacing metadata. Sending requires
 its own explicit gap through the existing transfer command, and handoff never
 proves device acceptance. No second live sending command or audition engine is
 introduced.

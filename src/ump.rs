@@ -626,7 +626,7 @@ macro_rules! helpers {
     };
 }
 helpers! {FlexData;
-    tempo(group:int,ten_nanoseconds_per_quarter:tempo_period);
+    tempo(group:int,bpm:tempo_period);
     time_signature(group:int,numerator:int,denominator_power:int,thirtyseconds_per_quarter:int);
     metronome(group:int,clocks_per_primary:int,accent1:int,accent2:int,accent3:int,subdivision1:int,subdivision2:int);
     key_signature(group:int,channel:optional_int,sharps_flats:int,tonic:int);
@@ -724,12 +724,9 @@ fn midi1_message(message: &Bound<'_, PyAny>) -> PyResult<meedee::messages::AnyMe
 }
 
 fn tempo_period(value: &Bound<'_, PyAny>) -> PyResult<i64> {
-    if !value.is_instance_of::<pyo3::types::PyString>() {
-        return int(value);
-    }
     int(&value
         .py()
         .import("meedee._units")?
         .getattr("tempo")?
-        .call1((value, "nanosecond / beat", 10))?)
+        .call1((value, 100_000_000))?)
 }

@@ -195,7 +195,7 @@ def test_transfer_conformance_retains_known_handoffs_and_uncertain_sink_effects(
     session = transfer.Session(
         transfer.Plan(
             [messages.SysEx(data=b"\x7d\x01"), messages.SysEx(data=b"\x7d\x02")],
-            gap_ns=10,
+            gap="10 ns",
         )
     )
     o = testing.Output(protocol="midi1")

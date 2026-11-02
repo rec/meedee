@@ -242,7 +242,7 @@ impl ExportReport {
     }
 }
 #[pyfunction]
-#[pyo3(signature=(event,*,header,origin,track=0,tempo=500_000,mapping=None,allow_loss=false))]
+#[pyo3(signature=(event,*,header,origin,track=0,tempo=500_000,mapping=None,allow_loss=false), text_signature="(event, *, header, origin, track=0, tempo=120.0, mapping=None, allow_loss=False)")]
 #[allow(clippy::too_many_arguments)]
 fn export_event(
     event: PyRef<'_, Event>,

@@ -135,7 +135,7 @@ def test_session_requires_explicit_discovery_reply_and_loss_handling() -> None:
     b.report_send(token=actions[0].token, sent=True, now_ns=3)
     a.feed(reply, input="a", now_ns=4)
     assert a.peers[0].muid == 2 and a.peers[0].info.capabilities == 0
-    query = a.inquire_endpoint(peer_muid=2, now_ns=5, timeout_ns=100)
+    query = a.inquire_endpoint(peer_muid=2, now_ns=5, timeout="100 ns")
     a.report_send(token=query.token, sent=True, now_ns=6)
     updates = b.feed(query.message, input="b", now_ns=7)
     assert any(
@@ -144,7 +144,7 @@ def test_session_requires_explicit_discovery_reply_and_loss_handling() -> None:
     response = b.respond(
         ci.EndpointReply(header=header(2, 1), product_instance_id="serial"),
         now_ns=8,
-        timeout_ns=100,
+        timeout="100 ns",
     )
     b.report_send(token=response.token, sent=True, now_ns=9)
     a.feed(response.message, input="a", now_ns=10)
@@ -207,7 +207,7 @@ def test_early_replies_wait_for_confirmation_and_stay_invalidated() -> None:
     )
     a.report_send(token=discovery.token, sent=True, now_ns=2)
     assert a.peers[0].muid == 2
-    query = a.inquire_endpoint(peer_muid=2, now_ns=3, timeout_ns=100)
+    query = a.inquire_endpoint(peer_muid=2, now_ns=3, timeout="100 ns")
     a.feed(
         ci.EndpointReply(header=header(2, 1), product_instance_id="serial"),
         input="a",

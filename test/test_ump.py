@@ -217,7 +217,7 @@ def test_flex_and_stream_text_validate_complete_utf8_and_protocol_lengths() -> N
         data=(0xFF000000, 0, 0),
     )
     assert assembler.feed(invalid) == [ump.AssemblyDiagnostic.MalformedText]
-    assert ump.encode(ump.tempo(group=1, ten_nanoseconds_per_quarter=50_000_000)) == (
+    assert ump.encode(ump.tempo(group=1, bpm=120.0)) == (
         0xD0100000,
         0x02FAF080,
         0,

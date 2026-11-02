@@ -25,7 +25,7 @@ def report_data(report: transfer.Report) -> dict[str, object]:
 def run_transfer(config: TransferPreview) -> int:
     plan = transfer.read_file(
         config.source,
-        gap_ns=config.gap_ms * 1_000_000,
+        gap=config.gap,
         message_limit=config.message_limit,
         byte_limit=config.byte_limit,
         payload_limit=config.payload_limit,
@@ -38,7 +38,7 @@ def run_transfer(config: TransferPreview) -> int:
                 "dry_run": True,
                 "message_count": plan.message_count,
                 "wire_bytes": plan.wire_bytes,
-                "gap_ns": plan.gap_ns,
+                "gap": plan.gap,
                 "examples": [
                     {
                         "index": i,
@@ -95,7 +95,7 @@ def run_transfer(config: TransferPreview) -> int:
             "kind": "transfer_summary",
             "dry_run": False,
             "port": config.port,
-            "gap_ns": plan.gap_ns,
+            "gap": plan.gap,
             "failure": failure,
             "interrupted": interrupted or report.reason == "interrupted",
         }
@@ -136,7 +136,7 @@ def run_receive(config: SysexReceive) -> int:
             capture = transfer.Capture(
                 stream=receiver.stream,
                 expected_messages=config.expected_messages,
-                timeout_ns=config.timeout_ms * 1_000_000,
+                timeout=config.timeout,
                 byte_limit=config.byte_limit,
                 payload_limit=config.payload_limit,
             )

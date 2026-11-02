@@ -212,9 +212,9 @@ class TransferPreview(BaseModel, frozen=True):
     """Validate and preview a complete bounded MIDI 1 SysEx file; opens no ports."""
 
     source: tyro.conf.Positional[Path]
-    gap_ms: Annotated[
-        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
-    ] = Field(ge=0, le=18_446_744_073_709)
+    gap: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(ge=0, le=18_446_744_073.709)
     message_limit: int = Field(default=256, gt=0)
     byte_limit: Annotated[
         int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
@@ -243,9 +243,9 @@ class SysexReceive(BaseModel, frozen=True):
     destination: tyro.conf.Positional[Path]
     port: str = Field(min_length=1)
     expected_messages: int = Field(gt=0)
-    timeout_ms: Annotated[
-        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
-    ] = Field(gt=0, le=18_446_744_073_709)
+    timeout: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(gt=0, le=18_446_744_073.709)
     byte_limit: Annotated[
         int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
     ] = Field(default=8_388_608, gt=0)
@@ -266,7 +266,7 @@ class SysexReceive(BaseModel, frozen=True):
         transfer.Capture(
             stream="validation",
             expected_messages=self.expected_messages,
-            timeout_ns=self.timeout_ms * 1_000_000,
+            timeout=float(self.timeout),
             byte_limit=int(self.byte_limit),
             payload_limit=int(self.payload_limit),
         )
@@ -279,9 +279,9 @@ class TuningPreview(BaseModel, frozen=True):
     device_id: int = Field(ge=0, le=126)
     program: int = Field(ge=0, le=127)
     bank: int | None = Field(default=None, ge=0, le=127)
-    timeout_ms: Annotated[
-        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
-    ] = Field(gt=0, le=18_446_744_073_709)
+    timeout: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(gt=0, le=18_446_744_073.709)
     output: Literal["text", "json"] = "text"
 
 
@@ -362,15 +362,15 @@ class CiBrowse(BaseModel, frozen=True):
         | None
     ) = None
     isolated: bool = True
-    discovery_ms: Annotated[
-        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
-    ] = Field(default=3000, ge=3000, le=18_446_744_073_709)
-    endpoint_ms: Annotated[
-        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
-    ] = Field(default=1000, gt=0, le=18_446_744_073_709)
-    timeout_ms: Annotated[
-        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
-    ] = Field(default=30000, gt=0, le=18_446_744_073_709)
+    discovery_timeout: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(default=3.0, ge=3.0, le=18_446_744_073.709)
+    endpoint_timeout: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1.0, gt=0, le=18_446_744_073.709)
+    timeout: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(default=30.0, gt=0, le=18_446_744_073.709)
     peer_limit: int = Field(default=16, gt=0)
     exchange_limit: int = Field(default=16, gt=0)
     detail_limit: int = Field(default=128, gt=0)
@@ -397,7 +397,7 @@ class CiBrowse(BaseModel, frozen=True):
             raise ValueError("UMP requires an explicit group; MIDI 1 has no group")
         if self.protocol == "midi1" and self.function_block is not None:
             raise ValueError("MIDI 1 has no UMP Function Block")
-        if self.timeout_ms <= self.discovery_ms:
+        if self.timeout <= self.discovery_timeout:
             raise ValueError("overall timeout must exceed discovery duration")
         return self
 

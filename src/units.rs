@@ -31,7 +31,25 @@ pub fn bytes(value: &Bound<'_, PyAny>) -> PyResult<usize> {
 }
 
 pub fn tempo(value: &Bound<'_, PyAny>) -> PyResult<u64> {
-    crate::files::uint(&normalize(value, "microsecond / beat", "tempo")?)
+    crate::files::uint(
+        &value
+            .py()
+            .import("meedee._units")?
+            .getattr("tempo")?
+            .call1((value, 1_000_000))?,
+    )
+}
+
+pub fn duration(value: &Bound<'_, PyAny>) -> PyResult<u64> {
+    // PyO3 applies from_py_with only to supplied arguments. Binding defaults
+    // therefore use native nanoseconds, with public seconds in text_signature.
+    crate::files::uint(
+        &value
+            .py()
+            .import("meedee._units")?
+            .getattr("duration")?
+            .call1((value,))?,
+    )
 }
 
 pub fn field<'py>(value: &Bound<'py, PyAny>, name: &str) -> PyResult<Bound<'py, PyAny>> {

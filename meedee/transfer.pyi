@@ -9,7 +9,7 @@ class Plan:
         self,
         messages: list[SysEx],
         *,
-        gap_ns: int | str,
+        gap: float | str,
         message_limit: int = 256,
         byte_limit: int | str = 8_388_608,
     ) -> None: ...
@@ -18,7 +18,7 @@ class Plan:
     @property
     def wire_bytes(self) -> int: ...
     @property
-    def gap_ns(self) -> int: ...
+    def gap(self) -> float: ...
     def message(self, index: int) -> SysEx: ...
 
 class Step:
@@ -60,7 +60,7 @@ class Session:
 def read_file(
     source: str | PathLike[str] | BinaryIO,
     *,
-    gap_ns: int | str,
+    gap: float | str,
     message_limit: int = 256,
     byte_limit: int | str = 8_388_608,
     payload_limit: int | str = 1_048_576,
@@ -88,7 +88,7 @@ class Capture:
         *,
         stream: str,
         expected_messages: int,
-        timeout_ns: int | str,
+        timeout: float | str,
         byte_limit: int | str = 8_388_608,
         payload_limit: int | str = 1_048_576,
     ) -> None: ...

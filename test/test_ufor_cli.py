@@ -117,8 +117,8 @@ def test_complete_bulk_export_is_transfer_ready_and_refuses_overwrite(
         and report["converted_keys"] == 128
         and report["preserved_keys"] == 0
     )
-    plan = transfer.read_file(destination, gap_ns=17)
-    assert plan.message_count == 1 and plan.gap_ns == 17
+    plan = transfer.read_file(destination, gap="17 ns")
+    assert plan.message_count == 1 and plan.gap == 17e-9
     decoded = tuning.decode(plan.message(0))
     assert decoded is not None and decoded.checksum == tuning.ChecksumStatus.Matches
     assert isinstance(

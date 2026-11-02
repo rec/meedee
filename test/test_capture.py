@@ -13,7 +13,9 @@ def event(message: messages.Message, stream: str = "s") -> events.Event:
 
 
 def capture(count: int = 2, timeout: int = 100) -> transfer.Capture:
-    return transfer.Capture(stream="s", expected_messages=count, timeout_ns=timeout)
+    return transfer.Capture(
+        stream="s", expected_messages=count, timeout=f"{timeout} ns"
+    )
 
 
 def test_capture_requires_count_before_export_and_refuses_overwrite(
@@ -66,9 +68,9 @@ def test_capture_deadline_and_protocol_failures_preserve_the_prefix() -> None:
         c.feed(item, 1)
         assert c.snapshot().status == "failed" and c.snapshot().received_messages == 0
     with pytest.raises(ValueError):
-        transfer.Capture(stream="s", expected_messages=3, timeout_ns=1, byte_limit=4)
+        transfer.Capture(stream="s", expected_messages=3, timeout="1 ns", byte_limit=4)
     with pytest.raises(TypeError):
-        transfer.Capture(stream="s", expected_messages=True, timeout_ns=1)
+        transfer.Capture(stream="s", expected_messages=True, timeout="1 ns")
 
 
 def test_receive_adapter_reuses_fragment_assembly_without_closing_input(

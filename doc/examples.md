@@ -21,7 +21,7 @@ works with ordinary keyboards and synths; native backend availability depends
 on the platform and build.
 
 Unit-bearing inputs also accept strings such as `timeout="250 ms"`,
-`gap_ns="2 ms"`, `frequency_hz="440 Hz"` and `byte_limit="8 MiB"`.
+`gap="2 ms"`, `frequency_hz="440 Hz"` and `byte_limit="8 MiB"`.
 Ordinary numeric inputs still work in each parameter's documented units, and
 returned values remain numeric. No Pint import is needed. Integer fields require
 exact conversions; beats and ticks are not implicitly converted to seconds.
@@ -482,7 +482,7 @@ def backup(path: Path) -> None:
         capture = transfer.Capture(
             stream=receiver.stream,
             expected_messages=count,
-            timeout_ns=int(timeout * 1_000_000_000),
+            timeout=timeout,
         )
         print("Input is open. Start the dump on the instrument now.")
         report = transfer_input.run(capture, receiver)
@@ -496,8 +496,8 @@ def backup(path: Path) -> None:
 
 
 def restore(path: Path) -> None:
-    gap_ms = float(input("Minimum gap after each message, in milliseconds: "))
-    plan = transfer.read_file(path, gap_ns=int(gap_ms * 1_000_000))
+    gap = input("Minimum gap after each message (seconds or units, e.g. 100 ms): ")
+    plan = transfer.read_file(path, gap=gap)
     print(f"Ready to send {plan.message_count} messages, {plan.wire_bytes} bytes.")
     client = midi.Output()
     ports = client.ports()
@@ -795,9 +795,9 @@ def main() -> None:
             local_muid=randbelow(ci.MAX_MUID + 1),
             identity=identity,
             route=ci.Route(input=receiver.stream, output="device"),
-            discovery_ns=3_000_000_000,
-            endpoint_ns=1_000_000_000,
-            timeout_ns=30_000_000_000,
+            discovery_timeout=3,
+            endpoint_timeout=1,
+            timeout=30,
         )
         print("Scanning MIDI-CI peers...")
         report = ci_live.run(browser, receiver, output)

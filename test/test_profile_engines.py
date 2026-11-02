@@ -180,7 +180,7 @@ def quarter_cycle(frames: int, reverse: bool = False) -> list[messages.QuarterFr
 
 
 def test_mtc_lock_requires_continuity_and_expires_at_the_deadline() -> None:
-    assembler = timecode.Assembler(timeout_ns=100)
+    assembler = timecode.Assembler(timeout="100 ns")
     now = 0
     for frame in (0, 2):
         result = None

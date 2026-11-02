@@ -104,7 +104,7 @@ def test_mpe_and_mtc_views_do_not_invent_unobserved_state_or_native_time() -> No
         event(messages.NoteOn(channel=2, note=60, velocity=100), 1)
     )
     assert observations and isinstance(observations[0].value, mpe.ChannelState)
-    assembler = timecode.EventAssembler(timeout_ns=100)
+    assembler = timecode.EventAssembler(timeout="100 ns")
     assert (
         assembler.feed(
             event(messages.QuarterFrame(message_type=0, value=0), 10), now_ns=1

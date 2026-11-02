@@ -61,7 +61,7 @@ def invoke(args: list[str]) -> int:
     return result.value.code
 
 
-@pytest.mark.parametrize("gap", ["20", "20 ms"])
+@pytest.mark.parametrize("gap", ["0.02", "20 ms"])
 def test_preview_bounds_examples_and_never_constructs_transport(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -77,7 +77,7 @@ def test_preview_bounds_examples_and_never_constructs_transport(
             [
                 "transfer-preview",
                 str(source),
-                "--gap-ms",
+                "--gap",
                 gap,
                 "--detail-limit",
                 "1",
@@ -91,7 +91,7 @@ def test_preview_bounds_examples_and_never_constructs_transport(
     )
     data = json.loads(capsys.readouterr().out)
     assert data["dry_run"] and data["message_count"] == 2 and data["wire_bytes"] == 8
-    assert data["gap_ns"] == 20_000_000 and data["omitted_examples"] == 1
+    assert data["gap"] == 0.02 and data["omitted_examples"] == 1
     assert data["examples"] == [{"index": 0, "wire_bytes": 4, "payload_preview": "7d"}]
     assert actions == []
 
@@ -111,8 +111,8 @@ def test_send_rejects_entire_bad_file_before_discovery(
             [
                 "transfer-send",
                 str(source),
-                "--gap-ms",
-                "0",
+                "--gap",
+                "0 ms",
                 "--port",
                 "synth",
                 "--output",
@@ -139,8 +139,8 @@ def test_send_preserves_exact_bytes_and_reports_uncertain_progress(
         [
             "transfer-send",
             str(source),
-            "--gap-ms",
-            "0",
+            "--gap",
+            "0 ms",
             "--port",
             "synth",
             "--output",
@@ -170,8 +170,8 @@ def test_ambiguous_output_never_opens_or_sends(
             [
                 "transfer-send",
                 str(source),
-                "--gap-ms",
-                "0",
+                "--gap",
+                "0 ms",
                 "--port",
                 "synth",
                 "--output",
@@ -200,8 +200,8 @@ def test_interrupt_during_close_keeps_completed_handoffs_visible(
             [
                 "transfer-send",
                 str(source),
-                "--gap-ms",
-                "0",
+                "--gap",
+                "0 ms",
                 "--port",
                 "synth",
                 "--output",

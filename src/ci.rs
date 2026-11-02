@@ -342,22 +342,22 @@ impl Session {
     fn pending_count(&self) -> usize {
         self.value.pending_count()
     }
-    #[pyo3(signature=(*,now_ns,timeout_ns=3_000_000_000))]
+    #[pyo3(signature=(*,now_ns,timeout=3_000_000_000), text_signature="($self, *, now_ns, timeout=3.0)")]
     fn discover(
         &mut self,
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
     ) -> PyResult<Action> {
         Ok(Action {
-            value: self.value.discover(now_ns, timeout_ns).map_err(error)?,
+            value: self.value.discover(now_ns, timeout).map_err(error)?,
         })
     }
-    #[pyo3(signature=(*,peer_muid,now_ns,timeout_ns))]
+    #[pyo3(signature=(*,peer_muid,now_ns,timeout))]
     fn inquire_endpoint(
         &mut self,
         peer_muid: &Bound<'_, PyAny>,
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
     ) -> PyResult<Action> {
         let peer = uint(peer_muid)?
             .try_into()
@@ -365,7 +365,7 @@ impl Session {
         Ok(Action {
             value: self
                 .value
-                .inquire_endpoint(peer, now_ns, timeout_ns)
+                .inquire_endpoint(peer, now_ns, timeout)
                 .map_err(error)?,
         })
     }
@@ -420,17 +420,17 @@ impl Session {
     ) -> PyResult<()> {
         self.value.restart(int(local_muid)?, now_ns).map_err(error)
     }
-    #[pyo3(signature=(message,*,now_ns,timeout_ns))]
+    #[pyo3(signature=(message,*,now_ns,timeout))]
     fn respond(
         &mut self,
         message: &Bound<'_, PyAny>,
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
     ) -> PyResult<Action> {
         Ok(Action {
             value: self
                 .value
-                .respond(extract(message)?, now_ns, timeout_ns)
+                .respond(extract(message)?, now_ns, timeout)
                 .map_err(error)?,
         })
     }
@@ -536,7 +536,7 @@ impl Browser {
         }
     }
     #[new]
-    #[pyo3(signature=(*,local_muid,identity,route,output_path=0,function_block=None,max_sysex=1_048_576,peer_limit=16,exchange_limit=16,reply_byte_limit=8_388_608,discovery_ns=3_000_000_000,endpoint_ns=1_000_000_000,timeout_ns=30_000_000_000,detail_limit=128))]
+    #[pyo3(signature=(*,local_muid,identity,route,output_path=0,function_block=None,max_sysex=1_048_576,peer_limit=16,exchange_limit=16,reply_byte_limit=8_388_608,discovery_timeout=3_000_000_000,endpoint_timeout=1_000_000_000,timeout=30_000_000_000,detail_limit=128), text_signature="(*, local_muid, identity, route, output_path=0, function_block=None, max_sysex=1048576, peer_limit=16, exchange_limit=16, reply_byte_limit=8388608, discovery_timeout=3.0, endpoint_timeout=1.0, timeout=30.0, detail_limit=128)")]
     #[allow(clippy::too_many_arguments)]
     fn new(
         local_muid: &Bound<'_, PyAny>,
@@ -548,9 +548,9 @@ impl Browser {
         #[pyo3(from_py_with=limit)] peer_limit: usize,
         #[pyo3(from_py_with=limit)] exchange_limit: usize,
         #[pyo3(from_py_with=crate::units::bytes)] reply_byte_limit: usize,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] discovery_ns: u64,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] endpoint_ns: u64,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] discovery_timeout: u64,
+        #[pyo3(from_py_with=crate::units::duration)] endpoint_timeout: u64,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
         #[pyo3(from_py_with=limit)] detail_limit: usize,
     ) -> PyResult<Self> {
         let session = session::Session::new(
@@ -568,9 +568,9 @@ impl Browser {
         Ok(Self {
             value: meedee::ci_browser::Browser::new(
                 session,
-                discovery_ns,
-                endpoint_ns,
-                timeout_ns,
+                discovery_timeout,
+                endpoint_timeout,
+                timeout,
                 detail_limit,
             )
             .map_err(error)?,

@@ -96,9 +96,9 @@ def run_browse(config: CiBrowse) -> int:
                 peer_limit=config.peer_limit,
                 exchange_limit=config.exchange_limit,
                 reply_byte_limit=config.byte_limit,
-                discovery_ns=config.discovery_ms * 1_000_000,
-                endpoint_ns=config.endpoint_ms * 1_000_000,
-                timeout_ns=config.timeout_ms * 1_000_000,
+                discovery_timeout=config.discovery_timeout,
+                endpoint_timeout=config.endpoint_timeout,
+                timeout=config.timeout,
                 detail_limit=config.detail_limit,
             )
             ci_live.run(

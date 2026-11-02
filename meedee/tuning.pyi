@@ -314,7 +314,7 @@ class ReplyTracker:
         *,
         request: BulkDumpRequest | BankedDumpRequest,
         now_ns: int | str,
-        timeout_ns: int | str,
+        timeout: float | str,
     ) -> None: ...
     @property
     def status(self) -> RequestStatus: ...
@@ -370,7 +370,7 @@ class Query:
         *,
         request: BulkDumpRequest | BankedDumpRequest,
         stream: str,
-        timeout_ns: int | str,
+        timeout: float | str,
     ) -> None: ...
     def prepare(self, now_ns: int | str) -> messages.SysEx: ...
     def confirm(self, now_ns: int | str) -> None: ...

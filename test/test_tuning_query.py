@@ -14,7 +14,7 @@ def query(bank: int | None = None) -> tuning.Query:
         if bank is None
         else tuning.BankedDumpRequest(device_id=1, bank=bank, program=2)
     )
-    return tuning.Query(request=request, stream="s", timeout_ns=10)
+    return tuning.Query(request=request, stream="s", timeout="10 ns")
 
 
 def reply(bank: int | None = None) -> bytes:

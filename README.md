@@ -116,7 +116,7 @@ histogram boundaries and measurement windows.
 To receive a dump initiated on an instrument, use the optional CLI:
 
 ```bash
-meedee sysex-receive backup.syx --port "Synth MIDI Out" --expected-messages 8 --timeout-ms 30000
+meedee sysex-receive backup.syx --port "Synth MIDI Out" --expected-messages 8 --timeout 30.0
 ```
 
 This passively collects MIDI 1 SysEx, closes the input, then creates a new file.
@@ -137,8 +137,8 @@ overwriting; sending remains a separate `transfer-send` action. See the
 ## Request an MTS tuning dump
 
 ```bash
-meedee tuning-preview --device-id 1 --program 2 --timeout-ms 3000
-meedee tuning-query tuning.syx --input-port "Synth Out" --output-port "Synth In" --device-id 1 --program 2 --timeout-ms 3000
+meedee tuning-preview --device-id 1 --program 2 --timeout 3.0
+meedee tuning-query tuning.syx --input-port "Synth Out" --output-port "Synth In" --device-id 1 --program 2 --timeout 3.0
 ```
 
 Add `--bank` for a banked request. Preview opens no ports; query sends one MIDI 1
@@ -390,15 +390,15 @@ use reccy for unit-aware Python inputs; uFor remains an optional extra.
 
 You can use ordinary numbers or reccy/Pint expressions. You do not need to import
 Pint or construct quantities. For example, `timeout="250 ms"`,
-`gap_ns="2 ms"`, `frequency_hz="0.44 kHz"` and `byte_limit="8 MiB"` normalize
+`gap="2 ms"`, `frequency_hz="0.44 kHz"` and `byte_limit="8 MiB"` normalize
 to the same values as their numeric equivalents. Bare numbers retain the units
 specified by each parameter. Returned values remain numbers.
 
 `smf.export_event(..., tempo="120 bpm")` and
-`ump.tempo(group=1, ten_nanoseconds_per_quarter="120 bpm")` accept beat rates
+`ump.tempo(group=1, bpm=120)` accept beat rates
 or beat periods such as `"500 ms / beat"`. Here a beat means a quarter note.
-Numeric tempo arguments retain their MIDI encoding units: microseconds per
-quarter note for SMF and ten-nanosecond units per quarter note for UMP.
+Numeric tempo arguments are BPM in both APIs. Transfer gaps and timeouts use
+seconds; for example, `gap=0.1` and `gap="100 ms"` are equivalent.
 
 Integer fields require exact conversions. A nonintegral nanosecond or byte
 count is rejected rather than rounded. Beats, ticks and seconds are distinct;
@@ -406,7 +406,7 @@ meedee does not infer a tempo or clock mapping to convert between them. Raw MIDI
 values such as velocity and controller values retain their protocol ranges.
 
 CLI quantity options accept the same expressions, quoted as one shell argument:
-`--duration "1 min"`, `--gap-ms "250 ms"`, `--byte-limit "8 MiB"`.
+`--duration "1 min"`, `--gap "250 ms"`, `--byte-limit "8 MiB"`.
 For the Pydantic command models, use `reccy.configuration.units.authored_dump()`
 to preserve authored expressions, `runtime_dump()` for normalized numbers, and
 `revalidation_dump()` when rebuilding a model without losing unit provenance.
@@ -887,17 +887,17 @@ is performed. See [the topology contract](plan/api.md#topology-observations-and-
 Validate and preview a complete `.syx` file without opening MIDI ports:
 
 ```sh
-meedee transfer-preview backup.syx --gap-ms 100 --output json
+meedee transfer-preview backup.syx --gap 0.1 --output json
 ```
 
 To send, choose a gap from the instrument's documented transfer requirements and
 an exact, unique output name. Sending may change instrument state:
 
 ```sh
-meedee transfer-send backup.syx --gap-ms 100 --port 'Exact output name'
+meedee transfer-send backup.syx --gap 0.1 --port 'Exact output name'
 ```
 
-The 100 ms value is an example, not a device recommendation. `--gap-ms` is
+The 100 ms value is an example, not a device recommendation. `--gap` is
 required; zero sends consecutive complete messages. No message splitting,
 automatic retries or device acknowledgements are inferred. The file is fully
 validated before output discovery. Defaults bound plans to 256 messages, 8 MiB
@@ -929,9 +929,9 @@ Those identity fields describe the local browser, not the device being sought.
 For UMP, use `--protocol ump --group N` with the intended group (1..16). A fresh
 random MUID is generated for each scan. Both ports must be uniquely named;
 process isolation is enabled by default. `--output json` produces a final report.
-The default discovery window is 3000 ms, endpoint timeout 1000 ms and overall
-scan deadline 30000 ms, adjustable with `--discovery-ms`, `--endpoint-ms` and
-`--timeout-ms`. The overall deadline does not interrupt blocked native calls.
+The default discovery window is 3 seconds, endpoint timeout 1 second and overall
+scan deadline 30 seconds, adjustable with `--discovery-timeout`, `--endpoint-timeout` and
+`--timeout`. The overall deadline does not interrupt blocked native calls.
 
 This sends management traffic, including protocol replies and required collision
 invalidations. It stops on loss/failure and never restarts or retries automatically.

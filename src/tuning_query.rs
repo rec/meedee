@@ -58,17 +58,17 @@ struct Query {
 #[pymethods]
 impl Query {
     #[new]
-    #[pyo3(signature=(*,request,stream,timeout_ns))]
+    #[pyo3(signature=(*,request,stream,timeout))]
     fn new(
         request: &Bound<'_, PyAny>,
         stream: String,
-        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
     ) -> PyResult<Self> {
         Ok(Self {
             value: tuning_query::Query::new(
                 crate::tuning::extract_message(request)?,
                 stream,
-                timeout_ns,
+                timeout,
             )
             .map_err(error)?,
         })

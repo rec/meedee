@@ -251,7 +251,7 @@ def test_dump_checksum_policy_and_ascii_names() -> None:
 
 def test_reply_tracker_matches_only_a_timely_reply_and_keeps_terminal_state() -> None:
     request = tuning.BankedDumpRequest(device_id=1, bank=3, program=2)
-    tracker = tuning.ReplyTracker(request=request, now_ns=100, timeout_ns=10)
+    tracker = tuning.ReplyTracker(request=request, now_ns=100, timeout="10 ns")
     assert tracker.deadline_ns == 110
     assert tracker.status == tuning.RequestStatus.Pending
     reply = tuning.KeyBasedDump(
@@ -269,22 +269,22 @@ def test_reply_tracker_matches_only_a_timely_reply_and_keeps_terminal_state() ->
     assert tracker.poll(now_ns=110) == tuning.RequestStatus.Completed
     assert tracker.cancel() == tuning.RequestStatus.Completed
     assert not tracker.observe(reply, now_ns=111)
-    tracker = tuning.ReplyTracker(request=request, now_ns=0, timeout_ns=10)
+    tracker = tuning.ReplyTracker(request=request, now_ns=0, timeout="10 ns")
     assert not tracker.observe(reply, now_ns=10)
     assert tracker.status == tuning.RequestStatus.TimedOut
     with pytest.raises(ValueError):
         tracker.poll(now_ns=9)
-    tracker = tuning.ReplyTracker(request=request, now_ns=0, timeout_ns=10)
+    tracker = tuning.ReplyTracker(request=request, now_ns=0, timeout="10 ns")
     assert tracker.cancel() == tuning.RequestStatus.Cancelled
     assert not tracker.observe(reply, now_ns=1)
     for kwargs in (
-        {"timeout_ns": 0},
+        {"timeout": "0 ns"},
         {"now_ns": 2**64 - 1},
         {"request": request.replace(device_id=127)},
     ):
         with pytest.raises(ValueError):
             tuning.ReplyTracker(
-                **({"request": request, "now_ns": 0, "timeout_ns": 1} | kwargs)
+                **({"request": request, "now_ns": 0, "timeout": "1 ns"} | kwargs)
             )
     with pytest.raises(TypeError):
-        tuning.ReplyTracker(request=request, now_ns=True, timeout_ns=1)
+        tuning.ReplyTracker(request=request, now_ns=True, timeout="1 ns")

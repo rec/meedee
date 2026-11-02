@@ -249,8 +249,10 @@ def test_ufor_numeric_overflow_and_underflow_cannot_generate_mts(detune: float) 
 
 
 @pytest.mark.parametrize("bank", [None, 3])
+@pytest.mark.parametrize("gap", [0.02, "20 ms"])
 def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast(
     bank: int | None,
+    gap: float | str,
 ) -> None:
     from meedee import transfer, transfer_output
     from meedee.testing import Output
@@ -261,10 +263,10 @@ def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast
         device_id=127,
         program=2,
         name="planned",
-        gap_ns=37,
+        gap=gap,
         bank=bank,
     )
-    assert plan.message_count == 1 and plan.gap_ns == 37
+    assert plan.message_count == 1 and plan.gap == 0.02
     wire = codecs.encode(plan.message(0))
     assert plan.wire_bytes == len(wire)
     decoded = tuning.decode(plan.message(0))

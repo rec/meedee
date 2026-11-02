@@ -43,7 +43,7 @@ def run_query(config: TuningPreview) -> int:
                 "dry_run": True,
                 "request_type": type(request).__name__,
                 "wire_hex": codecs.encode(request).hex(),
-                "timeout_ns": config.timeout_ms * 1_000_000,
+                "timeout": config.timeout,
             },
             config.output,
         )
@@ -82,7 +82,7 @@ def run_query(config: TuningPreview) -> int:
             query = tuning.Query(
                 request=request,
                 stream=receiver.stream,
-                timeout_ns=config.timeout_ms * 1_000_000,
+                timeout=config.timeout,
             )
             tuning_live.run(query, receiver, output)
         if query.snapshot().status == "completed":

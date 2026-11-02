@@ -10,30 +10,30 @@ from meedee import codecs, events, messages, midi, transfer, transfer_output
 
 def plan(gap_ns: int = 10) -> transfer.Plan:
     return transfer.read_file(
-        BytesIO(bytes.fromhex("f0 01 f7 f0 02 03 f7")), gap_ns=gap_ns
+        BytesIO(bytes.fromhex("f0 01 f7 f0 02 03 f7")), gap=f"{gap_ns} ns"
     )
 
 
 def test_plan_is_immutable_and_keeps_complete_wire_messages() -> None:
     source = BytesIO(bytes.fromhex("f0 01 f7 f0 02 03 f7"))
     p = transfer.read_file(
-        source, gap_ns=10, message_limit=2, byte_limit=7, payload_limit=2
+        source, gap="10 ns", message_limit=2, byte_limit=7, payload_limit=2
     )
     assert not source.closed
-    assert p.message_count == 2 and p.wire_bytes == 7 and p.gap_ns == 10
+    assert p.message_count == 2 and p.wire_bytes == 7 and p.gap == 1e-8
     assert codecs.encode(p.message(1)) == bytes.fromhex("f0 02 03 f7")
     with pytest.raises(AttributeError):
-        p.gap_ns = 0  # ty: ignore[invalid-assignment]
+        p.gap = 0  # ty: ignore[invalid-assignment]
     with pytest.raises(IndexError):
         p.message(2)
     m = [messages.SysEx(data=b"\x7d")]
-    p = transfer.Plan(m, gap_ns=0)
+    p = transfer.Plan(m, gap="0 ns")
     m.clear()
     assert p.message_count == 1 and p.message(0).data == b"\x7d"
     with pytest.raises(ValueError):
-        transfer.Plan([], gap_ns=0)
+        transfer.Plan([], gap="0 ns")
     with pytest.raises(TypeError):
-        transfer.Plan([messages.SysEx(data=b"")], gap_ns=True)
+        transfer.Plan([messages.SysEx(data=b"")], gap=True)
 
 
 @pytest.mark.parametrize(
@@ -51,7 +51,7 @@ def test_invalid_or_oversized_files_never_yield_a_partial_plan(
     data: str, options: dict[str, int]
 ) -> None:
     with pytest.raises(OSError):
-        transfer.read_file(BytesIO(bytes.fromhex(data)), gap_ns=0, **options)
+        transfer.read_file(BytesIO(bytes.fromhex(data)), gap="0 ns", **options)
 
 
 def test_session_pacing_and_uncertain_handoff_preserve_exact_progress() -> None:

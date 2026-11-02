@@ -88,12 +88,12 @@ before native validation. Integer conversions must be exact. Rust uses
 appropriately sized integer arguments with checked constructors. Neither
 language silently clamps values or accepts invalid states.
 
-Python waits use seconds, `_ns` inputs use nanoseconds, tick counts use ticks,
+Python waits, gaps and timeouts use seconds; explicit `_ns` timestamps and
+diagnostic inputs use nanoseconds. Tick counts use ticks,
 frequency inputs use hertz, pitch offsets use cents or semitones, and buffer
-budgets use bytes. Numeric values keep their existing meanings; results and
-archive/wire representations remain numeric. SMF and UMP tempo helpers additionally
-accept BPM or time per quarter-note beat, with exact conversion to the encoded
-period. No implicit beats-to-seconds or ticks-to-seconds mapping is introduced.
+budgets use bytes. SMF and UMP tempo helpers take numeric BPM or authored BPM/beat-period strings,
+with exact conversion to the encoded period. Archive/wire representations remain
+numeric and unchanged. Native Rust APIs retain integer nanosecond durations. No implicit beats-to-seconds or ticks-to-seconds mapping is introduced.
 Reccy's authored/runtime/revalidation dumps apply to Pydantic command models;
 the CLI normalizes a runtime copy before dispatch. Native resource handles and
 protocol records are not Pydantic configuration models.
@@ -457,7 +457,7 @@ checksum. Re-encoding a legacy mismatch generates the chosen checksum rather
 than preserving the received checksum byte. Lengths, seven-bit payloads and
 reserved scale channel bits are validated for recognized forms.
 
-`ReplyTracker(request=..., now_ns=..., timeout_ns=...)` tracks one unicast dump
+`ReplyTracker(request=..., now_ns=..., timeout=...)` tracks one unicast dump
 request, without sending, opening ports, sleeping or starting threads. Callers
 supply monotonic unsigned 64-bit nanoseconds from one clock and a positive
 bounded timeout. `observe(typed_message, now_ns=...)` returns True only for a
@@ -658,7 +658,8 @@ Reset All Controllers invalidate pending context. Raw messages remain caller-own
 `timecode.Position` validates SMPTE labels, including skipped drop-frame labels;
 `advance(frames=...)` wraps at 24 hours in either direction. FullFrame remains a
 wire value; the assembler validates its label before relocation. `Assembler`
-requires an explicit positive `timeout_ns`, monotonic integer `now_ns`, and
+requires an explicit positive Python `timeout` in seconds (Rust `timeout_ns`),
+monotonic integer `now_ns`, and
 caller-driven feed/poll. It returns frozen results with observations/diagnostics.
 One cycle publishes a position; a second cycle advancing exactly two frames in
 the same direction/rate acquires sequence lock. Gaps, malformed nibbles,
@@ -1161,7 +1162,8 @@ Rust `transfer::Plan` and frozen Python `transfer.Plan` retain a nonempty sequen
 of complete MIDI 1 SysEx messages in original order, without splitting, rewriting
 or inferred manufacturer semantics. Python construction takes a list of `SysEx`
 values. Rust construction accepts an iterator of fallible values. Both require
-an explicit unsigned `gap_ns`, including zero. Default limits are 256 messages
+an explicit nonnegative gap, including zero: Python `gap` uses seconds and
+Rust `gap_ns` uses nanoseconds. Default limits are 256 messages
 and 8 MiB of wire bytes, including each F0/F7 pair. Plans expose message count,
 wire size, gap and zero-based indexed message access; Python returns independent
 frozen message values. Sessions share the immutable plan internally.
@@ -1213,8 +1215,8 @@ any reserved message marked uncertain. Importing the planner/output adapter
 starts no native clients. Callers must serialize access to the session/output
 and avoid interleaving unrelated sends if device pacing requires exclusivity.
 
-The optional CLI adds `transfer-preview SOURCE --gap-ms N` and the distinct
-`transfer-send SOURCE --gap-ms N --port EXACT_NAME`. Gap is a required nonnegative
+The optional CLI adds `transfer-preview SOURCE --gap N` and the distinct
+`transfer-send SOURCE --gap N --port EXACT_NAME`. Gap is a required nonnegative
 integer number of milliseconds. Both fully validate the bounded SYX plan first.
 Preview opens no ports and prints bounded payload samples with omission counts;
 sending selects exactly one MIDI 1 output by name and defaults to process
@@ -1384,7 +1386,8 @@ unchanged.
 
 Rust `transfer::Capture` and Python `transfer.Capture` collect whole SysEx messages
 from one explicit stream. Construction requires stream, expected_messages and
-positive timeout_ns, with byte_limit=8_388_608 and payload_limit=1_048_576 defaults
+a positive timeout (Python `timeout` in seconds, Rust `timeout_ns`), with
+byte_limit=8_388_608 and payload_limit=1_048_576 defaults
 in Python. The byte budget includes F0/F7 framing; the expected count also bounds
 retained message objects. Impossible counts exceeding byte_limit/2 are rejected.
 Budgets exclude object/metadata overhead, decoder state, caller copies and native
@@ -1435,7 +1438,7 @@ access and configures its existing queue/decoder budgets. No native output, time
 worker or additional decoder is created. Uninterruptible in-process driver or
 Python work can exceed the observation deadline.
 
-`meedee sysex-receive DESTINATION --port NAME --expected-messages N --timeout-ms MS`
+`meedee sysex-receive DESTINATION --port NAME --expected-messages N --timeout SECONDS`
 requires one exact, unique input name and uses process isolation by default.
 Start a dump on the instrument after opening capture. Backend, receive-byte,
 capture-byte and payload limits are explicit options. The capture deadline starts
@@ -1453,7 +1456,8 @@ export failure. No physical instrument was used to qualify this workflow.
 
 Rust `tuning_query::Query` and Python `tuning.Query` combine the existing MTS
 request codecs, ReplyTracker and decoder. Construction requires one typed
-BulkDumpRequest or BankedDumpRequest, an input stream and a positive timeout_ns.
+BulkDumpRequest or BankedDumpRequest, an input stream and a positive timeout
+(Python `timeout` in seconds, Rust `timeout_ns`).
 Broadcast device ID 127 is rejected; device IDs are 0..126, programs/banks 0..127.
 Banked requests match either KeyBasedDump or ScaleOctaveDump using the existing
 tracker's device/bank/program rules. Ordinary requests match BulkDump. No new MTS
@@ -1509,7 +1513,7 @@ query. No extra decoder, timer, worker or cleanup traffic is created. Already
 queued input is eligible; there is no automatic drain or time alignment. Blocking
 in-process drivers or arbitrary caller code can exceed the observation deadline.
 
-`meedee tuning-preview --device-id ID --program P [--bank B] --timeout-ms MS`
+`meedee tuning-preview --device-id ID --program P [--bank B] --timeout SECONDS`
 prints the exact request bytes and deadline duration without importing native MIDI
 or opening ports. `meedee tuning-query DESTINATION` takes those same fields plus
 required `--input-port NAME --output-port NAME`. It uses process isolation by

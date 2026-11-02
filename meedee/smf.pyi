@@ -145,7 +145,7 @@ def export_event(
     header: Header,
     origin: events.Timestamp,
     track: int = 0,
-    tempo: int | str = 500_000,
+    tempo: float | str = 120.0,
     mapping: events.ClockMapping | None = None,
     allow_loss: bool = False,
 ) -> ExportReport: ...

@@ -1,10 +1,13 @@
 """Authored quantities normalize before reaching MIDI and scheduler code."""
 
+import inspect
+
 import pytest
 import tyro
 from reccy.configuration import units
 
 from meedee import (
+    ci,
     codecs,
     controls,
     events,
@@ -33,9 +36,36 @@ def test_configuration_retains_authored_units_and_normalizes_cli() -> None:
 
 def test_time_strings_and_numbers_produce_identical_transfer_plans() -> None:
     message = messages.SysEx(data=b"\x7d\x01")
-    authored = transfer.Plan([message], gap_ns="2 ms", byte_limit="1 KiB")
-    numeric = transfer.Plan([message], gap_ns=2_000_000, byte_limit=1024)
-    assert authored.gap_ns == numeric.gap_ns == 2_000_000
+    authored = transfer.Plan([message], gap="2 ms", byte_limit="1 KiB")
+    numeric = transfer.Plan([message], gap=0.002, byte_limit=1024)
+    assert authored.gap == numeric.gap == 0.002
+
+
+@pytest.mark.parametrize("timeout", [0.25, "250 ms"])
+def test_capture_timeout_uses_seconds_against_nanosecond_clock(
+    timeout: float | str,
+) -> None:
+    capture = transfer.Capture(stream="test", expected_messages=1, timeout=timeout)
+    capture.start(100)
+    capture.poll(250_000_099)
+    assert capture.snapshot().status == "active"
+    capture.poll(250_000_100)
+    assert capture.snapshot().status == "timed_out"
+
+
+def test_public_defaults_are_seconds_and_bpm() -> None:
+    assert inspect.signature(ci.Session.discover).parameters["timeout"].default == 3
+    parameters = inspect.signature(ci.Browser).parameters
+    assert parameters["discovery_timeout"].default == 3
+    assert parameters["endpoint_timeout"].default == 1
+    assert parameters["timeout"].default == 30
+    assert inspect.signature(smf.export_event).parameters["tempo"].default == 120
+
+
+@pytest.mark.parametrize("gap", [-1, float("nan"), float("inf"), "1 ns / 3", "1 beat"])
+def test_transfer_rejects_invalid_or_inexact_durations(gap: float | str) -> None:
+    with pytest.raises(ValueError):
+        transfer.Plan([messages.SysEx(data=b"\x7d")], gap=gap)
 
 
 def test_exact_time_conversion_and_wrong_dimensions() -> None:
@@ -59,11 +89,9 @@ def test_frequency_and_pitch_intervals() -> None:
     )
 
 
-@pytest.mark.parametrize("tempo", ["120 bpm", "500 ms / beat", "50000000"])
+@pytest.mark.parametrize("tempo", ["120 bpm", "500 ms / beat", "120"])
 def test_ump_tempo_strings_encode_the_same_midi_values(tempo: str) -> None:
-    assert ump.tempo(group=1, ten_nanoseconds_per_quarter=tempo) == ump.tempo(
-        group=1, ten_nanoseconds_per_quarter=50_000_000
-    )
+    assert ump.tempo(group=1, bpm=tempo) == ump.tempo(group=1, bpm=120.0)
 
 
 def test_smf_tempo_conversion_preserves_event_ticks() -> None:
@@ -77,7 +105,7 @@ def test_smf_tempo_conversion_preserves_event_ticks() -> None:
     header = smf.Header(format=0, tracks=1, division=480)
     assert (
         smf.export_event(event, header=header, origin=origin, tempo="120 bpm").events
-        == smf.export_event(event, header=header, origin=origin, tempo=500_000).events
+        == smf.export_event(event, header=header, origin=origin, tempo=120).events
     )
 
 
@@ -105,9 +133,9 @@ def test_encoded_units_retain_integral_ranges() -> None:
     with pytest.raises(ValueError):
         codecs.Decoder(sysex_limit="1 bit")
     with pytest.raises(ValueError):
-        ump.tempo(group=1, ten_nanoseconds_per_quarter="1 ns / beat")
+        ump.tempo(group=1, bpm="1 ns / beat")
     with pytest.raises(ValueError):
-        ump.tempo(group=1, ten_nanoseconds_per_quarter="0 bpm")
+        ump.tempo(group=1, bpm="0 bpm")
 
 
 def test_timecode_fields_and_clock_resolution_accept_units() -> None:

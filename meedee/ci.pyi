@@ -274,11 +274,9 @@ class Session:
     def peers(self) -> list[Peer]: ...
     @property
     def pending_count(self) -> int: ...
-    def discover(
-        self, *, now_ns: int | str, timeout_ns: int | str = 3_000_000_000
-    ) -> Action: ...
+    def discover(self, *, now_ns: int | str, timeout: float | str = 3.0) -> Action: ...
     def inquire_endpoint(
-        self, *, peer_muid: int, now_ns: int | str, timeout_ns: int | str
+        self, *, peer_muid: int, now_ns: int | str, timeout: float | str
     ) -> Action: ...
     def report_send(
         self, *, token: int, sent: bool, now_ns: int | str
@@ -295,7 +293,7 @@ class Session:
     def reset(self, *, reason: str) -> list[Action | Observation]: ...
     def restart(self, *, local_muid: int, now_ns: int | str) -> None: ...
     def respond(
-        self, message: Message, *, now_ns: int | str, timeout_ns: int | str
+        self, message: Message, *, now_ns: int | str, timeout: float | str
     ) -> Action: ...
 
 def decode(
@@ -326,9 +324,9 @@ class Browser:
         peer_limit: int = 16,
         exchange_limit: int = 16,
         reply_byte_limit: int | str = 8_388_608,
-        discovery_ns: int | str = 3_000_000_000,
-        endpoint_ns: int | str = 1_000_000_000,
-        timeout_ns: int | str = 30_000_000_000,
+        discovery_timeout: float | str = 3.0,
+        endpoint_timeout: float | str = 1.0,
+        timeout: float | str = 30.0,
         detail_limit: int = 128,
     ) -> None: ...
     def start(self, now_ns: int | str) -> list[Action]: ...

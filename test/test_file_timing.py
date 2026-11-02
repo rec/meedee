@@ -96,7 +96,7 @@ def test_clip_timed_reader_omits_file_markers_and_preserves_tempo() -> None:
         ump.DeltaClockstampTicksPerQuarter(ticks=480),
         ump.DeltaClockstamp(ticks=0),
         ump.start_of_clip(),
-        ump.tempo(group=1, ten_nanoseconds_per_quarter=50_000_000),
+        ump.tempo(group=1, bpm=120.0),
         ump.DeltaClockstamp(ticks=480),
         ump.Midi2NoteOn(
             group=1,

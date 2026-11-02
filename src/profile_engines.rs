@@ -676,11 +676,10 @@ struct Assembler {
 #[pymethods]
 impl Assembler {
     #[new]
-    #[pyo3(signature=(*,timeout_ns))]
-    fn new(timeout_ns: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(signature=(*,timeout))]
+    fn new(timeout: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            value: tc::Assembler::new(crate::units::nanoseconds(timeout_ns)?)
-                .map_err(value_error)?,
+            value: tc::Assembler::new(crate::units::duration(timeout)?).map_err(value_error)?,
         })
     }
     #[getter]

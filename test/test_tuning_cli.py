@@ -31,8 +31,8 @@ def arguments(path: Path) -> list[str]:
         "1",
         "--program",
         "2",
-        "--timeout-ms",
-        "100",
+        "--timeout",
+        "100 ms",
         "--output",
         "json",
     ]
@@ -140,8 +140,8 @@ def test_preview_and_argument_rejection_open_no_ports(
         "1",
         "--program",
         "2",
-        "--timeout-ms",
-        "100",
+        "--timeout",
+        "100 ms",
         "--output",
         "json",
     ]

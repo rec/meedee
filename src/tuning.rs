@@ -356,17 +356,17 @@ struct ReplyTracker {
 #[pymethods]
 impl ReplyTracker {
     #[new]
-    #[pyo3(signature=(*,request,now_ns,timeout_ns))]
+    #[pyo3(signature=(*,request,now_ns,timeout))]
     fn new(
         request: &Bound<'_, PyAny>,
         now_ns: &Bound<'_, PyAny>,
-        timeout_ns: &Bound<'_, PyAny>,
+        timeout: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
         Ok(Self {
             value: model::ReplyTracker::new(
                 &extract_message(request)?,
                 nanoseconds(now_ns)?,
-                nanoseconds(timeout_ns)?,
+                crate::units::duration(timeout)?,
             )
             .map_err(value_error)?,
         })

@@ -146,10 +146,10 @@ struct Timecode {
 #[pymethods]
 impl Timecode {
     #[new]
-    #[pyo3(signature=(*,timeout_ns,group=None))]
-    fn new(timeout_ns: &Bound<'_, PyAny>, group: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
+    #[pyo3(signature=(*,timeout,group=None))]
+    fn new(timeout: &Bound<'_, PyAny>, group: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
         Ok(Self {
-            value: model::Timecode::new(crate::units::nanoseconds(timeout_ns)?, selected(group)?)
+            value: model::Timecode::new(crate::units::duration(timeout)?, selected(group)?)
                 .map_err(error)?,
         })
     }
