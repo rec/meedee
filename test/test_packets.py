@@ -77,7 +77,7 @@ def test_disabled_timestamps_require_absence_and_clocks_distinguish_generations(
         ReceivedPacket(timestamp_ns=0, clock=one, packet=b"")
 
 
-@pytest.mark.parametrize("value", [True, 1.0, "1", 2**63, -(2**63) - 1])
+@pytest.mark.parametrize("value", [True, 1.0, 2**63, -(2**63) - 1])
 def test_receive_time_rejects_coercion_and_overflow(value: object) -> None:
     clock = Clock(
         identity="one", backend=midi.Backend.CoreMidi, mode=midi.TimestampMode.Absolute

@@ -3,10 +3,11 @@
 import json
 import sys
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 
 import tyro
 from pydantic import BaseModel, Field, model_validator
+from reccy.configuration import units
 
 from . import inspection, notes
 
@@ -14,7 +15,9 @@ from . import inspection, notes
 class FileOptions(BaseModel, frozen=True):
     format: Literal["archive", "smf", "syx", "clip"]
     output: Literal["text", "json"] = "text"
-    payload_limit: int = Field(default=1_048_576, gt=0)
+    payload_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
     detail_limit: int = Field(default=128, gt=0)
     preserve_unknown: bool = False
 
@@ -39,7 +42,9 @@ class Compare(FileOptions, frozen=True):
     source_map: dict[str, str] = Field(default_factory=dict)
     clock_map: dict[str, str] = Field(default_factory=dict)
     ignore_timestamps: bool = False
-    tick_tolerance: int = Field(default=0, ge=0)
+    tick_tolerance: Annotated[
+        int, units.unit_validator("tick"), tyro.conf.arg(constructor=str)
+    ] = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def check_timing_policy(self) -> Self:
@@ -69,15 +74,24 @@ class Monitor(BaseModel, frozen=True):
     output: Literal["text", "json"] = "text"
     isolated: bool = True
     metrics: bool = False
-    duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    duration: (
+        Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
+        | None
+    ) = Field(default=None, gt=0, allow_inf_nan=False)
     types: list[str] = Field(default_factory=list)
     channel: int | None = Field(default=None, ge=1, le=16)
     group: int | None = Field(default=None, ge=1, le=16)
     history_limit: int = Field(default=128, gt=0)
-    preview_bytes: int = Field(default=64, gt=0)
+    preview_bytes: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=64, gt=0)
     event_limit: int = Field(default=128, gt=0)
-    receive_byte_limit: int = Field(default=8_388_608, gt=0)
-    sysex_limit: int = Field(default=1_048_576, gt=0)
+    receive_byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
+    sysex_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
     detail_limit: int = Field(default=128, gt=0)
 
     @model_validator(mode="after")
@@ -96,7 +110,9 @@ class RouteOptions(BaseModel, frozen=True):
     remap_group: int | None = Field(default=None, ge=1, le=16)
     include_nonchannel: bool = False
     event_limit: int = Field(default=128, gt=0)
-    byte_limit: int = Field(default=8_388_608, gt=0)
+    byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
     output: Literal["text", "json"] = "text"
 
     @model_validator(mode="after")
@@ -117,9 +133,13 @@ class RoutePreview(RouteOptions, frozen=True):
 
     source: tyro.conf.Positional[Path]
     stream: str = Field(min_length=1)
-    payload_limit: int = Field(default=1_048_576, gt=0)
+    payload_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
     detail_limit: int = Field(default=128, gt=0)
-    preview_bytes: int = Field(default=64, gt=0)
+    preview_bytes: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=64, gt=0)
 
 
 class Patch(RouteOptions, frozen=True):
@@ -140,9 +160,16 @@ class Patch(RouteOptions, frozen=True):
         | None
     ) = None
     isolated: bool = True
-    duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
-    receive_byte_limit: int = Field(default=8_388_608, gt=0)
-    sysex_limit: int = Field(default=1_048_576, gt=0)
+    duration: (
+        Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
+        | None
+    ) = Field(default=None, gt=0, allow_inf_nan=False)
+    receive_byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
+    sysex_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
 
 
 class Ports(BaseModel, frozen=True):
@@ -171,8 +198,13 @@ class Ports(BaseModel, frozen=True):
 class WatchPorts(Ports, frozen=True):
     """Poll discovery; print the baseline and changes, with bounded history."""
 
-    interval: float = Field(default=1.0, gt=0, allow_inf_nan=False)
-    duration: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+    interval: Annotated[
+        float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1.0, gt=0, allow_inf_nan=False)
+    duration: (
+        Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
+        | None
+    ) = Field(default=None, gt=0, allow_inf_nan=False)
     history_limit: int = Field(default=128, gt=0)
 
 
@@ -180,12 +212,20 @@ class TransferPreview(BaseModel, frozen=True):
     """Validate and preview a complete bounded MIDI 1 SysEx file; opens no ports."""
 
     source: tyro.conf.Positional[Path]
-    gap_ms: int = Field(ge=0, le=18_446_744_073_709)
+    gap_ms: Annotated[
+        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
+    ] = Field(ge=0, le=18_446_744_073_709)
     message_limit: int = Field(default=256, gt=0)
-    byte_limit: int = Field(default=8_388_608, gt=0)
-    payload_limit: int = Field(default=1_048_576, gt=0)
+    byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
+    payload_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
     detail_limit: int = Field(default=128, gt=0)
-    preview_bytes: int = Field(default=64, gt=0)
+    preview_bytes: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=64, gt=0)
     output: Literal["text", "json"] = "text"
 
 
@@ -203,10 +243,18 @@ class SysexReceive(BaseModel, frozen=True):
     destination: tyro.conf.Positional[Path]
     port: str = Field(min_length=1)
     expected_messages: int = Field(gt=0)
-    timeout_ms: int = Field(gt=0, le=18_446_744_073_709)
-    byte_limit: int = Field(default=8_388_608, gt=0)
-    payload_limit: int = Field(default=1_048_576, gt=0)
-    receive_byte_limit: int = Field(default=8_388_608, gt=0)
+    timeout_ms: Annotated[
+        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
+    ] = Field(gt=0, le=18_446_744_073_709)
+    byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
+    payload_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
+    receive_byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
     isolated: bool = True
     output: Literal["text", "json"] = "text"
@@ -219,8 +267,8 @@ class SysexReceive(BaseModel, frozen=True):
             stream="validation",
             expected_messages=self.expected_messages,
             timeout_ns=self.timeout_ms * 1_000_000,
-            byte_limit=self.byte_limit,
-            payload_limit=self.payload_limit,
+            byte_limit=int(self.byte_limit),
+            payload_limit=int(self.payload_limit),
         )
         return self
 
@@ -231,7 +279,9 @@ class TuningPreview(BaseModel, frozen=True):
     device_id: int = Field(ge=0, le=126)
     program: int = Field(ge=0, le=127)
     bank: int | None = Field(default=None, ge=0, le=127)
-    timeout_ms: int = Field(gt=0, le=18_446_744_073_709)
+    timeout_ms: Annotated[
+        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
+    ] = Field(gt=0, le=18_446_744_073_709)
     output: Literal["text", "json"] = "text"
 
 
@@ -243,8 +293,12 @@ class TuningQuery(TuningPreview, frozen=True):
     output_port: str = Field(min_length=1)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
     isolated: bool = True
-    receive_byte_limit: int = Field(default=8_388_608, gt=0)
-    payload_limit: int = Field(default=1_048_576, gt=0)
+    receive_byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
+    payload_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, gt=0)
 
 
 class UforPreview(BaseModel, frozen=True):
@@ -308,15 +362,25 @@ class CiBrowse(BaseModel, frozen=True):
         | None
     ) = None
     isolated: bool = True
-    discovery_ms: int = Field(default=3000, ge=3000, le=18_446_744_073_709)
-    endpoint_ms: int = Field(default=1000, gt=0, le=18_446_744_073_709)
-    timeout_ms: int = Field(default=30000, gt=0, le=18_446_744_073_709)
+    discovery_ms: Annotated[
+        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
+    ] = Field(default=3000, ge=3000, le=18_446_744_073_709)
+    endpoint_ms: Annotated[
+        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1000, gt=0, le=18_446_744_073_709)
+    timeout_ms: Annotated[
+        int, units.unit_validator("millisecond"), tyro.conf.arg(constructor=str)
+    ] = Field(default=30000, gt=0, le=18_446_744_073_709)
     peer_limit: int = Field(default=16, gt=0)
     exchange_limit: int = Field(default=16, gt=0)
     detail_limit: int = Field(default=128, gt=0)
     event_limit: int = Field(default=128, gt=0)
-    max_sysex: int = Field(default=1_048_576, ge=128, le=268435455)
-    byte_limit: int = Field(default=8_388_608, gt=0)
+    max_sysex: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=1_048_576, ge=128, le=268435455)
+    byte_limit: Annotated[
+        int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
+    ] = Field(default=8_388_608, gt=0)
     output: Literal["text", "json"] = "text"
 
     @model_validator(mode="after")
@@ -360,6 +424,7 @@ def run(args: list[str] | None = None) -> int:
             args=args,
             prog="meedee",
         )
+        command = type(command).model_validate(units.runtime_dump(command))
         if isinstance(command, UforPreview):
             from ._ufor_cli import run_ufor
 

@@ -81,10 +81,22 @@ exact full-width MIDI 2 delivery and timestamps; see `validation.md`.
 
 ### Construction, inspection and replacement
 
-Python constructors are keyword-only. Integer fields require built-in `int`
-values, rejecting booleans, floats, strings and integer subclasses. Rust uses
+Python constructors are keyword-only. Numeric integer inputs require built-in
+`int` values, rejecting booleans, floats and integer subclasses. Unit-bearing
+Python inputs also accept reccy/Pint expression strings and normalize them
+before native validation. Integer conversions must be exact. Rust uses
 appropriately sized integer arguments with checked constructors. Neither
 language silently clamps values or accepts invalid states.
+
+Python waits use seconds, `_ns` inputs use nanoseconds, tick counts use ticks,
+frequency inputs use hertz, pitch offsets use cents or semitones, and buffer
+budgets use bytes. Numeric values keep their existing meanings; results and
+archive/wire representations remain numeric. SMF and UMP tempo helpers additionally
+accept BPM or time per quarter-note beat, with exact conversion to the encoded
+period. No implicit beats-to-seconds or ticks-to-seconds mapping is introduced.
+Reccy's authored/runtime/revalidation dumps apply to Pydantic command models;
+the CLI normalizes a runtime copy before dispatch. Native resource handles and
+protocol records are not Pydantic configuration models.
 
 Examples of the intended public construction style:
 
@@ -948,8 +960,8 @@ Both inputs must reach verified completion before equality is reported. There
 is no automatic alignment, cross-format musical conversion or resynchronization.
 
 The optional `cli` extra supplies Pydantic/Tyro inspect, validate, compare and
-monitor commands, text/JSON output and 0/1/2 verdicts. Core imports remain free
-of mandatory Python dependencies. The passive monitor selects one exact unique
+monitor commands, text/JSON output and 0/1/2 verdicts. Reccy is a runtime dependency for unit-aware Python inputs; its dependencies
+also supply Pydantic and Tyro. The passive monitor selects one exact unique
 input name and explicit protocol, with isolation enabled by default and existing
 typed-queue/payload limits. Display filters do not filter interpretation or hide
 loss/failure notices. Known loss resets views and continues; terminal transport

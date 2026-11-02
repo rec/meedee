@@ -87,13 +87,13 @@ value_classes! {
         #[staticmethod]
         #[pyo3(signature = (*, frequency_hz))]
         fn from_frequency(frequency_hz: &Bound<'_, PyAny>) -> PyResult<PitchConversion> {
-            Ok(PitchConversion { value: model::Pitch::from_frequency(real(frequency_hz)?)
+            Ok(PitchConversion { value: model::Pitch::from_frequency(real(&crate::units::normalize(frequency_hz, "hertz", "real")?)?)
                 .map_err(value_error)? })
         }
         #[staticmethod]
         #[pyo3(signature = (*, note, cents))]
         fn from_cents(note: &Bound<'_, PyAny>, cents: &Bound<'_, PyAny>) -> PyResult<PitchConversion> {
-            Ok(PitchConversion { value: model::Pitch::from_cents(int(note)?, real(cents)?)
+            Ok(PitchConversion { value: model::Pitch::from_cents(int(note)?, real(&crate::units::normalize(cents, "cent", "real")?)?)
                 .map_err(value_error)? })
         }
     };
@@ -104,7 +104,7 @@ value_classes! {
         #[pyo3(signature = (*, resolution, cents))]
         fn from_cents(resolution: &Bound<'_, PyAny>, cents: &Bound<'_, PyAny>) -> PyResult<ScaleConversion> {
             let cents = sequence(cents, 12)?.into_iter()
-                .map(|value| real(&value)).collect::<PyResult<Vec<_>>>()?;
+                .map(|value| real(&crate::units::normalize(&value, "cent", "real")?)).collect::<PyResult<Vec<_>>>()?;
             Ok(ScaleConversion { value: model::ScaleOffsets::from_cents(int(resolution)?, cents)
                 .map_err(value_error)? })
         }
@@ -442,6 +442,7 @@ fn real(value: &Bound<'_, PyAny>) -> PyResult<f64> {
     value.extract()
 }
 fn nanoseconds(value: &Bound<'_, PyAny>) -> PyResult<u64> {
+    let value = &crate::units::normalize(value, "nanosecond", "integer")?;
     if !value.is_exact_instance_of::<PyInt>() {
         return Err(PyTypeError::new_err("nanoseconds must be an int"));
     }

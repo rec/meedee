@@ -42,7 +42,7 @@ class Router:
         *,
         routes: list[Route],
         event_limit: int = 128,
-        byte_limit: int = 8_388_608,
+        byte_limit: int | str = 8_388_608,
     ) -> None: ...
     def feed(self, item: events.Event | events.StreamDiagnostic) -> None: ...
     def peek(self) -> Delivery | None: ...
@@ -110,7 +110,7 @@ def preview_file(
     *,
     routes: list[Route],
     event_limit: int = 128,
-    byte_limit: int = 8_388_608,
-    payload_limit: int = 1_048_576,
+    byte_limit: int | str = 8_388_608,
+    payload_limit: int | str = 1_048_576,
     detail_limit: int = 128,
 ) -> Preview: ...

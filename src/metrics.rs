@@ -1,5 +1,4 @@
 //! Pure Python metric snapshots and caller-driven accumulators.
-use crate::files::uint;
 use meedee::metrics;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -47,7 +46,10 @@ impl Histogram {
             value: metrics::Histogram::default(),
         }
     }
-    fn observe(&mut self, #[pyo3(from_py_with=uint)] nanoseconds: u64) -> PyResult<()> {
+    fn observe(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] nanoseconds: u64,
+    ) -> PyResult<()> {
         self.value.observe(nanoseconds).map_err(error)
     }
     fn snapshot(&self) -> Distribution {
@@ -108,15 +110,21 @@ struct Delivery {
 impl Delivery {
     #[new]
     #[pyo3(signature=(*,start_ns))]
-    fn new(#[pyo3(from_py_with=uint)] start_ns: u64) -> Self {
+    fn new(#[pyo3(from_py_with=crate::units::nanoseconds)] start_ns: u64) -> Self {
         Self {
             value: metrics::Delivery::new(start_ns),
         }
     }
-    fn observe(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+    fn observe(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
         self.value.observe(now_ns).map_err(error)
     }
-    fn snapshot(&self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<DeliveryReport> {
+    fn snapshot(
+        &self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<DeliveryReport> {
         Ok(DeliveryReport {
             value: self.value.snapshot(now_ns).map_err(error)?,
         })

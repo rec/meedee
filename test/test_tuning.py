@@ -213,7 +213,7 @@ def test_quantization_reports_only_wire_precision_loss() -> None:
     for x in (0, -1, float("nan"), float("inf")):
         with pytest.raises(ValueError):
             tuning.Pitch.from_frequency(frequency_hz=x)
-    for x in (True, "440", None):
+    for x in (True, None):
         with pytest.raises(TypeError):
             tuning.Pitch.from_frequency(frequency_hz=x)  # ty: ignore[invalid-argument-type]
     with pytest.raises(ValueError):

@@ -1,5 +1,5 @@
 //! Python one-shot queries over the shared MTS tracker and codecs.
-use crate::files::{os_error, uint, Stream};
+use crate::files::{os_error, Stream};
 use meedee::tuning_query;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -62,7 +62,7 @@ impl Query {
     fn new(
         request: &Bound<'_, PyAny>,
         stream: String,
-        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
     ) -> PyResult<Self> {
         Ok(Self {
             value: tuning_query::Query::new(
@@ -76,23 +76,29 @@ impl Query {
     fn prepare(
         &mut self,
         py: Python<'_>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<Py<PyAny>> {
         crate::messages::to_python(
             py,
             meedee::messages::AnyMessage::SysEx(self.value.prepare(now_ns).map_err(error)?),
         )
     }
-    fn confirm(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+    fn confirm(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
         self.value.confirm(now_ns).map_err(error)
     }
-    fn poll(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+    fn poll(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
         self.value.poll(now_ns).map_err(error)
     }
     fn feed(
         &mut self,
         item: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         let item = if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
             meedee::live::Item::Event(Box::new(e.value.clone()))

@@ -369,6 +369,7 @@ pub(crate) fn rpn_to_python(py: Python<'_>, value: messages::RpnSet) -> PyResult
 }
 
 pub fn integer(value: &Bound<'_, PyAny>, field: &str) -> PyResult<i64> {
+    let value = crate::units::field(value, field)?;
     if !value.get_type().is(value.py().get_type::<PyInt>()) {
         return Err(PyTypeError::new_err(format!("{field} must be an int")));
     }

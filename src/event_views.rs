@@ -130,7 +130,7 @@ view_methods!(Mpe;{
 struct Ump {
     value: model::Ump,
 }
-view_methods!(Ump;{#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=limit)]message_limit:usize,#[pyo3(from_py_with=limit)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:model::Ump::new(message_limit,total_limit,max_streams).map_err(error)?})}});
+view_methods!(Ump;{#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:model::Ump::new(message_limit,total_limit,max_streams).map_err(error)?})}});
 #[pyclass(name = "EventDecoder", module = "meedee.tuning")]
 struct Tuning {
     value: model::Tuning,
@@ -149,7 +149,8 @@ impl Timecode {
     #[pyo3(signature=(*,timeout_ns,group=None))]
     fn new(timeout_ns: &Bound<'_, PyAny>, group: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
         Ok(Self {
-            value: model::Timecode::new(uint(timeout_ns)?, selected(group)?).map_err(error)?,
+            value: model::Timecode::new(crate::units::nanoseconds(timeout_ns)?, selected(group)?)
+                .map_err(error)?,
         })
     }
     #[pyo3(signature=(value,*,now_ns))]
@@ -158,11 +159,19 @@ impl Timecode {
         value: &Bound<'_, PyAny>,
         now_ns: &Bound<'_, PyAny>,
     ) -> PyResult<Vec<Observation>> {
-        feed(&mut self.value, value, Some(uint(now_ns)?))
+        feed(
+            &mut self.value,
+            value,
+            Some(crate::units::nanoseconds(now_ns)?),
+        )
     }
     #[pyo3(signature=(*,now_ns))]
     fn poll(&mut self, now_ns: &Bound<'_, PyAny>) -> PyResult<Vec<Observation>> {
-        Ok(output(self.value.poll(uint(now_ns)?).map_err(error)?))
+        Ok(output(
+            self.value
+                .poll(crate::units::nanoseconds(now_ns)?)
+                .map_err(error)?,
+        ))
     }
     fn reset(&mut self) {
         self.value.reset();

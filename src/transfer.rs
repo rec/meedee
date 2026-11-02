@@ -15,9 +15,9 @@ impl Plan {
     #[pyo3(signature=(messages, *, gap_ns, message_limit=256, byte_limit=8_388_608))]
     fn new(
         messages: Vec<PyRef<'_, SysEx>>,
-        #[pyo3(from_py_with=uint)] gap_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] gap_ns: u64,
         #[pyo3(from_py_with=limit)] message_limit: usize,
-        #[pyo3(from_py_with=limit)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: transfer::Plan::new(
@@ -58,10 +58,10 @@ impl Plan {
 fn read_file(
     py: Python<'_>,
     source: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=uint)] gap_ns: u64,
+    #[pyo3(from_py_with=crate::units::nanoseconds)] gap_ns: u64,
     #[pyo3(from_py_with=limit)] message_limit: usize,
-    #[pyo3(from_py_with=limit)] byte_limit: usize,
-    #[pyo3(from_py_with=limit)] payload_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
 ) -> PyResult<Plan> {
     let source = Stream::input(source)?;
     Ok(Plan {
@@ -149,7 +149,10 @@ impl Session {
             value: transfer::Session::new(plan.value.clone()),
         }
     }
-    fn prepare(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<Option<Step>> {
+    fn prepare(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<Option<Step>> {
         Ok(self
             .value
             .prepare(now_ns)
@@ -159,7 +162,7 @@ impl Session {
     fn confirm(
         &mut self,
         #[pyo3(from_py_with=position)] index: usize,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         self.value.confirm(index, now_ns).map_err(error)
     }
@@ -240,9 +243,9 @@ impl Capture {
     fn new(
         stream: String,
         #[pyo3(from_py_with=limit)] expected_messages: usize,
-        #[pyo3(from_py_with=uint)] timeout_ns: u64,
-        #[pyo3(from_py_with=limit)] byte_limit: usize,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: transfer::Capture::new(
@@ -255,16 +258,22 @@ impl Capture {
             .map_err(error)?,
         })
     }
-    fn start(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+    fn start(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
         self.value.start(now_ns).map_err(error)
     }
-    fn poll(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<()> {
+    fn poll(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
         self.value.poll(now_ns).map_err(error)
     }
     fn feed(
         &mut self,
         item: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         let item = if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
             meedee::live::Item::Event(Box::new(e.value.clone()))

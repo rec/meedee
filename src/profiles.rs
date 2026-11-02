@@ -21,7 +21,7 @@ macro_rules! classes {
             #[pyo3(signature=(*,$($field),*))]
             fn new($($field:&Bound<'_,PyAny>),*)->PyResult<PyClassInitializer<Self>> {
                 Ok(PyClassInitializer::from(Message).add_subclass(Self {
-                    value:model::$name::new($(self::$read($field)?),*).map_err(value_error)?,
+                    value:model::$name::new($(self::$read(&crate::units::field($field,stringify!($field))?)?),*).map_err(value_error)?,
                 }))
             }
             $(#[getter]

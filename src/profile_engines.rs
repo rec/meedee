@@ -559,10 +559,10 @@ frozen!(Position;rate,hours,minutes,seconds,frames;{
         Ok(Self {
             value: tc::Position::new(
                 timecode::rate(rate)?,
-                int(hours)?,
-                int(minutes)?,
-                int(seconds)?,
-                int(frames)?,
+                int(&crate::units::field(hours,"hours")?)?,
+                int(&crate::units::field(minutes,"minutes")?)?,
+                int(&crate::units::field(seconds,"seconds")?)?,
+                int(&crate::units::field(frames,"frames")?)?,
             )
             .map_err(value_error)?,
         })
@@ -590,7 +590,7 @@ frozen!(Position;rate,hours,minutes,seconds,frames;{
     #[pyo3(signature=(*,frames))]
     fn advance(&self, frames: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            value: self.value.advance(int(frames)?),
+            value: self.value.advance(int(&crate::units::field(frames,"frames")?)?),
         })
     }
     #[pyo3(signature=(**changes))]
@@ -679,7 +679,8 @@ impl Assembler {
     #[pyo3(signature=(*,timeout_ns))]
     fn new(timeout_ns: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            value: tc::Assembler::new(unsigned(timeout_ns)?).map_err(value_error)?,
+            value: tc::Assembler::new(crate::units::nanoseconds(timeout_ns)?)
+                .map_err(value_error)?,
         })
     }
     #[getter]
@@ -693,7 +694,7 @@ impl Assembler {
     fn poll(&mut self, now_ns: &Bound<'_, PyAny>) -> PyResult<Option<AssemblyDiagnostic>> {
         Ok(self
             .value
-            .poll(unsigned(now_ns)?)
+            .poll(crate::units::nanoseconds(now_ns)?)
             .map_err(value_error)?
             .map(Into::into))
     }
@@ -703,7 +704,7 @@ impl Assembler {
         message: &Bound<'_, PyAny>,
         now_ns: &Bound<'_, PyAny>,
     ) -> PyResult<AssemblyResult> {
-        let now = unsigned(now_ns)?;
+        let now = crate::units::nanoseconds(now_ns)?;
         let value = if let Ok(v) = message.extract::<PyRef<'_, timecode::FullFrame>>() {
             self.value.relocate(&v.value, now).map_err(value_error)?
         } else {

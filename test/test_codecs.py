@@ -322,7 +322,7 @@ def test_diagnostics_are_frozen_values_and_not_constructible() -> None:
 
 def test_codec_settings_and_encoder_reject_invalid_types() -> None:
     assert codecs.Decoder().sysex_limit == 1048576
-    for v in (True, 1.0, "1", None):
+    for v in (True, 1.0, None):
         with pytest.raises(TypeError):
             codecs.Decoder(sysex_limit=v)  # ty: ignore[invalid-argument-type]
     for v in (0, -1, 10**100):

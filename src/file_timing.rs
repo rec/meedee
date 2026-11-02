@@ -17,9 +17,9 @@ impl MergedReader {
         py: Python<'_>,
         source: &Bound<'_, PyAny>,
         sequence: Option<&Bound<'_, PyAny>>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
         #[pyo3(from_py_with=limit)] track_limit: usize,
-        #[pyo3(from_py_with=limit)] buffer_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] buffer_limit: usize,
     ) -> PyResult<Self> {
         let sequence = sequence
             .map(uint)
@@ -83,9 +83,9 @@ impl SmfTimedReader {
         source: &Bound<'_, PyAny>,
         stream: String,
         sequence: Option<&Bound<'_, PyAny>>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
         #[pyo3(from_py_with=limit)] track_limit: usize,
-        #[pyo3(from_py_with=limit)] buffer_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] buffer_limit: usize,
     ) -> PyResult<Self> {
         let sequence = sequence
             .map(uint)
@@ -249,7 +249,7 @@ fn export_event(
     header: PyRef<'_, Header>,
     origin: PyRef<'_, Timestamp>,
     #[pyo3(from_py_with=uint)] track: u64,
-    #[pyo3(from_py_with=uint)] tempo: u64,
+    #[pyo3(from_py_with=crate::units::tempo)] tempo: u64,
     mapping: Option<PyRef<'_, ClockMapping>>,
     #[pyo3(from_py_with=crate::ump::boolean)] allow_loss: bool,
 ) -> PyResult<ExportReport> {

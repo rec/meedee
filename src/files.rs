@@ -203,7 +203,7 @@ pub struct Event {
     pub value: smf::Event,
 }
 frozen!(Event;track,tick,record;{
-#[new]#[pyo3(signature=(*,track,tick,record))]fn new(track:&Bound<'_,PyAny>,tick:&Bound<'_,PyAny>,record:&Bound<'_,PyAny>)->PyResult<Self>{Ok(Self{value:smf::Event{track:uint(track)?.try_into().map_err(|_|PyValueError::new_err("track out of range"))?,tick:uint(tick)?,record:extract_record(record)?}})}
+#[new]#[pyo3(signature=(*,track,tick,record))]fn new(track:&Bound<'_,PyAny>,tick:&Bound<'_,PyAny>,record:&Bound<'_,PyAny>)->PyResult<Self>{Ok(Self{value:smf::Event{track:uint(track)?.try_into().map_err(|_|PyValueError::new_err("track out of range"))?,tick:uint(&crate::units::field(tick,"tick")?)?,record:extract_record(record)?}})}
 #[getter]fn track(&self)->u16{self.value.track}#[getter]fn tick(&self)->u64{self.value.tick}#[getter]fn record(&self,py:Python<'_>)->PyResult<Py<PyAny>>{record_python(py,self.value.record.clone())}
 });
 fn extract_record(v: &Bound<'_, PyAny>) -> PyResult<smf::Record> {
@@ -259,7 +259,7 @@ impl Reader {
     #[pyo3(signature=(source,*,payload_limit=1_048_576))]
     fn new(
         source: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: Some(smf::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?),
@@ -295,7 +295,7 @@ impl Writer {
     fn new(
         destination: &Bound<'_, PyAny>,
         header: PyRef<'_, Header>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: Some(
@@ -333,7 +333,7 @@ impl SyxReader {
     #[pyo3(signature=(source,*,payload_limit=1_048_576))]
     fn new(
         source: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: Some(syx::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?),
@@ -358,7 +358,7 @@ impl SyxReader {
 fn write_syx(
     destination: &Bound<'_, PyAny>,
     messages: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=limit)] payload_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
 ) -> PyResult<()> {
     let mut stream = Stream::output(destination)?;
     for v in messages.try_iter()? {

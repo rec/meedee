@@ -1293,7 +1293,7 @@ def test_typed_callback_retains_the_blocking_operation_guard(
 def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
     workers: list[Popen[bytes]],
 ) -> None:
-    client = output_client("check_note")
+    client = output_client("check_note", timeout="5 s")
     note = messages.NoteOn(channel=1, note=60, velocity=100)
     clock = events.Clock(identity="output-test")
     origin = events.Timestamp(ticks=0, clock=clock)

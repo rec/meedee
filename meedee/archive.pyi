@@ -68,7 +68,7 @@ class Reader:
         self,
         source: str | PathLike[str] | BinaryIO,
         *,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
         recover: bool = False,
         preserve_unknown: bool = False,
     ) -> None: ...
@@ -93,7 +93,7 @@ class Writer:
         self,
         destination: str | PathLike[str] | BinaryIO,
         *,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
     ) -> None: ...
     def write(
         self,
@@ -130,9 +130,9 @@ class Recorder:
         stream: str,
         label: str = "",
         best_effort: bool = False,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
         record_limit: int = 128,
-        byte_limit: int = 8_388_608,
+        byte_limit: int | str = 8_388_608,
         metrics: bool = False,
     ) -> None: ...
     def record(
@@ -142,4 +142,4 @@ class Recorder:
     def fail(self, reason: str) -> None: ...
     @property
     def failure(self) -> str | None: ...
-    def stop(self, *, timeout: float = 5.0) -> RecordingReport: ...
+    def stop(self, *, timeout: float | str = 5.0) -> RecordingReport: ...

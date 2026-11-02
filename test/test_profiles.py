@@ -103,7 +103,10 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
             with pytest.raises(AttributeError):
                 setattr(v, f, 0)
             if fields[f] is int:
-                for x in (True, 1.0, "1", None):
+                invalid = (True, 1.0, None)
+                if f not in {"semitones", "hours", "minutes", "seconds", "frames"}:
+                    invalid += ("1",)
+                for x in invalid:
                     with pytest.raises(TypeError):
                         v.replace(**{f: x})
     for kwargs in (

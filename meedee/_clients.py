@@ -10,7 +10,7 @@ from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, events, messages, midi
+from . import _native, _units, events, messages, midi
 from ._errors import CompoundSendError
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
 from .events import Clock, ReceivedPacket
@@ -26,12 +26,14 @@ class Input:
         backend: midi.Backend | None = None,
         timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
         isolated: bool = True,
-        timeout: float = 5.0,
-        receive_byte_limit: int = DEFAULT_RECEIVE_BYTE_LIMIT,
+        timeout: float | str = 5.0,
+        receive_byte_limit: int | str = DEFAULT_RECEIVE_BYTE_LIMIT,
     ) -> None:
+        timeout = _units.real(timeout, "second")
         validate_settings(protocol, backend, isolated, timeout)
         if not isinstance(timestamps, midi.TimestampMode):
             raise TypeError("timestamps must be TimestampMode")
+        receive_byte_limit = _units.integer(receive_byte_limit, "byte")
         if type(receive_byte_limit) is not int:
             raise TypeError("receive_byte_limit must be a built-in integer")
         if receive_byte_limit <= 0:
@@ -117,8 +119,9 @@ class Output:
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
         isolated: bool = True,
-        timeout: float = 5.0,
+        timeout: float | str = 5.0,
     ) -> None:
+        timeout = _units.real(timeout, "second")
         validate_settings(protocol, backend, isolated, timeout)
         self._protocol = protocol
         settings: dict[str, object] = {

@@ -89,8 +89,8 @@ class Input:
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         isolated: bool = True,
-        timeout: float = 5.0,
-        receive_byte_limit: int = 8_388_608,
+        timeout: float | str = 5.0,
+        receive_byte_limit: int | str = 8_388_608,
     ) -> None: ...
     def ports(self) -> list[Port]: ...
     @property
@@ -109,7 +109,7 @@ class Output:
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
         isolated: bool = True,
-        timeout: float = 5.0,
+        timeout: float | str = 5.0,
     ) -> None: ...
     def ports(self) -> list[Port]: ...
     @property
@@ -174,10 +174,10 @@ class TypedInput:
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         isolated: bool = True,
-        timeout: float = 5.0,
-        receive_byte_limit: int = 8_388_608,
+        timeout: float | str = 5.0,
+        receive_byte_limit: int | str = 8_388_608,
         event_limit: int = 128,
-        sysex_limit: int = 1_048_576,
+        sysex_limit: int | str = 1_048_576,
     ) -> None: ...
     def ports(self) -> list[Port]: ...
     def connect(
@@ -207,7 +207,10 @@ class TypedInputConnection:
     @property
     def recording_report(self) -> archive.RecordingReport | None: ...
     def receive(
-        self, *, timeout: float | None = None, cancel: events.Cancellation | None = None
+        self,
+        *,
+        timeout: float | str | None = None,
+        cancel: events.Cancellation | None = None,
     ) -> events.Event | events.StreamDiagnostic | None: ...
     def start_recording(
         self,
@@ -215,12 +218,14 @@ class TypedInputConnection:
         *,
         label: str = "",
         best_effort: bool = False,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
         record_limit: int = 128,
-        byte_limit: int = 8_388_608,
+        byte_limit: int | str = 8_388_608,
         metrics: bool = False,
     ) -> archive.Recorder: ...
-    def stop_recording(self, *, timeout: float = 5.0) -> archive.RecordingReport: ...
+    def stop_recording(
+        self, *, timeout: float | str = 5.0
+    ) -> archive.RecordingReport: ...
     def close(self) -> None: ...
     def __enter__(self) -> TypedInputConnection: ...
     def __exit__(

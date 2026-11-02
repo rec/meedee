@@ -14,7 +14,7 @@ struct ManualClock {
 impl ManualClock {
     #[new]
     #[pyo3(signature=(*,now_ns=0))]
-    fn new(#[pyo3(from_py_with=uint)] now_ns: u64) -> Self {
+    fn new(#[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64) -> Self {
         Self {
             value: testing::ManualClock::new(now_ns),
         }
@@ -23,7 +23,10 @@ impl ManualClock {
     fn now_ns(&self) -> u64 {
         self.value.now_ns()
     }
-    fn advance(&mut self, #[pyo3(from_py_with=uint)] nanoseconds: u64) -> PyResult<()> {
+    fn advance(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] nanoseconds: u64,
+    ) -> PyResult<()> {
         self.value.advance(nanoseconds).map_err(error)
     }
 }
@@ -40,8 +43,8 @@ impl Input {
         protocol: &str,
         #[pyo3(from_py_with=limit)] packet_limit: usize,
         #[pyo3(from_py_with=limit)] event_limit: usize,
-        #[pyo3(from_py_with=limit)] byte_limit: usize,
-        #[pyo3(from_py_with=limit)] sysex_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] sysex_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: testing::Input::new(
@@ -64,6 +67,7 @@ impl Input {
     ) -> PyResult<bool> {
         let timestamp = timestamp_ns
             .map(|v| {
+                let v = crate::units::normalize(v, "nanosecond", "integer")?;
                 if !v.is_exact_instance_of::<PyInt>() {
                     return Err(PyTypeError::new_err("timestamp must be a built-in integer"));
                 }
@@ -83,7 +87,7 @@ impl Input {
         cancel: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Option<Py<PyAny>>> {
         if let Some(timeout) = timeout {
-            let v = timeout.extract::<f64>()?;
+            let v = crate::units::seconds(timeout)?;
             if timeout.is_instance_of::<PyBool>() || !v.is_finite() || v < 0.0 {
                 return Err(PyValueError::new_err(
                     "timeout must be finite and nonnegative",
@@ -205,7 +209,7 @@ impl Output {
     fn new(
         protocol: &str,
         #[pyo3(from_py_with=limit)] packet_limit: usize,
-        #[pyo3(from_py_with=limit)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: testing::Output::new(

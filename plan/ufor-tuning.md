@@ -16,11 +16,11 @@ uv sync --extra ufor --python 3.13
 
 The uFor and reccy source declarations track HTTPS/main; frozen uv commands use
 the recorded lockfile revisions. meedee supports only Python 3.13; the ordinary
-installation has no runtime dependencies. uFor remains optional and is not
+installation uses reccy for unit-aware inputs. uFor remains optional and is not
 imported by ordinary MIDI workflows.
 
 No optional module is imported or re-exported by `meedee.__init__`. Existing
-message, MTS and transport APIs retain their current dependencies and behavior.
+message, MTS and transport APIs retain their numeric representations and wire behavior.
 
 ## Resolve and inspect
 

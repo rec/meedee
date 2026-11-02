@@ -135,8 +135,9 @@ These are proposed product decisions, not requirements supplied by the user:
 - Include virtual ports on macOS and Linux. Expose the same method on Windows,
   raising `NotImplementedError` before changing any object state.
 - Preserve upstream message filtering, port identifiers, and timestamp units.
-- Keep Python runtime dependencies empty. Resource handles are native classes,
-  not Pydantic records; no configuration models or CLI are needed.
+- Use reccy for unit-aware Python configuration and input normalization. Resource
+  handles and runtime scheduling remain native; Pint quantities are not stored
+  in MIDI packets or archives.
 
 Exclude MIDI parsing, musical note abstractions, MIDI files, MIDI 2.0/UMP,
 scheduled output, automatic reconnection, hotplug watchers, persistent device

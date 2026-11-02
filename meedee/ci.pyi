@@ -59,7 +59,7 @@ class DiscoveryInfo:
         *,
         identity: Identity,
         capabilities: int,
-        max_sysex: int,
+        max_sysex: int | str,
         output_path: int | None = None,
     ) -> None: ...
     @property
@@ -259,10 +259,10 @@ class Session:
         route: Route,
         output_path: int = 0,
         function_block: int | None = None,
-        max_sysex: int = 1_048_576,
+        max_sysex: int | str = 1_048_576,
         peer_limit: int = 16,
         exchange_limit: int = 16,
-        reply_byte_limit: int = 8_388_608,
+        reply_byte_limit: int | str = 8_388_608,
     ) -> None: ...
     @property
     def local_muid(self) -> int: ...
@@ -274,20 +274,29 @@ class Session:
     def peers(self) -> list[Peer]: ...
     @property
     def pending_count(self) -> int: ...
-    def discover(self, *, now_ns: int, timeout_ns: int = 3_000_000_000) -> Action: ...
+    def discover(
+        self, *, now_ns: int | str, timeout_ns: int | str = 3_000_000_000
+    ) -> Action: ...
     def inquire_endpoint(
-        self, *, peer_muid: int, now_ns: int, timeout_ns: int
+        self, *, peer_muid: int, now_ns: int | str, timeout_ns: int | str
     ) -> Action: ...
     def report_send(
-        self, *, token: int, sent: bool, now_ns: int
+        self, *, token: int, sent: bool, now_ns: int | str
     ) -> list[Action | Observation]: ...
     def feed(
-        self, message: Message, *, input: str, group: int | None = None, now_ns: int
+        self,
+        message: Message,
+        *,
+        input: str,
+        group: int | None = None,
+        now_ns: int | str,
     ) -> list[Action | Observation]: ...
-    def poll(self, *, now_ns: int) -> list[Action | Observation]: ...
+    def poll(self, *, now_ns: int | str) -> list[Action | Observation]: ...
     def reset(self, *, reason: str) -> list[Action | Observation]: ...
-    def restart(self, *, local_muid: int, now_ns: int) -> None: ...
-    def respond(self, message: Message, *, now_ns: int, timeout_ns: int) -> Action: ...
+    def restart(self, *, local_muid: int, now_ns: int | str) -> None: ...
+    def respond(
+        self, message: Message, *, now_ns: int | str, timeout_ns: int | str
+    ) -> Action: ...
 
 def decode(
     message: SysEx,
@@ -313,21 +322,28 @@ class Browser:
         route: Route,
         output_path: int = 0,
         function_block: int | None = None,
-        max_sysex: int = 1_048_576,
+        max_sysex: int | str = 1_048_576,
         peer_limit: int = 16,
         exchange_limit: int = 16,
-        reply_byte_limit: int = 8_388_608,
-        discovery_ns: int = 3_000_000_000,
-        endpoint_ns: int = 1_000_000_000,
-        timeout_ns: int = 30_000_000_000,
+        reply_byte_limit: int | str = 8_388_608,
+        discovery_ns: int | str = 3_000_000_000,
+        endpoint_ns: int | str = 1_000_000_000,
+        timeout_ns: int | str = 30_000_000_000,
         detail_limit: int = 128,
     ) -> None: ...
-    def start(self, now_ns: int) -> list[Action]: ...
-    def poll(self, now_ns: int) -> list[Action]: ...
+    def start(self, now_ns: int | str) -> list[Action]: ...
+    def poll(self, now_ns: int | str) -> list[Action]: ...
     def feed(
-        self, message: Message, *, input: str, group: int | None = None, now_ns: int
+        self,
+        message: Message,
+        *,
+        input: str,
+        group: int | None = None,
+        now_ns: int | str,
     ) -> list[Action]: ...
-    def report_send(self, *, token: int, sent: bool, now_ns: int) -> list[Action]: ...
+    def report_send(
+        self, *, token: int, sent: bool, now_ns: int | str
+    ) -> list[Action]: ...
     def stop(self, reason: str) -> None: ...
     def snapshot(self) -> BrowseReport: ...
 

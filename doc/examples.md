@@ -20,6 +20,12 @@ process isolation on macOS, Windows and Linux. These programs use MIDI 1, which
 works with ordinary keyboards and synths; native backend availability depends
 on the platform and build.
 
+Unit-bearing inputs also accept strings such as `timeout="250 ms"`,
+`gap_ns="2 ms"`, `frequency_hz="440 Hz"` and `byte_limit="8 MiB"`.
+Ordinary numeric inputs still work in each parameter's documented units, and
+returned values remain numeric. No Pint import is needed. Integer fields require
+exact conversions; beats and ticks are not implicitly converted to seconds.
+
 ## 1. Play a melody on a synthesizer
 
 **Result:** the selected instrument plays an ascending C-major scale.

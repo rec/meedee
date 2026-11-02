@@ -1,4 +1,4 @@
-"""Optional CLI entry point; importing the core never requires CLI dependencies."""
+"""CLI entry point; unit and CLI dependencies are supplied by reccy."""
 
 import sys
 

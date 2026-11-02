@@ -8,7 +8,10 @@ from .messages import SysEx
 
 class Reader:
     def __init__(
-        self, source: str | PathLike[str] | BinaryIO, *, payload_limit: int = 1_048_576
+        self,
+        source: str | PathLike[str] | BinaryIO,
+        *,
+        payload_limit: int | str = 1_048_576,
     ) -> None: ...
     def close(self) -> None: ...
     def __iter__(self) -> Iterator[SysEx]: ...
@@ -18,5 +21,5 @@ def write(
     destination: str | PathLike[str] | BinaryIO,
     messages: Iterable[SysEx],
     *,
-    payload_limit: int = 1_048_576,
+    payload_limit: int | str = 1_048_576,
 ) -> None: ...

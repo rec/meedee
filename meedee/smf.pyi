@@ -57,7 +57,7 @@ class Event:
         self,
         *,
         track: int,
-        tick: int,
+        tick: int | str,
         record: messages.Message | Meta | SysExFragment | UnknownChunk,
     ) -> None: ...
     @property
@@ -70,7 +70,10 @@ class Event:
 
 class Reader:
     def __init__(
-        self, source: str | PathLike[str] | BinaryIO, *, payload_limit: int = 1_048_576
+        self,
+        source: str | PathLike[str] | BinaryIO,
+        *,
+        payload_limit: int | str = 1_048_576,
     ) -> None: ...
     @property
     def header(self) -> Header: ...
@@ -84,7 +87,7 @@ class Writer:
         destination: str | PathLike[str] | BinaryIO,
         *,
         header: Header,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
     ) -> None: ...
     def write(self, event: Event) -> None: ...
     def finish(self) -> None: ...
@@ -95,9 +98,9 @@ class MergedReader:
         source: str | PathLike[str] | BinaryIO,
         *,
         sequence: int | None = None,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
         track_limit: int = 128,
-        buffer_limit: int = 8_388_608,
+        buffer_limit: int | str = 8_388_608,
     ) -> None: ...
     @property
     def header(self) -> Header: ...
@@ -112,9 +115,9 @@ class TimedReader:
         *,
         stream: str,
         sequence: int | None = None,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
         track_limit: int = 128,
-        buffer_limit: int = 8_388_608,
+        buffer_limit: int | str = 8_388_608,
     ) -> None: ...
     @property
     def header(self) -> Header: ...
@@ -142,7 +145,7 @@ def export_event(
     header: Header,
     origin: events.Timestamp,
     track: int = 0,
-    tempo: int = 500_000,
+    tempo: int | str = 500_000,
     mapping: events.ClockMapping | None = None,
     allow_loss: bool = False,
 ) -> ExportReport: ...

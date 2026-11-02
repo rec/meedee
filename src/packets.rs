@@ -141,7 +141,9 @@ impl Clock {
             tick_numerator,
             tick_denominator,
             origin,
-            resolution_ticks.map(crate::files::uint).transpose()?,
+            resolution_ticks
+                .map(|v| crate::files::uint(&crate::units::field(v, "resolution_ticks")?))
+                .transpose()?,
         )
         .map_err(|e| PyValueError::new_err(e.to_string()))?;
         if let (Some(b), Some(m)) = (backend, mode) {
@@ -242,6 +244,7 @@ impl ReceivedPacket {
         packet: &Bound<'_, PyAny>,
         sequence: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
+        let timestamp_ns = crate::units::normalize(timestamp_ns, "nanosecond", "integer")?;
         let timestamp_ns = if timestamp_ns.is_none() {
             None
         } else {

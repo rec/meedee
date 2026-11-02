@@ -12,7 +12,7 @@ from time import monotonic
 from types import TracebackType
 from uuid import uuid4
 
-from . import _native, archive, events, midi
+from . import _native, _units, archive, events, midi
 from ._clients import (
     Input,
     InputConnection,
@@ -30,11 +30,13 @@ class TypedInput:
         backend: midi.Backend | None = None,
         timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
         isolated: bool = True,
-        timeout: float = 5.0,
-        receive_byte_limit: int = 8_388_608,
+        timeout: float | str = 5.0,
+        receive_byte_limit: int | str = 8_388_608,
         event_limit: int = 128,
-        sysex_limit: int = 1_048_576,
+        sysex_limit: int | str = 1_048_576,
     ) -> None:
+        receive_byte_limit = _units.integer(receive_byte_limit, "byte")
+        sysex_limit = _units.integer(sysex_limit, "byte")
         for n in (event_limit, sysex_limit):
             if type(n) is not int:
                 raise TypeError("event_limit and sysex_limit must be built-in integers")
@@ -198,11 +200,16 @@ class TypedInputConnection:
                 self._bridge.deliver_typed(item)
 
     def receive(
-        self, *, timeout: float | None = None, cancel: events.Cancellation | None = None
+        self,
+        *,
+        timeout: float | str | None = None,
+        cancel: events.Cancellation | None = None,
     ) -> events.Event | events.StreamDiagnostic | None:
         _native.check_thread()
         if self._bridge is not None:
             raise midi.StateError("receive is unavailable in callback mode")
+        if timeout is not None:
+            timeout = _units.real(timeout, "second")
         if timeout is not None and (
             isinstance(timeout, bool)
             or not isinstance(timeout, (int, float))
@@ -236,9 +243,9 @@ class TypedInputConnection:
         *,
         label: str = "",
         best_effort: bool = False,
-        payload_limit: int = 1_048_576,
+        payload_limit: int | str = 1_048_576,
         record_limit: int = 128,
-        byte_limit: int = 8_388_608,
+        byte_limit: int | str = 8_388_608,
         metrics: bool = False,
     ) -> archive.Recorder:
         _native.check_thread()
@@ -296,7 +303,7 @@ class TypedInputConnection:
             self._recorder.fail(str(failure))
         self._ignored_on_close = 0
 
-    def stop_recording(self, *, timeout: float = 5.0) -> archive.RecordingReport:
+    def stop_recording(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
         _native.check_thread()
         with self._lock:
             self._final_loss()

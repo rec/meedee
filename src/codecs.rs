@@ -111,8 +111,11 @@ impl Decoder {
 }
 
 fn strict_limit(value: &Bound<'_, PyAny>) -> PyResult<usize> {
-    usize::try_from(messages::integer(value, "sysex_limit")?)
-        .map_err(|_| PyValueError::new_err("sysex_limit must be positive"))
+    usize::try_from(messages::integer(
+        &crate::units::normalize(value, "byte", "integer")?,
+        "sysex_limit",
+    )?)
+    .map_err(|_| PyValueError::new_err("sysex_limit must be positive"))
 }
 
 #[pyfunction]

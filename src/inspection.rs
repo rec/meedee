@@ -129,7 +129,7 @@ fn inspect_file(
     py: Python<'_>,
     source: &Bound<'_, PyAny>,
     format: &str,
-    #[pyo3(from_py_with=limit)] payload_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
     #[pyo3(from_py_with=limit)] detail_limit: usize,
 ) -> PyResult<Report> {

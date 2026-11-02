@@ -82,7 +82,7 @@ struct DiscoveryInfo {
 }
 frozen!(DiscoveryInfo;identity,capabilities,max_sysex,output_path;{
     #[new]#[pyo3(signature=(*,identity,capabilities,max_sysex,output_path=None))]
-    fn new(identity:PyRef<'_,Identity>,capabilities:&Bound<'_,PyAny>,max_sysex:&Bound<'_,PyAny>,output_path:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:model::DiscoveryInfo::new(identity.value.clone(),int(capabilities)?,int(max_sysex)?,output_path.map(int).transpose()?).map_err(error)?})}
+    fn new(identity:PyRef<'_,Identity>,capabilities:&Bound<'_,PyAny>,max_sysex:&Bound<'_,PyAny>,output_path:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:model::DiscoveryInfo::new(identity.value.clone(),int(capabilities)?,int(&crate::units::normalize(max_sysex,"byte","integer")?)?,output_path.map(int).transpose()?).map_err(error)?})}
     #[getter]fn identity(&self)->Identity{Identity{value:self.value.identity().clone()}}
     #[getter]fn capabilities(&self)->u8{self.value.capabilities()}
     #[getter]fn max_sysex(&self)->u32{self.value.max_sysex()}
@@ -295,10 +295,10 @@ impl Session {
         route: PyRef<'_, Route>,
         #[pyo3(from_py_with=int)] output_path: i64,
         function_block: Option<&Bound<'_, PyAny>>,
-        #[pyo3(from_py_with=int)] max_sysex: i64,
+        #[pyo3(from_py_with=byte_count)] max_sysex: i64,
         #[pyo3(from_py_with=limit)] peer_limit: usize,
         #[pyo3(from_py_with=limit)] exchange_limit: usize,
-        #[pyo3(from_py_with=limit)] reply_byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] reply_byte_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: session::Session::new(
@@ -345,8 +345,8 @@ impl Session {
     #[pyo3(signature=(*,now_ns,timeout_ns=3_000_000_000))]
     fn discover(
         &mut self,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
-        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
     ) -> PyResult<Action> {
         Ok(Action {
             value: self.value.discover(now_ns, timeout_ns).map_err(error)?,
@@ -356,8 +356,8 @@ impl Session {
     fn inquire_endpoint(
         &mut self,
         peer_muid: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
-        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
     ) -> PyResult<Action> {
         let peer = uint(peer_muid)?
             .try_into()
@@ -375,7 +375,7 @@ impl Session {
         py: Python<'_>,
         #[pyo3(from_py_with=uint)] token: u64,
         #[pyo3(from_py_with=crate::ump::boolean)] sent: bool,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<Vec<Py<PyAny>>> {
         updates(
             py,
@@ -389,7 +389,7 @@ impl Session {
         message: &Bound<'_, PyAny>,
         input: &str,
         group: Option<&Bound<'_, PyAny>>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<Vec<Py<PyAny>>> {
         let group = optional_byte(group)?;
         let result = if let Ok(v) = message.extract::<PyRef<'_, crate::messages::SysEx>>() {
@@ -404,7 +404,7 @@ impl Session {
     fn poll(
         &mut self,
         py: Python<'_>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<Vec<Py<PyAny>>> {
         updates(py, self.value.poll(now_ns).map_err(error)?)
     }
@@ -416,7 +416,7 @@ impl Session {
     fn restart(
         &mut self,
         local_muid: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         self.value.restart(int(local_muid)?, now_ns).map_err(error)
     }
@@ -424,8 +424,8 @@ impl Session {
     fn respond(
         &mut self,
         message: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
-        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
     ) -> PyResult<Action> {
         Ok(Action {
             value: self
@@ -544,13 +544,13 @@ impl Browser {
         route: PyRef<'_, Route>,
         #[pyo3(from_py_with=int)] output_path: i64,
         function_block: Option<&Bound<'_, PyAny>>,
-        #[pyo3(from_py_with=int)] max_sysex: i64,
+        #[pyo3(from_py_with=byte_count)] max_sysex: i64,
         #[pyo3(from_py_with=limit)] peer_limit: usize,
         #[pyo3(from_py_with=limit)] exchange_limit: usize,
-        #[pyo3(from_py_with=limit)] reply_byte_limit: usize,
-        #[pyo3(from_py_with=uint)] discovery_ns: u64,
-        #[pyo3(from_py_with=uint)] endpoint_ns: u64,
-        #[pyo3(from_py_with=uint)] timeout_ns: u64,
+        #[pyo3(from_py_with=crate::units::bytes)] reply_byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] discovery_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] endpoint_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] timeout_ns: u64,
         #[pyo3(from_py_with=limit)] detail_limit: usize,
     ) -> PyResult<Self> {
         let session = session::Session::new(
@@ -577,7 +577,10 @@ impl Browser {
         })
     }
 
-    fn start(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<Vec<Action>> {
+    fn start(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<Vec<Action>> {
         Ok(self
             .value
             .start(now_ns)
@@ -586,7 +589,10 @@ impl Browser {
             .map(|value| Action { value })
             .collect())
     }
-    fn poll(&mut self, #[pyo3(from_py_with=uint)] now_ns: u64) -> PyResult<Vec<Action>> {
+    fn poll(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<Vec<Action>> {
         Ok(self
             .value
             .poll(now_ns)
@@ -601,7 +607,7 @@ impl Browser {
         message: &Bound<'_, PyAny>,
         input: &str,
         group: Option<&Bound<'_, PyAny>>,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<Vec<Action>> {
         let raw = if let Ok(v) = message.extract::<PyRef<'_, crate::messages::SysEx>>() {
             v.value.clone()
@@ -621,7 +627,7 @@ impl Browser {
         &mut self,
         #[pyo3(from_py_with=uint)] token: u64,
         #[pyo3(from_py_with=crate::ump::boolean)] sent: bool,
-        #[pyo3(from_py_with=uint)] now_ns: u64,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<Vec<Action>> {
         Ok(self
             .value
@@ -746,4 +752,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Session>()?;
     m.add_function(wrap_pyfunction!(decode, m)?)?;
     Ok(())
+}
+
+fn byte_count(value: &Bound<'_, PyAny>) -> PyResult<i64> {
+    int(&crate::units::normalize(value, "byte", "integer")?)
 }

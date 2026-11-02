@@ -58,7 +58,7 @@ impl PacketDecoder {
     fn new(
         stream: String,
         protocol: Protocol,
-        #[pyo3(from_py_with=limit)] sysex_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] sysex_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: model::Decoder::new(stream, protocol.native(), sysex_limit)

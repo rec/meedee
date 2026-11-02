@@ -165,7 +165,7 @@ impl Reader {
     #[pyo3(signature=(source,*,payload_limit=1_048_576,recover=false,preserve_unknown=false))]
     fn new(
         source: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
         #[pyo3(from_py_with=crate::ump::boolean)] recover: bool,
         #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
     ) -> PyResult<Self> {
@@ -218,7 +218,7 @@ impl Writer {
     #[pyo3(signature=(destination,*,payload_limit=1_048_576))]
     fn new(
         destination: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: Some(

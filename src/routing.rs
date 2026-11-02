@@ -96,7 +96,7 @@ impl Router {
     fn new(
         routes: Vec<PyRef<'_, Route>>,
         #[pyo3(from_py_with=limit)] event_limit: usize,
-        #[pyo3(from_py_with=limit)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: routing::Router::new(
@@ -286,8 +286,8 @@ fn preview_file(
     source: &Bound<'_, PyAny>,
     routes: Vec<PyRef<'_, Route>>,
     #[pyo3(from_py_with=limit)] event_limit: usize,
-    #[pyo3(from_py_with=limit)] byte_limit: usize,
-    #[pyo3(from_py_with=limit)] payload_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     #[pyo3(from_py_with=limit)] detail_limit: usize,
 ) -> PyResult<Preview> {
     let source = Stream::input(source)?;

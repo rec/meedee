@@ -198,7 +198,7 @@ fn packetize_sysex7(
     py: Python<'_>,
     group: &Bound<'_, PyAny>,
     data: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=limit)] message_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] message_limit: usize,
 ) -> PyResult<Vec<Py<PyAny>>> {
     model::packetize_sysex7(int(group)?, &buffer(py, data, message_limit)?)
         .map_err(error)?
@@ -213,7 +213,7 @@ fn packetize_sysex8(
     group: &Bound<'_, PyAny>,
     stream_id: &Bound<'_, PyAny>,
     data: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=limit)] message_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] message_limit: usize,
 ) -> PyResult<Vec<Py<PyAny>>> {
     model::packetize_sysex8(
         int(group)?,
@@ -388,8 +388,8 @@ impl Assembler {
     #[new]
     #[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]
     fn new(
-        #[pyo3(from_py_with=limit)] message_limit: usize,
-        #[pyo3(from_py_with=limit)] total_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] message_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] total_limit: usize,
         #[pyo3(from_py_with=limit)] max_streams: usize,
     ) -> PyResult<Self> {
         Ok(Self {
@@ -626,7 +626,7 @@ macro_rules! helpers {
     };
 }
 helpers! {FlexData;
-    tempo(group:int,ten_nanoseconds_per_quarter:int);
+    tempo(group:int,ten_nanoseconds_per_quarter:tempo_period);
     time_signature(group:int,numerator:int,denominator_power:int,thirtyseconds_per_quarter:int);
     metronome(group:int,clocks_per_primary:int,accent1:int,accent2:int,accent3:int,subdivision1:int,subdivision2:int);
     key_signature(group:int,channel:optional_int,sharps_flats:int,tonic:int);
@@ -721,4 +721,15 @@ fn midi1_message(message: &Bound<'_, PyAny>) -> PyResult<meedee::messages::AnyMe
         ));
     }
     Err(PyTypeError::new_err("expected a primitive MIDI 1 message"))
+}
+
+fn tempo_period(value: &Bound<'_, PyAny>) -> PyResult<i64> {
+    if !value.is_instance_of::<pyo3::types::PyString>() {
+        return int(value);
+    }
+    int(&value
+        .py()
+        .import("meedee._units")?
+        .getattr("tempo")?
+        .call1((value, "nanosecond / beat", 10))?)
 }

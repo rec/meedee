@@ -12,7 +12,7 @@ class Clock:
         tick_numerator: int = 1,
         tick_denominator: int = 1_000_000_000,
         origin: str | None = None,
-        resolution_ticks: int | None = None,
+        resolution_ticks: int | str | None = None,
     ) -> None: ...
     @property
     def identity(self) -> str: ...
@@ -37,7 +37,7 @@ class ReceivedPacket:
     def __init__(
         self,
         *,
-        timestamp_ns: int | None,
+        timestamp_ns: int | str | None,
         clock: Clock,
         packet: bytes | bytearray | memoryview | midi.UmpPacket,
         sequence: int | None = None,
@@ -54,7 +54,7 @@ class ReceivedPacket:
     def __hash__(self) -> int: ...
 
 class Timestamp:
-    def __init__(self, *, ticks: int, clock: Clock) -> None: ...
+    def __init__(self, *, ticks: int | str, clock: Clock) -> None: ...
     @property
     def ticks(self) -> int: ...
     @property
@@ -124,7 +124,11 @@ class StreamDiagnostic:
 
 class PacketDecoder:
     def __init__(
-        self, *, stream: str, protocol: midi.Protocol, sysex_limit: int = 1_048_576
+        self,
+        *,
+        stream: str,
+        protocol: midi.Protocol,
+        sysex_limit: int | str = 1_048_576,
     ) -> None: ...
     def feed(self, packet: ReceivedPacket) -> list[Event | StreamDiagnostic]: ...
     def loss(self, *, lost: int, reason: str) -> StreamDiagnostic: ...

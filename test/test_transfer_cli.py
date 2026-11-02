@@ -61,8 +61,12 @@ def invoke(args: list[str]) -> int:
     return result.value.code
 
 
+@pytest.mark.parametrize("gap", ["20", "20 ms"])
 def test_preview_bounds_examples_and_never_constructs_transport(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    gap: str,
 ) -> None:
     source = tmp_path / "dump.syx"
     source.write_bytes(bytes.fromhex("f0 7d 01 f7 f0 7d 02 f7"))
@@ -74,7 +78,7 @@ def test_preview_bounds_examples_and_never_constructs_transport(
                 "transfer-preview",
                 str(source),
                 "--gap-ms",
-                "20",
+                gap,
                 "--detail-limit",
                 "1",
                 "--preview-bytes",

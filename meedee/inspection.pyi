@@ -9,7 +9,7 @@ def inspect_file(
     source: str | PathLike[str] | BinaryIO,
     *,
     format: Literal["archive", "smf", "syx", "clip"],
-    payload_limit: int = 1_048_576,
+    payload_limit: int | str = 1_048_576,
     preserve_unknown: bool = False,
     detail_limit: int = 128,
 ) -> Report: ...
@@ -95,7 +95,7 @@ def compare_files(
     clock_map: dict[str, str] | None = None,
     ignore_timestamps: bool = False,
     tick_tolerance: int = 0,
-    payload_limit: int = 1_048_576,
+    payload_limit: int | str = 1_048_576,
     detail_limit: int = 128,
     preserve_unknown: bool = False,
 ) -> ComparisonReport: ...

@@ -79,7 +79,7 @@ fn compare_files(
     clock_map: Option<BTreeMap<String, String>>,
     #[pyo3(from_py_with=crate::ump::boolean)] ignore_timestamps: bool,
     #[pyo3(from_py_with=uint)] tick_tolerance: u64,
-    #[pyo3(from_py_with=limit)] payload_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     #[pyo3(from_py_with=limit)] detail_limit: usize,
     #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
 ) -> PyResult<ComparisonReport> {

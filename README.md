@@ -384,7 +384,33 @@ Unmapped keys require deliberate `preserve_unmapped=True`; invalid pitches alway
 block generation. See the [bridge contract](plan/ufor-tuning.md).
 
 meedee supports Python 3.13 only, including patch releases. Ordinary installs
-have no runtime dependencies; uFor remains an optional extra.
+use reccy for unit-aware Python inputs; uFor remains an optional extra.
+
+### Units in Python inputs
+
+You can use ordinary numbers or reccy/Pint expressions. You do not need to import
+Pint or construct quantities. For example, `timeout="250 ms"`,
+`gap_ns="2 ms"`, `frequency_hz="0.44 kHz"` and `byte_limit="8 MiB"` normalize
+to the same values as their numeric equivalents. Bare numbers retain the units
+specified by each parameter. Returned values remain numbers.
+
+`smf.export_event(..., tempo="120 bpm")` and
+`ump.tempo(group=1, ten_nanoseconds_per_quarter="120 bpm")` accept beat rates
+or beat periods such as `"500 ms / beat"`. Here a beat means a quarter note.
+Numeric tempo arguments retain their MIDI encoding units: microseconds per
+quarter note for SMF and ten-nanosecond units per quarter note for UMP.
+
+Integer fields require exact conversions. A nonintegral nanosecond or byte
+count is rejected rather than rounded. Beats, ticks and seconds are distinct;
+meedee does not infer a tempo or clock mapping to convert between them. Raw MIDI
+values such as velocity and controller values retain their protocol ranges.
+
+CLI quantity options accept the same expressions, quoted as one shell argument:
+`--duration "1 min"`, `--gap-ms "250 ms"`, `--byte-limit "8 MiB"`.
+For the Pydantic command models, use `reccy.configuration.units.authored_dump()`
+to preserve authored expressions, `runtime_dump()` for normalized numbers, and
+`revalidation_dump()` when rebuilding a model without losing unit provenance.
+Native messages, clocks and archive records retain their existing representations.
 
 ## General MIDI and profile helpers
 

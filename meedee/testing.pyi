@@ -6,10 +6,10 @@ from typing import Literal, Self
 from . import events, messages, midi
 
 class ManualClock:
-    def __init__(self, *, now_ns: int = 0) -> None: ...
+    def __init__(self, *, now_ns: int | str = 0) -> None: ...
     @property
     def now_ns(self) -> int: ...
-    def advance(self, nanoseconds: int) -> None: ...
+    def advance(self, nanoseconds: int | str) -> None: ...
 
 class Input:
     def __init__(
@@ -19,18 +19,21 @@ class Input:
         protocol: Literal["midi1", "ump"],
         packet_limit: int = 128,
         event_limit: int = 128,
-        byte_limit: int = 8_388_608,
-        sysex_limit: int = 1_048_576,
+        byte_limit: int | str = 8_388_608,
+        sysex_limit: int | str = 1_048_576,
     ) -> None: ...
     def inject(
         self,
         packet: bytes | bytearray | memoryview | midi.UmpPacket,
         *,
         clock: events.Clock,
-        timestamp_ns: int | None = None,
+        timestamp_ns: int | str | None = None,
     ) -> bool: ...
     def receive(
-        self, *, timeout: float | None = None, cancel: events.Cancellation | None = None
+        self,
+        *,
+        timeout: float | str | None = None,
+        cancel: events.Cancellation | None = None,
     ) -> events.Event | events.StreamDiagnostic | None: ...
     def lose(self, count: int) -> None: ...
     def fail(self, reason: str) -> None: ...
@@ -76,7 +79,7 @@ class Output:
         *,
         protocol: Literal["midi1", "ump"],
         packet_limit: int = 128,
-        byte_limit: int = 8_388_608,
+        byte_limit: int | str = 8_388_608,
     ) -> None: ...
     def send(
         self, value: messages.Message | bytes | bytearray | memoryview | midi.UmpPacket

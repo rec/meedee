@@ -54,9 +54,9 @@ impl Recorder {
         stream: String,
         label: &str,
         #[pyo3(from_py_with=crate::ump::boolean)] best_effort: bool,
-        #[pyo3(from_py_with=limit)] payload_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
         #[pyo3(from_py_with=limit)] record_limit: usize,
-        #[pyo3(from_py_with=limit)] byte_limit: usize,
+        #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
         #[pyo3(from_py_with=crate::ump::boolean)] metrics: bool,
     ) -> PyResult<Self> {
         crate::callback::check_thread()?;
@@ -121,7 +121,11 @@ impl Recorder {
         self.value.failure()
     }
     #[pyo3(signature=(*,timeout=5.0))]
-    fn stop(&self, py: Python<'_>, timeout: f64) -> PyResult<RecordingReport> {
+    fn stop(
+        &self,
+        py: Python<'_>,
+        #[pyo3(from_py_with=crate::units::seconds)] timeout: f64,
+    ) -> PyResult<RecordingReport> {
         crate::callback::check_thread()?;
         if !timeout.is_finite() || timeout <= 0.0 {
             return Err(PyValueError::new_err("timeout must be positive and finite"));

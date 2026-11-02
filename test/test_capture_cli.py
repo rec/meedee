@@ -23,7 +23,7 @@ def invoke(path: Path, *args: str) -> int:
                 "--expected-messages",
                 "2",
                 "--timeout-ms",
-                "100",
+                "100 ms",
                 "--output",
                 "json",
                 *args,

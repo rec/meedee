@@ -34,6 +34,7 @@ mod recording;
 mod tuning;
 mod tuning_query;
 mod ump;
+mod units;
 
 #[cfg(all(test, target_os = "macos"))]
 mod transport_tests;
