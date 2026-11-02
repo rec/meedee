@@ -111,6 +111,11 @@ SysEx(data=b'\x7e\x7f\x06\x01')
 note.replace(velocity=80)
 ```
 
+`NoteOn.transpose(semitones)` and `NoteOff.transpose(semitones)` return a new
+message with its note shifted and clamped to 0..127. Velocity and channel,
+including an unassigned channel, are preserved. Multiple source notes can clamp
+to the same destination key; the method does not track voice identity.
+
 Expose readable fields, constructor signatures, field annotations, `repr`,
 same-type value equality and stable hashes for deeply immutable types. Python
 class patterns work through `__match_args__`; positional matching does not

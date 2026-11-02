@@ -86,7 +86,7 @@ impl SysEx {
 }
 
 macro_rules! channel_message {
-    ($name:ident $signature:tt { $($field:ident),* }) => {
+    ($name:ident $signature:tt { $($field:ident),* } $(; $($method:item)*)?) => {
         #[pyclass(frozen, extends = Message, module = "meedee.messages")]
         struct $name { value: messages::$name, assigned: bool }
         impl $name {
@@ -98,6 +98,7 @@ macro_rules! channel_message {
         }
         #[pymethods]
         impl $name {
+            $($($method)*)?
             #[new]
             #[pyo3(signature = $signature)]
             fn new($(#[pyo3(from_py_with=strict_integer)] $field: i64,)* channel: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
@@ -149,7 +150,32 @@ macro_rules! channel_message {
     };
 }
 
+macro_rules! note_message {
+    ($name:ident $signature:tt) => {
+        channel_message! { $name $signature { note, velocity };
+            fn transpose(
+                &self, py: Python<'_>,
+                #[pyo3(from_py_with=strict_integer)] semitones: i64,
+            ) -> PyResult<Py<Self>> {
+                let note = i64::from(self.value.note()).saturating_add(semitones).clamp(0, 127);
+                Py::new(py, PyClassInitializer::from(Message).add_subclass(Self {
+                    value: messages::$name::new(i64::from(self.value.channel()), note, i64::from(self.value.velocity())).map_err(value_error)?,
+                    assigned: self.assigned,
+                }))
+            }
+        }
+    };
+}
+
 macro_rules! message_classes {
+    (NoteOn $signature:tt { channel, note, velocity }; $($rest:tt)*) => {
+        note_message! { NoteOn $signature }
+        message_classes! { $($rest)* }
+    };
+    (NoteOff $signature:tt { channel, note, velocity }; $($rest:tt)*) => {
+        note_message! { NoteOff $signature }
+        message_classes! { $($rest)* }
+    };
     ($name:ident $signature:tt { channel, $($field:ident),* }; $($rest:tt)*) => {
         channel_message! { $name $signature { $($field),* } }
         message_classes! { $($rest)* }

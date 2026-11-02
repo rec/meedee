@@ -66,3 +66,14 @@ def test_full_notes_delegate_midi_validation_and_keep_authored_duration() -> Non
             messages.Note(1, **fields)
     with pytest.raises(AttributeError):
         note.duration = 2  # ty: ignore[invalid-assignment]
+
+
+def test_note_transposition_clamps_and_preserves_channel_and_velocity() -> None:
+    for constructor in (messages.NoteOn, messages.NoteOff):
+        note = constructor(60, 75)
+        shifted = note.transpose(12)
+        assert (shifted.note, shifted.velocity, shifted.channel) == (72, 75, None)
+        assert note.note == 60
+        assert note.transpose(-100).note == 0
+        assert note.transpose(100).note == 127
+        assert constructor(120, 50, 3).transpose(12).channel == 3
