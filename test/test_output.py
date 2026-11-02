@@ -64,7 +64,7 @@ def transport(monkeypatch: pytest.MonkeyPatch) -> Iterator[NativeConnection]:
     yield connection
 
 
-def test_channel_inheritance_explicit_override_and_repeated_note_cleanup(
+def test_output_channel_overrides_messages_and_tracks_cleanup(
     transport: NativeConnection,
 ) -> None:
     note = messages.NoteOn(60)
@@ -75,9 +75,9 @@ def test_channel_inheritance_explicit_override_and_repeated_note_cleanup(
         b"\x91\x3c\x5a",
         b"\x91\x3c\x5a",
         b"\x81\x3c\x00",
-        b"\x92\x3f\x46",
+        b"\x91\x3f\x46",
         b"\x81\x3c\x00",
-        b"\x82\x3f\x00",
+        b"\x81\x3f\x00",
     ]
     assert transport.closed
 
@@ -205,10 +205,10 @@ def test_two_stage_connection_and_close_are_idempotent(
 
 
 def test_bank_selection_inherits_output_channel(transport: NativeConnection) -> None:
-    command = gm.BankProgramSelect(12)
+    command = gm.BankProgramSelect(12, channel=7)
     with midi.Output(channel=3) as out:
         out(command)
-    assert command.channel is None
+    assert command.channel == 7
     assert transport.packets() == [b"\xb2\x00\x00", b"\xb2\x20\x00", b"\xc2\x0b"]
 
 
@@ -252,8 +252,8 @@ def test_full_notes_and_rests_schedule_beats_and_release_before_next_attack(
         b"\x81\x3c\x00",
         b"\x91\x3c\x46",
         b"\x81\x3c\x00",
-        b"\x92\x40\x5a",
-        b"\x82\x40\x00",
+        b"\x91\x40\x5a",
+        b"\x81\x40\x00",
     ]
 
 
@@ -342,3 +342,15 @@ def test_full_note_releases_at_its_deadline_before_context_exit(
         out(messages.Note("2 ms", 60))
         assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
     assert transport.packets() == []
+
+
+@pytest.mark.parametrize("channel", [None, 1])
+def test_output_distinguishes_no_channel_from_explicit_channel_one(
+    transport: NativeConnection, channel: int | None
+) -> None:
+    with midi.Output(channel=channel) as out:
+        out(messages.ProgramChange(34, channel=3), messages.ProgramChange(81))
+    assert transport.packets() == [
+        bytes([0xC2 if channel is None else 0xC0, 33]),
+        b"\xc0\x50",
+    ]

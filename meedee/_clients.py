@@ -225,7 +225,7 @@ class Output:
     def __init__(
         self,
         *,
-        channel: int = 1,
+        channel: int | None = None,
         bpm: int | float | None = None,
         port: str | None = None,
         protocol: midi.Protocol = midi.Protocol.Midi1,
@@ -236,8 +236,6 @@ class Output:
         timeout = _units.real(timeout, "second")
         validate_settings(protocol, backend, isolated, timeout)
         messages.NoteOn(0, channel=channel)
-        if channel is None:
-            raise TypeError("output channel must be an integer")
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
         if bpm is not None:
@@ -496,7 +494,7 @@ class OutputConnection:
                 if end > 2**64 - 1:
                     raise ValueError("delay exceeds scheduler range")
                 if isinstance(v, messages.Note):
-                    channel = self._client._channel if v.channel is None else v.channel
+                    channel = self._client._channel or v.channel or 1
                     attack = messages.NoteOn(v.note, v.velocity, channel)
                     release = messages.NoteOff(v.note, channel=channel)
                     timeline.append(
@@ -509,30 +507,27 @@ class OutputConnection:
                         (end, _native.prepare_output(self._client._protocol, release))
                     )
             else:
-                if (
-                    isinstance(
-                        v,
-                        (
-                            gm.BankProgramSelect,
-                            messages.NoteOn,
-                            messages.NoteOff,
-                            messages.PolyPressure,
-                            messages.ControlChange,
-                            messages.ProgramChange,
-                            messages.ChannelPressure,
-                            messages.PitchBend,
-                            messages.ControlChange14,
-                            messages.RpnSet,
-                            messages.NrpnSet,
-                            messages.RpnIncrement,
-                            messages.RpnDecrement,
-                            messages.NrpnIncrement,
-                            messages.NrpnDecrement,
-                        ),
-                    )
-                    and v.channel is None
-                ):
-                    v = v.replace(channel=self._client._channel)
+                if isinstance(
+                    v,
+                    (
+                        gm.BankProgramSelect,
+                        messages.NoteOn,
+                        messages.NoteOff,
+                        messages.PolyPressure,
+                        messages.ControlChange,
+                        messages.ProgramChange,
+                        messages.ChannelPressure,
+                        messages.PitchBend,
+                        messages.ControlChange14,
+                        messages.RpnSet,
+                        messages.NrpnSet,
+                        messages.RpnIncrement,
+                        messages.RpnDecrement,
+                        messages.NrpnIncrement,
+                        messages.NrpnDecrement,
+                    ),
+                ) and (self._client._channel is not None or v.channel is None):
+                    v = v.replace(channel=self._client._channel or 1)
                 prepared = _native.prepare_output(self._client._protocol, v)
                 timeline.append(
                     (deadline, v if isinstance(prepared, tuple) else prepared)

@@ -35,7 +35,8 @@ are quarter-note beats; without it they are seconds. Explicit time units such
 as `Note("500 ms", 60)` retain their meaning at every tempo. Explicit beats need
 `bpm`. Scheduling and clocks are automatic, without `Event` objects or sleeps.
 
-Output channel defaults to 1; an unassigned message or note inherits it.
+Output() preserves message channels and supplies channel 1 when unassigned.
+An explicit Output(channel=N) overrides MIDI 1 message and note channels.
 `Output(port="FLOW 8")` selects a unique name substring or wildcard match;
 omission selects the first output. Raw `NoteOn` values can still overlap, with
 explicit delays and releases. Delays use the same tempo rule as notes and rests.

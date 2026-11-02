@@ -144,9 +144,8 @@ with Input(channel=1) as input, Output() as out:
 `Input(channel=[1, 4])` selects several channels. Channel-less traffic is excluded;
 diagnostics are always retained. `replace()` returns a new message.
 
-There is a trap when using two outputs: **an output's channel only supplies an
-unset message channel**. This code does not reroute incoming notes to channels 2
-and 3; received messages already have channels:
+Alternatively, give each output a channel. An explicitly configured output
+channel overrides the channel on every MIDI 1 channel message sent through it:
 
 ```python
 from meedee.messages import NoteOff, NoteOn, ProgramChange
@@ -159,17 +158,18 @@ with Input() as input, Output(channel=2) as out2, Output(channel=3) as out3:
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out2(m)  # Keeps the keyboard's channel, not channel 2.
+                out2(m)
             else:
-                out3(m)  # Keeps the keyboard's channel, not channel 3.
+                out3(m)
         else:
             out2(m)
             out3(m)
 ```
 
-For channel messages, `out2(m.replace(channel=None))` explicitly lets `out2`
-supply its channel. The first version makes the destination channel explicit
-and needs only one output connection.
+Use `Output()` for multiple channels: it preserves assigned message channels
+and uses channel 1 for unassigned messages. `Output(channel=1)` explicitly forces
+channel 1. The override applies to MIDI 1 message objects, full notes and compound
+commands; encoded packets and timestamped `play()` retain their explicit addressing.
 
 ## 6. Record and replay a performance
 

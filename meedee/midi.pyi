@@ -165,7 +165,7 @@ class Output:
     def __init__(
         self,
         *,
-        channel: int = 1,
+        channel: int | None = None,
         bpm: int | float | None = None,
         port: str | None = None,
         protocol: Protocol = Protocol.Midi1,

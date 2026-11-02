@@ -1543,7 +1543,7 @@ this workflow's device-free tests.
 
 ## Callable MIDI 1 output
 
-Python `Output(channel=1, port=None, bpm=None, isolated=False)` remains a discovery client
+Python `Output(channel=None, port=None, bpm=None, isolated=False)` remains a discovery client
 with `ports()` and `connect(port)`. As a context manager it opens the first port,
 or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
 No or ambiguous matches raise before connecting. `isolated=True` remains supported
@@ -1646,5 +1646,7 @@ its existing timestamped, checked interface.
 Only channels 1..16 are valid. With a channel selection, channel-less messages
 are excluded and diagnostics are retained. Filtering applies to polling,
 callbacks, iteration and attached recordings. Raw mode rejects channel selection.
-An output's configured channel fills only an unassigned message channel; routing
-received messages requires explicit replacement of their channel.
+Output(channel=None), the default, preserves assigned channels and supplies
+channel 1 when unassigned. An explicit Output(channel=N) overrides MIDI 1 message,
+full-note and compound-command channels without modifying the original values.
+Encoded packets and timestamped play() retain their explicit addressing.
