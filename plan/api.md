@@ -95,7 +95,8 @@ diagnostic inputs use nanoseconds. Tick counts use ticks,
 frequency inputs use hertz, pitch offsets use cents or semitones, and buffer
 budgets use bytes. SMF and UMP tempo helpers take numeric BPM or authored BPM/beat-period strings,
 with exact conversion to the encoded period. Archive/wire representations remain
-numeric and unchanged. Native Rust APIs retain integer nanosecond durations. No implicit beats-to-seconds or ticks-to-seconds mapping is introduced.
+numeric and unchanged. Native Rust APIs retain integer nanosecond durations. Beat durations convert to seconds only with an explicit `Output(bpm=...)`;
+tick conversion still requires its clock.
 Reccy's authored/runtime/revalidation dumps apply to Pydantic command models;
 the CLI normalizes a runtime copy before dispatch. Native resource handles and
 protocol records are not Pydantic configuration models.
@@ -1537,16 +1538,17 @@ this workflow's device-free tests.
 
 ## Callable MIDI 1 output
 
-Python `Output(channel=1, port=None, isolated=False)` remains a discovery client
+Python `Output(channel=1, port=None, bpm=None, isolated=False)` remains a discovery client
 with `ports()` and `connect(port)`. As a context manager it opens the first port,
 or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
 No or ambiguous matches raise before connecting. `isolated=True` remains supported
 and launches a separate worker module, without importing the calling script.
 
 The connection is callable; the former public `send()` method is removed.
-`out(*values)` accepts messages, raw packets, and nonnegative finite delays.
-Numeric values and dimensionless numeric strings mean seconds; time quantities
-use the existing Pint-backed parser. Other dimensions are rejected. Arguments
+`out(*values)` accepts full notes, rests, messages, raw packets and nonnegative
+finite delays. Numeric values and dimensionless numeric strings mean quarter-note
+beats with `bpm` set, seconds otherwise. Explicit time quantities retain their
+meaning; explicit beats require a tempo. Other dimensions are rejected. Arguments
 are validated before sending. One call uses cumulative monotonic deadlines,
 including a trailing delay, with signal checks while waiting and no `time.sleep`.
 The existing timestamped `play()` calls the same connection.
@@ -1574,3 +1576,28 @@ cleanup error are retained together. Garbage collection is not a cleanup API.
 This supersedes older statements that Python output close sends no releases;
 low-level Rust transport and caller-driven testing sinks retain their own close
 semantics. Shared-channel callers must account for the explicit reset policy.
+
+
+### Full notes and rests
+
+`messages.Note(duration, note, velocity=90, channel=None)` validates its MIDI
+payload through the existing NoteOn constructor. `messages.Rest(duration)` only
+carries a duration. Both are immutable authored playback values, not wire
+messages. Duration accepts integers, floats and Pint-backed time/beat expressions;
+negative, nonfinite and unrelated quantities are rejected at construction.
+
+`Output(bpm=...)` accepts a positive finite numeric quarter-note tempo. Each Note
+schedules NoteOn at the cursor, advances by its duration and schedules NoteOff
+with release velocity zero. A Rest advances without sending. The next item
+starts after that release, including consecutive notes on the same key. Explicit
+message channels override the output channel; stored notes remain unchanged.
+
+Calls preflight all items before sending, accumulate exact rational seconds and
+round absolute deadlines to the nearest nanosecond. This supports ordinary tempos
+without requiring an exactly integral nanosecond beat and avoids accumulated
+rounding drift. The existing native monotonic scheduler creates the clock; callers
+need no Clock, Timestamp or Event. Zero durations are allowed. Low-level NoteOn
+messages still overlap until released; existing context cleanup also covers a
+full note interrupted before its scheduled release. Native UMP full-note playback
+is outside this MIDI 1 interface. Timestamped events remain available for archival
+and advanced playback workflows.

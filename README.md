@@ -22,20 +22,27 @@ commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
 
 ```python
-from meedee.messages import NoteOn
+from meedee.messages import Note, Rest
 from meedee.midi import Output
 
-with Output(channel=2) as out:
-    out(NoteOn(60), "300 ms", NoteOn(63), "300 ms", NoteOn(65), 1)
+with Output(bpm=120) as out:
+    out(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
 ```
 
-Notes overlap until context exit releases them. Output channel defaults to 1;
-message `channel=None` inherits it. `Output(port="FLOW 8")` selects a unique name
-substring or wildcard match; omission selects the first output. Calls schedule
-numeric seconds or time-unit strings against cumulative deadlines, without
-`time.sleep()`. Explicit MIDI 1 close also resets changed pitch bend, CC1/64/66/67,
-and channel/polyphonic pressure. It leaves volume, pan, expression, programs and
-tuning alone. UMP retains explicit addressing and has no automatic cleanup.
+`Note(duration, note, velocity=90, channel=None)` plays an attack and release;
+`Rest(duration)` advances time without sending. With `bpm`, numeric durations
+are quarter-note beats; without it they are seconds. Explicit time units such
+as `Note("500 ms", 60)` retain their meaning at every tempo. Explicit beats need
+`bpm`. Scheduling and clocks are automatic, without `Event` objects or sleeps.
+
+Output channel defaults to 1; an unassigned message or note inherits it.
+`Output(port="FLOW 8")` selects a unique name substring or wildcard match;
+omission selects the first output. Raw `NoteOn` values can still overlap, with
+explicit delays and releases. Delays use the same tempo rule as notes and rests.
+Explicit MIDI 1 close releases outstanding notes and resets changed pitch bend,
+CC1/64/66/67, and channel/polyphonic pressure. It leaves volume, pan, expression,
+programs and tuning alone. UMP retains explicit addressing and does not support
+full-note values or automatic cleanup.
 
 ## Files, typed I/O and exact time
 
@@ -590,7 +597,8 @@ ports = output.ports()
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
 `protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
-`isolated=True`; outputs default to `isolated=False`, `channel=1`, and `port=None`.
+`isolated=True`; outputs default to `isolated=False`, `channel=1`, `port=None`,
+and `bpm=None`.
 Input additionally accepts `timestamps=TimestampMode.Absolute` and
 `receive_byte_limit=8_388_608`. Choose `Protocol.Ump` explicitly for UMP, and
 send an immutable `UmpPacket(words=[...])`. There is no automatic protocol

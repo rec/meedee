@@ -107,6 +107,7 @@ class Output:
         self,
         *,
         channel: int = 1,
+        bpm: int | float | None = None,
         port: str | None = None,
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
@@ -161,7 +162,9 @@ class OutputConnection:
     ) -> events.PlaybackReport: ...
     def __call__(
         self,
-        *values: messages.Message
+        *values: messages.Note
+        | messages.Rest
+        | messages.Message
         | bytes
         | bytearray
         | memoryview

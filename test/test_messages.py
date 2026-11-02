@@ -38,3 +38,31 @@ def test_unassigned_messages_preserve_identity_until_resolved() -> None:
     assert codecs.expand(command.replace(channel=3))
     assert codecs.encode(messages.NoteOff(60, channel=1)) == b"\x80\x3c\x00"
     assert codecs.encode(messages.SongPosition(1)) == b"\xf2\x01\x00"
+
+
+def test_full_notes_delegate_midi_validation_and_keep_authored_duration() -> None:
+    import pytest
+
+    note = messages.Note("500 ms", 60)
+    assert (note.duration, note.note, note.velocity, note.channel) == (
+        "500 ms",
+        60,
+        90,
+        None,
+    )
+    assert messages.Rest("1 beat").duration == "1 beat"
+    for duration in [-1, float("inf"), float("nan"), True, "1 Hz", "-1 beat"]:
+        with pytest.raises((ValueError, TypeError)):
+            messages.Note(duration, 60)
+        with pytest.raises((ValueError, TypeError)):
+            messages.Rest(duration)
+    for fields in [
+        {"note": 128},
+        {"note": True},
+        {"note": 60, "velocity": 128},
+        {"note": 60, "channel": 17},
+    ]:
+        with pytest.raises((ValueError, TypeError)):
+            messages.Note(1, **fields)
+    with pytest.raises(AttributeError):
+        note.duration = 2  # ty: ignore[invalid-assignment]

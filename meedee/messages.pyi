@@ -1,5 +1,29 @@
 """Immutable values backed by the shared Rust MIDI toolkit."""
 
+class Note:
+    """An attack and release separated by a duration, resolved during playback."""
+    def __init__(
+        self,
+        duration: int | float | str,
+        note: int,
+        velocity: int = 90,
+        channel: int | None = None,
+    ) -> None: ...
+    @property
+    def duration(self) -> int | float | str: ...
+    @property
+    def note(self) -> int: ...
+    @property
+    def velocity(self) -> int: ...
+    @property
+    def channel(self) -> int | None: ...
+
+class Rest:
+    """Advance playback by a duration without sending a message."""
+    def __init__(self, duration: int | float | str) -> None: ...
+    @property
+    def duration(self) -> int | float | str: ...
+
 class Message:
     """Abstract native base. Direct construction is rejected."""
 

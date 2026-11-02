@@ -17,88 +17,52 @@ when explicitly closed or when leaving its context.
 
 ## 1. Play one note
 
-Play middle C on the first output for half a second. Context exit releases it.
+Play middle C for half a second on the first output.
 
 ```python
-from meedee.messages import NoteOn
+from meedee.messages import Note
 from meedee.midi import Output
 
 with Output() as out:
-    out(NoteOn(60), "500 ms")
+    out(Note("500 ms", 60))
 ```
 
-`NoteOn(60)` defaults to velocity 90 and inherits the output's channel, which
-defaults to 1. Use `Output(channel=2)` to change it or `NoteOn(60, 90, 3)` to
-explicitly target channel 3. Messages are immutable; inheritance does not modify
-them. `port="FLOW 8"` selects a unique name substring; `*` and `?` support wildcard
-matching. Omitting the port selects the first one.
-
-Calls accept multiple messages and delays. Numbers and dimensionless numeric
-strings mean seconds; time expressions such as `"300 ms"` are converted to seconds.
-Other units and negative/nonfinite delays are errors. Each call uses cumulative
-monotonic deadlines, including any final delay, without `time.sleep()`.
-
-```python
-from meedee.messages import NoteOn
-from meedee.midi import Output
-
-with Output(channel=2) as out:
-    out(NoteOn(60), "300 ms", NoteOn(63), "300 ms", NoteOn(65), 1)
-```
-
-These notes overlap until context exit. For an explicit release, send `NoteOff(60)`.
-Cleanup also resets changed pitch bend, modulation, sustain, sostenuto, soft pedal
-and channel/polyphonic pressure. Volume, pan, expression, program and tuning are
-left alone. Cleanup affects shared channels, so reserve them for these examples;
-a transport failure can prevent releases. UMP output retains explicit channels
-and has no automatic state cleanup in this MIDI 1 implementation.
+`Note` sends both the attack and release. Velocity defaults to 90; the channel
+comes from the output, which defaults to 1. Use `Output(channel=2)` to change it.
 
 ## 2. Play a tune in beats
 
-Describe each note by `(pitch, duration_in_beats, velocity)`; `None` is a rest.
-One beat is a quarter note. Tempo is supplied once, in quarter notes per minute.
-The cursor advances by each duration, so no start times or gaps are needed in
-the tune itself.
-
-The current playback API takes timestamped events. This example converts musical
-durations to those events using 24 ticks per beat, supporting halves and thirds.
+Set tempo once. Each note or rest advances the tune by its duration.
 
 ```python
-from meedee import events, messages, midi
+from meedee.messages import Note, Rest
+from meedee.midi import Output
 
-bpm = 120
-clock = events.Clock(identity="tune", tick_numerator=60, tick_denominator=bpm * 24)
-origin = events.Timestamp(ticks=0, clock=clock)
-tune = [(60, 1, 90), (62, 0.5, 70), (64, 0.5, 100), (None, 1, 0), (67, 2, 85)]
-sequence: list[events.Event] = []
-cursor = 0
-for note, duration, velocity in tune:
-    end = cursor + round(duration * 24)
-    if note is not None:
-        sequence.extend(
-            [
-                events.Event(
-                    stream="tune",
-                    timestamp=events.Timestamp(ticks=cursor, clock=clock),
-                    message=messages.NoteOn(channel=1, note=note, velocity=velocity),
-                ),
-                events.Event(
-                    stream="tune",
-                    timestamp=events.Timestamp(ticks=end, clock=clock),
-                    message=messages.NoteOff(channel=1, note=note, velocity=0),
-                ),
-            ]
-        )
-    cursor = end
-
-client = midi.Output()
-with client.connect(client.ports()[0]) as output:
-    print(output.play(sequence, origin=origin, metrics=True))
+with Output(bpm=120) as out:  # Numeric durations are beats.
+    out(
+        Note(duration=1, note=60, velocity=90),
+        Note(0.5, 62, 70),
+        Note(0.5, 64, 100),
+        Rest("1 beat"),
+        Note(2, 64, 100),
+    )
 ```
 
-Change `bpm` without changing the tune. Durations are rounded to this example's
-1/24-beat grid. Releases precede the next attack at a shared timestamp. Playback
-uses monotonic deadlines; its report measures host timing, not audio latency.
+One beat is a quarter note. Without `bpm`, numeric durations mean seconds.
+Explicit time units keep their meaning at any tempo; explicit beats require
+`bpm`. The clock and scheduling are automatic, with no `Event` objects or sleeps.
+
+`Output(port="FLOW 8")` selects a unique name substring; `*` and `?` support
+wildcard matching. Two-stage `client.connect(client.ports()[0])` also works.
+For overlapping attacks, use `NoteOn` with delays and explicit `NoteOff` releases;
+`Note` instead releases before the next item starts. Numeric delays follow the
+same tempo rule as notes and rests.
+
+Context exit releases outstanding tracked MIDI 1 notes and resets changed pitch
+bend, modulation, sustain, sostenuto, soft pedal and channel/polyphonic pressure.
+Volume, pan, expression, programs and tuning are left alone. Reserve the channels
+for these examples; transport failure can prevent cleanup. UMP requires explicit
+addressing and does not support these full-note values or automatic cleanup.
 
 ## 3. See what your keyboard sends
 

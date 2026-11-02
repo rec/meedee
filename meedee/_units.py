@@ -71,3 +71,33 @@ def tempo(value: float | str, units_per_second: int) -> int:
     if period.denominator != 1:
         raise ValueError("Tempo cannot be represented exactly in the MIDI field")
     return period.numerator
+
+
+def musical_duration(value: float | str) -> tuple[Fraction, str | None]:
+    """Read a nonnegative duration without requiring a playback tempo yet."""
+    if isinstance(value, str):
+        from reccy.configuration.units import magnitude, quantity_unit
+
+        unit = "second" if ":" in value else quantity_unit(value)
+        if unit not in (None, "second", "beat"):
+            raise ValueError("Duration must be a number, time or beats")
+        amount = Fraction(
+            cast(Fraction, magnitude(value, unit or "dimensionless", exact=True))
+        )
+    else:
+        if type(value) not in (int, float):
+            raise TypeError("Duration must be a number or unit expression")
+        amount, unit = Fraction(str(value)), None
+    if amount < 0:
+        raise ValueError("Duration must be nonnegative")
+    return amount, unit
+
+
+def sequence_duration(value: float | str, beat_period: Fraction | None) -> Fraction:
+    """Resolve contextual numbers and explicit units to exact seconds."""
+    amount, unit = musical_duration(value)
+    if unit == "beat" and beat_period is None:
+        raise ValueError("Beat durations require Output(bpm=...)")
+    if unit != "second" and beat_period is not None:
+        amount *= beat_period
+    return amount

@@ -210,3 +210,135 @@ def test_bank_selection_inherits_output_channel(transport: NativeConnection) -> 
         out(command)
     assert command.channel is None
     assert transport.packets() == [b"\xb2\x00\x00", b"\xb2\x20\x00", b"\xc2\x0b"]
+
+
+def test_full_notes_and_rests_schedule_beats_and_release_before_next_attack(
+    transport: NativeConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meedee import _native
+
+    deadlines: list[int] = []
+
+    def sequence(
+        send: Callable[[object], None], timeline: list[tuple[int, object]]
+    ) -> None:
+        for t, m in timeline:
+            deadlines.append(t)
+            if m is not None:
+                send(m)
+
+    monkeypatch.setattr(_native, "output_sequence", sequence)
+    note = messages.Note(1, 60)
+    with midi.Output(bpm=120, channel=2) as out:
+        out(
+            note,
+            messages.Note(0.5, 60, 70),
+            messages.Rest("1 beat"),
+            messages.Note("250ms", 64, channel=3),
+        )
+    assert note.channel is None
+    assert deadlines == [
+        0,
+        500_000_000,
+        500_000_000,
+        750_000_000,
+        1_250_000_000,
+        1_500_000_000,
+        1_500_000_000,
+    ]
+    assert transport.packets() == [
+        b"\x91\x3c\x5a",
+        b"\x81\x3c\x00",
+        b"\x91\x3c\x46",
+        b"\x81\x3c\x00",
+        b"\x92\x40\x5a",
+        b"\x82\x40\x00",
+    ]
+
+
+def test_full_note_defaults_to_seconds_and_interrupt_cleanup_releases_it(
+    transport: NativeConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meedee import _native
+
+    def sequence(
+        send: Callable[[object], None], timeline: list[tuple[int, object]]
+    ) -> None:
+        assert [t for t, _ in timeline] == [0, 500_000_000, 500_000_000]
+        send(timeline[0][1])
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(_native, "output_sequence", sequence)
+    with pytest.raises(KeyboardInterrupt):
+        with midi.Output() as out:
+            out(messages.Note(0.5, 60))
+    assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
+    assert transport.closed
+
+
+def test_fractional_beat_deadlines_round_totals_without_drift(
+    transport: NativeConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meedee import _native
+
+    deadlines: list[int] = []
+
+    def sequence(
+        send: Callable[[object], None], timeline: list[tuple[int, object]]
+    ) -> None:
+        deadlines.extend(t for t, _ in timeline)
+
+    monkeypatch.setattr(_native, "output_sequence", sequence)
+    with midi.Output(bpm=123) as out:
+        out(*(messages.Note("1/3 beat", 60) for _ in range(123)))
+    assert deadlines[-1] == 20_000_000_000
+    assert deadlines[1] == 162_601_626
+
+
+@pytest.mark.parametrize(
+    "value", [messages.Note("1 beat", 60), messages.Rest("1 beat"), "1 beat"]
+)
+def test_beats_require_tempo_before_any_sends(
+    transport: NativeConnection, value: object
+) -> None:
+    with midi.Output() as out:
+        with pytest.raises(ValueError, match="require"):
+            out(messages.NoteOn(60), value)  # ty: ignore[invalid-argument-type]
+    assert transport.packets() == []
+
+
+@pytest.mark.parametrize("bpm", [0, -1, float("inf"), float("nan"), True, "fast"])
+def test_invalid_tempo_is_rejected(transport: NativeConnection, bpm: object) -> None:
+    with pytest.raises((ValueError, TypeError)):
+        midi.Output(bpm=bpm)  # ty: ignore[invalid-argument-type]
+
+
+def test_bare_delays_follow_tempo_but_explicit_seconds_do_not(
+    transport: NativeConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meedee import _native
+
+    deadlines: list[int] = []
+
+    def sequence(
+        send: Callable[[object], None], timeline: list[tuple[int, object]]
+    ) -> None:
+        deadlines.extend(t for t, _ in timeline)
+
+    monkeypatch.setattr(_native, "output_sequence", sequence)
+    with midi.Output(bpm=120) as out:
+        out(1, "1", "500 ms", messages.Rest(1))
+    assert deadlines == [2_000_000_000]
+
+
+def test_full_note_releases_at_its_deadline_before_context_exit(
+    transport: NativeConnection,
+) -> None:
+    with midi.Output() as out:
+        out(messages.Note("2 ms", 60))
+        assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
+    assert transport.packets() == []

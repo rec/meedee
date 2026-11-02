@@ -368,8 +368,93 @@ fn value_hash(value: &impl Hash) -> u64 {
     hasher.finish()
 }
 
+/// A performed note: the existing NoteOn value plus an authored duration.
+#[pyclass(frozen, module = "meedee.messages")]
+struct Note {
+    duration: Py<PyAny>,
+    attack: Py<NoteOn>,
+}
+#[pymethods]
+impl Note {
+    #[new]
+    #[pyo3(signature=(duration, note, velocity=90, channel=None))]
+    fn new(
+        py: Python<'_>,
+        duration: &Bound<'_, PyAny>,
+        #[pyo3(from_py_with=strict_integer)] note: i64,
+        #[pyo3(from_py_with=strict_integer)] velocity: i64,
+        channel: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        validate_duration(duration)?;
+        Ok(Self {
+            duration: duration.clone().unbind(),
+            attack: Py::new(py, NoteOn::new(note, velocity, channel)?)?,
+        })
+    }
+    #[getter]
+    fn duration(&self, py: Python<'_>) -> Py<PyAny> {
+        self.duration.clone_ref(py)
+    }
+    #[getter]
+    fn note(&self, py: Python<'_>) -> i64 {
+        self.attack.borrow(py).note()
+    }
+    #[getter]
+    fn velocity(&self, py: Python<'_>) -> i64 {
+        self.attack.borrow(py).velocity()
+    }
+    #[getter]
+    fn channel(&self, py: Python<'_>) -> Option<i64> {
+        self.attack.borrow(py).channel()
+    }
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        Ok(format!(
+            "Note(duration={}, note={}, velocity={}, channel={})",
+            self.duration.bind(py).repr()?,
+            self.note(py),
+            self.velocity(py),
+            self.channel(py)
+                .map_or_else(|| "None".into(), |v| v.to_string())
+        ))
+    }
+}
+
+#[pyclass(frozen, module = "meedee.messages")]
+struct Rest {
+    duration: Py<PyAny>,
+}
+#[pymethods]
+impl Rest {
+    #[new]
+    #[pyo3(signature=(duration))]
+    fn new(duration: &Bound<'_, PyAny>) -> PyResult<Self> {
+        validate_duration(duration)?;
+        Ok(Self {
+            duration: duration.clone().unbind(),
+        })
+    }
+    #[getter]
+    fn duration(&self, py: Python<'_>) -> Py<PyAny> {
+        self.duration.clone_ref(py)
+    }
+    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
+        Ok(format!("Rest(duration={})", self.duration.bind(py).repr()?))
+    }
+}
+
+fn validate_duration(value: &Bound<'_, PyAny>) -> PyResult<()> {
+    value
+        .py()
+        .import("meedee._units")?
+        .getattr("musical_duration")?
+        .call1((value,))?;
+    Ok(())
+}
+
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Message>()?;
+    module.add_class::<Note>()?;
+    module.add_class::<Rest>()?;
     module.add_class::<SysEx>()?;
     register_short(module)?;
     register_commands(module)?;

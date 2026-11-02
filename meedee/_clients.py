@@ -6,6 +6,7 @@ import inspect
 import math
 from collections.abc import Callable, Iterable
 from fnmatch import fnmatchcase
+from fractions import Fraction
 from functools import partial
 from types import TracebackType
 from typing import cast
@@ -113,12 +114,21 @@ class Input:
 class Output:
     """Discover MIDI destinations and open message/packet output connections."""
 
-    __slots__ = ("_native", "_context", "_protocol", "_channel", "_port", "_connection")
+    __slots__ = (
+        "_native",
+        "_context",
+        "_protocol",
+        "_channel",
+        "_port",
+        "_connection",
+        "_beat_period",
+    )
 
     def __init__(
         self,
         *,
         channel: int = 1,
+        bpm: int | float | None = None,
         port: str | None = None,
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
@@ -132,6 +142,12 @@ class Output:
             raise TypeError("output channel must be an integer")
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
+        if bpm is not None:
+            if type(bpm) not in (int, float):
+                raise TypeError("bpm must be a number")
+            if not math.isfinite(bpm) or bpm <= 0:
+                raise ValueError("bpm must be positive and finite")
+        self._beat_period = None if bpm is None else Fraction(60) / Fraction(str(bpm))
         self._channel = channel
         self._port = port
         self._connection: OutputConnection | None = None
@@ -369,7 +385,9 @@ class OutputConnection:
 
     def __call__(
         self,
-        *values: messages.Message
+        *values: messages.Note
+        | messages.Rest
+        | messages.Message
         | bytes
         | bytearray
         | memoryview
@@ -378,20 +396,35 @@ class OutputConnection:
         | float
         | str,
     ) -> None:
-        """Send messages and wait at cumulative deadlines for delays in seconds."""
+        """Schedule notes, rests, messages and delays against one monotonic origin."""
         _native.check_thread()
         if self.closed:
             raise _native.StateError("MIDI connection is closed or failed")
-        deadline = 0
+        elapsed = Fraction(0)
         timeline: list[tuple[int, object]] = []
         for v in values:
-            if isinstance(v, (int, float, str)):
-                delay = _units.duration(v)
-                if delay < 0:
-                    raise ValueError("delays must be nonnegative")
-                deadline += delay
-                if deadline > 2**64 - 1:
+            deadline = round(elapsed * 1_000_000_000)
+            if isinstance(v, (messages.Note, messages.Rest, int, float, str)):
+                duration = (
+                    v.duration if isinstance(v, (messages.Note, messages.Rest)) else v
+                )
+                elapsed += _units.sequence_duration(duration, self._client._beat_period)
+                end = round(elapsed * 1_000_000_000)
+                if end > 2**64 - 1:
                     raise ValueError("delay exceeds scheduler range")
+                if isinstance(v, messages.Note):
+                    channel = self._client._channel if v.channel is None else v.channel
+                    attack = messages.NoteOn(v.note, v.velocity, channel)
+                    release = messages.NoteOff(v.note, channel=channel)
+                    timeline.append(
+                        (
+                            deadline,
+                            _native.prepare_output(self._client._protocol, attack),
+                        )
+                    )
+                    timeline.append(
+                        (end, _native.prepare_output(self._client._protocol, release))
+                    )
             else:
                 if (
                     isinstance(
@@ -421,7 +454,7 @@ class OutputConnection:
                 timeline.append(
                     (deadline, v if isinstance(prepared, tuple) else prepared)
                 )
-        timeline.append((deadline, None))
+        timeline.append((round(elapsed * 1_000_000_000), None))
         _native.output_sequence(self._send, timeline)
 
     def _send(self, value: object) -> None:
