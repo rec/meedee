@@ -127,6 +127,19 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         event_limit: int = 128,
         sysex_limit: int | str = 1_048_576,
     ) -> None: ...
+    def record(
+        self,
+        duration: float | str,
+        *,
+        output: str | PathLike[str] | None = None,
+        overwrite: bool = False,
+    ) -> list[
+        events.Clock
+        | archive.Stream
+        | events.Event
+        | archive.Gap
+        | archive.Discontinuity
+    ]: ...
     def ports(self) -> list[Port]: ...
     @property
     def worker_failure(self) -> Exception | None: ...
@@ -173,6 +186,7 @@ class Output:
         isolated: bool = False,
         timeout: float | str = 5.0,
     ) -> None: ...
+    def play(self, source: Iterable[object]) -> events.PlaybackReport: ...
     def ports(self) -> list[Port]: ...
     @property
     def worker_failure(self) -> Exception | None: ...
@@ -191,7 +205,7 @@ class OutputConnection:
         self,
         source: Iterable[object],
         *,
-        origin: events.Timestamp,
+        origin: events.Timestamp | None = None,
         mappings: list[events.ClockMapping]
         | tuple[events.ClockMapping, ...]
         | None = None,

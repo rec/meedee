@@ -173,56 +173,31 @@ commands; encoded packets and timestamped `play()` retain their explicit address
 
 ## 6. Record and replay a performance
 
-Record ten seconds to `take.meedee`, inspect the take, then replay it through the
-first output. Recording replaces an existing file at that path. Release keys and
-pedals before the recording ends. There is no live forwarding during capture.
+Record ten seconds in memory, then replay it through the first output.
 
 ```python
-from time import monotonic
+from meedee.midi import Input, Output
 
-from meedee import archive, events, inspection, midi
-
-inputs = midi.Input(isolated=False)
-with inputs.connect(inputs.ports()[0]) as receiver:
-    receiver.start_recording("take.meedee", metrics=True)
-    try:
-        deadline = monotonic() + 10
-        while monotonic() < deadline:
-            if receiver.failure is not None:
-                raise receiver.failure
-            receiver.receive(timeout=0.05)
-    finally:
-        recorded = receiver.stop_recording()
-print(recorded)
-if not recorded.complete:
-    raise RuntimeError("Recording incomplete")
-quality = inspection.inspect_file("take.meedee", format="archive")
-print(quality)
-if not quality.complete or quality.gap_records or quality.timestamp_regressions:
-    raise RuntimeError("Take failed quality checks")
-
-reader = archive.Reader("take.meedee")
-try:
-    origin = next(
-        r.timestamp
-        for r in reader
-        if isinstance(r, events.Event) and r.timestamp is not None
-    )
-finally:
-    reader.close()
-
-outputs = midi.Output()
-reader = archive.Reader("take.meedee")
-try:
-    with outputs.connect(outputs.ports()[0]) as output:
-        print(output.play(reader, origin=origin, metrics=True))
-finally:
-    reader.close()
+Output().play(Input().record(10))
 ```
 
-Replay trims initial silence and sends recorded controllers and SysEx too. An
-empty take raises `StopIteration`. Archive v1 is unpublished; see the
-[format contract](https://github.com/rec/meedee/blob/main/plan/archive-format.md).
+Or save the recording and play it later:
+
+```python
+from meedee.archive import Reader
+from meedee.midi import Input, Output
+
+filename = "rec.meedee"
+Input().record(10, output=filename, overwrite=True)
+
+# Later:
+Output().play(Reader(filename))
+```
+
+`record()` returns the captured records, including any diagnostics. File output
+writes the same capture; existing files are protected unless `overwrite=True`.
+Playback preserves timing between messages and trims initial silence. Both calls
+close their connections automatically, and `play()` closes an archive reader.
 
 ## 7. Transpose a MIDI file
 

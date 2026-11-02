@@ -890,7 +890,8 @@ completed events; a source span can begin before recording was attached. Explici
 stop detaches capture but leaves input open. Closing input stops its attached
 recording and reports incomplete cleanup; garbage collection is not success.
 
-Playback requires an explicit Timestamp origin. SMF/Clip TimedReader.origin supplies
+Playback uses a Timestamp origin, inferred from the first event when omitted
+in Python. SMF/Clip TimedReader.origin supplies
 a file origin, preserving leading silence. To remove it, callers deliberately use
 the first event's timestamp instead. Mapping applies target seconds = source seconds
 * rate + offset; uncertainty is declared metadata, not a synchronization guarantee.
@@ -1650,3 +1651,30 @@ Output(channel=None), the default, preserves assigned channels and supplies
 channel 1 when unassigned. An explicit Output(channel=N) overrides MIDI 1 message,
 full-note and compound-command channels without modifying the original values.
 Encoded packets and timestamped play() retain their explicit addressing.
+
+
+### Short capture and replay
+
+`Input.record(duration, output=None, overwrite=False)` captures decoded input
+from the first port for a duration in seconds (unit strings are accepted). It
+returns a list of archive-compatible Clock, Stream, Event, Gap and Discontinuity
+records. Decoder diagnostics and terminal receive failures remain in the capture;
+terminal failures end recording early. The input closes before returning, with
+final partial-message and loss diagnostics retained. Raw mode is rejected.
+When output is specified, the in-memory result is written to an archive after
+capture, using exclusive creation unless overwrite=True. File errors raise.
+
+`Output.play(source)` opens the selected output and closes it on completion or
+failure. A passed archive Reader is consumed and closed. Connection-level play
+also allows omission of origin, inferred from the first Event timestamp. Initial
+silence is trimmed; inter-event timing is retained. Empty captures send no events.
+Existing checked replay rejects gaps and discontinuities rather than silently
+skipping them. Explicit origin/mapping options remain on the connection method.
+
+Input and Output destructors close an active convenience context and dispose an
+isolated worker when Python finalizes the client. Native callback references are
+visible to cyclic GC, and worker delivery references are weak, so internal
+ownership cycles do not prevent collection after application references are
+released. A live connection intentionally retains its client. Python finalization
+is not guaranteed.
+The record/play convenience methods use deterministic context cleanup, not GC.

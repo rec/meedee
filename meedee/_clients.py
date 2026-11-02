@@ -10,7 +10,9 @@ from collections.abc import Callable, Generator, Iterable, Iterator
 from fnmatch import fnmatchcase
 from fractions import Fraction
 from functools import partial
+from itertools import chain
 from os import PathLike
+from pathlib import Path
 from queue import Empty, Full
 from threading import Lock
 from time import monotonic
@@ -158,6 +160,63 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         connection._raw = transport
         return connection
 
+    def record(
+        self,
+        duration: float | str,
+        *,
+        output: str | PathLike[str] | None = None,
+        overwrite: bool = False,
+    ) -> list[
+        events.Clock
+        | archive.Stream
+        | events.Event
+        | archive.Gap
+        | archive.Discontinuity
+    ]:
+        """Capture to memory, optionally saving the same records to an archive."""
+        seconds = _units.real(duration, "second")
+        if not math.isfinite(seconds) or seconds < 0:
+            raise ValueError("duration must be finite and nonnegative")
+        if self._raw_mode:
+            raise midi.StateError("recording requires decoded input (raw=False)")
+        records: list[
+            events.Clock
+            | archive.Stream
+            | events.Event
+            | archive.Gap
+            | archive.Discontinuity
+        ] = []
+        with self as receiver:
+            records.extend(
+                [receiver.clock, archive.Stream(id=receiver.stream, label="")]
+            )
+            clocks = {receiver.clock.identity}
+            deadline = monotonic() + seconds
+            while (remaining := deadline - monotonic()) > 0:
+                try:
+                    item = receiver.receive(timeout=min(0.05, remaining))
+                except INPUT_ERRORS as error:
+                    records.append(
+                        archive.Discontinuity(stream=receiver.stream, reason=str(error))
+                    )
+                    break
+                append_record(records, item, clocks)
+            receiver.close()
+            # Closing finalizes partial messages and reports loss followed by silence.
+            while True:
+                try:
+                    item = receiver.receive(timeout=0)
+                except INPUT_ERRORS:
+                    break
+                append_record(records, item, clocks)
+        if output is not None:
+            with Path(output).open("wb" if overwrite else "xb") as destination:
+                writer = archive.Writer(destination)
+                for r in records:
+                    writer.write(r)
+                writer.finish()
+        return records
+
     def __enter__(self) -> InputConnection[T]:
         if self._connection is not None:
             raise midi.StateError("input context is already open")
@@ -205,8 +264,13 @@ class Input[T = events.Event | events.StreamDiagnostic]:
                 connection.close()
 
     def __del__(self) -> None:
-        if (context := getattr(self, "_context", None)) is not None:
-            context.dispose()
+        try:
+            if (connection := getattr(self, "_connection", None)) is not None:
+                self._connection = None
+                connection.close()
+        finally:
+            if (context := getattr(self, "_context", None)) is not None:
+                context.dispose()
 
 
 class Output:
@@ -297,6 +361,17 @@ class Output:
         connection._closed = False
         return connection
 
+    def play(self, source: Iterable[object]) -> events.PlaybackReport:
+        """Play a capture on the selected output, inferring its timing origin."""
+        try:
+            if self._connection is not None:
+                return self._connection.play(source)
+            with self as connection:
+                return connection.play(source)
+        finally:
+            if isinstance(source, archive.Reader):
+                source.close()
+
     def __enter__(self) -> OutputConnection:
         if self._connection is not None:
             raise _native.StateError("output context is already open")
@@ -328,8 +403,13 @@ class Output:
             close_context(connection.close, exc_value)
 
     def __del__(self) -> None:
-        if (context := getattr(self, "_context", None)) is not None:
-            context.dispose()
+        try:
+            if (connection := getattr(self, "_connection", None)) is not None:
+                self._connection = None
+                connection.close()
+        finally:
+            if (context := getattr(self, "_context", None)) is not None:
+                context.dispose()
 
 
 class _InputTransport[T]:
@@ -445,7 +525,7 @@ class OutputConnection:
         self,
         source: Iterable[object],
         *,
-        origin: events.Timestamp,
+        origin: events.Timestamp | None = None,
         mappings: list[events.ClockMapping]
         | tuple[events.ClockMapping, ...]
         | None = None,
@@ -454,6 +534,19 @@ class OutputConnection:
         metrics: bool = False,
     ) -> events.PlaybackReport:
         """Play timestamped events on the caller's thread, stopping on failure."""
+        if origin is None:
+            iterator = iter(source)
+            prefix: list[object] = []
+            for item in iterator:
+                prefix.append(item)
+                if isinstance(item, events.Event):
+                    if item.timestamp is None:
+                        raise ValueError("playback requires timestamped events")
+                    origin = item.timestamp
+                    break
+            source = chain(prefix, iterator)
+            if origin is None:
+                origin = events.Timestamp(ticks=0, clock=events.Clock(identity="empty"))
         return _native.play(
             self,
             source,
@@ -990,6 +1083,33 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
             bridge.retire()
         if (recorder := getattr(self, "_recorder", None)) is not None:
             recorder.fail("input was abandoned during recording")
+
+
+def append_record(
+    records: list[
+        events.Clock
+        | archive.Stream
+        | events.Event
+        | archive.Gap
+        | archive.Discontinuity
+    ],
+    item: object,
+    clocks: set[str],
+) -> None:
+    if isinstance(item, events.Event):
+        if item.timestamp is not None and item.timestamp.clock.identity not in clocks:
+            records.append(item.timestamp.clock)
+            clocks.add(item.timestamp.clock.identity)
+        records.append(item)
+    elif isinstance(item, events.StreamDiagnostic):
+        if item.kind == "clock_change":
+            records.append(
+                archive.Discontinuity(stream=item.stream, reason=item.reason)
+            )
+        else:
+            records.append(
+                archive.Gap(stream=item.stream, lost=item.lost, reason=item.reason)
+            )
 
 
 def port_from_wire(wire: tuple[object, ...]) -> midi.Port:

@@ -1321,3 +1321,31 @@ def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
             output(ump.Midi1Packet(group=1, message=note))
         assert not output.closed and output.worker_failure is None
     assert output.closed
+
+
+@pytest.mark.parametrize("input_mode", [False, True])
+@pytest.mark.parametrize("connected", [False, True])
+def test_clients_leaving_scope_are_collectible_and_workers_exit(
+    workers: list[Popen[bytes]],
+    input_mode: bool,
+    connected: bool,
+) -> None:
+    class ObservedInput(midi.Input):
+        pass
+
+    class ObservedOutput(midi.Output):
+        pass
+
+    def open_client() -> weakref.ReferenceType[ObservedInput | ObservedOutput]:
+        with patch.dict(
+            os.environ, {"MEEDEE_TEST_MODE": "quiet" if input_mode else "output"}
+        ):
+            client = ObservedInput() if input_mode else ObservedOutput(isolated=True)
+        if connected:
+            client.__enter__()
+        return weakref.ref(client)
+
+    reference = open_client()
+    gc.collect()
+    assert reference() is None
+    workers[0].wait(timeout=3)

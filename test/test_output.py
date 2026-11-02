@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import gc
+import weakref
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from time import monotonic
 
 import pytest
@@ -354,3 +357,59 @@ def test_output_distinguishes_no_channel_from_explicit_channel_one(
         bytes([0xC2 if channel is None else 0xC0, 33]),
         b"\xc0\x50",
     ]
+
+
+def test_client_play_infers_origin_and_closes_reader_and_output(
+    transport: NativeConnection, tmp_path: Path
+) -> None:
+    from meedee import archive, events
+
+    clock = events.Clock(identity="capture")
+    path = tmp_path / "rec.meedee"
+    writer = archive.Writer(path)
+    writer.write(clock)
+    writer.write(archive.Stream(id="s", label=""))
+    writer.write(
+        events.Event(
+            stream="s",
+            timestamp=events.Timestamp(ticks=123_000_000_000, clock=clock),
+            message=messages.NoteOn(60, channel=2),
+        )
+    )
+    writer.finish()
+    reader = archive.Reader(path)
+    report = midi.Output().play(reader)
+    assert report.sent_events == 1
+    assert transport.closed
+    assert transport.packets() == [b"\x91\x3c\x5a", b"\x81\x3c\x00"]
+    with pytest.raises(ValueError, match="closed"):
+        next(reader)
+
+
+def test_client_play_accepts_empty_capture(transport: NativeConnection) -> None:
+    report = midi.Output().play([])
+    assert report.sent_events == 0
+    assert transport.closed
+
+
+@pytest.mark.parametrize("connected", [False, True])
+def test_output_is_automatically_collected_and_releases_notes(
+    transport: NativeConnection,
+    connected: bool,
+) -> None:
+    class ObservedOutput(midi.Output):
+        pass
+
+    def open_output() -> weakref.ReferenceType[ObservedOutput]:
+        client = ObservedOutput()
+        if connected:
+            connection = client.__enter__()
+            connection(messages.NoteOn(60))
+        return weakref.ref(client)
+
+    reference = open_output()
+    gc.collect()
+    assert reference() is None
+    if connected:
+        assert transport.closed
+        assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]

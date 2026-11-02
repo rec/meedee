@@ -1,5 +1,7 @@
 """Source-local timing, typed adapters, recording and supervised cancellation."""
 
+import gc
+import weakref
 from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
@@ -484,3 +486,79 @@ def test_channel_selection_applies_to_callbacks_and_recordings(
         ]
     finally:
         reader.close()
+
+
+def test_record_returns_memory_capture_and_file_round_trip(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
+) -> None:
+    path = tmp_path / "rec.meedee"
+    client = midi.Input(isolated=False)
+    records = client.record(0, output=path)
+    assert [r.message for r in records if isinstance(r, events.Event)] == [
+        messages.NoteOn(60, 100, 1)
+    ]
+    original = path.read_bytes()
+    with pytest.raises(FileExistsError):
+        client.record(0, output=path)
+    assert path.read_bytes() == original
+    client.record("0 seconds", output=path, overwrite=True)
+    reader = archive.Reader(path)
+    try:
+        assert [r.message for r in reader if isinstance(r, events.Event)] == [
+            messages.NoteOn(60, 100, 1)
+        ]
+        assert reader.complete
+    finally:
+        reader.close()
+
+
+@pytest.mark.parametrize("connected", [False, True])
+def test_input_is_automatically_collected_after_scope_exit(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    connected: bool,
+) -> None:
+    class ObservedInput(midi.Input):
+        pass
+
+    def open_input() -> weakref.ReferenceType[ObservedInput]:
+        client = ObservedInput(isolated=False)
+        if connected:
+            client.__enter__()
+        return weakref.ref(client)
+
+    reference = open_input()
+    # The test fixture stores callbacks externally; a real transport owns them.
+    iterable_input.clear()
+    gc.collect()
+    assert reference() is None
+
+
+@pytest.mark.parametrize("duration", [-1, float("inf"), float("nan")])
+def test_record_rejects_invalid_duration_before_opening(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]], duration: float
+) -> None:
+    with pytest.raises(ValueError, match="duration"):
+        midi.Input(isolated=False).record(duration)
+    assert not iterable_input
+
+
+def test_record_uses_duration_deadline_and_retains_terminal_failure(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meedee import _clients
+
+    ticks = iter([100.0, 100.0, 100.0, 110.0])
+    monkeypatch.setattr(_clients, "monotonic", lambda: next(ticks, 110.0))
+    records = midi.Input(isolated=False).record(10)
+    assert len([r for r in records if isinstance(r, events.Event)]) == 1
+
+    def failed_receive(self: midi.InputConnection, *, timeout: float) -> None:
+        raise midi.ResourceError("capture overflow")
+
+    ticks = iter([100.0, 100.0])
+    monkeypatch.setattr(midi.InputConnection, "receive", failed_receive)
+    records = midi.Input(isolated=False).record(10)
+    failures = [r for r in records if isinstance(r, archive.Discontinuity)]
+    assert len(failures) == 1
+    assert failures[0].reason == "capture overflow"
