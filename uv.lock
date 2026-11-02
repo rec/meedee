@@ -3,7 +3,7 @@ revision = 3
 requires-python = "==3.13.*"
 
 [options]
-exclude-newer = "2026-10-23T15:49:40.704286Z"
+exclude-newer = "2026-10-26T11:21:11.368818Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -90,6 +90,9 @@ wheels = [
 [[package]]
 name = "meedee"
 source = { editable = "." }
+dependencies = [
+    { name = "reccy" },
+]
 
 [package.optional-dependencies]
 cli = [
@@ -105,7 +108,6 @@ dev = [
     { name = "maturin" },
     { name = "pytest" },
     { name = "pyupgrade" },
-    { name = "reccy" },
     { name = "ruff" },
     { name = "ty" },
 ]
@@ -113,6 +115,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "pydantic", marker = "extra == 'cli'", specifier = ">=2" },
+    { name = "reccy", git = "https://github.com/rec/reccy.git?branch=main" },
     { name = "tyro", marker = "extra == 'cli'", specifier = ">=1.0.16" },
     { name = "ufor", marker = "python_full_version >= '3.13' and extra == 'ufor'", git = "https://github.com/rec/ufor?branch=main" },
 ]
@@ -123,7 +126,6 @@ dev = [
     { name = "maturin", specifier = "==1.15.0" },
     { name = "pytest", specifier = ">=8" },
     { name = "pyupgrade", specifier = ">=3.19" },
-    { name = "reccy", git = "https://github.com/rec/reccy.git?branch=main" },
     { name = "ruff", specifier = ">=0.11" },
     { name = "ty", specifier = ">=0.0.1" },
 ]
@@ -251,7 +253,7 @@ wheels = [
 [[package]]
 name = "reccy"
 version = "0.2.0"
-source = { git = "https://github.com/rec/reccy.git?branch=main#63359261e03abda8e2e703e3da04b6a652a85966" }
+source = { git = "https://github.com/rec/reccy.git?branch=main#9b5f1d4ccc72948f929e2c2d3be5e0609a52bcee" }
 dependencies = [
     { name = "pint" },
     { name = "pydantic" },
