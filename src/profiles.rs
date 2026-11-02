@@ -63,10 +63,99 @@ mod gm {
     use super::*;
     use meedee::gm as model;
     classes! {"meedee.gm";
-        BankProgramSelect {channel:int=>number:PyInt,bank_msb:int=>number:PyInt,bank_lsb:int=>number:PyInt,program:int=>number:PyInt};
         Gm1On {device_id:int=>number:PyInt};
         GmOff {device_id:int=>number:PyInt};
         Gm2On {device_id:int=>number:PyInt};
+    }
+    #[pyclass(frozen, extends=Message, module="meedee.gm")]
+    pub(super) struct BankProgramSelect {
+        pub(super) value: model::BankProgramSelect,
+        pub(super) assigned: bool,
+    }
+    #[pymethods]
+    impl BankProgramSelect {
+        #[new]
+        #[pyo3(signature=(program, bank_msb=0, bank_lsb=0, channel=None))]
+        fn new(
+            #[pyo3(from_py_with=int)] program: i64,
+            #[pyo3(from_py_with=int)] bank_msb: i64,
+            #[pyo3(from_py_with=int)] bank_lsb: i64,
+            channel: Option<&Bound<'_, PyAny>>,
+        ) -> PyResult<PyClassInitializer<Self>> {
+            let channel = channel.map(int).transpose()?;
+            Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                value: model::BankProgramSelect::new(
+                    channel.unwrap_or(1),
+                    bank_msb,
+                    bank_lsb,
+                    program,
+                )
+                .map_err(value_error)?,
+                assigned: channel.is_some(),
+            }))
+        }
+        #[getter]
+        fn channel(&self) -> Option<u8> {
+            self.assigned.then(|| self.value.channel())
+        }
+        #[getter]
+        fn program(&self) -> u8 {
+            self.value.program()
+        }
+        #[getter]
+        fn bank_msb(&self) -> u8 {
+            self.value.bank_msb()
+        }
+        #[getter]
+        fn bank_lsb(&self) -> u8 {
+            self.value.bank_lsb()
+        }
+        fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
+            let py = slf.py();
+            render(
+                slf.into_pyobject(py)?.as_any(),
+                "BankProgramSelect",
+                &["program", "bank_msb", "bank_lsb", "channel"],
+            )
+        }
+        fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+            other
+                .extract::<PyRef<'_, Self>>()
+                .is_ok_and(|v| self.assigned == v.assigned && self.value == v.value)
+        }
+        fn __hash__(&self) -> u64 {
+            hash(&(&self.value, self.assigned))
+        }
+        #[pyo3(signature=(**changes))]
+        fn replace<'py>(
+            slf: PyRef<'py, Self>,
+            changes: Option<&Bound<'py, PyDict>>,
+        ) -> PyResult<Bound<'py, PyAny>> {
+            let py = slf.py();
+            replacement(
+                slf.into_pyobject(py)?.as_any(),
+                &["program", "bank_msb", "bank_lsb", "channel"],
+                changes,
+            )
+        }
+        #[classattr]
+        fn __match_args__() -> (&'static str, &'static str, &'static str, &'static str) {
+            ("program", "bank_msb", "bank_lsb", "channel")
+        }
+        #[classattr]
+        fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+            let fields = PyDict::new(py);
+            for name in ["program", "bank_msb", "bank_lsb"] {
+                fields.set_item(name, py.get_type::<PyInt>())?;
+            }
+            fields.set_item(
+                "channel",
+                py.import("typing")?
+                    .getattr("Optional")?
+                    .get_item(py.get_type::<PyInt>())?,
+            )?;
+            Ok(fields)
+        }
     }
     entries! {
         Program {program:u8=>PyInt,name:&'static str=>PyString,family:&'static str=>PyString};
@@ -331,18 +420,23 @@ primitives!(
     universal::MasterCoarseTuning,
     timecode::FullFrame
 );
-pub fn extract_command(command: &Bound<'_, PyAny>) -> Option<meedee::messages::AnyCommand> {
+pub fn extract_command(
+    command: &Bound<'_, PyAny>,
+) -> PyResult<Option<meedee::messages::AnyCommand>> {
     if let Ok(value) = command.extract::<PyRef<'_, gm::BankProgramSelect>>() {
-        return Some(meedee::messages::AnyCommand::BankProgramSelect(
+        if !value.assigned {
+            return Err(PyValueError::new_err("message channel is unassigned"));
+        }
+        return Ok(Some(meedee::messages::AnyCommand::BankProgramSelect(
             value.value.clone(),
-        ));
+        )));
     }
     if let Ok(value) = command.extract::<PyRef<'_, mpe::ZoneConfiguration>>() {
-        return Some(meedee::messages::AnyCommand::ZoneConfiguration(
+        return Ok(Some(meedee::messages::AnyCommand::ZoneConfiguration(
             value.value.clone(),
-        ));
+        )));
     }
-    None
+    Ok(None)
 }
 pub fn command_wire(
     command: &meedee::messages::AnyCommand,

@@ -19,18 +19,18 @@ def verify(module: ModuleType) -> None:
     assert issubclass(module.SysEx, module.Message)
     assert module.NoteOn.__module__ == "meedee.messages"
     assert module.NoteOn.__annotations__ == {
-        "channel": int,
+        "channel": int | None,
         "note": int,
         "velocity": int,
     }
     assert module.SysEx.__annotations__ == {"data": bytes}
-    assert str(inspect.signature(module.NoteOn)) == "(*, channel, note, velocity)"
-    assert str(inspect.signature(module.SysEx)) == "(*, data)"
+    assert str(inspect.signature(module.NoteOn)) == "(note, velocity=90, channel=None)"
+    assert str(inspect.signature(module.SysEx)) == "(data)"
 
     note = module.NoteOn(channel=1, note=60, velocity=100)
     assert isinstance(note, module.Message)
     assert (note.channel, note.note, note.velocity) == (1, 60, 100)
-    assert repr(note) == "NoteOn(channel=1, note=60, velocity=100)"
+    assert repr(note) == "NoteOn(note=60, velocity=100, channel=1)"
     assert not hasattr(note, "__dict__")
     for n in ("channel", "note", "velocity", "extra"):
         with case.assertRaises(AttributeError):
@@ -39,9 +39,9 @@ def verify(module: ModuleType) -> None:
         object.__setattr__(note, "note", 61)
     with case.assertRaises(AttributeError):
         del note.note
-    with case.assertRaises(TypeError):
+    with case.assertRaises(ValueError):
         module.NoteOn(1, 60, 100)
-    for n in (True, False, 1.0, "1", None):
+    for n in (True, False, 1.0, "1"):
         with case.assertRaises(TypeError):
             module.NoteOn(channel=n, note=60, velocity=100)
         with case.assertRaises(TypeError):
@@ -67,7 +67,7 @@ def verify(module: ModuleType) -> None:
     with case.assertRaises(TypeError):
         note.replace(unknown=3)
     match note:
-        case module.NoteOn(1, 60, 100):
+        case module.NoteOn(60, 100, 1):
             pass
         case _:
             raise AssertionError("native class pattern matching failed")

@@ -22,102 +22,6 @@ impl Message {
 }
 
 #[pyclass(frozen, extends = Message, module = "meedee.messages")]
-struct NoteOn {
-    value: messages::NoteOn,
-}
-
-#[pymethods]
-impl NoteOn {
-    #[new]
-    #[pyo3(signature = (*, channel, note, velocity))]
-    fn new(
-        channel: &Bound<'_, PyAny>,
-        note: &Bound<'_, PyAny>,
-        velocity: &Bound<'_, PyAny>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        Ok(PyClassInitializer::from(Message).add_subclass(Self {
-            value: messages::NoteOn::new(
-                integer(channel, "channel")?,
-                integer(note, "note")?,
-                integer(velocity, "velocity")?,
-            )
-            .map_err(value_error)?,
-        }))
-    }
-
-    #[getter]
-    fn channel(&self) -> u8 {
-        self.value.channel()
-    }
-
-    #[getter]
-    fn note(&self) -> u8 {
-        self.value.note()
-    }
-
-    #[getter]
-    fn velocity(&self) -> u8 {
-        self.value.velocity()
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "NoteOn(channel={}, note={}, velocity={})",
-            self.value.channel(),
-            self.value.note(),
-            self.value.velocity()
-        )
-    }
-
-    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
-        Ok(other
-            .extract::<PyRef<'_, Self>>()
-            .is_ok_and(|other| self.value == other.value))
-    }
-
-    fn __hash__(&self) -> u64 {
-        value_hash(&self.value)
-    }
-
-    #[pyo3(signature = (**changes))]
-    fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
-        let mut channel = i64::from(self.value.channel());
-        let mut note = i64::from(self.value.note());
-        let mut velocity = i64::from(self.value.velocity());
-        if let Some(changes) = changes {
-            for (name, value) in changes.iter() {
-                match name.extract::<String>()?.as_str() {
-                    "channel" => channel = integer(&value, "channel")?,
-                    "note" => note = integer(&value, "note")?,
-                    "velocity" => velocity = integer(&value, "velocity")?,
-                    name => return Err(PyTypeError::new_err(format!("unknown field: {name}"))),
-                }
-            }
-        }
-        Py::new(
-            py,
-            PyClassInitializer::from(Message).add_subclass(Self {
-                value: messages::NoteOn::new(channel, note, velocity).map_err(value_error)?,
-            }),
-        )
-    }
-
-    #[classattr]
-    fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-        let annotations = PyDict::new(py);
-        for name in ["channel", "note", "velocity"] {
-            annotations.set_item(name, py.get_type::<PyInt>())?;
-        }
-        Ok(annotations)
-    }
-
-    #[classattr]
-    fn __match_args__() -> (&'static str, &'static str, &'static str) {
-        ("channel", "note", "velocity")
-    }
-}
-
-#[pyclass(frozen, extends = Message, module = "meedee.messages")]
 pub(crate) struct SysEx {
     pub(crate) value: messages::SysEx,
 }
@@ -125,7 +29,7 @@ pub(crate) struct SysEx {
 #[pymethods]
 impl SysEx {
     #[new]
-    #[pyo3(signature = (*, data))]
+    #[pyo3(signature = (data))]
     fn new(data: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
         Ok(PyClassInitializer::from(Message).add_subclass(Self {
             value: payload(data)?,
@@ -181,11 +85,82 @@ impl SysEx {
     }
 }
 
+macro_rules! channel_message {
+    ($name:ident $signature:tt { $($field:ident),* }) => {
+        #[pyclass(frozen, extends = Message, module = "meedee.messages")]
+        struct $name { value: messages::$name, assigned: bool }
+        impl $name {
+            fn from_value(value: messages::$name) -> Self { Self { value, assigned: true } }
+            fn resolved(&self) -> PyResult<&messages::$name> {
+                if !self.assigned { return Err(PyValueError::new_err("message channel is unassigned")); }
+                Ok(&self.value)
+            }
+        }
+        #[pymethods]
+        impl $name {
+            #[new]
+            #[pyo3(signature = $signature)]
+            fn new($(#[pyo3(from_py_with=strict_integer)] $field: i64,)* channel: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
+                let channel = channel.map(|v| integer(v, "channel")).transpose()?;
+                Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                    value: messages::$name::new(channel.unwrap_or(1), $($field),*).map_err(value_error)?,
+                    assigned: channel.is_some(),
+                }))
+            }
+            #[getter]
+            fn channel(&self) -> Option<i64> { self.assigned.then(|| i64::from(self.value.channel())) }
+            $(#[getter] fn $field(&self) -> i64 { i64::from(self.value.$field()) })*
+            fn __repr__(&self) -> String {
+                let fields = vec![$(format!("{}={}", stringify!($field), self.value.$field())),*];
+                format!("{}({}, channel={})", stringify!($name), fields.join(", "), self.channel().map_or_else(|| "None".into(), |v| v.to_string()))
+            }
+            fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+                other.extract::<PyRef<'_, Self>>().is_ok_and(|v| self.assigned == v.assigned && self.value == v.value)
+            }
+            fn __hash__(&self) -> u64 { value_hash(&(&self.value, self.assigned)) }
+            #[pyo3(signature=(**changes))]
+            fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
+                let mut channel = self.channel();
+                $(let mut $field = i64::from(self.value.$field());)*
+                if let Some(changes) = changes {
+                    for (name, value) in changes.iter() {
+                        match name.extract::<String>()?.as_str() {
+                            "channel" => channel = if value.is_none() { None } else { Some(integer(&value, "channel")?) },
+                            $(stringify!($field) => $field = integer(&value, stringify!($field))?,)*
+                            _ => return Err(PyTypeError::new_err(format!("unknown field: {name}"))),
+                        }
+                    }
+                }
+                Py::new(py, PyClassInitializer::from(Message).add_subclass(Self {
+                    value: messages::$name::new(channel.unwrap_or(1), $($field),*).map_err(value_error)?,
+                    assigned: channel.is_some(),
+                }))
+            }
+            #[classattr]
+            fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+                let annotations = PyDict::new(py);
+                $(annotations.set_item(stringify!($field), py.get_type::<PyInt>())?;)*
+                annotations.set_item("channel", py.import("typing")?.getattr("Optional")?.get_item(py.get_type::<PyInt>())?)?;
+                Ok(annotations)
+            }
+            #[classattr]
+            fn __match_args__(py: Python<'_>) -> PyResult<Bound<'_, PyTuple>> { PyTuple::new(py, [$(stringify!($field),)* "channel"]) }
+        }
+    };
+}
+
 macro_rules! message_classes {
-    ($($name:ident $signature:tt { $($field:ident),* };)*) => {
-        $(
+    ($name:ident $signature:tt { channel, $($field:ident),* }; $($rest:tt)*) => {
+        channel_message! { $name $signature { $($field),* } }
+        message_classes! { $($rest)* }
+    };
+    ($name:ident $signature:tt { $($field:ident),* }; $($rest:tt)*) => {
             #[pyclass(frozen, extends = Message, module = "meedee.messages")]
             struct $name { value: messages::$name }
+            impl $name {
+                fn from_value(value: messages::$name) -> Self { Self { value } }
+                fn resolved(&self) -> PyResult<&messages::$name> { Ok(&self.value) }
+            }
 
             #[pymethods]
             impl $name {
@@ -240,9 +215,9 @@ macro_rules! message_classes {
                     PyTuple::new(py, names)
                 }
             }
-        )*
-
+        message_classes! { $($rest)* }
     };
+    () => {};
 }
 
 macro_rules! short_messages {
@@ -255,14 +230,11 @@ macro_rules! short_messages {
         }
 
         pub fn encode_message(message: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
-            if let Ok(message) = message.extract::<PyRef<'_, NoteOn>>() {
-                return Ok(message.value.encode());
-            }
             if let Ok(message) = message.extract::<PyRef<'_, SysEx>>() {
                 return Ok(message.value.encode());
             }
             $(if let Ok(message) = message.extract::<PyRef<'_, $name>>() {
-                return Ok(message.value.encode());
+                return Ok(message.resolved()?.encode());
             })*
             if let Some(bytes) = crate::profiles::encode_message(message) { return Ok(bytes); }
             if let Some(bytes) = crate::ci::encode_message(message) { return Ok(bytes); }
@@ -270,27 +242,24 @@ macro_rules! short_messages {
         }
 
         pub(crate) fn extract_primitive(message: &Bound<'_, PyAny>) -> PyResult<messages::AnyMessage> {
-            if let Ok(value) = message.extract::<PyRef<'_, NoteOn>>() {return Ok(messages::AnyMessage::NoteOn(value.value.clone()));}
             if let Ok(value) = message.extract::<PyRef<'_, SysEx>>() {return Ok(messages::AnyMessage::SysEx(value.value.clone()));}
-            $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {return Ok(messages::AnyMessage::$name(value.value.clone()));})*
+            $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {return Ok(messages::AnyMessage::$name(value.resolved()?.clone()));})*
             Err(PyTypeError::new_err("expected a primitive MIDI 1.0 message"))
         }
 
         pub fn to_python(py: Python<'_>, message: messages::AnyMessage) -> PyResult<Py<PyAny>> {
             match message {
-                messages::AnyMessage::NoteOn(value) => Ok(Py::new(py,
-                    PyClassInitializer::from(Message).add_subclass(NoteOn { value }))?.into_any()),
                 messages::AnyMessage::SysEx(value) => Ok(Py::new(py,
                     PyClassInitializer::from(Message).add_subclass(SysEx { value }))?.into_any()),
                 $(messages::AnyMessage::$name(value) => Ok(Py::new(py,
-                    PyClassInitializer::from(Message).add_subclass($name { value }))?.into_any()),)*
+                    PyClassInitializer::from(Message).add_subclass($name::from_value(value)))?.into_any()),)*
             }
         }
 
         pub fn control_input(message: &Bound<'_, PyAny>) -> PyResult<meedee::controls::InputMessage> {
             use meedee::controls::InputMessage;
             if let Ok(message) = message.extract::<PyRef<'_, ControlChange>>() {
-                return Ok(InputMessage::ControlChange(message.value.clone()));
+                return Ok(InputMessage::ControlChange(message.resolved()?.clone()));
             }
             if message.is_instance_of::<SystemReset>() || crate::profiles::changes_mode(message) {
                 return Ok(InputMessage::SystemReset);
@@ -307,15 +276,16 @@ macro_rules! short_messages {
 }
 
 short_messages! {
-    NoteOff (*, channel, note, velocity) { channel, note, velocity };
-    PolyPressure (*, channel, note, pressure) { channel, note, pressure };
-    ControlChange (*, channel, controller, value) { channel, controller, value };
-    ProgramChange (*, channel, program) { channel, program };
-    ChannelPressure (*, channel, pressure) { channel, pressure };
-    PitchBend (*, channel, value) { channel, value };
-    QuarterFrame (*, message_type, value) { message_type, value };
-    SongPosition (*, position) { position };
-    SongSelect (*, song) { song };
+    NoteOn (note, velocity=90, channel=None) { channel, note, velocity };
+    NoteOff (note, velocity=0, channel=None) { channel, note, velocity };
+    PolyPressure (note, pressure=0, channel=None) { channel, note, pressure };
+    ControlChange (controller, value, channel=None) { channel, controller, value };
+    ProgramChange (program, channel=None) { channel, program };
+    ChannelPressure (pressure=0, channel=None) { channel, pressure };
+    PitchBend (value=0, channel=None) { channel, value };
+    QuarterFrame ( message_type, value) { message_type, value };
+    SongPosition ( position) { position };
+    SongSelect ( song) { song };
     TuneRequest () {};
     TimingClock () {};
     Start () {};
@@ -335,9 +305,9 @@ macro_rules! command_messages {
         }
         pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
             $(if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
-                return Ok(messages::AnyCommand::$name(command.value.clone()));
+                return Ok(messages::AnyCommand::$name(command.resolved()?.clone()));
             })*
-            crate::profiles::extract_command(command)
+            crate::profiles::extract_command(command)?
                 .ok_or_else(|| PyTypeError::new_err("command must be a supported compound command"))
         }
         pub fn command_wire(command: &messages::AnyCommand) -> (String, std::collections::HashMap<String, i64>) {
@@ -351,19 +321,19 @@ macro_rules! command_messages {
 }
 
 command_messages! {
-    ControlChange14 (*, channel, controller, value) { channel, controller, value };
-    RpnSet (*, channel, parameter, value, resolution) { channel, parameter, value, resolution };
-    NrpnSet (*, channel, parameter, value, resolution) { channel, parameter, value, resolution };
-    RpnIncrement (*, channel, parameter) { channel, parameter };
-    RpnDecrement (*, channel, parameter) { channel, parameter };
-    NrpnIncrement (*, channel, parameter) { channel, parameter };
-    NrpnDecrement (*, channel, parameter) { channel, parameter };
+    ControlChange14 (controller, value, channel=None) { channel, controller, value };
+    RpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
+    NrpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
+    RpnIncrement (parameter, channel=None) { channel, parameter };
+    RpnDecrement (parameter, channel=None) { channel, parameter };
+    NrpnIncrement (parameter, channel=None) { channel, parameter };
+    NrpnDecrement (parameter, channel=None) { channel, parameter };
 }
 
 pub(crate) fn rpn_to_python(py: Python<'_>, value: messages::RpnSet) -> PyResult<Py<PyAny>> {
     Ok(Py::new(
         py,
-        PyClassInitializer::from(Message).add_subclass(RpnSet { value }),
+        PyClassInitializer::from(Message).add_subclass(RpnSet::from_value(value)),
     )?
     .into_any())
 }
@@ -400,7 +370,6 @@ fn value_hash(value: &impl Hash) -> u64 {
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Message>()?;
-    module.add_class::<NoteOn>()?;
     module.add_class::<SysEx>()?;
     register_short(module)?;
     register_commands(module)?;
@@ -440,4 +409,8 @@ fn python_representation_contract_and_measurements() {
             std::mem::size_of::<messages::SysEx>()
         );
     });
+}
+
+fn strict_integer(value: &Bound<'_, PyAny>) -> PyResult<i64> {
+    integer(value, "value")
 }

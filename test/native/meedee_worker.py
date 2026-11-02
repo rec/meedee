@@ -190,7 +190,10 @@ class OutputConnection:
             raise midi.SendError("device disconnected")
         if self.mode == "check_bytes" and packet != b"\xf0\x7d\x00\xff\xf7":
             raise midi.SendError("bytes changed in transport")
-        if self.mode == "check_note" and packet != b"\x90\x3c\x64":
+        if self.mode == "check_note" and packet not in (
+            b"\x90\x3c\x64",
+            b"\x80\x3c\x00",
+        ):
             raise midi.SendError("note bytes changed in transport")
 
     def send_command(self, command: object) -> None:

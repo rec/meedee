@@ -30,7 +30,7 @@ def main() -> None:
                                 value=0xFEDCBA98,
                             )
                         )
-                        output.send(value)
+                        output(value)
                         received = receiver.receive(timeout=2)
                         assert isinstance(received, events.Event), received
                         assert received.message == value

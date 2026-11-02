@@ -4,10 +4,14 @@ from . import messages
 
 class BankProgramSelect(messages.Message):
     def __init__(
-        self, *, channel: int, bank_msb: int, bank_lsb: int, program: int
+        self,
+        program: int,
+        bank_msb: int = 0,
+        bank_lsb: int = 0,
+        channel: int | None = None,
     ) -> None: ...
     @property
-    def channel(self) -> int: ...
+    def channel(self) -> int | None: ...
     @property
     def bank_msb(self) -> int: ...
     @property
@@ -17,7 +21,7 @@ class BankProgramSelect(messages.Message):
     def replace(
         self,
         *,
-        channel: int = ...,
+        channel: int | None = ...,
         bank_msb: int = ...,
         bank_lsb: int = ...,
         program: int = ...,
@@ -131,7 +135,7 @@ class ControllerDestination(messages.Message):
     @property
     def device_id(self) -> int: ...
     @property
-    def channel(self) -> int: ...
+    def channel(self) -> int | None: ...
     @property
     def source(self) -> int: ...
     @property
@@ -155,7 +159,7 @@ class KeyBasedControl(messages.Message):
     @property
     def device_id(self) -> int: ...
     @property
-    def channel(self) -> int: ...
+    def channel(self) -> int | None: ...
     @property
     def note(self) -> int: ...
     @property

@@ -172,9 +172,9 @@ fn play(
     let source = Source {
         iterator: source.try_iter()?.into_any().unbind(),
     };
-    let send = output.getattr("send")?.unbind();
+    let send = output.clone().unbind();
     if !send.bind(py).is_callable() {
-        return Err(PyTypeError::new_err("MIDI output with callable send required"));
+        return Err(PyTypeError::new_err("callable MIDI output required"));
     }
     let result = py.detach(move || {
         model::play(
@@ -184,8 +184,7 @@ fn play(
             &cancel,
             |message| {
                 Python::attach(|py| {
-                    send
-                        .bind(py)
+                    send.bind(py)
                         .call1((payload_python(py, message.clone())?,))?;
                     Ok::<(), PyErr>(())
                 })
@@ -228,7 +227,33 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     error.setattr("__module__", "meedee.events")?;
     m.add("PlaybackError", error)
 }
+/// Execute a validated call against one origin, including its trailing delay.
+#[pyfunction]
+fn output_sequence(
+    py: Python<'_>,
+    send: &Bound<'_, PyAny>,
+    timeline: Vec<(u64, Py<PyAny>)>,
+) -> PyResult<()> {
+    use model::PlaybackClock;
+    crate::callback::check_thread()?;
+    let mut clock = model::MonotonicClock::default();
+    let cancel = model::Cancellation::default();
+    for (deadline, value) in timeline {
+        while clock.now_ns() < deadline {
+            let next = deadline.min(clock.now_ns().saturating_add(50_000_000));
+            py.detach(|| clock.wait_until(next, &cancel))
+                .map_err(os_error)?;
+            py.check_signals()?;
+        }
+        if !value.bind(py).is_none() {
+            send.call1((value,))?;
+        }
+    }
+    Ok(())
+}
+
 pub fn register_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(play, m)?)?;
+    m.add_function(wrap_pyfunction!(output_sequence, m)?)?;
     Ok(())
 }

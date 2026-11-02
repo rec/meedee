@@ -5,13 +5,15 @@ from __future__ import annotations
 import inspect
 import math
 from collections.abc import Callable, Iterable
+from fnmatch import fnmatchcase
 from functools import partial
 from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, _units, events, messages, midi
+from . import _native, _units, codecs, events, gm, messages, midi
 from ._errors import CompoundSendError
+from ._output_state import OutputState
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
 from .events import Clock, ReceivedPacket
 
@@ -111,18 +113,28 @@ class Input:
 class Output:
     """Discover MIDI destinations and open message/packet output connections."""
 
-    __slots__ = ("_native", "_context", "_protocol")
+    __slots__ = ("_native", "_context", "_protocol", "_channel", "_port", "_connection")
 
     def __init__(
         self,
         *,
+        channel: int = 1,
+        port: str | None = None,
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
-        isolated: bool = True,
+        isolated: bool = False,
         timeout: float | str = 5.0,
     ) -> None:
         timeout = _units.real(timeout, "second")
         validate_settings(protocol, backend, isolated, timeout)
+        messages.NoteOn(0, channel=channel)
+        if channel is None:
+            raise TypeError("output channel must be an integer")
+        if port is not None and not isinstance(port, str):
+            raise TypeError("port must be a name pattern or None")
+        self._channel = channel
+        self._port = port
+        self._connection: OutputConnection | None = None
         self._protocol = protocol
         settings: dict[str, object] = {
             "identity": uuid4().hex,
@@ -172,6 +184,36 @@ class Output:
             connection._generation = self._context.generation
         connection._closed = False
         return connection
+
+    def __enter__(self) -> OutputConnection:
+        if self._connection is not None:
+            raise _native.StateError("output context is already open")
+        ports = self.ports()
+        if self._port is not None:
+            pattern = self._port
+            ports = [
+                p for p in ports if fnmatchcase(p.name, pattern) or pattern in p.name
+            ]
+            if len(ports) != 1:
+                raise ValueError(
+                    f"Port pattern {pattern!r} matched {len(ports)} outputs; "
+                    "expected one"
+                )
+        if not ports:
+            raise ValueError("No MIDI output ports available")
+        self._connection = self.connect(ports[0])
+        return self._connection
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        connection = self._connection
+        self._connection = None
+        if connection is not None:
+            close_context(connection.close, exc_value)
 
     def __del__(self) -> None:
         if (context := getattr(self, "_context", None)) is not None:
@@ -278,7 +320,14 @@ class InputConnection:
 class OutputConnection:
     """An open destination for messages, encoded packets and timed playback."""
 
-    __slots__ = ("_client", "_native", "_closed", "_generation", "__weakref__")
+    __slots__ = (
+        "_client",
+        "_native",
+        "_closed",
+        "_generation",
+        "_state",
+        "__weakref__",
+    )
 
     def __init__(self) -> None:
         raise TypeError("MIDI connection handles cannot be constructed directly")
@@ -287,6 +336,7 @@ class OutputConnection:
     def _create(cls, client: Output) -> OutputConnection:
         connection = object.__new__(cls)
         connection._client = client
+        connection._state = OutputState()
         connection._native = cast(_native.OutputConnection | None, None)
         connection._closed = True
         connection._generation = (
@@ -317,9 +367,64 @@ class OutputConnection:
             metrics=metrics,
         )
 
-    def send(
-        self, value: messages.Message | bytes | bytearray | memoryview | midi.UmpPacket
+    def __call__(
+        self,
+        *values: messages.Message
+        | bytes
+        | bytearray
+        | memoryview
+        | midi.UmpPacket
+        | int
+        | float
+        | str,
     ) -> None:
+        """Send messages and wait at cumulative deadlines for delays in seconds."""
+        _native.check_thread()
+        if self.closed:
+            raise _native.StateError("MIDI connection is closed or failed")
+        deadline = 0
+        timeline: list[tuple[int, object]] = []
+        for v in values:
+            if isinstance(v, (int, float, str)):
+                delay = _units.duration(v)
+                if delay < 0:
+                    raise ValueError("delays must be nonnegative")
+                deadline += delay
+                if deadline > 2**64 - 1:
+                    raise ValueError("delay exceeds scheduler range")
+            else:
+                if (
+                    isinstance(
+                        v,
+                        (
+                            gm.BankProgramSelect,
+                            messages.NoteOn,
+                            messages.NoteOff,
+                            messages.PolyPressure,
+                            messages.ControlChange,
+                            messages.ProgramChange,
+                            messages.ChannelPressure,
+                            messages.PitchBend,
+                            messages.ControlChange14,
+                            messages.RpnSet,
+                            messages.NrpnSet,
+                            messages.RpnIncrement,
+                            messages.RpnDecrement,
+                            messages.NrpnIncrement,
+                            messages.NrpnDecrement,
+                        ),
+                    )
+                    and v.channel is None
+                ):
+                    v = v.replace(channel=self._client._channel)
+                prepared = _native.prepare_output(self._client._protocol, v)
+                timeline.append(
+                    (deadline, v if isinstance(prepared, tuple) else prepared)
+                )
+        timeline.append((deadline, None))
+        _native.output_sequence(self._send, timeline)
+
+    def _send(self, value: object) -> None:
         """Send a message, compound command or encoded packet immediately.
 
         Compound operations serialize their entire expansion on this connection.
@@ -330,6 +435,12 @@ class OutputConnection:
         prepared = _native.prepare_output(self._client._protocol, value)
         if isinstance(prepared, tuple):
             total = prepared[2]
+            packets = [
+                codecs.encode(m)
+                for m in cast(
+                    Callable[[object], list[messages.Message]], codecs.expand
+                )(value)
+            ]
             try:
                 if self._native is not None:
                     self._native.send_command(value)
@@ -340,12 +451,18 @@ class OutputConnection:
                     self._client._context.request(
                         "send_command", [prepared, self._generation], serial=True
                     )
+            except CompoundSendError as error:
+                for p in packets[: error.completed_messages or 0]:
+                    self._state.feed(p)
+                raise
             except (
                 _native.WorkerError,
                 _native.WorkerTimeoutError,
                 _native.NativePanicError,
             ) as error:
                 raise CompoundSendError(str(error), None, total) from error
+            for p in packets:
+                self._state.feed(p)
         elif self._native is not None:
             self._native.send(prepared)
         else:
@@ -363,6 +480,9 @@ class OutputConnection:
                 serial=True,
             )
 
+        if isinstance(prepared, bytes):
+            self._state.feed(prepared)
+
     @property
     def closed(self) -> bool:
         if self._native is not None:
@@ -376,6 +496,18 @@ class OutputConnection:
 
     def close(self) -> None:
         _native.check_thread()
+        if self.closed:
+            self._close_transport()
+            return
+        try:
+            for m in self._state.cleanup():
+                self._send(m)
+        except BaseException as error:
+            close_context(self._close_transport, error)
+            raise
+        self._close_transport()
+
+    def _close_transport(self) -> None:
         if self._native is not None:
             self._native.close()
         elif not self._closed:

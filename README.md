@@ -17,9 +17,25 @@ UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
 tracked in [the plan](plan/meedee.md).
-`OutputConnection.send()` accepts message objects, compound control/bank/MPE
+`out(...)` accepts message objects, compound control/bank/MPE
 commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
+
+```python
+from meedee.messages import NoteOn
+from meedee.midi import Output
+
+with Output(channel=2) as out:
+    out(NoteOn(60), "300 ms", NoteOn(63), "300 ms", NoteOn(65), 1)
+```
+
+Notes overlap until context exit releases them. Output channel defaults to 1;
+message `channel=None` inherits it. `Output(port="FLOW 8")` selects a unique name
+substring or wildcard match; omission selects the first output. Calls schedule
+numeric seconds or time-unit strings against cumulative deadlines, without
+`time.sleep()`. Explicit MIDI 1 close also resets changed pitch bend, CC1/64/66/67,
+and channel/polyphonic pressure. It leaves volume, pan, expression, programs and
+tuning alone. UMP retains explicit addressing and has no automatic cleanup.
 
 ## Files, typed I/O and exact time
 
@@ -66,9 +82,10 @@ representations. Version 1 remains unpublished, with format freeze and future
 compatibility guarantees still owner decisions.
 
 `midi.TypedInput` decodes received packets into events. `midi.Output` opens one
-`OutputConnection` supporting `send()` for messages, compound operations and
+`OutputConnection` supporting `out(...)` for messages, compound operations and
 encoded bytes/UMP packets, and `play()` for timestamped events. Both use the same
-native transport and default Python process isolation. Typed input connections
+native transport. Inputs default to process isolation; outputs default to in-process
+transport, with `isolated=True` available. Typed input connections
 provide either a callback or `receive(timeout=..., cancel=...)`, returning an
 immutable `events.Event` or `events.StreamDiagnostic`. Events preserve primitive
 messages, the completion packet's timestamp and their contributing packet span. Optional `EventInterpreter`,
@@ -92,7 +109,8 @@ payload. General file records default to a configurable 1 MiB payload limit.
 `output.play(source, origin=..., mappings=..., cancel=...)` runs on the caller's
 thread. It requires timestamped events and explicit mappings between unrelated
 clocks, reports lateness and stops on failure without retry. Cancellation sends
-no automatic NoteOff/reset or other cleanup. Archive records are checked while
+no immediate NoteOff/reset. Closing the MIDI 1 connection releases tracked notes
+and resets selected changed controls. Archive records are checked while
 streaming: reading and verifying an entire capture before playback is necessary
 if no output may precede discovering a damaged or incomplete trailer. CRCs detect
 accidental corruption and do not authenticate a file.
@@ -316,7 +334,7 @@ assert decoder.finish() == []
 ```
 
 The pure codec supports MIDI 1.0 note, pressure, CC, program, signed pitch bend,
-system common, real-time and SysEx messages. Values are immutable, keyword-only,
+system common, real-time and SysEx messages. Values are immutable, positional,
 hashable and support checked `replace`. Channels are 1–16, programs are 1–128,
 CC identifiers are 0–127, and PitchBend.value is -8192–8191 with center zero.
 Channel-mode messages remain primitive ControlChange values; zero-velocity
@@ -426,7 +444,7 @@ selection = gm.BankProgramSelect(
 packets = [codecs.encode(p) for p in codecs.expand(selection)]
 volume = controls.Controller.ChannelVolume.message(channel=1, value=100)
 zone = mpe.ZoneConfiguration(manager_channel=1, members=7)
-# An open MIDI 1.0 output can explicitly send selection or zone with send().
+# An open MIDI 1.0 output can explicitly send selection or zone with out(...).
 ```
 
 Rust owns the GM1 instrument/family and percussion maps, all 256 GM2 melodic
@@ -483,14 +501,14 @@ primitives = expand(command)
 interpreter = Interpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
 # An open MIDI 1.0 output can send the whole command:
-# connection.send(command)
+# connection(command)
 ```
 
 `ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
-identifier. Use `send()` for messages, compound commands or encoded packets.
+identifier. Use `out(...)` for messages, compound commands or encoded packets.
 Use primitive `encode()` for byte encoding and `expand()` to inspect commands.
 UMP outputs reject these MIDI 1.0 commands rather than translating silently.
 
@@ -552,7 +570,7 @@ sequences require source context and are not guessed. Returned primitive lists
 are not atomic live sends; output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
-negotiation runs automatically. `OutputConnection.send()` takes `midi.UmpPacket`;
+negotiation runs automatically. `OutputConnection.__call__()` takes `midi.UmpPacket`;
 construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
 has passed between test-owned virtual peers. Other native backends and physical
 MIDI 2.0 device compatibility remain unqualified.
@@ -566,12 +584,13 @@ output = Output()
 ports = output.ports()
 # Select an endpoint deliberately from this snapshot, for example ports[index].
 # with output.connect(ports[index]) as connection:
-#     connection.send(bytes([0x90, 60, 100]))
-#     connection.send(bytes([0x80, 60, 0]))
+#     connection(bytes([0x90, 60, 100]))
+#     connection(bytes([0x80, 60, 0]))
 ```
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
-`protocol=Protocol.Midi1`, `backend=None`, `isolated=True`, and `timeout=5.0`.
+`protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
+`isolated=True`; outputs default to `isolated=False`, `channel=1`, and `port=None`.
 Input additionally accepts `timestamps=TimestampMode.Absolute` and
 `receive_byte_limit=8_388_608`. Choose `Protocol.Ump` explicitly for UMP, and
 send an immutable `UmpPacket(words=[...])`. There is no automatic protocol
@@ -601,7 +620,7 @@ Nanosecond storage does not promise nanosecond accuracy.
 Receive packets are raw transport chunks, including partial SysEx or multiple
 UMPs. The binding does not assemble unfinished SysEx or apply `Ignore` filters.
 Use `TypedInput` for decoded events or the pure byte codec explicitly for framing.
-`OutputConnection.send()` accepts unsigned-byte buffers,
+`OutputConnection.__call__()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.
@@ -627,8 +646,8 @@ clock after opening also discards that worker.
 Input silence does not identify unplugging, rebooting, unresponsiveness or an
 idle device. A failed send can already have changed physical state.
 
-By default each client has a separate Python child process owning its native
-transport. Input callbacks run in the parent. Native operation deadlines
+With `isolated=True`, each client has a separate Python child process owning its
+native transport. This is the input default; outputs default to `isolated=False`. Input callbacks run in the parent. Native operation deadlines
 terminate a failed child; native errors, crashes and timeouts invalidate that
 client without automatically reopening it. `worker_failure` reports a known
 worker failure, not endpoint health. `isolated=False` uses the same Rust
@@ -720,7 +739,7 @@ CoreMIDI metadata read fails discovery without returning partial results or
 preventing a later explicit discovery attempt. There are no automatic retries.
 Ports and ordinary clients still close normally. Pure message/file imports do
 not initialize this runtime. This is not recovery from a crashed/restarted MIDI service;
-default isolation permits replacing the affected child, while in-process use
+explicit isolation permits replacing the affected child, while in-process use
 may require restarting the application. Observer disposal failures remain open.
 
 Release CI remains triggered only by a published release, testing Python 3.13
@@ -957,7 +976,7 @@ event = receiver.receive()  # Decoded by the production packet decoder.
 
 sink = testing.Output(protocol="midi1")
 if isinstance(event, events.Event):
-    sink.send(event.message)
+    sink(event.message)
 assert sink.take_packet() == b"\x90\x3c\x64"
 ```
 

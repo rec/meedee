@@ -131,7 +131,7 @@ class Output:
         self.assembler = ump.Assembler()
         self.closed = False
 
-    def send(self, message: messages.Message) -> None:
+    def __call__(self, message: messages.Message) -> None:
         self.sent.append(message)
         if self.fail and len(self.sent) == 2:
             raise midi.SendError("second packet may have been sent")

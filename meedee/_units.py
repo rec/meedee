@@ -26,9 +26,14 @@ def real(value: float | str, unit: str) -> float:
 def duration(value: float | str) -> int:
     """Convert seconds to exact native nanoseconds."""
     if isinstance(value, str):
-        from reccy.configuration.units import magnitude
+        from reccy.configuration.units import magnitude, quantity_unit
 
-        seconds = Fraction(cast(Fraction, magnitude(value, "second", exact=True)))
+        unit = (
+            "dimensionless"
+            if ":" not in value and quantity_unit(value) is None
+            else "second"
+        )
+        seconds = Fraction(cast(Fraction, magnitude(value, unit, exact=True)))
     else:
         if type(value) not in (int, float):
             raise TypeError("Duration must be seconds or a unit expression")

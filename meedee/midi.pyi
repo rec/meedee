@@ -106,9 +106,11 @@ class Output:
     def __init__(
         self,
         *,
+        channel: int = 1,
+        port: str | None = None,
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
-        isolated: bool = True,
+        isolated: bool = False,
         timeout: float | str = 5.0,
     ) -> None: ...
     def ports(self) -> list[Port]: ...
@@ -116,6 +118,13 @@ class Output:
     def worker_failure(self) -> Exception | None: ...
     def connect(self, port: Port) -> OutputConnection: ...
     def create_virtual(self, name: str) -> OutputConnection: ...
+    def __enter__(self) -> OutputConnection: ...
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
 
 class InputConnection:
     @property
@@ -150,8 +159,16 @@ class OutputConnection:
         allow_rounding: bool = False,
         metrics: bool = False,
     ) -> events.PlaybackReport: ...
-    def send(
-        self, value: messages.Message | bytes | bytearray | memoryview | UmpPacket
+    def __call__(
+        self,
+        *values: messages.Message
+        | bytes
+        | bytearray
+        | memoryview
+        | UmpPacket
+        | int
+        | float
+        | str,
     ) -> None: ...
     @property
     def worker_failure(self) -> Exception | None: ...

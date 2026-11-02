@@ -41,7 +41,8 @@ Slice 2 transport choices, approved 2026-10-14:
   snapshots. `backend_id` is metadata, not a unique persistent identity.
 - Remove native naming parameters except the virtual endpoint name, and remove
   ID lookup. The pinned C API cannot honor the former and IDs cannot guarantee
-  the latter. Keep default per-client process isolation and its in-process option.
+  the latter. Retain per-client process isolation as an option; input defaults to isolated
+  and output defaults to in-process transport.
 - Callbacks take an immutable `meedee.events.ReceivedPacket`: exact optional
   signed `timestamp_ns`, connection `clock`, and raw `packet`. Bytes remain
   bytes; UMP uses an immutable UmpPacket with a tuple of 32-bit words.
@@ -81,7 +82,8 @@ exact full-width MIDI 2 delivery and timestamps; see `validation.md`.
 
 ### Construction, inspection and replacement
 
-Python constructors are keyword-only. Numeric integer inputs require built-in
+MIDI 1 message constructors accept positional payload fields and a trailing
+optional channel. Other constructors retain keyword-only fields. Numeric integer inputs require built-in
 `int` values, rejecting booleans, floats and integer subclasses. Unit-bearing
 Python inputs also accept reccy/Pint expression strings and normalize them
 before native validation. Integer conversions must be exact. Rust uses
@@ -227,11 +229,11 @@ provided by slice 4 below and tuning by slice 5; GM profiles and files retain la
 Seven frozen Message subclasses are added in `meedee.messages`:
 ControlChange14(channel, controller, value), RpnSet/NrpnSet(channel, parameter,
 value, resolution), and RpnIncrement/RpnDecrement/NrpnIncrement/NrpnDecrement
-(channel, parameter). All fields are keyword-only strict integers, with checked
+(channel, parameter). Payload fields are positional strict integers, with an optional trailing channel and checked
 replacement, annotations and class patterns as for primitive messages.
 ControlChange14 uses controller 0–31 and value 0–16383. Parameter identifiers
 are 0–16383 except RPN 16383, which is null selection and cannot be set/stepped;
-NRPN 16383 remains a legitimate identifier. Set resolution is required and
+NRPN 16383 remains a legitimate identifier. Set resolution defaults to 14 and is
 exactly 7 or 14, with value 0–127 or 0–16383 respectively. Changing resolution
 does not rescale a value. All commands retain channel numbering 1–16.
 
@@ -250,8 +252,8 @@ subtrait. Free `codecs::encode` retains its behavior. `Command: Message` exposes
 expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
-`OutputConnection.send(command)` accepts these commands on MIDI 1.0
-outputs, rejecting UMP before sending. Encoded packets use `send`. One native
+`out(command)` accepts these commands on MIDI 1.0
+outputs, rejecting UMP before sending. Encoded packets also use `out(packet)`. One native
 owner-thread operation and the existing connection serialization cover the whole
 sequence, including release; raw sends, other commands and close cannot run
 between its steps on that connection. This is not atomicity against other
@@ -352,7 +354,7 @@ is `test/native/meedee_messages.py`, using standard-library assertions because
 an embedded interpreter does not automatically import the development venv's
 pytest installation.
 
-Checks cover abstract construction, native inheritance, keyword-only signatures,
+Checks cover abstract construction, native inheritance, constructor signatures,
 annotations, readable fields, equality/hashing, pattern matching, mutation
 rejection, unknown replacement fields, invalid types/ranges, large Python
 integers, mutable-buffer snapshots and immutable replacement. Rust checks
@@ -441,7 +443,7 @@ Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
 
 All these messages implement Rust PrimitiveMessage and Python Message, and work
-with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
+with `codecs.encode`. Raw output uses `connection(codecs.encode(message))`;
 there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
 ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
 containing `message` and `checksum`, or None for unrelated/unsupported forms;
@@ -1531,3 +1533,44 @@ LegacyMismatch or timeout/cancellation/interruption, and 2 for setup, malformed
 input, loss, send, close or export failure. A completed query with exported=false
 is not a saved backup. No physical instrument interoperability is qualified by
 this workflow's device-free tests.
+
+
+## Callable MIDI 1 output
+
+Python `Output(channel=1, port=None, isolated=False)` remains a discovery client
+with `ports()` and `connect(port)`. As a context manager it opens the first port,
+or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
+No or ambiguous matches raise before connecting. `isolated=True` remains supported
+and launches a separate worker module, without importing the calling script.
+
+The connection is callable; the former public `send()` method is removed.
+`out(*values)` accepts messages, raw packets, and nonnegative finite delays.
+Numeric values and dimensionless numeric strings mean seconds; time quantities
+use the existing Pint-backed parser. Other dimensions are rejected. Arguments
+are validated before sending. One call uses cumulative monotonic deadlines,
+including a trailing delay, with signal checks while waiting and no `time.sleep`.
+The existing timestamped `play()` calls the same connection.
+
+MIDI 1 channel-message and compound-command constructors take positional payload
+fields, then `channel=None`. NoteOn velocity defaults to 90; NoteOff velocity,
+pressure and pitch bend default to zero; RPN/NRPN resolution defaults to 14.
+`gm.BankProgramSelect(program, bank_msb=0, bank_lsb=0, channel=None)` also inherits
+the output channel.
+Controller/value and parameter/value choices remain explicit. MIDI 1 system
+payloads are positional. Decoded values always carry explicit channels. An
+unresolved message cannot be encoded or placed in a timestamped event until
+`replace(channel=...)` resolves it; output calls resolve it using their channel.
+UMP and management constructor signatures are unchanged.
+
+Explicit close/context exit releases outstanding confirmed MIDI 1 NoteOns,
+counting repeated attacks per channel/key and treating zero-velocity NoteOn as
+a release. It resets only changed bend, CC1/64/66/67, and channel/polyphonic
+pressure. Raw MIDI 1 packets and confirmed compound-send prefixes are tracked.
+Unknown send progress cannot establish device state. Volume, pan, expression,
+programs, tuning and arbitrary controllers are not reset. UMP cleanup is outside
+this slice. Native transport is closed even if cleanup fails; a body error and
+cleanup error are retained together. Garbage collection is not a cleanup API.
+
+This supersedes older statements that Python output close sends no releases;
+low-level Rust transport and caller-driven testing sinks retain their own close
+semantics. Shared-channel callers must account for the explicit reset policy.

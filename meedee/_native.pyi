@@ -87,3 +87,6 @@ def play(
     allow_rounding: bool = False,
     metrics: bool = False,
 ) -> events.PlaybackReport: ...
+def output_sequence(
+    send: Callable[[object], None], timeline: list[tuple[int, object]]
+) -> None: ...

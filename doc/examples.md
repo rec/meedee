@@ -10,32 +10,48 @@ Connect a suitable keyboard or synth before running them. MIDI carries messages,
 not audio; configure the synth's sound and audio output separately. Channels are
 1..16, notes and velocities are 0..127, and program numbers are 1..128.
 
-`isolated=False` runs the native transport in this process, allowing straight-line
-scripts without a multiprocessing main guard. The default isolated transport
-provides worker failure containment but requires that guard in standalone scripts.
-Closing a connection does not release held notes; interrupted sends can leave
-notes sounding. Use dedicated channels for these examples.
+Outputs run in-process by default. Use `isolated=True` for worker failure
+containment; neither mode requires a main guard. Input clients still default to
+isolation. Native MIDI 1 output tracks notes and selected controls for cleanup
+when explicitly closed or when leaving its context.
 
 ## 1. Play one note
 
-Play middle C on channel 1 for half a second.
+Play middle C on the first output for half a second. Context exit releases it.
 
 ```python
-from time import sleep
+from meedee.messages import NoteOn
+from meedee.midi import Output
 
-from meedee import messages, midi
-
-client = midi.Output(isolated=False)
-with client.connect(client.ports()[0]) as output:
-    output.send(messages.NoteOn(channel=1, note=60, velocity=90))
-    try:
-        sleep(0.5)
-    finally:
-        output.send(messages.NoteOff(channel=1, note=60, velocity=0))
+with Output() as out:
+    out(NoteOn(60), "500 ms")
 ```
 
-This sleep holds a single note. For a tune, use scheduled playback as below so
-send overhead does not accumulate between notes.
+`NoteOn(60)` defaults to velocity 90 and inherits the output's channel, which
+defaults to 1. Use `Output(channel=2)` to change it or `NoteOn(60, 90, 3)` to
+explicitly target channel 3. Messages are immutable; inheritance does not modify
+them. `port="FLOW 8"` selects a unique name substring; `*` and `?` support wildcard
+matching. Omitting the port selects the first one.
+
+Calls accept multiple messages and delays. Numbers and dimensionless numeric
+strings mean seconds; time expressions such as `"300 ms"` are converted to seconds.
+Other units and negative/nonfinite delays are errors. Each call uses cumulative
+monotonic deadlines, including any final delay, without `time.sleep()`.
+
+```python
+from meedee.messages import NoteOn
+from meedee.midi import Output
+
+with Output(channel=2) as out:
+    out(NoteOn(60), "300 ms", NoteOn(63), "300 ms", NoteOn(65), 1)
+```
+
+These notes overlap until context exit. For an explicit release, send `NoteOff(60)`.
+Cleanup also resets changed pitch bend, modulation, sustain, sostenuto, soft pedal
+and channel/polyphonic pressure. Volume, pan, expression, program and tuning are
+left alone. Cleanup affects shared channels, so reserve them for these examples;
+a transport failure can prevent releases. UMP output retains explicit channels
+and has no automatic state cleanup in this MIDI 1 implementation.
 
 ## 2. Play a tune in beats
 
@@ -75,14 +91,9 @@ for note, duration, velocity in tune:
         )
     cursor = end
 
-client = midi.Output(isolated=False)
+client = midi.Output()
 with client.connect(client.ports()[0]) as output:
-    try:
-        print(output.play(sequence, origin=origin, metrics=True))
-    finally:
-        for note, _, _ in tune:
-            if note is not None:
-                output.send(messages.NoteOff(channel=1, note=note, velocity=0))
+    print(output.play(sequence, origin=origin, metrics=True))
 ```
 
 Change `bpm` without changing the tune. Durations are rounded to this example's
@@ -124,7 +135,7 @@ from time import monotonic
 from meedee import events, messages, midi
 
 inputs = midi.TypedInput(isolated=False)
-outputs = midi.Output(isolated=False)
+outputs = midi.Output()
 with (
     inputs.connect(inputs.ports()[0]) as receiver,
     outputs.connect(outputs.ports()[0]) as output,
@@ -144,14 +155,14 @@ with (
                 message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
             ):
                 if message.channel == 1 and message.note <= 115:
-                    output.send(message.replace(note=message.note + 12))
+                    output(message.replace(note=message.note + 12))
 ```
 
 ## 5. Split a keyboard into bass and lead
 
 On a multitimbral GM synth, send keys below middle C to bass on channel 2 and
-higher keys to lead on channel 3. This example forwards notes only. Release keys
-before it stops; it sends no global reset or automatic cleanup.
+higher keys to lead on channel 3. This example forwards notes only. Context exit releases remaining tracked notes;
+it sends no global reset.
 
 ```python
 from time import monotonic
@@ -159,13 +170,13 @@ from time import monotonic
 from meedee import events, messages, midi
 
 inputs = midi.TypedInput(isolated=False)
-outputs = midi.Output(isolated=False)
+outputs = midi.Output()
 with (
     inputs.connect(inputs.ports()[0]) as receiver,
     outputs.connect(outputs.ports()[0]) as output,
 ):
-    output.send(messages.ProgramChange(channel=2, program=34))
-    output.send(messages.ProgramChange(channel=3, program=81))
+    output(messages.ProgramChange(channel=2, program=34))
+    output(messages.ProgramChange(channel=3, program=81))
     deadline = monotonic() + 60
     while monotonic() < deadline:
         if receiver.failure is not None:
@@ -179,7 +190,7 @@ with (
             message = item.message
             if isinstance(message, (messages.NoteOn, messages.NoteOff)):
                 if message.channel == 1:
-                    output.send(message.replace(channel=2 if message.note < 60 else 3))
+                    output(message.replace(channel=2 if message.note < 60 else 3))
 ```
 
 ## 6. Record and replay a performance
@@ -222,7 +233,7 @@ try:
 finally:
     reader.close()
 
-outputs = midi.Output(isolated=False)
+outputs = midi.Output()
 reader = archive.Reader("take.meedee")
 try:
     with outputs.connect(outputs.ports()[0]) as output:
@@ -299,7 +310,7 @@ from meedee import midi, transfer, transfer_output
 
 plan = transfer.read_file("backup.syx", gap=0.1)
 print(plan)
-client = midi.Output(isolated=False)
+client = midi.Output()
 with client.connect(client.ports()[0]) as output:
     print(transfer_output.run(transfer.Session(plan), output))
 ```
@@ -333,7 +344,7 @@ with Path("just-three.syx").open("xb") as stream:
 ```
 
 After the instrument has loaded it, select the tuning with
-`output.send(controls.tuning_program(channel=1, program=2))`, importing `controls`
+`output(controls.tuning_program(channel=1, program=2))`, importing `controls`
 from `meedee`. Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
@@ -366,21 +377,17 @@ sequence = [
         *((2, m) for m in ending),
     ]
 ]
-client = midi.Output(isolated=False)
+client = midi.Output()
 with client.connect(client.ports()[0]) as output:
-    output.send(zone)
+    output(zone)
     for voice in [root, moving]:
-        output.send(
+        output(
             controls.pitch_bend_sensitivity(
                 channel=voice.channel, semitones=48, cents=0
             )
         )
-        output.send(messages.PitchBend(channel=voice.channel, value=0))
-    try:
-        print(output.play(sequence, origin=origin))
-    finally:
-        for message in ending:
-            output.send(message)
+        output(messages.PitchBend(channel=voice.channel, value=0))
+    print(output.play(sequence, origin=origin))
 ```
 
 The allocator supplies separate member channels and the corresponding releases.
@@ -402,7 +409,7 @@ identity = ci.Identity(
     manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
 )
 inputs = midi.TypedInput(isolated=False)
-outputs = midi.Output(isolated=False)
+outputs = midi.Output()
 with (
     inputs.connect(inputs.ports()[0]) as receiver,
     outputs.connect(outputs.ports()[0]) as output,

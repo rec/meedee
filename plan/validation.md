@@ -242,7 +242,7 @@ pass after the stub change.
 
 ## Mutable send buffers (A2), 2026-10-09
 
-Public `send()` accepts bytes, bytearray, and memoryview, copying mutable buffers
+Public `out(...)` accepts bytes, bytearray, and memoryview, copying mutable buffers
 and views into bytes before native work or serial waiting. Strided views retain
 their logical contents; native and isolated paths receive the same snapshot.
 Device-free checks cover all three added forms in both modes, including mutation

@@ -14,7 +14,7 @@ def dispatch(
     wire = codecs.encode(action.message)
     try:
         for p in ump.packetize_sysex7(group=action.route.group, data=wire[1:-1]):
-            output.send(p)
+            output(p)
     except midi.MidiError:
         session.report_send(token=action.token, sent=False, now_ns=monotonic_ns())
         raise

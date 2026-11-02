@@ -35,9 +35,9 @@ def respond(
     assert isinstance(received, events.Event), received
     assert codecs.encode(received.message) == codecs.encode(request)
     # Keep nonmatching traffic observable without pretending it is a reply.
-    output.send(messages.TimingClock())
-    output.send(messages.SysEx(data=b"\x7d\x01"))
-    output.send(reply)
+    output(messages.TimingClock())
+    output(messages.SysEx(data=b"\x7d\x01"))
+    output(reply)
     assert receiver.dropped_packets == 0 and receiver.failure is None
 
 

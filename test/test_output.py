@@ -1,0 +1,212 @@
+"""Callable output behavior against a device-free native transport stand-in."""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterator
+from time import monotonic
+
+import pytest
+
+from meedee import codecs, gm, messages, midi, testing
+
+
+class NativeConnection:
+    def __init__(self) -> None:
+        self.sink = testing.Output(protocol="midi1")
+        self.closed = False
+        self.fail_release = False
+        self.partial: int | None = None
+
+    def send(self, packet: bytes) -> None:
+        if self.fail_release and packet[0] & 0xF0 == 0x80:
+            raise midi.SendError("release failed")
+        self.sink(packet)
+
+    def send_command(self, command: messages.ControlChange14) -> None:
+        for i, message in enumerate(codecs.expand(command)):
+            if self.partial == i:
+                raise midi.CompoundSendError("partial", i, 2)
+            self.sink(message)
+
+    def close(self) -> None:
+        self.closed = True
+
+    def __enter__(self) -> NativeConnection:
+        return self
+
+    def packets(self) -> list[bytes | midi.UmpPacket]:
+        result: list[bytes | midi.UmpPacket] = []
+        while (packet := self.sink.take_packet()) is not None:
+            result.append(packet)
+        return result
+
+
+@pytest.fixture
+def transport(monkeypatch: pytest.MonkeyPatch) -> Iterator[NativeConnection]:
+    from meedee import _native
+
+    connection = NativeConnection()
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def ports(self) -> list[midi.Port]:
+            return [
+                midi.Port._from_wire("test", 0, i, n, midi.Backend.CoreMidi, i, False)
+                for i, n in enumerate(["FLOW 8 MIDI", "Other"])
+            ]
+
+        def connect(self, port: midi.Port) -> NativeConnection:
+            return connection
+
+    monkeypatch.setattr(_native, "Output", Client)
+    yield connection
+
+
+def test_channel_inheritance_explicit_override_and_repeated_note_cleanup(
+    transport: NativeConnection,
+) -> None:
+    note = messages.NoteOn(60)
+    with midi.Output(channel=2, port="FLOW 8") as out:
+        out(note, note, messages.NoteOff(60), messages.NoteOn(63, 70, 3))
+    assert note.channel is None
+    assert transport.packets() == [
+        b"\x91\x3c\x5a",
+        b"\x91\x3c\x5a",
+        b"\x81\x3c\x00",
+        b"\x92\x3f\x46",
+        b"\x81\x3c\x00",
+        b"\x82\x3f\x00",
+    ]
+    assert transport.closed
+
+
+def test_call_schedules_cumulative_delays_including_trailing_time(
+    transport: NativeConnection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from meedee import _native
+
+    deadlines: list[int] = []
+
+    def sequence(
+        send: Callable[[object], None], timeline: list[tuple[int, object]]
+    ) -> None:
+        for t, m in timeline:
+            deadlines.append(t)
+            if m is not None:
+                send(m)
+
+    monkeypatch.setattr(_native, "output_sequence", sequence)
+    with midi.Output() as out:
+        out(
+            messages.NoteOn(60),
+            "300ms",
+            messages.NoteOn(63),
+            "3 / 10",
+            messages.NoteOn(65),
+            1,
+        )
+    assert deadlines == [0, 300_000_000, 600_000_000, 1_600_000_000]
+    assert len(transport.packets()) == 6
+
+
+def test_delay_only_call_waits_without_sending(transport: NativeConnection) -> None:
+    with midi.Output() as out:
+        start = monotonic()
+        out("2ms")
+        assert monotonic() - start >= 0.002
+    assert transport.packets() == []
+
+
+@pytest.mark.parametrize(
+    "delay", [-1, True, float("inf"), float("nan"), "3 Hz", "2 beats"]
+)
+def test_invalid_delay_rejects_the_whole_call_before_sending(
+    transport: NativeConnection,
+    delay: float | str,
+) -> None:
+    with midi.Output() as out:
+        with pytest.raises((TypeError, ValueError, OverflowError)):
+            out(messages.NoteOn(60), delay)
+    assert transport.packets() == []
+
+
+def test_cleanup_resets_only_changed_controls_and_tracks_raw_packets(
+    transport: NativeConnection,
+) -> None:
+    with midi.Output() as out:
+        out(b"\x90\x3c\x5a", messages.NoteOn(61, 0))
+        out(
+            messages.PitchBend(200),
+            messages.ChannelPressure(40),
+            messages.PolyPressure(60, 20),
+        )
+        for controller in [1, 64, 66, 67, 7, 10, 11]:
+            out(messages.ControlChange(controller, 100))
+        out(messages.ControlChange(1, 0))
+        sent = transport.packets()
+    assert len(sent) == 13
+    assert transport.packets() == [
+        b"\x80\x3c\x00",
+        b"\xe0\x00\x40",
+        b"\xd0\x00",
+        b"\xa0\x3c\x00",
+        b"\xb0\x40\x00",
+        b"\xb0\x42\x00",
+        b"\xb0\x43\x00",
+    ]
+
+
+def test_cleanup_runs_on_body_failure_and_always_closes_transport(
+    transport: NativeConnection,
+) -> None:
+    transport.fail_release = True
+    with pytest.raises(ExceptionGroup) as failure:
+        with midi.Output() as out:
+            out(messages.NoteOn(60))
+            raise ValueError("body failed")
+    assert [type(e) for e in failure.value.exceptions] == [ValueError, midi.SendError]
+    assert transport.closed
+
+
+def test_compound_failure_cleanup_uses_confirmed_prefix(
+    transport: NativeConnection,
+) -> None:
+    transport.partial = 1
+    with pytest.raises(midi.CompoundSendError):
+        with midi.Output() as out:
+            out(messages.ControlChange14(1, 128))
+    assert transport.packets() == [b"\xb0\x01\x01", b"\xb0\x01\x00"]
+    assert transport.closed
+
+
+@pytest.mark.parametrize("pattern", ["missing", "*"])
+def test_port_patterns_require_one_match(
+    transport: NativeConnection, pattern: str
+) -> None:
+    with pytest.raises(ValueError, match="expected one"):
+        with midi.Output(port=pattern):
+            pass
+    assert transport.packets() == []
+
+
+def test_two_stage_connection_and_close_are_idempotent(
+    transport: NativeConnection,
+) -> None:
+    client = midi.Output(channel=4)
+    with client.connect(client.ports()[0]) as out:
+        out(messages.NoteOn(60))
+    out.close()
+    assert transport.packets() == [b"\x93\x3c\x5a", b"\x83\x3c\x00"]
+    with pytest.raises(midi.StateError):
+        out(messages.NoteOn(60))
+
+
+def test_bank_selection_inherits_output_channel(transport: NativeConnection) -> None:
+    command = gm.BankProgramSelect(12)
+    with midi.Output(channel=3) as out:
+        out(command)
+    assert command.channel is None
+    assert transport.packets() == [b"\xb2\x00\x00", b"\xb2\x20\x00", b"\xc2\x0b"]

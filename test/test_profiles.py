@@ -34,7 +34,9 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
         constructor = getattr(modules[name], name)
         values: dict[str, object] = dict(
             zip(
-                inspect.signature(constructor).parameters,
+                ["channel", "bank_msb", "bank_lsb", "program"]
+                if name == "BankProgramSelect"
+                else inspect.signature(constructor).parameters,
                 (int(n) for n in numbers),
                 strict=True,
             )
@@ -96,9 +98,10 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
         with pytest.raises(TypeError):
             v.replace(unknown=1)
         for f in fields:
-            assert (
-                inspect.signature(cls).parameters[f].kind
-                == inspect.Parameter.KEYWORD_ONLY
+            assert inspect.signature(cls).parameters[f].kind == (
+                inspect.Parameter.POSITIONAL_OR_KEYWORD
+                if cls is gm.BankProgramSelect
+                else inspect.Parameter.KEYWORD_ONLY
             )
             with pytest.raises(AttributeError):
                 setattr(v, f, 0)
@@ -116,7 +119,7 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
         with pytest.raises(ValueError):
             mpe.ZoneConfiguration(**kwargs)
     match gm.BankProgramSelect(channel=16, bank_msb=121, bank_lsb=3, program=128):
-        case gm.BankProgramSelect(16, 121, 3, 128):
+        case gm.BankProgramSelect(128, 121, 3, 16):
             pass
         case _:
             pytest.fail("command pattern did not match")

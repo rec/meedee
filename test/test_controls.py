@@ -24,7 +24,12 @@ def command_vectors() -> Iterator[tuple[object, bytes]]:
             constructor(
                 **dict(
                     zip(
-                        inspect.signature(constructor).parameters,
+                        ["channel"]
+                        + [
+                            n
+                            for n in inspect.signature(constructor).parameters
+                            if n != "channel"
+                        ],
                         (int(v) for v in values),
                         strict=True,
                     )
@@ -46,7 +51,7 @@ def test_commands_expand_to_shared_independent_wire_vectors() -> None:
         codecs.expand(messages.ControlChange(channel=1, controller=7, value=1))  # ty: ignore[invalid-argument-type]
 
 
-def test_commands_are_frozen_strict_keyword_values_with_checked_replacement() -> None:
+def test_commands_are_frozen_positional_values_with_checked_replacement() -> None:
     for c, _ in command_vectors():
         constructor = getattr(messages, type(c).__name__)
         assert isinstance(c, messages.Message)
@@ -60,17 +65,18 @@ def test_commands_are_frozen_strict_keyword_values_with_checked_replacement() ->
         assert hash(c) == hash(c.replace())
         with pytest.raises(TypeError):
             c.replace(unknown=1)
-        with pytest.raises(TypeError):
-            constructor(*values.values())
+        assert constructor(*values.values()) == c
         for f in fields:
-            assert fields[f] is int
+            assert fields[f] == (int | None if f == "channel" else int)
             assert (
                 inspect.signature(constructor).parameters[f].kind
-                == inspect.Parameter.KEYWORD_ONLY
+                == inspect.Parameter.POSITIONAL_OR_KEYWORD
             )
             with pytest.raises(AttributeError):
                 setattr(c, f, 1)
             for v in (True, 1.0, "1", None):
+                if f == "channel" and v is None:
+                    continue
                 with pytest.raises(TypeError):
                     constructor(**(values | {f: v}))
                 with pytest.raises(TypeError):
@@ -82,7 +88,7 @@ def test_commands_are_frozen_strict_keyword_values_with_checked_replacement() ->
         command.replace(resolution=7)
     assert command.replace(resolution=7, value=127).value == 127
     match command:
-        case messages.NrpnSet(1, 1234, 10000, 14):
+        case messages.NrpnSet(1234, 10000, 14, 1):
             pass
         case _:
             pytest.fail("command pattern did not match")
@@ -105,8 +111,7 @@ def test_command_ranges_and_null_parameter_are_explicit() -> None:
                 constructor(channel=1, parameter=0, value=0, resolution=resolution)
         with pytest.raises(ValueError):
             constructor(channel=1, parameter=0, value=128, resolution=7)
-        with pytest.raises(TypeError):
-            constructor(channel=1, parameter=0, value=0)
+        assert constructor(channel=1, parameter=0, value=0).resolution == 14
     for name in ("RpnSet", "RpnIncrement", "RpnDecrement"):
         fields = {"channel": 1, "parameter": 16383}
         if name == "RpnSet":

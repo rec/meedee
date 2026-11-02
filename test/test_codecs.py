@@ -20,7 +20,9 @@ def wire_vectors() -> Iterator[tuple[messages.Message, bytes]]:
         fields, wire = line.split("|")
         name, *values = fields.split()
         constructor = getattr(messages, name)
-        names = inspect.signature(constructor).parameters
+        names = list(inspect.signature(constructor).parameters)
+        if "channel" in names:
+            names = ["channel"] + [n for n in names if n != "channel"]
         arguments = (
             {"data": bytes.fromhex(" ".join(values))}
             if name == "SysEx"
@@ -70,21 +72,21 @@ def test_new_messages_preserve_the_frozen_field_and_replacement_contract() -> No
         with pytest.raises(AttributeError):
             m.extra = 1
         for f in fields:
-            assert fields[f] is int
+            assert fields[f] == (int | None if f == "channel" else int)
             assert (
                 inspect.signature(constructor).parameters[f].kind
-                == inspect.Parameter.KEYWORD_ONLY
+                == inspect.Parameter.POSITIONAL_OR_KEYWORD
             )
             with pytest.raises(AttributeError):
                 setattr(m, f, 1)
             for v in (True, False, 1.5, "1", None, Integer(1)):
+                if f == "channel" and v is None:
+                    continue
                 with pytest.raises(TypeError):
                     constructor(**(values | {f: v}))
                 with pytest.raises(TypeError):
                     m.replace(**{f: v})
-        if fields:
-            with pytest.raises(TypeError):
-                constructor(*values.values())
+        assert constructor(*values.values()) == m
         with pytest.raises(TypeError):
             type("Subclass", (constructor,), {})
     note = messages.NoteOff(channel=1, note=60, velocity=64)
@@ -92,7 +94,7 @@ def test_new_messages_preserve_the_frozen_field_and_replacement_contract() -> No
     assert note.replace(note=61).note == 61
     assert note.note == 60
     match note:
-        case messages.NoteOff(1, 60, 64):
+        case messages.NoteOff(60, 64, 1):
             pass
         case _:
             pytest.fail("message pattern did not match")
