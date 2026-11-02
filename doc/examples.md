@@ -1,840 +1,428 @@
-# Ten practical Python MIDI projects
+# Practical Python MIDI examples
 
-Each example is a complete program with an observable result: sound from an
-instrument, useful live output, a recorded performance or a new file. They build
-from playing a melody to managing tuning, expression and device discovery.
+Start with one note, then work through timing, live input, files and instrument
+management. Each code block is a separate script. Use Python 3.13 and install
+with `uv sync --locked`; the tuning example also needs `--extra ufor`.
+See [build requirements](https://github.com/rec/meedee/blob/main/README.md#build-and-qualification).
 
-Use Python 3.13. In this checkout, install with `uv sync --locked`, save a code
-block as a `.py` file, and run it with `uv run your_example.py`. Example 8 also
-needs `uv sync --locked --extra ufor`. Source-build requirements are in
-[README.md](https://github.com/rec/meedee/blob/main/README.md#build-and-qualification).
+The live examples use the **first available port** and hard-coded settings.
+Connect a suitable keyboard or synth before running them. MIDI carries messages,
+not audio; configure the synth's sound and audio output separately. Channels are
+1..16, notes and velocities are 0..127, and program numbers are 1..128.
 
-The live examples list ports and ask for exact names. An input is a source your
-program receives from; an output is a destination it sends to. Names must match
-one port in that client's current discovery snapshot. Connect your hardware or
-start your software instrument before running a script. A MIDI connection carries
-messages, not audio: the instrument still needs its own audio output configured.
+`isolated=False` runs the native transport in this process, allowing straight-line
+scripts without a multiprocessing main guard. The default isolated transport
+provides worker failure containment but requires that guard in standalone scripts.
+Closing a connection does not release held notes; interrupted sends can leave
+notes sounding. Use dedicated channels for these examples.
 
-Keep the `if __name__ == "__main__":` guards. The default Python transport uses
-process isolation on macOS, Windows and Linux. These programs use MIDI 1, which
-works with ordinary keyboards and synths; native backend availability depends
-on the platform and build.
+## 1. Play one note
 
-Unit-bearing inputs also accept strings such as `timeout="250 ms"`,
-`gap="2 ms"`, `frequency_hz="440 Hz"` and `byte_limit="8 MiB"`.
-Ordinary numeric inputs still work in each parameter's documented units, and
-returned values remain numeric. No Pint import is needed. Integer fields require
-exact conversions; beats and ticks are not implicitly converted to seconds.
+Play middle C on channel 1 for half a second.
 
-## 1. Play a melody on a synthesizer
+```python
+from time import sleep
 
-**Result:** the selected instrument plays an ascending C-major scale.
+from meedee import messages, midi
 
-**You need:** a hardware synth or software instrument listening on MIDI channel
-1. Select a playable sound and reserve channel 1 for this example. Save as
-`melody.py`.
+client = midi.Output(isolated=False)
+with client.connect(client.ports()[0]) as output:
+    output.send(messages.NoteOn(channel=1, note=60, velocity=90))
+    try:
+        sleep(0.5)
+    finally:
+        output.send(messages.NoteOff(channel=1, note=60, velocity=0))
+```
+
+This sleep holds a single note. For a tune, use scheduled playback as below so
+send overhead does not accumulate between notes.
+
+## 2. Play a tune in beats
+
+Describe each note by `(pitch, duration_in_beats, velocity)`; `None` is a rest.
+One beat is a quarter note. Tempo is supplied once, in quarter notes per minute.
+The cursor advances by each duration, so no start times or gaps are needed in
+the tune itself.
+
+The current playback API takes timestamped events. This example converts musical
+durations to those events using 24 ticks per beat, supporting halves and thirds.
 
 ```python
 from meedee import events, messages, midi
 
-
-def main() -> None:
-    client = midi.Output()
-    ports = client.ports()
-    for port in ports:
-        print(port.name)
-    name = input("Synth input port: ")
-    (port,) = [p for p in ports if p.name == name]
-
-    # One tick is one millisecond; every event has a deadline from the same zero.
-    clock = events.Clock(identity="melody", tick_numerator=1, tick_denominator=1000)
-    origin = events.Timestamp(ticks=0, clock=clock)
-    notes = [60, 62, 64, 65, 67, 69, 71, 72]
-    sequence: list[events.Event] = []
-    for index, note in enumerate(notes):
-        start = index * 350
+bpm = 120
+clock = events.Clock(identity="tune", tick_numerator=60, tick_denominator=bpm * 24)
+origin = events.Timestamp(ticks=0, clock=clock)
+tune = [(60, 1, 90), (62, 0.5, 70), (64, 0.5, 100), (None, 1, 0), (67, 2, 85)]
+sequence: list[events.Event] = []
+cursor = 0
+for note, duration, velocity in tune:
+    end = cursor + round(duration * 24)
+    if note is not None:
         sequence.extend(
             [
                 events.Event(
-                    stream="melody",
-                    timestamp=events.Timestamp(ticks=start, clock=clock),
-                    message=messages.NoteOn(channel=1, note=note, velocity=90),
+                    stream="tune",
+                    timestamp=events.Timestamp(ticks=cursor, clock=clock),
+                    message=messages.NoteOn(channel=1, note=note, velocity=velocity),
                 ),
                 events.Event(
-                    stream="melody",
-                    timestamp=events.Timestamp(ticks=start + 300, clock=clock),
+                    stream="tune",
+                    timestamp=events.Timestamp(ticks=end, clock=clock),
                     message=messages.NoteOff(channel=1, note=note, velocity=0),
                 ),
             ]
         )
+    cursor = end
 
-    with client.connect(port) as output:
-        finished = False
-        try:
-            print("Playing the scale with 300 ms notes and 50 ms gaps.")
-            report = output.play(sequence, origin=origin, metrics=True)
-            finished = not report.cancelled
-            print(
-                f"Sent {report.sent_events} events; "
-                f"max lateness={report.max_lateness_ns} ns"
-            )
-        finally:
-            if not finished:
-                for note in notes:
-                    output.send(messages.NoteOff(channel=1, note=note, velocity=0))
-    print("Melody finished.")
-
-
-if __name__ == "__main__":
-    main()
+client = midi.Output(isolated=False)
+with client.connect(client.ports()[0]) as output:
+    try:
+        print(output.play(sequence, origin=origin, metrics=True))
+    finally:
+        for note, _, _ in tune:
+            if note is not None:
+                output.send(messages.NoteOff(channel=1, note=note, velocity=0))
 ```
 
-Message constructors use channels 1..16 and MIDI 1 notes/velocities 0..127.
-`output.play()` schedules the timestamped sequence against one monotonic origin,
-so send overhead does not accumulate into later note deadlines. The timestamps
-are exact musical intentions; operating-system timing and output handoff can
-still be late. Metrics report host lateness, not physical audio latency.
+Change `bpm` without changing the tune. Durations are rounded to this example's
+1/24-beat grid. Releases precede the next attack at a shared timestamp. Playback
+uses monotonic deadlines; its report measures host timing, not audio latency.
 
-The sequence includes its NoteOffs. If playback is interrupted, the `finally`
-block attempts releases for the phrase's keys on the reserved channel. A failed
-send still leaves device state uncertain; closing a port does not silence an
-instrument. No bank or program changes are needed for this first example.
+## 3. See what your keyboard sends
 
-## 2. See what your keyboard is sending
+Print complete decoded events, including timestamps, for 30 seconds. Diagnostics
+are printed too; terminal output can itself be slow enough to cause input loss.
 
-**Result:** playing the keyboard prints note names, channels, velocities and
-press/release actions for 30 seconds. Use this to check a keyboard connection or
-identify the channel it transmits on. Save as `keyboard_monitor.py`.
+```python
+from time import monotonic
 
-**You need:** a MIDI keyboard. No output instrument is required.
+from meedee import midi
+
+client = midi.TypedInput(isolated=False)
+with client.connect(client.ports()[0]) as receiver:
+    deadline = monotonic() + 30
+    while monotonic() < deadline:
+        if receiver.failure is not None:
+            raise receiver.failure
+        if receiver.dropped_packets:
+            raise RuntimeError("Input lost packets")
+        if (item := receiver.receive(timeout=0.05)) is not None:
+            print(item)
+```
+
+## 4. Transpose a keyboard up an octave
+
+Forward channel-1 notes and polyphonic pressure to a synth, one octave higher.
+Notes above 115 are omitted, including their releases. Other traffic is excluded.
+Use separate input and output devices to avoid a feedback loop, and release keys
+before the 60-second window ends.
 
 ```python
 from time import monotonic
 
 from meedee import events, messages, midi
 
+inputs = midi.TypedInput(isolated=False)
+outputs = midi.Output(isolated=False)
+with (
+    inputs.connect(inputs.ports()[0]) as receiver,
+    outputs.connect(outputs.ports()[0]) as output,
+):
+    deadline = monotonic() + 60
+    while monotonic() < deadline:
+        if receiver.failure is not None:
+            raise receiver.failure
+        if receiver.dropped_packets:
+            raise RuntimeError("Input loss; forwarding stopped")
+        item = receiver.receive(timeout=0.05)
+        if isinstance(item, events.StreamDiagnostic):
+            raise RuntimeError(item.reason)
+        if isinstance(item, events.Event):
+            message = item.message
+            if isinstance(
+                message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
+            ):
+                if message.channel == 1 and message.note <= 115:
+                    output.send(message.replace(note=message.note + 12))
+```
 
-def note_name(note: int) -> str:
-    names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-    return f"{names[note % 12]}{note // 12 - 1}"
+## 5. Split a keyboard into bass and lead
 
+On a multitimbral GM synth, send keys below middle C to bass on channel 2 and
+higher keys to lead on channel 3. This example forwards notes only. Release keys
+before it stops; it sends no global reset or automatic cleanup.
 
-def main() -> None:
-    client = midi.TypedInput()
-    ports = client.ports()
-    for port in ports:
-        print(port.name)
-    name = input("Keyboard output port: ")
-    (port,) = [p for p in ports if p.name == name]
+```python
+from time import monotonic
 
-    with client.connect(port) as receiver:
-        deadline = monotonic() + 30
-        print("Play some notes. Middle C is labelled C4 here.")
-        while monotonic() < deadline:
-            if (failure := receiver.failure) is not None:
-                raise failure
-            if receiver.dropped_packets:
-                raise RuntimeError("Input lost packets; restart the monitor.")
-            item = receiver.receive(timeout=0.05)
-            if isinstance(item, events.StreamDiagnostic):
-                raise RuntimeError(item.reason)
-            if not isinstance(item, events.Event):
-                continue
+from meedee import events, messages, midi
+
+inputs = midi.TypedInput(isolated=False)
+outputs = midi.Output(isolated=False)
+with (
+    inputs.connect(inputs.ports()[0]) as receiver,
+    outputs.connect(outputs.ports()[0]) as output,
+):
+    output.send(messages.ProgramChange(channel=2, program=34))
+    output.send(messages.ProgramChange(channel=3, program=81))
+    deadline = monotonic() + 60
+    while monotonic() < deadline:
+        if receiver.failure is not None:
+            raise receiver.failure
+        if receiver.dropped_packets:
+            raise RuntimeError("Input loss; forwarding stopped")
+        item = receiver.receive(timeout=0.05)
+        if isinstance(item, events.StreamDiagnostic):
+            raise RuntimeError(item.reason)
+        if isinstance(item, events.Event):
             message = item.message
             if isinstance(message, (messages.NoteOn, messages.NoteOff)):
-                pressed = isinstance(message, messages.NoteOn) and message.velocity > 0
-                action = "press" if pressed else "release"
-                print(
-                    f"{note_name(message.note):3}  channel={message.channel:2}  "
-                    f"{action:7}  velocity={message.velocity:3}"
-                )
-    print("Monitoring finished.")
-
-
-if __name__ == "__main__":
-    main()
+                if message.channel == 1:
+                    output.send(message.replace(channel=2 if message.note < 60 else 3))
 ```
 
-Typed input decodes packets into messages and retains their timestamp and source
-span in `events.Event`. A zero-velocity NoteOn is displayed as a release.
-Diagnostics and the transport drop counter are separate loss signals; neither
-should be silently filtered out. Slow terminal output can itself overload input.
+## 6. Record and replay a performance
 
-## 3. Turn your keyboard into an octave transposer
-
-**Result:** notes played on channel 1 reach a second instrument one octave higher.
-Note releases and polyphonic pressure are transposed consistently. Controllers,
-channel pressure and pitch bend on channel 1 pass through unchanged.
-
-**You need:** separate keyboard input and synth output ports. Avoid selecting a
-loopback that feeds the program's output back into its input. Use a synth on
-channel 1. Save as `transpose_keyboard.py`.
+Record ten seconds to `take.meedee`, inspect the take, then replay it through the
+first output. Recording replaces an existing file at that path. Release keys and
+pedals before the recording ends. There is no live forwarding during capture.
 
 ```python
 from time import monotonic
-
-from meedee import events, messages, midi
-
-
-def main() -> None:
-    inputs = midi.TypedInput()
-    outputs = midi.Output()
-    sources = inputs.ports()
-    destinations = outputs.ports()
-    print("Inputs:", [p.name for p in sources])
-    print("Outputs:", [p.name for p in destinations])
-    source_name = input("Keyboard output port: ")
-    destination_name = input("Synth input port: ")
-    (source,) = [p for p in sources if p.name == source_name]
-    (destination,) = [p for p in destinations if p.name == destination_name]
-
-    with inputs.connect(source) as receiver, outputs.connect(destination) as output:
-        print("Transposing +12 for 60 seconds. Release keys and pedals before it ends.")
-        deadline = monotonic() + 60
-        while monotonic() < deadline:
-            if (failure := receiver.failure) is not None:
-                raise failure
-            if receiver.dropped_packets:
-                raise RuntimeError("Input loss; forwarding stopped.")
-            item = receiver.receive(timeout=0.05)
-            if isinstance(item, events.StreamDiagnostic):
-                raise RuntimeError(item.reason)
-            if not isinstance(item, events.Event):
-                continue
-            message = item.message
-            if isinstance(
-                message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
-            ):
-                if message.channel == 1 and message.note + 12 <= 127:
-                    output.send(message.replace(note=message.note + 12))
-            elif isinstance(message, messages.ControlChange):
-                if message.channel == 1 and message.controller < 120:
-                    output.send(message)
-            elif isinstance(message, (messages.ChannelPressure, messages.PitchBend)):
-                if message.channel == 1:
-                    output.send(message)
-    print("Transposer stopped.")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-The highest octave is omitted because transposing it would exceed note 127.
-The same rule applies to releases. System messages, SysEx, program changes and
-channel-mode controls are excluded. This forwarder does not claim ownership of
-the synth and sends no reset on exit. If forwarding is interrupted while notes
-or pedals are active, use the instrument's own panic/reset control.
-
-## 4. Split a keyboard into bass and lead parts
-
-**Result:** keys below middle C play a bass sound on channel 2; middle C and above
-play a lead sound on channel 3. Modulation, volume, expression, sustain, pitch
-bend and channel pressure affect both parts.
-
-**You need:** a multitimbral GM-compatible instrument with channels 2 and 3
-available, and a keyboard transmitting on channel 1. The program explicitly sets
-GM program 34 (fingered electric bass) and 81 (square lead), without sending a GM
-reset. Save as `keyboard_split.py`.
-
-```python
-from time import monotonic
-
-from meedee import events, messages, midi
-
-
-def main() -> None:
-    inputs = midi.TypedInput()
-    outputs = midi.Output()
-    sources = inputs.ports()
-    destinations = outputs.ports()
-    print("Inputs:", [p.name for p in sources])
-    print("Outputs:", [p.name for p in destinations])
-    source_name = input("Keyboard output port: ")
-    destination_name = input("Multitimbral synth input port: ")
-    (source,) = [p for p in sources if p.name == source_name]
-    (destination,) = [p for p in destinations if p.name == destination_name]
-
-    with inputs.connect(source) as receiver, outputs.connect(destination) as output:
-        output.send(messages.ProgramChange(channel=2, program=34))
-        output.send(messages.ProgramChange(channel=3, program=81))
-        print("Split at C4 for 60 seconds. Release keys and pedals before it ends.")
-        deadline = monotonic() + 60
-        while monotonic() < deadline:
-            if (failure := receiver.failure) is not None:
-                raise failure
-            if receiver.dropped_packets:
-                raise RuntimeError("Input loss; split forwarding stopped.")
-            item = receiver.receive(timeout=0.05)
-            if isinstance(item, events.StreamDiagnostic):
-                raise RuntimeError(item.reason)
-            if not isinstance(item, events.Event):
-                continue
-            message = item.message
-            if isinstance(
-                message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
-            ):
-                if message.channel == 1:
-                    channel = 2 if message.note < 60 else 3
-                    output.send(message.replace(channel=channel))
-            elif isinstance(message, messages.ControlChange):
-                if message.channel == 1 and message.controller in (1, 7, 11, 64):
-                    for channel in [2, 3]:
-                        output.send(message.replace(channel=channel))
-            elif isinstance(message, (messages.PitchBend, messages.ChannelPressure)):
-                if message.channel == 1:
-                    for channel in [2, 3]:
-                        output.send(message.replace(channel=channel))
-    print("Keyboard split stopped.")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-Unlike static channel/group routing, this split needs application logic to inspect
-the note number. The split point stays fixed, so a release always goes to the
-same part as its NoteOn. As in example 3, an interrupted route sends no automatic
-cleanup; release keys/pedals before the observation window ends.
-
-## 5. Record a performance, then hear it back
-
-**Result:** records ten seconds of keyboard input into a uniquely named archive,
-reports capture quality, and plays the take through a selected instrument.
-The archive remains on disk for later inspection or playback.
-
-**You need:** a keyboard and a listening synth. The synth must accept the
-keyboard's channels. Recording is passive; there is no live thru in this example.
-Save as `record_and_replay.py`.
-
-```python
-from pathlib import Path
-from time import monotonic
-from uuid import uuid4
 
 from meedee import archive, events, inspection, midi
 
-
-def main() -> None:
-    path = Path(f"take-{uuid4().hex}.meedee")
-    inputs = midi.TypedInput()
-    ports = inputs.ports()
-    print("Inputs:", [p.name for p in ports])
-    name = input("Keyboard output port: ")
-    (port,) = [p for p in ports if p.name == name]
-    with inputs.connect(port) as receiver:
-        receiver.start_recording(path, label="Keyboard performance", metrics=True)
-        try:
-            print("Recording for 10 seconds. Release keys and pedals before the end.")
-            deadline = monotonic() + 10
-            while monotonic() < deadline:
-                if (failure := receiver.failure) is not None:
-                    raise failure
-                receiver.receive(timeout=0.05)
-        finally:
-            recorded = receiver.stop_recording()
-    print(f"Saved {path}: {recorded.records} records, pressure={recorded.pressure}")
-    if not recorded.complete:
-        raise RuntimeError(f"Incomplete recording: {recorded.failure}")
-    quality = inspection.inspect_file(path, format="archive")
-    if not quality.complete or quality.gap_records or quality.timestamp_regressions:
-        raise RuntimeError(f"Take failed quality checks: {quality.problem}")
-
-    reader = archive.Reader(path)
-    origin: events.Timestamp | None = None
+inputs = midi.TypedInput(isolated=False)
+with inputs.connect(inputs.ports()[0]) as receiver:
+    receiver.start_recording("take.meedee", metrics=True)
     try:
-        for record in reader:
-            if isinstance(record, events.Event) and record.timestamp is not None:
-                origin = record.timestamp
-                break
+        deadline = monotonic() + 10
+        while monotonic() < deadline:
+            if receiver.failure is not None:
+                raise receiver.failure
+            receiver.receive(timeout=0.05)
     finally:
-        reader.close()
-    if origin is None:
-        raise RuntimeError("No timestamped events were recorded.")
+        recorded = receiver.stop_recording()
+print(recorded)
+if not recorded.complete:
+    raise RuntimeError("Recording incomplete")
+quality = inspection.inspect_file("take.meedee", format="archive")
+print(quality)
+if not quality.complete or quality.gap_records or quality.timestamp_regressions:
+    raise RuntimeError("Take failed quality checks")
 
-    outputs = midi.Output()
-    ports = outputs.ports()
-    print("Outputs:", [p.name for p in ports])
-    name = input("Synth input port for replay: ")
-    (port,) = [p for p in ports if p.name == name]
-    reader = archive.Reader(path)
-    try:
-        with outputs.connect(port) as output:
-            played = output.play(reader, origin=origin, metrics=True)
-            print(f"Replayed {played.sent_events} events.")
-            print(f"Maximum host lateness: {played.max_lateness_ns} ns")
-    finally:
-        reader.close()
+reader = archive.Reader("take.meedee")
+try:
+    origin = next(
+        r.timestamp
+        for r in reader
+        if isinstance(r, events.Event) and r.timestamp is not None
+    )
+finally:
+    reader.close()
 
-
-if __name__ == "__main__":
-    main()
+outputs = midi.Output(isolated=False)
+reader = archive.Reader("take.meedee")
+try:
+    with outputs.connect(outputs.ports()[0]) as output:
+        print(output.play(reader, origin=origin, metrics=True))
+finally:
+    reader.close()
 ```
 
-Recording is bounded and reports loss/write failures. The unique destination
-avoids intentionally overwriting an earlier take; the recorder itself would
-truncate an existing path. The application event queue is drained while the
-background recorder writes. Full inspection happens before output starts.
+Replay trims initial silence and sends recorded controllers and SysEx too. An
+empty take raises `StopIteration`. Archive v1 is unpublished; see the
+[format contract](https://github.com/rec/meedee/blob/main/plan/archive-format.md).
 
-Replay starts at the first timestamped event, intentionally trimming initial
-silence. Capture timestamps retain relative timing, not a promise of physical
-latency. Playback can include controllers and SysEx received from the keyboard.
-Stopping playback or reaching the end of a take does not generate missing
-NoteOffs. Archive v1 is currently unpublished; see
-[the format contract](https://github.com/rec/meedee/blob/main/plan/archive-format.md).
+## 7. Transpose a MIDI file
 
-## 6. Export a transposed MIDI file
-
-**Result:** reads a `.mid` file, prints its format and message counts, then writes
-a new file one octave higher. The output can be imported into a DAW or notation
-program. No MIDI ports are opened. Save as `transpose_file.py`.
-
-**You need:** an existing Standard MIDI File. Channel 10 is left unchanged under
-the usual GM drum convention. The program changes notes and polyphonic pressure,
-while retaining tracks, ticks, tempo, other metadata and file records.
+Read `song.mid` and write `song-up.mid`, preserving tracks, timing and metadata.
+Channel 10 is left unchanged under the GM drum convention. This opens no ports.
 
 ```python
 from pathlib import Path
 
 from meedee import inspection, messages, smf
 
-
-def main() -> None:
-    source = Path(input("Source .mid file: "))
-    destination = Path(input("New transposed .mid file: "))
-    report = inspection.inspect_file(source, format="smf")
-    print("Header:", report.smf_header)
-    print("Messages:", report.message_counts)
-    if not report.complete:
-        raise RuntimeError(report.problem)
-
-    # Check the range before creating any output file.
-    reader = smf.Reader(source)
-    try:
-        for event in reader:
-            message = event.record
-            if isinstance(
-                message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
-            ):
-                if message.channel != 10 and message.note > 115:
-                    raise ValueError("Transposition would exceed MIDI note 127.")
-    finally:
-        reader.close()
-
-    reader = smf.Reader(source)
-    count = 0
-    try:
-        with destination.open("xb") as stream:
-            writer = smf.Writer(stream, header=reader.header)
-            for event in reader:
-                message = event.record
-                if isinstance(
-                    message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
-                ):
-                    if message.channel != 10:
-                        event = event.replace(
-                            record=message.replace(note=message.note + 12)
-                        )
-                        count += 1
-                writer.write(event)
-            writer.finish()
-    finally:
-        reader.close()
-    print(f"Wrote {destination}; transposed {count} note/pressure records.")
-
-
-if __name__ == "__main__":
-    main()
+print(inspection.inspect_file("song.mid", format="smf"))
+reader = smf.Reader("song.mid")
+try:
+    transformed: list[smf.Event] = []
+    for event in reader:
+        message = event.record
+        if isinstance(
+            message, (messages.NoteOn, messages.NoteOff, messages.PolyPressure)
+        ):
+            if message.channel != 10:
+                event = event.replace(record=message.replace(note=message.note + 12))
+        transformed.append(event)
+    with Path("song-up.mid").open("xb") as stream:
+        writer = smf.Writer(stream, header=reader.header)
+        for event in transformed:
+            writer.write(event)
+        writer.finish()
+finally:
+    reader.close()
+print(inspection.inspect_file("song-up.mid", format="smf"))
 ```
 
-The destination is exclusively created, so existing files are preserved. A disk
-or later read failure can leave a partial new file. This preserves decoded file
-records; running-status byte encoding need not be identical. For direct playback
-of a file, `smf.TimedReader` supplies tempo-aware performance events to
-`output.play(score, origin=score.origin)`.
+The example holds the file in memory and rejects out-of-range notes before
+creating the destination. Exclusive creation preserves an existing destination.
 
-## 7. Back up and restore a synthesizer dump
+## 8. Back up and restore SysEx
 
-**Result:** either captures an instrument-initiated SysEx dump into a new `.syx`
-file, or sends an existing backup back to the selected instrument with explicit
-pacing. Save as `sysex_backup.py` and run it once per operation.
+Start a dump on the instrument after launching this capture script. It expects
+one complete SysEx message within 30 seconds and creates `backup.syx` only after
+successful capture, refusing overwrite. Adjust the count for your instrument.
 
-**You need:** an instrument with a documented MIDI 1 SysEx dump function. Find
-its expected message count and minimum inter-message gap in its documentation.
-Restoring a dump can replace sounds or settings on the instrument. Use a backup
-for the intended device and select its port deliberately.
+```python
+from meedee import midi, transfer, transfer_input
+
+client = midi.TypedInput(isolated=False)
+with client.connect(client.ports()[0]) as receiver:
+    capture = transfer.Capture(stream=receiver.stream, expected_messages=1, timeout=30)
+    report = transfer_input.run(capture, receiver)
+print(report)
+if report.status != "completed":
+    raise RuntimeError(report.reason)
+capture.write("backup.syx")
+```
+
+Run this separate script to restore it. The first output must be the intended
+instrument, ready to receive this dump: restoration can replace sounds/settings.
+The 100 ms gap is transfer pacing, not musical timing; use the device's documented
+requirement. Successful handoff does not prove the device accepted the dump.
+
+```python
+from meedee import midi, transfer, transfer_output
+
+plan = transfer.read_file("backup.syx", gap=0.1)
+print(plan)
+client = midi.Output(isolated=False)
+with client.connect(client.ports()[0]) as output:
+    print(transfer_output.run(transfer.Session(plan), output))
+```
+
+## 9. Export a just-intonation tuning
+
+Create `just-three.syx` with keys 69, 70 and 71 tuned to 440, 660 and 880 Hz.
+Install the `ufor` extra first. The dump targets MTS device ID 0, tuning program 2;
+unselected keys use NoChange. Send it with the restore example when the receiving
+synth supports these features and is configured for that device ID.
 
 ```python
 from pathlib import Path
-
-from meedee import midi, transfer, transfer_input, transfer_output
-
-
-def backup(path: Path) -> None:
-    count = int(input("Expected SysEx message count: "))
-    timeout = float(input("Overall capture timeout in seconds: "))
-    client = midi.TypedInput()
-    ports = client.ports()
-    print("Inputs:", [p.name for p in ports])
-    name = input("Instrument output port: ")
-    (port,) = [p for p in ports if p.name == name]
-    with client.connect(port) as receiver:
-        capture = transfer.Capture(
-            stream=receiver.stream,
-            expected_messages=count,
-            timeout=timeout,
-        )
-        print("Input is open. Start the dump on the instrument now.")
-        report = transfer_input.run(capture, receiver)
-    if report.status != "completed":
-        raise RuntimeError(f"Capture {report.status}: {report.reason}")
-    capture.write(path)
-    print(
-        f"Saved {report.received_messages} messages, "
-        f"{report.wire_bytes} bytes to {path}."
-    )
-
-
-def restore(path: Path) -> None:
-    gap = input("Minimum gap after each message (seconds or units, e.g. 100 ms): ")
-    plan = transfer.read_file(path, gap=gap)
-    print(f"Ready to send {plan.message_count} messages, {plan.wire_bytes} bytes.")
-    client = midi.Output()
-    ports = client.ports()
-    print("Outputs:", [p.name for p in ports])
-    name = input("Instrument input port to restore: ")
-    (port,) = [p for p in ports if p.name == name]
-    input("Prepare the instrument to receive its dump, then press Enter to send: ")
-    with client.connect(port) as output:
-        report = transfer_output.run(transfer.Session(plan), output)
-    print(
-        f"{report.status}: {report.confirmed_messages}/"
-        f"{report.total_messages} handed off."
-    )
-    if report.status != "completed":
-        raise RuntimeError(
-            f"Transfer stopped: {report.reason}; "
-            f"uncertain message={report.uncertain_message}"
-        )
-
-
-def main() -> None:
-    operation = input("Operation (backup or restore): ")
-    path = Path(input(".syx file: "))
-    if operation == "backup":
-        backup(path)
-    elif operation == "restore":
-        restore(path)
-    else:
-        raise ValueError("Choose backup or restore.")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-Backup creates no file after receive loss, timeout or decoding failure. Its path
-writer refuses overwrite. Reaching the supplied count does not prove the
-instrument's entire dump was captured. Final disk errors can leave a partial file.
-Restore sends whole messages, with no splitting, retries or inferred device
-acknowledgements. Successful output handoff does not establish device acceptance.
-
-## 8. Load a just-intonation tuning and audition it
-
-**Result:** saves a three-pitch MTS dump, loads it into tuning program 2, selects
-that tuning for channel 1 and plays the three keys. The intended pitches are
-440 Hz, 660 Hz and 880 Hz rather than adjacent equal-tempered semitones.
-
-**You need:** `meedee[ufor]` and a synth supporting ordinary MTS bulk dumps,
-NoChange entries and tuning-program selection by RPN. Choose the instrument's
-specific device ID, 0..126. This replaces three entries of tuning program 2;
-back up that program first if needed. Save as `audition_tuning.py`.
-
-```python
-from pathlib import Path
-from uuid import uuid4
 
 from ufor.tuning import RatioTable, Tuning
 
-from meedee import codecs, controls, events, messages, midi, syx, ufor_tuning
+from meedee import codecs, messages, syx, ufor_tuning
 
-
-def main() -> None:
-    device_id = int(input("Instrument MTS device ID (0..126): "))
-    if not 0 <= device_id <= 126:
-        raise ValueError("Use a specific device ID from 0 through 126.")
-    source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
-    preview = ufor_tuning.preview(source, notes=[69, 70, 71])
-    for key in preview.entries:
-        print(f"Key {key.note}: {key.frequency} Hz; error={key.error_cents} cents")
-    dump = ufor_tuning.bulk_dump(
-        preview,
-        device_id=device_id,
-        program=2,
-        name="Just three",
-        preserve_unmapped=True,
-    )
-    raw = messages.SysEx(data=codecs.encode(dump)[1:-1])
-    path = Path(f"just-three-{uuid4().hex}.syx")
-    with path.open("xb") as stream:
-        syx.write(stream, [raw])
-    print(f"Saved tuning dump to {path}.")
-
-    clock = events.Clock(identity="audition", tick_numerator=1, tick_denominator=1000)
-    origin = events.Timestamp(ticks=0, clock=clock)
-    sequence: list[events.Event] = []
-    for index, note in enumerate([69, 70, 71, 70, 69]):
-        start = index * 600
-        sequence.extend(
-            [
-                events.Event(
-                    stream="audition",
-                    timestamp=events.Timestamp(ticks=start, clock=clock),
-                    message=messages.NoteOn(channel=1, note=note, velocity=90),
-                ),
-                events.Event(
-                    stream="audition",
-                    timestamp=events.Timestamp(ticks=start + 600, clock=clock),
-                    message=messages.NoteOff(channel=1, note=note, velocity=0),
-                ),
-            ]
-        )
-
-    client = midi.Output()
-    ports = client.ports()
-    print("Outputs:", [p.name for p in ports])
-    name = input("MTS synth input port: ")
-    (port,) = [p for p in ports if p.name == name]
-    with client.connect(port) as output:
-        output.send(raw)
-        input("Wait for the synth to finish loading, then press Enter to audition: ")
-        output.send(controls.tuning_program(channel=1, program=2))
-        finished = False
-        try:
-            print("Auditioning keys 69, 70, 71, 70, 69 with 600 ms per note.")
-            report = output.play(sequence, origin=origin, metrics=True)
-            finished = not report.cancelled
-            print(
-                f"Sent {report.sent_events} events; "
-                f"max lateness={report.max_lateness_ns} ns"
-            )
-        finally:
-            if not finished:
-                for note in [69, 70, 71]:
-                    output.send(messages.NoteOff(channel=1, note=note, velocity=0))
-    print("Audition finished; tuning program 2 remains loaded and selected.")
-
-
-if __name__ == "__main__":
-    main()
+source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
+preview = ufor_tuning.preview(source, notes=[69, 70, 71])
+print(preview)
+dump = ufor_tuning.bulk_dump(
+    preview,
+    device_id=0,
+    program=2,
+    name="Just three",
+    preserve_unmapped=True,
+)
+with Path("just-three.syx").open("xb") as stream:
+    syx.write(stream, [messages.SysEx(data=codecs.encode(dump)[1:-1])])
 ```
 
-Unselected keys are explicitly preserved with NoChange. MTS tuning programs are
-0..127, unlike ordinary `ProgramChange.program`, which is 1..128. The library can
-construct and send the tuning but cannot establish that an instrument applied it.
-The wait is for the operator to confirm readiness, not an inferred acknowledgement.
-Reserve channel 1 for the audition. As in example 1, playback schedules both
-attacks and releases, with explicit release attempts if the sequence is interrupted.
+After the instrument has loaded it, select the tuning with
+`output.send(controls.tuning_program(channel=1, program=2))`, importing `controls`
+from `meedee`. Then use the beat-based tune example with notes 69, 70 and 71.
+MTS program numbers are 0..127, unlike ordinary program changes.
 
-## 9. Bend one note in a chord with MPE
+## 10. Bend one note of an MPE chord
 
-**Result:** holds C and E while bending only E up about two semitones, increasing
-its pressure and moving its timbre controller. C remains at its original pitch.
-
-**You need:** an MPE-capable instrument with an expressive preset. This configures
-a lower zone with two members (channels 2 and 3), sets their bend range to ±48
-semitones and leaves that configuration in place. Use these channels exclusively
-for the example. Save as `mpe_expression.py`.
+Hold C and E for two beats, bending only E up two semitones after the first beat.
+This configures an MPE lower zone on channels 2 and 3 with a 48-semitone bend
+range. Use an MPE synth and reserve these channels; the configuration remains.
 
 ```python
 from meedee import controls, events, messages, midi, mpe
 
-
-def main() -> None:
-    client = midi.Output()
-    ports = client.ports()
-    print("Outputs:", [p.name for p in ports])
-    name = input("MPE synth input port: ")
-    (port,) = [p for p in ports if p.name == name]
-    zone = mpe.ZoneConfiguration(manager_channel=1, members=2)
-    allocator = mpe.Allocator(zone=zone)
-    root = allocator.allocate(note=60, velocity=90)
-    moving = allocator.allocate(note=64, velocity=90)
-
-    clock = events.Clock(identity="mpe-phrase", tick_numerator=1, tick_denominator=1000)
-    origin = events.Timestamp(ticks=0, clock=clock)
-    sequence: list[events.Event] = []
+zone = mpe.ZoneConfiguration(manager_channel=1, members=2)
+allocator = mpe.Allocator(zone=zone)
+root = allocator.allocate(note=60, velocity=90)
+moving = allocator.allocate(note=64, velocity=75)
+bpm = 120
+clock = events.Clock(identity="mpe", tick_numerator=60, tick_denominator=bpm)
+origin = events.Timestamp(ticks=0, clock=clock)
+releases = [allocator.release(voice_id=v.id, velocity=0) for v in [root, moving]]
+ending = [*releases, messages.PitchBend(channel=moving.channel, value=0)]
+sequence = [
+    events.Event(
+        stream="mpe", timestamp=events.Timestamp(ticks=b, clock=clock), message=m
+    )
+    for b, m in [
+        (0, root.note_on),
+        (0, moving.note_on),
+        (1, messages.PitchBend(channel=moving.channel, value=round(8192 * 2 / 48))),
+        *((2, m) for m in ending),
+    ]
+]
+client = midi.Output(isolated=False)
+with client.connect(client.ports()[0]) as output:
+    output.send(zone)
     for voice in [root, moving]:
-        initial = [
-            messages.PitchBend(channel=voice.channel, value=0),
-            messages.ChannelPressure(channel=voice.channel, pressure=0),
-            messages.ControlChange(channel=voice.channel, controller=74, value=64),
-            voice.note_on,
-        ]
-        sequence.extend(
-            events.Event(
-                stream="mpe",
-                timestamp=origin,
-                message=m,
+        output.send(
+            controls.pitch_bend_sensitivity(
+                channel=voice.channel, semitones=48, cents=0
             )
-            for m in initial
         )
-    for step in range(41):
-        changes = [
-            messages.PitchBend(
-                channel=moving.channel, value=round(8192 * 2 / 48 * step / 40)
-            ),
-            messages.ChannelPressure(
-                channel=moving.channel, pressure=round(127 * step / 40)
-            ),
-            messages.ControlChange(
-                channel=moving.channel, controller=74, value=64 + round(63 * step / 40)
-            ),
-        ]
-        sequence.extend(
-            events.Event(
-                stream="mpe",
-                timestamp=events.Timestamp(ticks=step * 50, clock=clock),
-                message=m,
-            )
-            for m in changes
-        )
-    # Build releases from the allocator's voice tokens before playing the phrase.
-    releases = [allocator.release(voice_id=v.id, velocity=0) for v in [root, moving]]
-    ending: list[messages.Message] = [*releases]
-    ending.extend(
-        messages.PitchBend(channel=v.channel, value=0) for v in [root, moving]
-    )
-    sequence.extend(
-        events.Event(
-            stream="mpe",
-            timestamp=events.Timestamp(ticks=2500, clock=clock),
-            message=m,
-        )
-        for m in ending
-    )
-
-    with client.connect(port) as output:
-        output.send(zone)
-        for voice in [root, moving]:
-            output.send(
-                controls.pitch_bend_sensitivity(
-                    channel=voice.channel, semitones=48, cents=0
-                )
-            )
-        finished = False
-        try:
-            print(
-                "Holding C while E bends upward with independent pressure and timbre."
-            )
-            report = output.play(sequence, origin=origin, metrics=True)
-            finished = not report.cancelled
-            print(
-                f"Sent {report.sent_events} events; "
-                f"max lateness={report.max_lateness_ns} ns"
-            )
-        finally:
-            if not finished:
-                for message in ending:
-                    output.send(message)
-    print("MPE phrase finished.")
-
-
-if __name__ == "__main__":
-    main()
+        output.send(messages.PitchBend(channel=voice.channel, value=0))
+    try:
+        print(output.play(sequence, origin=origin))
+    finally:
+        for message in ending:
+            output.send(message)
 ```
 
-The allocator assigns separate member channels and returns voice tokens used to
-construct the correct releases. The sequence schedules expression changes every
-50 ms through 2 seconds, then releases the chord at 2.5 seconds. Events sharing a
-timestamp retain list order. The receiving preset decides how pressure and CC74
-sound. A successful send does not prove it accepted the MPE configuration or
-bend range. NoteOffs and bend resets are scheduled in the phrase; interrupted
-playback attempts that same ending immediately. Cleanup affects this program's
-reserved member channels, without issuing a global All Notes Off or reset; a
-transport failure can still prevent release.
+The allocator supplies separate member channels and the corresponding releases.
+The explicit beat positions here describe expression within a held chord.
 
-## 10. Inventory MIDI-CI devices on a connection
+## 11. Discover MIDI-CI devices
 
-**Result:** sends MIDI-CI Discovery, requests Product Instance IDs from discovered
-format-2 peers, and prints a device inventory with identities and capabilities.
-Save as `ci_inventory.py`.
-
-**You need:** a MIDI-CI-capable device connected in both directions. Supply the
-identity of your local participant, not the identity of the device you hope to
-find. Use a deliberately chosen experimental identity for experimental work;
-do not imply ownership of an assigned manufacturer identity.
+Connect a MIDI-CI device in both directions. This sends Discovery and Product
+Instance ID inquiries, then prints the complete inventory report. The local
+identity below is explicitly experimental, using manufacturer ID 0x7D; it does
+not identify a commercial product. A fresh local MUID is generated for each scan.
 
 ```python
 from secrets import randbelow
 
 from meedee import ci, ci_live, midi
 
-
-def main() -> None:
-    manufacturer = bytes.fromhex(input("Local manufacturer identity (3 bytes hex): "))
-    family = int(input("Local family number: "))
-    model = int(input("Local model number: "))
-    revision = bytes.fromhex(input("Local revision (4 bytes hex): "))
-    identity = ci.Identity(
-        manufacturer=manufacturer, family=family, model=model, revision=revision
+identity = ci.Identity(
+    manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
+)
+inputs = midi.TypedInput(isolated=False)
+outputs = midi.Output(isolated=False)
+with (
+    inputs.connect(inputs.ports()[0]) as receiver,
+    outputs.connect(outputs.ports()[0]) as output,
+):
+    browser = ci.Browser(
+        local_muid=randbelow(ci.MAX_MUID + 1),
+        identity=identity,
+        route=ci.Route(input=receiver.stream, output="device"),
+        discovery_timeout=3,
+        endpoint_timeout=1,
+        timeout=30,
     )
-    inputs = midi.TypedInput()
-    outputs = midi.Output()
-    sources = inputs.ports()
-    destinations = outputs.ports()
-    print("Inputs:", [p.name for p in sources])
-    print("Outputs:", [p.name for p in destinations])
-    source_name = input("Device output port: ")
-    destination_name = input("Device input port: ")
-    (source,) = [p for p in sources if p.name == source_name]
-    (destination,) = [p for p in destinations if p.name == destination_name]
-
-    with inputs.connect(source) as receiver, outputs.connect(destination) as output:
-        browser = ci.Browser(
-            local_muid=randbelow(ci.MAX_MUID + 1),
-            identity=identity,
-            route=ci.Route(input=receiver.stream, output="device"),
-            discovery_timeout=3,
-            endpoint_timeout=1,
-            timeout=30,
-        )
-        print("Scanning MIDI-CI peers...")
-        report = ci_live.run(browser, receiver, output)
-    print(
-        f"Scan {report.status}; "
-        f"{report.confirmed_actions} management actions handed off."
-    )
-    if report.reason:
-        print("Reason:", report.reason)
-    for peer in report.peers:
-        product = peer.info.identity
-        print(f"MUID {peer.muid:07x}, CI format {peer.version}")
-        print(f"  Manufacturer: {product.manufacturer.hex()}")
-        print(f"  Family/model: {product.family}/{product.model}")
-        print(f"  Revision: {product.revision.hex()}")
-        print(f"  Product Instance ID: {peer.product_instance_id}")
-        print(f"  Declared capabilities: {peer.info.capabilities:#x}")
-    if not report.peers:
-        print("No peers observed during this scan.")
-    for diagnostic in report.diagnostics:
-        print(f"Diagnostic: {diagnostic.kind}: {diagnostic.reason}")
-
-
-if __name__ == "__main__":
-    main()
+    print(ci_live.run(browser, receiver, output))
 ```
 
-The browser also sends required management replies and stops on input loss or
-transport failure. It performs no Profiles, Property Exchange or instrument
-configuration writes. An empty inventory does not prove the device is offline;
-identities and capability bits are peer declarations.
+The browser handles management replies but performs no Profiles, Property
+Exchange or instrument configuration writes. An empty inventory does not prove
+the device is offline. For native UMP, set both clients' protocol to
+`midi.Protocol.Ump` and set `group=1` on the route; backend support is required.
 
-For a native UMP connection, construct both typed clients with
-`protocol=midi.Protocol.Ump` and add the intended `group=1` (or another 1..16
-group) to `ci.Route`. The same browser adapter handles SysEx7 packetization and
-assembly. Native UMP availability depends on the selected backend.
-
-For ownership, bounds and failure details, consult
-[the API contract](https://github.com/rec/meedee/blob/main/plan/api.md) and
-[the MIDI-CI contract](https://github.com/rec/meedee/blob/main/plan/ci.md).
+See the [API contract](https://github.com/rec/meedee/blob/main/plan/api.md) and
+[MIDI-CI contract](https://github.com/rec/meedee/blob/main/plan/ci.md) for ownership,
+bounds and failure behavior.
