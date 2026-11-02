@@ -15,7 +15,7 @@ from meedee import archive, events, messages, midi
 def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
     name = f"meedee-qualification-{uuid4().hex}"
     start = perf_counter_ns()
-    with midi.TypedInput(isolated=isolated).create_virtual(name) as receiver:
+    with midi.Input(isolated=isolated).create_virtual(name) as receiver:
         sender = midi.Output(isolated=isolated)
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"

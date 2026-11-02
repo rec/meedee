@@ -18,10 +18,12 @@ def receive(packet: ReceivedPacket) -> None:
         raise RuntimeError("native shutdown test release deadline exceeded")
 
 
-def open_connections() -> tuple[midi.InputConnection, midi.OutputConnection]:
+def open_connections() -> tuple[
+    midi.InputConnection[ReceivedPacket], midi.OutputConnection
+]:
     token = f"meedee-shutdown-{uuid4().hex}"
     isolated = environ.get("MEEDEE_TEST_ISOLATED", "1") == "1"
-    source = midi.Input(isolated=isolated)
+    source = midi.Input(raw=True, isolated=isolated)
     incoming = source.create_virtual(token, receive)
     target = midi.Output(isolated=isolated)
     (port,) = (p for p in target.ports() if token in p.name)

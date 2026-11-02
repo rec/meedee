@@ -88,7 +88,8 @@ explicit preservation; known Event headers are validated even for future message
 representations. Version 1 remains unpublished, with format freeze and future
 compatibility guarantees still owner decisions.
 
-`midi.TypedInput` decodes received packets into events. `midi.Output` opens one
+`midi.Input()` decodes received packets into events; `midi.Input(raw=True)`
+returns unchanged transport packets. `midi.Output` opens one
 `OutputConnection` supporting `out(...)` for messages, compound operations and
 encoded bytes/UMP packets, and `play()` for timestamped events. Both use the same
 native transport. Inputs default to process isolation; outputs default to in-process
@@ -100,7 +101,7 @@ messages, the completion packet's timestamp and their contributing packet span. 
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
 
-`TypedInputConnection.dropped_packets` exposes the observed raw receive-drop
+`InputConnection.dropped_packets` exposes the observed raw receive-drop
 count, including updates during silence. Poll it alongside `failure` when loss
 must stop a live session: typed queue overflow is reported through `failure`.
 Isolated updates are asynchronous, so neither property proves loss-free delivery
@@ -359,7 +360,8 @@ Use one decoder per source; diagnostic offsets count bytes actually fed.
 
 These are live byte-stream rules, not Standard MIDI File or UMP parsing.
 Encoding adds full status/framing bytes. No timestamps are invented or attached
-to decoded values; raw transport callbacks remain raw; typed adapters add event timing explicitly. Input snapshots and returned
+to decoded values by the codec. Decoded Input attaches event timing; raw mode
+preserves transport packets. Input snapshots and returned
 lists have memory costs beyond the retained SysEx limit. Details and remaining
 protocol boundaries are in [the API contract](plan/api.md).
 
@@ -597,7 +599,7 @@ ports = output.ports()
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
 `protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
-`isolated=True`; outputs default to `isolated=False`, `channel=1`, `port=None`,
+`isolated=True` and `raw=False`; outputs default to `isolated=False`, `channel=1`, `port=None`,
 and `bpm=None`.
 Input additionally accepts `timestamps=TimestampMode.Absolute` and
 `receive_byte_limit=8_388_608`. Choose `Protocol.Ump` explicitly for UMP, and
@@ -615,7 +617,8 @@ that selection without looking it up again by ID. Virtual endpoints use
 real-connection names are not configurable through the pinned C API. CoreMIDI
 virtual names still use the fork's existing ASCII input conversion.
 
-Input callbacks accept one immutable `ReceivedPacket` from `meedee.events`.
+Decoded callbacks accept an `Event` or `StreamDiagnostic`. With `raw=True`,
+callbacks accept one immutable `ReceivedPacket` from `meedee.events`.
 Its `packet` is owned `bytes` or an immutable `UmpPacket` whose `words` are a
 tuple of unsigned 32-bit integers. Its `timestamp_ns` is an exact signed integer
 or `None` when capture is disabled. Zero is a valid captured timestamp. `clock`
@@ -625,9 +628,10 @@ children use distinct clock identities. Backend Absolute timestamps may have a
 host-clock fallback, are not UTC and are not assumed comparable across clocks.
 Nanosecond storage does not promise nanosecond accuracy.
 
-Receive packets are raw transport chunks, including partial SysEx or multiple
-UMPs. The binding does not assemble unfinished SysEx or apply `Ignore` filters.
-Use `TypedInput` for decoded events or the pure byte codec explicitly for framing.
+In raw mode, received packets are transport chunks, including partial SysEx or
+multiple UMPs. Raw mode does not assemble messages or apply `Ignore` filters.
+Use `Input()` for decoded events or `Input(raw=True)` for unchanged transport
+packets. Both modes support callbacks or bounded `receive()` queues.
 `OutputConnection.__call__()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send

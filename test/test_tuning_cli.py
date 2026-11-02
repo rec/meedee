@@ -91,7 +91,7 @@ def install(
             actions.append("output connected")
             return Output()
 
-    monkeypatch.setattr(midi, "TypedInput", InputClient)
+    monkeypatch.setattr(midi, "Input", InputClient)
     monkeypatch.setattr(midi, "Output", OutputClient)
     ticks = iter([0, 0])
     monkeypatch.setattr(
@@ -132,7 +132,7 @@ def test_preview_and_argument_rejection_open_no_ports(
     def forbidden(**kwargs: object) -> None:
         raise AssertionError("preview must not construct transports")
 
-    monkeypatch.setattr(midi, "TypedInput", forbidden)
+    monkeypatch.setattr(midi, "Input", forbidden)
     monkeypatch.setattr(midi, "Output", forbidden)
     args = [
         "tuning-preview",

@@ -8,7 +8,7 @@ from meedee import events, messages, midi, ump
 def main() -> None:
     for protocol in (midi.Protocol.Midi1, midi.Protocol.Ump):
         for isolated in (True, False):
-            source = midi.TypedInput(protocol=protocol, isolated=isolated)
+            source = midi.Input(protocol=protocol, isolated=isolated)
             sender = midi.Output(protocol=protocol, isolated=isolated)
             for cycle in range(1, 4):
                 name = f"meedee-reopen-{uuid4().hex}"

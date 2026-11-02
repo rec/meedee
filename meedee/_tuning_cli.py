@@ -66,7 +66,7 @@ def run_query(config: TuningPreview) -> int:
             output_client = midi.Output(
                 protocol=midi.Protocol.Midi1, backend=backend, isolated=config.isolated
             )
-            input_client = midi.TypedInput(
+            input_client = midi.Input(
                 protocol=midi.Protocol.Midi1,
                 backend=backend,
                 isolated=config.isolated,

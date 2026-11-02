@@ -1,9 +1,9 @@
-"""Raw byte/UMP transport backed by the shared Rust toolkit."""
+"""Decoded or raw MIDI input and callable output over the shared Rust transport."""
 
 from collections.abc import Callable, Iterable
 from os import PathLike
 from types import TracebackType
-from typing import ClassVar
+from typing import ClassVar, Literal, overload
 
 from . import archive, events, messages
 
@@ -81,26 +81,58 @@ class Port:
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]
 
-class Input:
+class Input[T = events.Event | events.StreamDiagnostic]:
+    @overload
     def __init__(
-        self,
+        self: Input[events.ReceivedPacket],
         *,
+        raw: Literal[True],
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         isolated: bool = True,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = 8_388_608,
+        event_limit: int = 128,
+        sysex_limit: int | str = 1_048_576,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: Input[events.Event | events.StreamDiagnostic],
+        *,
+        raw: Literal[False] = False,
+        protocol: Protocol = Protocol.Midi1,
+        backend: Backend | None = None,
+        timestamps: TimestampMode = TimestampMode.Absolute,
+        isolated: bool = True,
+        timeout: float | str = 5.0,
+        receive_byte_limit: int | str = 8_388_608,
+        event_limit: int = 128,
+        sysex_limit: int | str = 1_048_576,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: Input[events.Event | events.StreamDiagnostic | events.ReceivedPacket],
+        *,
+        raw: bool,
+        protocol: Protocol = Protocol.Midi1,
+        backend: Backend | None = None,
+        timestamps: TimestampMode = TimestampMode.Absolute,
+        isolated: bool = True,
+        timeout: float | str = 5.0,
+        receive_byte_limit: int | str = 8_388_608,
+        event_limit: int = 128,
+        sysex_limit: int | str = 1_048_576,
     ) -> None: ...
     def ports(self) -> list[Port]: ...
     @property
     def worker_failure(self) -> Exception | None: ...
     def connect(
-        self, port: Port, callback: Callable[[events.ReceivedPacket], object]
-    ) -> InputConnection: ...
+        self, port: Port, callback: Callable[[T], object] | None = None
+    ) -> InputConnection[T]: ...
     def create_virtual(
-        self, name: str, callback: Callable[[events.ReceivedPacket], object]
-    ) -> InputConnection: ...
+        self, name: str, callback: Callable[[T], object] | None = None
+    ) -> InputConnection[T]: ...
 
 class Output:
     def __init__(
@@ -120,26 +152,6 @@ class Output:
     def connect(self, port: Port) -> OutputConnection: ...
     def create_virtual(self, name: str) -> OutputConnection: ...
     def __enter__(self) -> OutputConnection: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None: ...
-
-class InputConnection:
-    @property
-    def clock(self) -> events.Clock: ...
-    @property
-    def dropped_packets(self) -> int: ...
-    @property
-    def last_message_time(self) -> float | None: ...
-    @property
-    def worker_failure(self) -> Exception | None: ...
-    @property
-    def closed(self) -> bool: ...
-    def close(self) -> None: ...
-    def __enter__(self) -> InputConnection: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,
@@ -186,34 +198,7 @@ class OutputConnection:
         traceback: TracebackType | None,
     ) -> None: ...
 
-class TypedInput:
-    def __init__(
-        self,
-        *,
-        protocol: Protocol = Protocol.Midi1,
-        backend: Backend | None = None,
-        timestamps: TimestampMode = TimestampMode.Absolute,
-        isolated: bool = True,
-        timeout: float | str = 5.0,
-        receive_byte_limit: int | str = 8_388_608,
-        event_limit: int = 128,
-        sysex_limit: int | str = 1_048_576,
-    ) -> None: ...
-    def ports(self) -> list[Port]: ...
-    def connect(
-        self,
-        port: Port,
-        callback: Callable[[events.Event | events.StreamDiagnostic], object]
-        | None = None,
-    ) -> TypedInputConnection: ...
-    def create_virtual(
-        self,
-        name: str,
-        callback: Callable[[events.Event | events.StreamDiagnostic], object]
-        | None = None,
-    ) -> TypedInputConnection: ...
-
-class TypedInputConnection:
+class InputConnection[T = events.Event | events.StreamDiagnostic]:
     @property
     def stream(self) -> str: ...
     @property
@@ -223,6 +208,10 @@ class TypedInputConnection:
     @property
     def dropped_packets(self) -> int: ...
     @property
+    def last_message_time(self) -> float | None: ...
+    @property
+    def worker_failure(self) -> Exception | None: ...
+    @property
     def failure(self) -> Exception | None: ...
     @property
     def recording_report(self) -> archive.RecordingReport | None: ...
@@ -231,7 +220,7 @@ class TypedInputConnection:
         *,
         timeout: float | str | None = None,
         cancel: events.Cancellation | None = None,
-    ) -> events.Event | events.StreamDiagnostic | None: ...
+    ) -> T | None: ...
     def start_recording(
         self,
         destination: str | PathLike[str],
@@ -247,7 +236,7 @@ class TypedInputConnection:
         self, *, timeout: float | str = 5.0
     ) -> archive.RecordingReport: ...
     def close(self) -> None: ...
-    def __enter__(self) -> TypedInputConnection: ...
+    def __enter__(self) -> InputConnection[T]: ...
     def __exit__(
         self,
         exc_type: type[BaseException] | None,

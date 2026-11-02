@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def run(
     query: tuning.Query,
-    receiver: midi.TypedInputConnection,
+    receiver: midi.InputConnection,
     output: midi.OutputConnection,
     *,
     cancel: events.Cancellation | None = None,

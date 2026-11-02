@@ -1,6 +1,7 @@
 > Historical transport design: the current callable Python output API, channel
 > inheritance and context cleanup supersede the original `send()` interface below.
-> See [the API contract](api.md#callable-midi-1-output).
+> Input now defaults to decoded events; use `raw=True` for the raw callbacks
+> described below. See [the API contract](api.md#unified-python-input).
 
 # meedee implementation plan
 

@@ -187,7 +187,7 @@ def run(
 ) -> ci.BrowseReport:
     return ci_live.run(
         b,
-        cast(midi.TypedInputConnection, receiver),
+        cast(midi.InputConnection, receiver),
         cast(midi.OutputConnection, output),
         cancel=cancel,
     )
@@ -320,7 +320,7 @@ def test_cli_uses_fresh_muid_and_closes_both_connections(
         def connect(self, port: SimpleNamespace) -> Receiver | Output:
             return self.connection
 
-    monkeypatch.setattr(midi, "TypedInput", lambda **kwargs: Client(receiver, "in"))
+    monkeypatch.setattr(midi, "Input", lambda **kwargs: Client(receiver, "in"))
     monkeypatch.setattr(midi, "Output", lambda **kwargs: Client(output, "out"))
     with pytest.raises(SystemExit) as result:
         cli.main(

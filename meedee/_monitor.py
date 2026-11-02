@@ -137,7 +137,7 @@ def run_monitor(config: Monitor) -> int:
     protocol = midi.Protocol.Midi1 if config.protocol == "midi1" else midi.Protocol.Ump
     backend = None if config.backend is None else getattr(midi.Backend, config.backend)
     try:
-        client = midi.TypedInput(
+        client = midi.Input(
             protocol=protocol,
             backend=backend,
             isolated=config.isolated,
@@ -163,7 +163,7 @@ def run_monitor(config: Monitor) -> int:
         return 2
 
 
-def watch(connection: midi.TypedInputConnection, config: Monitor) -> int:
+def watch(connection: midi.InputConnection, config: Monitor) -> int:
     session = Session(config, connection.stream, connection.clock)
     start = monotonic()
     interrupted = False

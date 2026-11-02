@@ -4,27 +4,43 @@ from __future__ import annotations
 
 import inspect
 import math
+from _thread import LockType
 from collections.abc import Callable, Iterable
 from fnmatch import fnmatchcase
 from fractions import Fraction
 from functools import partial
+from os import PathLike
+from queue import Empty, Full
+from threading import Lock
+from time import monotonic
 from types import TracebackType
 from typing import cast
 from uuid import uuid4
 
-from . import _native, _units, codecs, events, gm, messages, midi
+from . import _native, _units, archive, codecs, events, gm, messages, midi
 from ._errors import CompoundSendError
 from ._output_state import OutputState
-from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery
-from .events import Clock, ReceivedPacket
+from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery, ReceiveQueue
+from .events import Clock
 
 
-class Input:
-    __slots__ = ("_native", "_context")
+class Input[T = events.Event | events.StreamDiagnostic]:
+    __slots__ = (
+        "_native",
+        "_context",
+        "_protocol",
+        "_raw_mode",
+        "_event_limit",
+        "_sysex_limit",
+        "_byte_limit",
+    )
 
     def __init__(
         self,
         *,
+        raw: bool = False,
+        event_limit: int = 128,
+        sysex_limit: int | str = 1_048_576,
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
         timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
@@ -41,6 +57,19 @@ class Input:
             raise TypeError("receive_byte_limit must be a built-in integer")
         if receive_byte_limit <= 0:
             raise ValueError("receive_byte_limit must be positive")
+        if type(raw) is not bool:
+            raise TypeError("raw must be a boolean")
+        sysex_limit = _units.integer(sysex_limit, "byte")
+        for n in (event_limit, sysex_limit):
+            if type(n) is not int:
+                raise TypeError("event_limit and sysex_limit must be built-in integers")
+            if n <= 0:
+                raise ValueError("event_limit and sysex_limit must be positive")
+        self._protocol = protocol
+        self._raw_mode = raw
+        self._event_limit = event_limit
+        self._sysex_limit = sysex_limit
+        self._byte_limit = receive_byte_limit
         settings: dict[str, object] = {
             "identity": uuid4().hex,
             "protocol": protocol,
@@ -67,43 +96,48 @@ class Input:
         return None if self._context is None else self._context.failure_exception
 
     def connect(
-        self, port: midi.Port, callback: Callable[[ReceivedPacket], object]
-    ) -> InputConnection:
-        validate_open(callback=callback)
-        if callback is None:
-            raise TypeError("MIDI callback must be callable")
-        if not isinstance(port, midi.Port):
-            raise TypeError("port must be a discovery snapshot")
-        identity = uuid4().hex
-        connection = InputConnection._create(self)
-        if self._native is not None:
-            connection._native = self._native.connect(port, callback, identity)
-        else:
-            assert self._context is not None
-            connection._delivery = self._context.open(
-                "connect", port._wire, "", callback, identity
-            )
-            connection._generation = self._context.generation
-        connection._closed = False
-        return connection
+        self, port: midi.Port, callback: Callable[[T], object] | None = None
+    ) -> InputConnection[T]:
+        return self._open(port, None, callback)
 
     def create_virtual(
-        self, name: str, callback: Callable[[ReceivedPacket], object]
-    ) -> InputConnection:
+        self, name: str, callback: Callable[[T], object] | None = None
+    ) -> InputConnection[T]:
         validate_open(name, callback)
-        if callback is None:
-            raise TypeError("MIDI callback must be callable")
+        return self._open(None, name, callback)
+
+    def _open(
+        self,
+        port: midi.Port | None,
+        name: str | None,
+        callback: Callable[[T], object] | None,
+    ) -> InputConnection[T]:
+        validate_open(callback=callback)
+        if name is None and not isinstance(port, midi.Port):
+            raise TypeError("port must be a discovery snapshot")
         identity = uuid4().hex
-        connection = InputConnection._create(self)
+        connection = InputConnection[T]._create(self, callback)
+        transport = _InputTransport[T]._create(self)
         if self._native is not None:
-            connection._native = self._native.create_virtual(name, callback, identity)
+            transport._native = (
+                self._native.connect(
+                    cast(midi.Port, port), connection._deliver, identity
+                )
+                if name is None
+                else self._native.create_virtual(name, connection._deliver, identity)
+            )
         else:
             assert self._context is not None
-            connection._delivery = self._context.open(
-                "virtual", None, name, callback, identity
+            transport._delivery = self._context.open(
+                "connect" if name is None else "virtual",
+                None if port is None else port._wire,
+                name or "",
+                connection._deliver,
+                identity,
             )
-            connection._generation = self._context.generation
-        connection._closed = False
+            transport._generation = self._context.generation
+        transport._closed = False
+        connection._raw = transport
         return connection
 
     def __del__(self) -> None:
@@ -236,7 +270,7 @@ class Output:
             context.dispose()
 
 
-class InputConnection:
+class _InputTransport[T]:
     __slots__ = (
         "_client",
         "_native",
@@ -250,7 +284,7 @@ class InputConnection:
         raise TypeError("MIDI connection handles cannot be constructed directly")
 
     @classmethod
-    def _create(cls, client: Input) -> InputConnection:
+    def _create(cls, client: Input[T]) -> _InputTransport[T]:
         connection = object.__new__(cls)
         connection._client = client
         connection._native = cast(_native.InputConnection | None, None)
@@ -310,21 +344,6 @@ class InputConnection:
                 self._closed = True
             finally:
                 self._delivery.drain()
-
-    def __enter__(self) -> InputConnection:
-        if self._native is not None:
-            self._native.__enter__()
-        elif self.closed:
-            raise _native.StateError("MIDI connection is closed or failed")
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        close_context(self.close, exc_value)
 
     def __del__(self) -> None:
         if (delivery := getattr(self, "_delivery", None)) is not None:
@@ -569,6 +588,309 @@ class OutputConnection:
             self._client._context.defer_close(self._generation)
 
 
+class InputConnection[T = events.Event | events.StreamDiagnostic]:
+    _raw: _InputTransport[T] | None
+    _stream: str
+    _decoder: events.PacketDecoder | None
+    _bridge: _native.CallbackBridge | None
+    _queue: ReceiveQueue[T]
+    _lock: LockType
+    _closing: bool
+    _failure: Exception | None
+    _recorder: archive.Recorder | None
+    _recording_starting: bool
+    _known_lost: int
+    _ignored_on_close: int
+    _recording_report: archive.RecordingReport | None
+
+    def __init__(self) -> None:
+        raise TypeError("connection handles are created by Input")
+
+    @classmethod
+    def _create(
+        cls,
+        client: Input[T],
+        callback: Callable[[T], object] | None,
+    ) -> InputConnection[T]:
+        connection = object.__new__(cls)
+        connection._raw = None
+        connection._stream = uuid4().hex
+        connection._decoder = (
+            None
+            if client._raw_mode
+            else events.PacketDecoder(
+                stream=connection._stream,
+                protocol=client._protocol,
+                sysex_limit=client._sysex_limit,
+            )
+        )
+        connection._bridge = (
+            None if callback is None else _native.CallbackBridge(callback)
+        )
+        connection._queue = ReceiveQueue[T](
+            client._byte_limit, capacity=client._event_limit, size_of=input_size
+        )
+        connection._lock = Lock()
+        connection._closing = False
+        connection._failure = None
+        connection._recorder = None
+        connection._recording_starting = False
+        connection._known_lost = 0
+        connection._ignored_on_close = 0
+        connection._recording_report = None
+        return connection
+
+    @property
+    def stream(self) -> str:
+        return self._stream
+
+    @property
+    def clock(self) -> events.Clock:
+        if self._raw is None:
+            raise midi.StateError("input is not open yet")
+        return self._raw.clock
+
+    @property
+    def closed(self) -> bool:
+        return self._raw is None or self._raw.closed
+
+    @property
+    def dropped_packets(self) -> int:
+        """Observed raw receive drops, including drops followed by silence."""
+        return 0 if self._raw is None else self._raw.dropped_packets
+
+    @property
+    def failure(self) -> Exception | None:
+        return self._failure or (
+            None if self._raw is None else self._raw.worker_failure
+        )
+
+    @property
+    def worker_failure(self) -> Exception | None:
+        return None if self._raw is None else self._raw.worker_failure
+
+    @property
+    def last_message_time(self) -> float | None:
+        if self._bridge is not None:
+            return self._bridge.last_message_time
+        return None if self._raw is None else self._raw.last_message_time
+
+    @property
+    def recording_report(self) -> archive.RecordingReport | None:
+        return self._recording_report
+
+    def _accept(
+        self,
+        items: list[events.Event | events.StreamDiagnostic | events.ReceivedPacket],
+    ) -> None:
+        for item in items:
+            if isinstance(item, events.StreamDiagnostic) and item.kind == "loss":
+                self._known_lost += item.lost
+            if self._recorder is not None and not isinstance(
+                item, events.ReceivedPacket
+            ):
+                self._recorder.record(item)
+            if self._bridge is None and self._failure is None:
+                try:
+                    self._queue.put_nowait(cast(T, item))
+                except Full:
+                    self._failure = midi.ResourceError(
+                        "input receive queue overflowed; "
+                        "recording has independent admission"
+                    )
+
+    def _deliver(self, packet: events.ReceivedPacket) -> None:
+        with self._lock:
+            if self._closing:
+                self._ignored_on_close += 1
+                return
+            items: list[
+                events.Event | events.StreamDiagnostic | events.ReceivedPacket
+            ] = [packet] if self._decoder is None else list(self._decoder.feed(packet))
+            self._accept(items)
+        if self._bridge is not None:
+            for item in items:
+                if isinstance(item, events.ReceivedPacket):
+                    self._bridge.deliver(item)
+                else:
+                    self._bridge.deliver_typed(item)
+
+    def receive(
+        self,
+        *,
+        timeout: float | str | None = None,
+        cancel: events.Cancellation | None = None,
+    ) -> T | None:
+        _native.check_thread()
+        if self._bridge is not None:
+            raise midi.StateError("receive is unavailable in callback mode")
+        if timeout is not None:
+            timeout = _units.real(timeout, "second")
+        if timeout is not None and (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout)
+            or timeout < 0
+        ):
+            raise ValueError("timeout must be None or a finite nonnegative number")
+        deadline = None if timeout is None else monotonic() + timeout
+        while True:
+            if cancel is not None and cancel.cancelled:
+                raise InterruptedError("MIDI receive cancelled")
+            try:
+                return self._queue.get_nowait()
+            except Empty:
+                pass
+            if (failure := self.failure) is not None:
+                raise failure
+            if self._closing or self.closed:
+                raise midi.StateError("input is closed")
+            remaining = 0.05 if deadline is None else min(0.05, deadline - monotonic())
+            if remaining <= 0:
+                return None
+            try:
+                return self._queue.get(timeout=remaining)
+            except Empty:
+                continue
+
+    def start_recording(
+        self,
+        destination: str | PathLike[str],
+        *,
+        label: str = "",
+        best_effort: bool = False,
+        payload_limit: int | str = 1_048_576,
+        record_limit: int = 128,
+        byte_limit: int | str = 8_388_608,
+        metrics: bool = False,
+    ) -> archive.Recorder:
+        if self._decoder is None:
+            raise midi.StateError("recording requires decoded input (raw=False)")
+        _native.check_thread()
+        with self._lock:
+            if (
+                self._closing
+                or self.closed
+                or self._recorder is not None
+                or self._recording_starting
+            ):
+                raise midi.StateError("recording is already active or input is closed")
+            self._recording_starting = True
+        try:
+            recorder = archive.Recorder(
+                destination,
+                clock=self.clock,
+                stream=self._stream,
+                label=label,
+                best_effort=best_effort,
+                payload_limit=payload_limit,
+                record_limit=record_limit,
+                byte_limit=byte_limit,
+                metrics=metrics,
+            )
+            with self._lock:
+                closed = self._closing
+                if not closed:
+                    self._recorder = recorder
+            if closed:
+                recorder.fail("input closed while recording started")
+                recorder.stop()
+                raise midi.StateError("input closed while recording started")
+            return recorder
+        finally:
+            with self._lock:
+                self._recording_starting = False
+
+    def _final_loss(self) -> None:
+        assert self._raw is not None
+        if self._decoder is None:
+            return
+        lost = (
+            max(0, self._raw.dropped_packets - self._known_lost)
+            + self._ignored_on_close
+        )
+        if lost:
+            self._accept(
+                [
+                    self._decoder.loss(
+                        lost=lost, reason="known input loss at recording/close boundary"
+                    )
+                ]
+            )
+        if (
+            failure := self._raw.worker_failure
+        ) is not None and self._recorder is not None:
+            self._recorder.fail(str(failure))
+        self._ignored_on_close = 0
+
+    def stop_recording(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
+        _native.check_thread()
+        with self._lock:
+            self._final_loss()
+            recorder = self._recorder
+            self._recorder = None
+        if recorder is None:
+            raise midi.StateError("no recording is attached")
+        if self._decoder is not None and self._decoder.pending:
+            recorder.fail("recording ended with an unfinished message")
+        self._recording_report = recorder.stop(timeout=timeout)
+        return self._recording_report
+
+    def close(self) -> None:
+        _native.check_thread()
+        if self._raw is None or self._closing and self._raw.closed:
+            return
+        with self._lock:
+            self._closing = True
+        failure: BaseException | None = None
+        try:
+            self._raw.close()
+        except BaseException as error:
+            # Preserve a transport failure if recording cleanup also fails.
+            failure = error
+        try:
+            with self._lock:
+                self._final_loss()
+                if self._decoder is not None:
+                    self._accept(list(self._decoder.finish()))
+                recorder = self._recorder
+                self._recorder = None
+            if self._bridge is not None:
+                self._bridge.retire()
+                self._bridge.drain()
+            if recorder is not None:
+                self._recording_report = recorder.stop()
+                if not self._recording_report.complete:
+                    raise OSError(self._recording_report.failure)
+        except BaseException as error:
+            if failure is not None:
+                raise BaseExceptionGroup(
+                    "MIDI close and recording cleanup both failed", [failure, error]
+                ) from None
+            raise
+        if failure is not None:
+            raise failure
+
+    def __enter__(self) -> InputConnection[T]:
+        if self.closed:
+            raise midi.StateError("input is closed")
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        close_context(self.close, exc_value)
+
+    def __del__(self) -> None:
+        if (bridge := getattr(self, "_bridge", None)) is not None:
+            bridge.retire()
+        if (recorder := getattr(self, "_recorder", None)) is not None:
+            recorder.fail("input was abandoned during recording")
+
+
 def port_from_wire(wire: tuple[object, ...]) -> midi.Port:
     owner, snapshot, index, name, backend, backend_id, input_port = wire
     return midi.Port._from_wire(
@@ -660,3 +982,13 @@ def validate_open(
         raise TypeError(
             "MIDI callback must accept one positional ReceivedPacket"
         ) from error
+
+
+def input_size(item: object) -> int:
+    if isinstance(item, events.ReceivedPacket):
+        return (
+            len(item.packet.words) * 4
+            if isinstance(item.packet, midi.UmpPacket)
+            else len(item.packet)
+        )
+    return _native.live_size(cast(events.Event | events.StreamDiagnostic, item))

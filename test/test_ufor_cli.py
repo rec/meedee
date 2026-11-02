@@ -25,7 +25,7 @@ def forbid_devices(monkeypatch: pytest.MonkeyPatch) -> None:
     def forbidden(**kwargs: object) -> None:
         raise AssertionError("offline workflow constructed a MIDI client")
 
-    for n in ("Input", "Output", "TypedInput"):
+    for n in ("Input", "Output"):
         monkeypatch.setattr(midi, n, forbidden)
 
 

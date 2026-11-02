@@ -53,7 +53,7 @@ def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
 ) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.Input(protocol=protocol, timestamps=timestamps)
+    source = midi.Input(raw=True, protocol=protocol, timestamps=timestamps)
     target = midi.Output(protocol=protocol)
     token = f"meedee-{uuid4().hex}"
     with ExitStack() as stack:
@@ -84,7 +84,9 @@ def test_duplicate_names_have_distinct_snapshots() -> None:
     token = f"meedee-duplicate-{uuid4().hex}"
     first = midi.Output()
     second = midi.Output()
-    observer = midi.Input()
+    observer = midi.Input(
+        raw=True,
+    )
     with first.create_virtual(token), second.create_virtual(token):
         ports = [p for p in observer.ports() if p.name == token]
         assert len(ports) == 2
@@ -96,7 +98,9 @@ def test_duplicate_names_have_distinct_snapshots() -> None:
 
 def test_successful_close_restores_client_and_reopen_uses_a_new_clock() -> None:
     require_unix()
-    source = midi.Input()
+    source = midi.Input(
+        raw=True,
+    )
     target = midi.Output()
     receiver = Collector()
     token = f"meedee-reopen-{uuid4().hex}"
@@ -116,7 +120,9 @@ def test_successful_close_restores_client_and_reopen_uses_a_new_clock() -> None:
 
 def test_disappeared_endpoint_fails_open_and_requires_a_fresh_client() -> None:
     require_unix()
-    source = midi.Input()
+    source = midi.Input(
+        raw=True,
+    )
     target = midi.Output()
     receiver = Collector()
     token = f"meedee-disappearance-{uuid4().hex}"
@@ -140,7 +146,9 @@ def test_sysex_byte_stream_preserves_fragments_without_assembling_in_the_binding
 ) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.Input()
+    source = midi.Input(
+        raw=True,
+    )
     target = midi.Output()
     token = f"meedee-sysex-{uuid4().hex}"
     message = b"\xf0\x7d" + bytes(i % 128 for i in range(size - 3)) + b"\xf7"
@@ -154,7 +162,9 @@ def test_sysex_byte_stream_preserves_fragments_without_assembling_in_the_binding
 def test_burst_preserves_raw_byte_stream() -> None:
     require_unix()
     receiver = Collector()
-    source = midi.Input()
+    source = midi.Input(
+        raw=True,
+    )
     target = midi.Output()
     token = f"meedee-burst-{uuid4().hex}"
     messages = [bytes((0xB0, i // 128, i % 128)) for i in range(1000)]

@@ -66,15 +66,16 @@ addressing and does not support these full-note values or automatic cleanup.
 
 ## 3. See what your keyboard sends
 
-Print complete decoded events, including timestamps, for 30 seconds. Diagnostics
-are printed too; terminal output can itself be slow enough to cause input loss.
+Print complete decoded events, including timestamps, for 30 seconds. Use
+`Input(raw=True)` instead to receive unchanged transport packets. Diagnostics
+are printed in decoded mode; terminal output can itself cause input loss.
 
 ```python
 from time import monotonic
 
 from meedee import midi
 
-client = midi.TypedInput(isolated=False)
+client = midi.Input(isolated=False)
 with client.connect(client.ports()[0]) as receiver:
     deadline = monotonic() + 30
     while monotonic() < deadline:
@@ -98,7 +99,7 @@ from time import monotonic
 
 from meedee import events, messages, midi
 
-inputs = midi.TypedInput(isolated=False)
+inputs = midi.Input(isolated=False)
 outputs = midi.Output()
 with (
     inputs.connect(inputs.ports()[0]) as receiver,
@@ -133,7 +134,7 @@ from time import monotonic
 
 from meedee import events, messages, midi
 
-inputs = midi.TypedInput(isolated=False)
+inputs = midi.Input(isolated=False)
 outputs = midi.Output()
 with (
     inputs.connect(inputs.ports()[0]) as receiver,
@@ -168,7 +169,7 @@ from time import monotonic
 
 from meedee import archive, events, inspection, midi
 
-inputs = midi.TypedInput(isolated=False)
+inputs = midi.Input(isolated=False)
 with inputs.connect(inputs.ports()[0]) as receiver:
     receiver.start_recording("take.meedee", metrics=True)
     try:
@@ -254,7 +255,7 @@ successful capture, refusing overwrite. Adjust the count for your instrument.
 ```python
 from meedee import midi, transfer, transfer_input
 
-client = midi.TypedInput(isolated=False)
+client = midi.Input(isolated=False)
 with client.connect(client.ports()[0]) as receiver:
     capture = transfer.Capture(stream=receiver.stream, expected_messages=1, timeout=30)
     report = transfer_input.run(capture, receiver)
@@ -372,7 +373,7 @@ from meedee import ci, ci_live, midi
 identity = ci.Identity(
     manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
 )
-inputs = midi.TypedInput(isolated=False)
+inputs = midi.Input(isolated=False)
 outputs = midi.Output()
 with (
     inputs.connect(inputs.ports()[0]) as receiver,

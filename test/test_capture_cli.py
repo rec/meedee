@@ -52,7 +52,7 @@ def install(
             actions.append("connected")
             return receiver
 
-    monkeypatch.setattr(midi, "TypedInput", Client)
+    monkeypatch.setattr(midi, "Input", Client)
     monkeypatch.setattr(transfer_input, "monotonic_ns", lambda: 0)
     return actions
 

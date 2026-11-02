@@ -72,4 +72,4 @@ def test_client_rejects_positional_arguments_before_native_initialization(
     client: type[midi.Input] | type[midi.Output],
 ) -> None:
     with pytest.raises(TypeError):
-        client(37)  # ty: ignore[too-many-positional-arguments]
+        client(37)  # ty: ignore[too-many-positional-arguments, no-matching-overload]

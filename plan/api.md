@@ -43,11 +43,11 @@ Slice 2 transport choices, approved 2026-10-14:
   ID lookup. The pinned C API cannot honor the former and IDs cannot guarantee
   the latter. Retain per-client process isolation as an option; input defaults to isolated
   and output defaults to in-process transport.
-- Callbacks take an immutable `meedee.events.ReceivedPacket`: exact optional
+- Raw-mode callbacks take an immutable `meedee.events.ReceivedPacket`: exact optional
   signed `timestamp_ns`, connection `clock`, and raw `packet`. Bytes remain
   bytes; UMP uses an immutable UmpPacket with a tuple of 32-bit words.
-- Raw chunks/batches are exposed now. Message framing and Ignore filters wait
-  for the bounded codec slice; no unfinished SysEx assembly is introduced.
+- Raw mode exposes chunks/batches without assembly. Decoded mode, now the
+  default, assembles messages and reports stream diagnostics.
 - Failed opens entering Rust invalidate the client in both modes. Ordinary
   Python validation happens first. Successful explicit close restores it.
 
@@ -221,8 +221,8 @@ cannot be detected from bytes alone. This decoder is for live MIDI 1.0 bytes,
 not UMP or Standard MIDI Files.
 
 Events/timestamps, transport integration and receive filters remain separate
-from this codec. Transport callbacks continue to receive ReceivedPacket;
-timestamped typed integration belongs to slice 10. Fine CC and RPN/NRPN are
+from this codec. Raw-mode callbacks receive ReceivedPacket; decoded Input
+provides the timestamped integration implemented in slice 10. Fine CC and RPN/NRPN are
 provided by slice 4 below and tuning by slice 5; GM profiles and files retain later slices.
 
 ### Slice 4 compound commands and observations, approved 2026-10-14
@@ -814,7 +814,7 @@ completion; recovery is explicit and returns only verified complete records.
 Native clock values and absent timestamps remain exact, with rational units and
 stable record IDs. Unknown records may be retained opaquely without execution.
 
-TypedInput wraps the existing input transport. Python Output opens one
+Input combines decoded and raw reception over the existing input transport. Python Output opens one
 OutputConnection with send for message objects, compound operations and encoded
 packets, and play for timestamped events.
 Message and packet operations share connection ownership and process isolation;
@@ -1601,3 +1601,25 @@ messages still overlap until released; existing context cleanup also covers a
 full note interrupted before its scheduled release. Native UMP full-note playback
 is outside this MIDI 1 interface. Timestamped events remain available for archival
 and advanced playback workflows.
+
+
+## Unified Python input
+
+`Input(raw=False, ...)` is the sole public input client. Decoded input is the
+default, yielding `events.Event` and `events.StreamDiagnostic`; `raw=True` yields
+unchanged `events.ReceivedPacket` values, including partial SysEx and UMP chunks.
+The former TypedInput and TypedInputConnection classes are removed without aliases.
+Both modes return InputConnection and share discovery, isolation, port lifetime,
+callback guards and close behavior. Input continues to default to isolation.
+
+Both modes accept an optional callback at connect/create_virtual, or support
+`receive(timeout=..., cancel=...)` when no callback is supplied. Queue admission
+uses event_limit (packet count in raw mode) and receive_byte_limit. Overflow
+sets failure; queued items remain readable before the failure is raised.
+Transport loss stays visible through dropped_packets, including silence.
+Decoded mode retains assembly diagnostics, stream identity and archive recording.
+Raw recording is rejected explicitly because archive recording requires decoded
+events. The worker_failure and last_message_time properties remain available.
+
+Type hints infer InputConnection[ReceivedPacket] for raw=True and decoded event
+unions by default; a dynamic boolean yields the union of both modes.

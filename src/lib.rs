@@ -183,12 +183,6 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;
     }
-    let typed = PyModule::import(py, "meedee._typed")?;
-    for name in ["TypedInput", "TypedInputConnection"] {
-        let class = typed.getattr(name)?;
-        class.setattr("__module__", "meedee.midi")?;
-        module.add(name, class)?;
-    }
     let error = PyModule::import(py, "meedee._errors")?.getattr("CompoundSendError")?;
     error.setattr("__module__", "meedee.midi")?;
     module.add("CompoundSendError", error)?;

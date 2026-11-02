@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 def run(
     capture: transfer.Capture,
-    receiver: midi.TypedInputConnection,
+    receiver: midi.InputConnection,
     *,
     cancel: events.Cancellation | None = None,
 ) -> transfer.CaptureReport:

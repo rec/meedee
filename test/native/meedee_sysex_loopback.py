@@ -26,7 +26,7 @@ def connect(name: str, isolated: bool) -> midi.OutputConnection:
 
 
 def respond(
-    receiver: midi.TypedInputConnection,
+    receiver: midi.InputConnection,
     output: midi.OutputConnection,
     request: tuning.BulkDumpRequest | tuning.BankedDumpRequest,
     reply: messages.SysEx,
@@ -45,8 +45,8 @@ def exercise(isolated: bool, directory: Path) -> None:
     suffix = uuid4().hex
     names = [f"meedee-syx-{suffix}-{n}" for n in (1, 2)]
     with (
-        midi.TypedInput(isolated=isolated).create_virtual(names[0]) as receiver,
-        midi.TypedInput(isolated=isolated).create_virtual(names[1]) as peer,
+        midi.Input(isolated=isolated).create_virtual(names[0]) as receiver,
+        midi.Input(isolated=isolated).create_virtual(names[1]) as peer,
         connect(names[1], isolated) as output,
         connect(names[0], isolated) as peer_output,
         ThreadPoolExecutor(max_workers=1) as worker,

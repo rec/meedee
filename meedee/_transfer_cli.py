@@ -124,7 +124,7 @@ def run_receive(config: SysexReceive) -> int:
         backend = (
             None if config.backend is None else getattr(midi.Backend, config.backend)
         )
-        client = midi.TypedInput(
+        client = midi.Input(
             protocol=midi.Protocol.Midi1,
             backend=backend,
             isolated=config.isolated,

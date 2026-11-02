@@ -102,7 +102,7 @@ def test_worker_cap_reserves_in_progress_starts_without_blocking_admission(
     monkeypatch.setattr(_transport, "MAX_WORKERS", 1)
     entered = Event()
     release = Event()
-    created: Queue[midi.Input] = Queue()
+    created: Queue[midi.Input[events.ReceivedPacket]] = Queue()
     launch = _transport.subprocess.Popen
 
     def delayed(command: list[str], stdin: int, stdout: int) -> Popen[bytes]:
@@ -812,7 +812,7 @@ def test_cyclic_collection_releases_the_client_and_child(
     source = input_client("quiet")
 
     class Receiver:
-        connection: midi.InputConnection
+        connection: midi.InputConnection[events.ReceivedPacket]
 
         def __call__(self, packet: ReceivedPacket) -> None:
             pass
@@ -854,9 +854,11 @@ def test_invalid_deadlines_are_rejected_before_starting_a_worker(
     assert not workers
 
 
-def input_client(mode: str, **settings: object) -> midi.Input:
+def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPacket]:
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
-        return cast(Callable[..., midi.Input], midi.Input)(**settings)
+        return cast(Callable[..., midi.Input[events.ReceivedPacket]], midi.Input)(
+            **({"raw": True} | settings)
+        )
 
 
 def output_client(mode: str, **settings: object) -> midi.Output:
@@ -1209,7 +1211,7 @@ def test_typed_input_exposes_receive_drops_without_another_packet(
     workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("MEEDEE_TEST_MODE", "native_drop_idle")
-    source = midi.TypedInput(timeout=1)
+    source = midi.Input(timeout=1)
     with source.connect(source.ports()[0]) as connection:
         deadline = monotonic() + 3
         while connection.dropped_packets != 7 and monotonic() < deadline:
@@ -1228,7 +1230,7 @@ def test_typed_queue_reports_overflow_and_retains_primitive_events(
     from meedee.events import Event
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "twice")
-    source = midi.TypedInput(timeout=1, event_limit=1)
+    source = midi.Input(timeout=1, event_limit=1)
     with source.connect(source.ports()[0]) as connection:
         deadline = monotonic() + 2
         while connection.failure is None and monotonic() < deadline:
@@ -1247,7 +1249,7 @@ def test_typed_receive_wakes_on_cancellation_and_close(
     from meedee.events import Cancellation
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "input")
-    source = midi.TypedInput(timeout=1)
+    source = midi.Input(timeout=1)
     connection = source.connect(source.ports()[0])
     cancel = Cancellation()
     errors: Queue[BaseException] = Queue()
@@ -1283,7 +1285,7 @@ def test_typed_callback_retains_the_blocking_operation_guard(
             midi.Output(isolated=True, timeout=1)
         called.set()
 
-    source = midi.TypedInput(timeout=1)
+    source = midi.Input(timeout=1)
     with source.connect(source.ports()[0], callback):
         assert called.wait(2)
 

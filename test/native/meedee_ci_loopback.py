@@ -22,7 +22,7 @@ def dispatch(
 
 
 def receive(
-    receiver: midi.TypedInputConnection, assembler: ump.EventAssembler
+    receiver: midi.InputConnection, assembler: ump.EventAssembler
 ) -> messages.SysEx:
     while True:
         value = receiver.receive(timeout=3)
@@ -52,8 +52,8 @@ def main() -> None:
         manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
     )
     with (
-        midi.TypedInput(protocol=midi.Protocol.Ump).create_virtual(names[0]) as a,
-        midi.TypedInput(protocol=midi.Protocol.Ump).create_virtual(names[1]) as b,
+        midi.Input(protocol=midi.Protocol.Ump).create_virtual(names[0]) as a,
+        midi.Input(protocol=midi.Protocol.Ump).create_virtual(names[1]) as b,
         connect(names[1]) as a_out,
         connect(names[0]) as b_out,
     ):

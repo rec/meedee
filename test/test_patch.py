@@ -112,7 +112,7 @@ def install(
         return source
 
     monkeypatch.setattr(midi, "Output", output_client)
-    monkeypatch.setattr(midi, "TypedInput", input_client)
+    monkeypatch.setattr(midi, "Input", input_client)
 
 
 def config(*, event_limit: int = 128) -> Patch:

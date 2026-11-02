@@ -10,7 +10,7 @@ from meedee import archive, events, messages, midi
 
 def exercise(isolated: bool, destination: Path) -> None:
     name = f"meedee-typed-test-{uuid4().hex}"
-    with midi.TypedInput(isolated=isolated).create_virtual(name) as receiver:
+    with midi.Input(isolated=isolated).create_virtual(name) as receiver:
         sender = midi.Output(isolated=isolated)
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"

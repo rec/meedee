@@ -69,7 +69,7 @@ def run_browse(config: CiBrowse) -> int:
             output_client = midi.Output(
                 protocol=protocol, backend=backend, isolated=config.isolated
             )
-            input_client = midi.TypedInput(
+            input_client = midi.Input(
                 protocol=protocol,
                 backend=backend,
                 isolated=config.isolated,

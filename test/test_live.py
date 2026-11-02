@@ -219,13 +219,16 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
             pass
 
         def create_virtual(
-            self, name: str, callback: Callable[[events.ReceivedPacket], object]
+            self,
+            name: str,
+            callback: Callable[[events.ReceivedPacket], object],
+            identity: str,
         ) -> Connection:
             callbacks.append(callback)
             return connection
 
-    monkeypatch.setattr("meedee._typed.Input", Input)
-    receiver = midi.TypedInput().create_virtual("test-only")
+    monkeypatch.setattr(_native, "Input", Input)
+    receiver = midi.Input(isolated=False).create_virtual("test-only")
     path = tmp_path / "typed.meedee"
     receiver.start_recording(path)
     callback = callbacks[0]
@@ -241,3 +244,105 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
     assert len([v for v in values if isinstance(v, events.Event)]) == 1
     assert reader.complete is not lost
     reader.close()
+
+
+@pytest.mark.parametrize("raw", [False, True])
+@pytest.mark.parametrize("callback_mode", [False, True])
+def test_unified_input_delivers_decoded_messages_or_unchanged_packets(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    raw: bool,
+    callback_mode: bool,
+) -> None:
+    callbacks: list[Callable[[events.ReceivedPacket], object]] = []
+    observed: list[object] = []
+    capture_clock = clock()
+
+    class Connection:
+        closed = False
+        worker_failure = None
+        dropped_packets = 0
+        clock = capture_clock
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def create_virtual(
+            self,
+            name: str,
+            callback: Callable[[events.ReceivedPacket], object],
+            identity: str,
+        ) -> Connection:
+            callbacks.append(callback)
+            return Connection()
+
+    monkeypatch.setattr(_native, "Input", Client)
+    client = midi.Input(raw=raw, isolated=False)
+    with client.create_virtual(
+        "fixture", observed.append if callback_mode else None
+    ) as receiver:
+        first = packet(b"\xf0\x7d\x01", 0, 100)
+        last = packet(b"\x02\xf7", 1, 200)
+        callbacks[0](first)
+        callbacks[0](last)
+        if callback_mode:
+            with pytest.raises(midi.StateError, match="callback"):
+                receiver.receive(timeout=0)
+        else:
+            while (item := receiver.receive(timeout=0)) is not None:
+                observed.append(item)
+        if raw:
+            assert observed == [first, last]
+            with pytest.raises(midi.StateError, match="decoded"):
+                receiver.start_recording(tmp_path / "raw.meedee")
+            assert not (tmp_path / "raw.meedee").exists()
+        else:
+            assert len(observed) == 1
+            message = observed[0]
+            assert isinstance(message, events.Event)
+            assert message.message == messages.SysEx(b"\x7d\x01\x02")
+            assert message.timestamp is not None and message.timestamp.ticks == 200
+    assert receiver.closed
+
+
+def test_raw_receive_queue_is_bounded_and_drains_before_reporting_overflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    callbacks: list[Callable[[events.ReceivedPacket], object]] = []
+
+    class Connection:
+        closed = False
+        dropped_packets = 0
+        worker_failure = None
+
+        def close(self) -> None:
+            self.closed = True
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def create_virtual(
+            self,
+            name: str,
+            callback: Callable[[events.ReceivedPacket], object],
+            identity: str,
+        ) -> Connection:
+            callbacks.append(callback)
+            return Connection()
+
+    monkeypatch.setattr(_native, "Input", Client)
+    with midi.Input(raw=True, isolated=False, event_limit=1).create_virtual(
+        "fixture"
+    ) as receiver:
+        first = packet(b"\xf8", 0, 100)
+        callbacks[0](first)
+        callbacks[0](packet(b"\xfa", 1, 200))
+        assert receiver.receive(timeout=0) == first
+        with pytest.raises(midi.ResourceError, match="overflowed"):
+            receiver.receive(timeout=0)
+        assert isinstance(receiver.failure, midi.ResourceError)

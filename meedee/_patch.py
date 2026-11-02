@@ -13,7 +13,7 @@ def run_patch(config: Patch) -> int:
     protocol = midi.Protocol.Midi1 if config.protocol == "midi1" else midi.Protocol.Ump
     backend = None if config.backend is None else getattr(midi.Backend, config.backend)
     router: routing.Router | None = None
-    connection: midi.TypedInputConnection | None = None
+    connection: midi.InputConnection | None = None
     interrupted = False
     failure: str | None = None
     data: dict[str, object]
@@ -26,7 +26,7 @@ def run_patch(config: Patch) -> int:
                 )
                 port = select_port(client.ports(), name, direction="output")
                 outputs[name] = stack.enter_context(client.connect(port))
-            client_input = midi.TypedInput(
+            client_input = midi.Input(
                 protocol=protocol,
                 backend=backend,
                 isolated=config.isolated,
@@ -89,7 +89,7 @@ def run_patch(config: Patch) -> int:
 
 
 def forward(
-    connection: midi.TypedInputConnection,
+    connection: midi.InputConnection,
     outputs: dict[str, midi.OutputConnection],
     router: routing.Router,
     duration: float | None,
