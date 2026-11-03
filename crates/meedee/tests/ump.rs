@@ -181,7 +181,12 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
 #[test]
 fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
     for v in 0..=127 {
-        let original = AnyMessage::NoteOn(NoteOn::new(1, 60, v).unwrap());
+        let original = AnyMessage::NoteOn(
+            NoteOn::new(60)
+                .and_then(|m| m.with_velocity(v))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        );
         let t = to_midi2(&original, 16).unwrap();
         assert_eq!(t.status, TranslationStatus::Exact);
         let r = to_midi1(&t.messages[0], false).unwrap();
@@ -214,11 +219,15 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
             .unwrap()
             .messages
             .iter()
-            .flat_map(|v| v.encode())
+            .flat_map(|v| v.encode().unwrap())
             .collect::<Vec<_>>(),
         [0xbf, 0, 121, 0xbf, 32, 3, 0xcf, 127]
     );
-    let select = AnyMessage::ControlChange(ControlChange::new(1, 101, 0).unwrap());
+    let select = AnyMessage::ControlChange(
+        ControlChange::new(101, 0)
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
+    );
     assert_eq!(
         to_midi2(&select, 1).unwrap().status,
         TranslationStatus::ContextRequired
@@ -258,7 +267,12 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::TooManyPackets)]
     );
     for bend in -8192..=8191 {
-        let original = AnyMessage::PitchBend(PitchBend::new(16, bend).unwrap());
+        let original = AnyMessage::PitchBend(
+            PitchBend::new()
+                .and_then(|m| m.with_value(bend))
+                .and_then(|m| m.with_channel(16))
+                .unwrap(),
+        );
         let up = to_midi2(&original, 16).unwrap();
         assert_eq!(
             to_midi1(&up.messages[0], false).unwrap().messages,

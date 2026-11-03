@@ -95,7 +95,8 @@ diagnostic inputs use nanoseconds. Tick counts use ticks,
 frequency inputs use hertz, pitch offsets use cents or semitones, and buffer
 budgets use bytes. SMF and UMP tempo helpers take numeric BPM or authored BPM/beat-period strings,
 with exact conversion to the encoded period. Archive/wire representations remain
-numeric and unchanged. Native Rust APIs retain integer nanosecond durations. Beat durations convert to seconds only with an explicit `Output(bpm=...)`;
+numeric and unchanged. Low-level Rust APIs retain integer nanosecond durations;
+Rust Note/Rest use `Duration` or `Beats`. Beat durations convert to seconds only with an explicit tempo (`Output(bpm=...)` in Python);
 tick conversion still requires its clock.
 Reccy's authored/runtime/revalidation dumps apply to Pydantic command models;
 the CLI normalizes a runtime copy before dispatch. Native resource handles and
@@ -254,7 +255,9 @@ units. Increment/decrement has no amount field or guessed absolute value.
 
 Rust `Message` is now the common marker trait. The existing encoding method
 moves to `PrimitiveMessage: Message`; method-style encoding callers import that
-subtrait. Free `codecs::encode` retains its behavior. `Command: Message` exposes
+subtrait. Both method and free `codecs::encode` return a checked Result and
+reject an unassigned channel. MIDI 1 constructors leave channels unassigned;
+`with_channel` assigns them and `without_channel` clears them. `Command: Message` exposes
 expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
@@ -385,8 +388,9 @@ Observations on macOS arm64, five runs of 10,000 constructions per sample:
 | Python 3.11.7, peak Python-tracked allocation for a 10,000-value list | 325,648 bytes | 645,864 bytes |
 | Python 3.15.0, peak Python-tracked allocation for a 10,000-value list | 325,512 bytes | 645,806 bytes |
 
-The canonical Rust note value occupies 3 bytes; the boxed SysEx payload
-descriptor occupies 16 bytes, excluding its allocation. The baseline has no
+In this prototype measurement, the Rust note value occupied 3 bytes and the boxed
+SysEx payload descriptor occupied 16 bytes, excluding its allocation. These sizes
+precede the optional-channel API and do not describe its current layout. The baseline has no
 range validation and is a measurement control, not a second production API.
 `tracemalloc` does not measure Rust payload allocations or total resident memory.
 Debug and release observations differ substantially; smaller Python allocation
@@ -533,8 +537,9 @@ guidelines discuss varying initialization times rather than a universal safe
 constant. Callers schedule settling themselves; no codec/command inserts sleeps
 or sends a mode/reset message on import/open/close.
 
-The approved Rust change makes `Command.expand()` and `codecs::expand()` return
-Vec<AnyMessage>, replacing the CC-only vector throughout. Python expand returns
+Rust `Command.expand()` and `codecs::expand()` return
+`Result<Vec<AnyMessage>, ValueError>`. An unassigned channel must be resolved
+before expansion. Primitive encoding likewise returns `Result<Vec<u8>, ValueError>`. Python expand returns
 a fresh list of primitive Messages; existing CC commands produce the same CC
 objects and bytes. AnyCommand additionally carries BankProgramSelect and
 mpe::ZoneConfiguration. `send` accepts both types through the same

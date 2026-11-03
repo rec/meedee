@@ -312,13 +312,13 @@ impl Management {
         }
     }
     pub fn sysex(&self) -> SysEx {
-        let bytes = self.encode();
+        let bytes = self.encode().expect("validated system message");
         SysEx::new(bytes[1..bytes.len() - 1].to_vec()).expect("validated CI message")
     }
 }
 impl Message for Management {}
 impl PrimitiveMessage for Management {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![
             240,
             126,
@@ -365,7 +365,7 @@ impl PrimitiveMessage for Management {
         }
         b.extend(&self.extensions);
         b.push(247);
-        b
+        Ok(b)
     }
 }
 /// None means non-CI or an unsupported CI message family/endpoint selector.

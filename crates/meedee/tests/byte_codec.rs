@@ -17,7 +17,7 @@ fn shared_wire_vectors_match_values_and_all_two_part_feeds() {
             .map(|v| u8::from_str_radix(v, 16).unwrap())
             .collect();
         let message = fixture_message(name, &fields);
-        assert_eq!(encode(&message), bytes, "{line}");
+        assert_eq!(encode(&message).unwrap(), bytes, "{line}");
         for split in 0..=bytes.len() {
             let mut decoder = Decoder::default();
             let mut actual = decoder.feed(&bytes[..split]);
@@ -68,7 +68,7 @@ fn all_channel_statuses_and_data_boundaries_round_trip_without_normalization() {
                 let [DecodeItem::Message(message)] = items else {
                     panic!("valid wire message was not decoded");
                 };
-                assert_eq!(encode(&message), wire);
+                assert_eq!(encode(&message).unwrap(), wire);
             }
         }
     }
@@ -101,7 +101,12 @@ fn sysex_limit_reports_once_and_releases_state_before_recovery() {
     );
     assert_eq!(
         items[2],
-        DecodeItem::Message(AnyMessage::NoteOn(NoteOn::new(1, 60, 0).unwrap()))
+        DecodeItem::Message(AnyMessage::NoteOn(
+            NoteOn::new(60)
+                .and_then(|m| m.with_velocity(0))
+                .and_then(|m| m.with_channel(1))
+                .unwrap()
+        ))
     );
     assert!(decoder.finish().is_empty());
     assert!(Decoder::new(0).is_err());
@@ -120,7 +125,61 @@ fn fixture_message(name: &str, fields: &[&str]) -> AnyMessage {
         );
     }
     let values: Vec<i64> = fields.iter().map(|v| v.parse().unwrap()).collect();
-    macro_rules! construct {
+    match name {
+        "NoteOn" => AnyMessage::NoteOn(
+            NoteOn::new(values[1])
+                .unwrap()
+                .with_velocity(values[2])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        "NoteOff" => AnyMessage::NoteOff(
+            NoteOff::new(values[1])
+                .unwrap()
+                .with_velocity(values[2])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        "PolyPressure" => AnyMessage::PolyPressure(
+            PolyPressure::new(values[1])
+                .unwrap()
+                .with_pressure(values[2])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        "ControlChange" => AnyMessage::ControlChange(
+            ControlChange::new(values[1], values[2])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        "ProgramChange" => AnyMessage::ProgramChange(
+            ProgramChange::new(values[1])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        "ChannelPressure" => AnyMessage::ChannelPressure(
+            ChannelPressure::new()
+                .unwrap()
+                .with_pressure(values[1])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        "PitchBend" => AnyMessage::PitchBend(
+            PitchBend::new()
+                .unwrap()
+                .with_value(values[1])
+                .unwrap()
+                .with_channel(values[0])
+                .unwrap(),
+        ),
+        _ => {
+            macro_rules! construct {
         ($($name:ident ($($index:literal),*)),*) => {
             match name {
                 $(stringify!($name) => AnyMessage::$name($name::new($(values[$index]),*).unwrap()),)*
@@ -128,10 +187,59 @@ fn fixture_message(name: &str, fields: &[&str]) -> AnyMessage {
             }
         };
     }
-    construct! {
-        NoteOn(0,1,2), NoteOff(0,1,2), PolyPressure(0,1,2), ControlChange(0,1,2),
-        ProgramChange(0,1), ChannelPressure(0,1), PitchBend(0,1), QuarterFrame(0,1),
-        SongPosition(0), SongSelect(0), TuneRequest(), TimingClock(), Start(),
-        Continue(), Stop(), ActiveSensing(), SystemReset()
+            construct! {
+                QuarterFrame(0,1),
+                SongPosition(0), SongSelect(0), TuneRequest(), TimingClock(), Start(),
+                Continue(), Stop(), ActiveSensing(), SystemReset()
+            }
+        }
     }
+}
+
+#[test]
+fn defaults_require_channel_resolution_and_transposition_clamps() {
+    let note = NoteOn::new(60).unwrap();
+    assert_eq!(note.channel(), None);
+    assert_eq!(note.velocity(), 90);
+    assert!(note.encode().is_err());
+    let note = note.with_channel(3).unwrap();
+    assert_eq!(note.encode().unwrap(), [0x92, 60, 90]);
+    let high = note.clone().transpose(i64::MAX);
+    assert_eq!(high.encode().unwrap(), [0x92, 127, 90]);
+    assert_eq!(note.clone().transpose(i64::MIN).note(), 0);
+    assert_eq!(note.clone().without_channel().channel(), None);
+    assert!(note.without_channel().encode().is_err());
+    let release = NoteOff::new(60).unwrap().with_channel(3).unwrap();
+    assert_eq!(release.transpose(12).encode().unwrap(), [0x82, 72, 0]);
+    assert_eq!(PitchBend::new().unwrap().value(), 0);
+    assert_eq!(ChannelPressure::new().unwrap().pressure(), 0);
+    assert_eq!(PolyPressure::new(60).unwrap().pressure(), 0);
+}
+
+#[test]
+fn commands_resolve_channels_before_expansion_and_builders_validate_ranges() {
+    let command = RpnSet::new(0, 128).unwrap();
+    assert_eq!(command.resolution(), 14);
+    assert!(command.expand().is_err());
+    assert!(command.clone().with_resolution(7).is_err());
+    assert!(command.clone().with_resolution(8).is_err());
+    let messages = command.with_channel(2).unwrap().expand().unwrap();
+    assert!(messages.iter().all(|m| m.encode().unwrap()[0] == 0xb1));
+    let bank = meedee::gm::BankProgramSelect::new(34).unwrap();
+    assert!(bank.expand().is_err());
+    let bytes: Vec<_> = bank
+        .with_channel(2)
+        .unwrap()
+        .expand()
+        .unwrap()
+        .iter()
+        .flat_map(|m| m.encode().unwrap())
+        .collect();
+    assert_eq!(bytes, [0xb1, 0, 0, 0xb1, 32, 0, 0xc1, 33]);
+    assert!(RpnSet::new(0, 127)
+        .unwrap()
+        .with_resolution(7)
+        .unwrap()
+        .with_value(128)
+        .is_err());
 }

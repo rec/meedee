@@ -7,12 +7,12 @@
 use crate::messages::*;
 
 /// Encode exactly one primitive message without running-status compression.
-pub fn encode(message: &(impl PrimitiveMessage + ?Sized)) -> Vec<u8> {
+pub fn encode(message: &(impl PrimitiveMessage + ?Sized)) -> Result<Vec<u8>, ValueError> {
     message.encode()
 }
 
 /// Expand a semantic command into ordered primitive MIDI 1.0 messages. No I/O occurs.
-pub fn expand(command: &(impl Command + ?Sized)) -> Vec<AnyMessage> {
+pub fn expand(command: &(impl Command + ?Sized)) -> Result<Vec<AnyMessage>, ValueError> {
     command.expand()
 }
 
@@ -264,13 +264,46 @@ fn short_message(status: u8, data: [u8; 2]) -> AnyMessage {
     // Status and data ranges are established by accept(); no caller-provided
     // unchecked indexing or unchecked message constructor is exposed.
     match status {
-        0x80..=0x8f => AnyMessage::NoteOff(NoteOff::new(channel, a, b).unwrap()),
-        0x90..=0x9f => AnyMessage::NoteOn(NoteOn::new(channel, a, b).unwrap()),
-        0xa0..=0xaf => AnyMessage::PolyPressure(PolyPressure::new(channel, a, b).unwrap()),
-        0xb0..=0xbf => AnyMessage::ControlChange(ControlChange::new(channel, a, b).unwrap()),
-        0xc0..=0xcf => AnyMessage::ProgramChange(ProgramChange::new(channel, a + 1).unwrap()),
-        0xd0..=0xdf => AnyMessage::ChannelPressure(ChannelPressure::new(channel, a).unwrap()),
-        0xe0..=0xef => AnyMessage::PitchBend(PitchBend::new(channel, a + (b << 7) - 8192).unwrap()),
+        0x80..=0x8f => AnyMessage::NoteOff(
+            NoteOff::new(a)
+                .and_then(|m| m.with_velocity(b))
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
+        0x90..=0x9f => AnyMessage::NoteOn(
+            NoteOn::new(a)
+                .and_then(|m| m.with_velocity(b))
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
+        0xa0..=0xaf => AnyMessage::PolyPressure(
+            PolyPressure::new(a)
+                .and_then(|m| m.with_pressure(b))
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
+        0xb0..=0xbf => AnyMessage::ControlChange(
+            ControlChange::new(a, b)
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
+        0xc0..=0xcf => AnyMessage::ProgramChange(
+            ProgramChange::new(a + 1)
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
+        0xd0..=0xdf => AnyMessage::ChannelPressure(
+            ChannelPressure::new()
+                .and_then(|m| m.with_pressure(a))
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
+        0xe0..=0xef => AnyMessage::PitchBend(
+            PitchBend::new()
+                .and_then(|m| m.with_value(a + (b << 7) - 8192))
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        ),
         0xf1 => AnyMessage::QuarterFrame(QuarterFrame::new(a >> 4, a & 15).unwrap()),
         0xf2 => AnyMessage::SongPosition(SongPosition::new(a + (b << 7)).unwrap()),
         0xf3 => AnyMessage::SongSelect(SongSelect::new(a).unwrap()),
@@ -281,10 +314,10 @@ fn short_message(status: u8, data: [u8; 2]) -> AnyMessage {
 macro_rules! encode_short {
     ($($name:ident ($value:ident) => $bytes:expr;)*) => {
         $(impl PrimitiveMessage for $name {
-            fn encode(&$value) -> Vec<u8> { $bytes }
+            fn encode(&$value) -> Result<Vec<u8>, ValueError> { Ok($bytes) }
         })*
         impl PrimitiveMessage for AnyMessage {
-            fn encode(&self) -> Vec<u8> {
+            fn encode(&self) -> Result<Vec<u8>, ValueError> {
                 match self {
                     $(Self::$name(message) => message.encode(),)*
                     Self::SysEx(message) => message.encode(),
@@ -295,17 +328,18 @@ macro_rules! encode_short {
 }
 
 impl PrimitiveMessage for SysEx {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, ValueError> {
         let mut bytes = Vec::with_capacity(self.data().len() + 2);
         bytes.push(0xf0);
         bytes.extend_from_slice(self.data());
         bytes.push(0xf7);
-        bytes
+        Ok(bytes)
     }
 }
 
 fn cc(channel: u8, controller: u8, value: u8) -> ControlChange {
-    ControlChange::new(channel.into(), controller.into(), value.into())
+    ControlChange::new(controller.into(), value.into())
+        .and_then(|m| m.with_channel(channel.into()))
         .expect("expanded fields have validated wire ranges")
 }
 
@@ -326,40 +360,44 @@ fn parameter_command(channel: u8, parameter: u16, msb: u8, data: &[(u8, u8)]) ->
 }
 
 impl Command for ControlChange14 {
-    fn expand(&self) -> Vec<AnyMessage> {
-        vec![
-            cc(self.channel(), self.controller(), (self.value() >> 7) as u8),
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        Ok(vec![
             cc(
-                self.channel(),
+                self.resolved_channel()?,
+                self.controller(),
+                (self.value() >> 7) as u8,
+            ),
+            cc(
+                self.resolved_channel()?,
                 self.controller() + 32,
                 (self.value() & 127) as u8,
             ),
         ]
         .into_iter()
         .map(AnyMessage::ControlChange)
-        .collect()
+        .collect())
     }
 }
 
 macro_rules! parameter_commands {
     (sets: $($set:ident => $selector:literal),*; steps: $($step:ident => ($family:literal, $controller:literal)),* $(;)?) => {
         $(impl Command for $set {
-            fn expand(&self) -> Vec<AnyMessage> {
+            fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
                 let data = if self.resolution() == 7 {
                     vec![(6, self.value() as u8)]
                 } else {
                     vec![(6, (self.value() >> 7) as u8), (38, (self.value() & 127) as u8)]
                 };
-                parameter_command(self.channel(), self.parameter(), $selector, &data)
+                Ok(parameter_command(self.resolved_channel()?, self.parameter(), $selector, &data))
             }
         })*
         $(impl Command for $step {
-            fn expand(&self) -> Vec<AnyMessage> {
-                parameter_command(self.channel(), self.parameter(), $family, &[($controller, 0)])
+            fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+                Ok(parameter_command(self.resolved_channel()?, self.parameter(), $family, &[($controller, 0)]))
             }
         })*
         impl Command for AnyCommand {
-            fn expand(&self) -> Vec<AnyMessage> {
+            fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
                 match self {
                     Self::ControlChange14(command) => command.expand(),
                     Self::BankProgramSelect(command) => command.expand(),
@@ -379,15 +417,15 @@ parameter_commands! {
 }
 
 encode_short! {
-    NoteOn(self) => vec![0x90 | (self.channel() - 1), self.note(), self.velocity()];
-    NoteOff(self) => vec![0x80 | (self.channel() - 1), self.note(), self.velocity()];
-    PolyPressure(self) => vec![0xa0 | (self.channel() - 1), self.note(), self.pressure()];
-    ControlChange(self) => vec![0xb0 | (self.channel() - 1), self.controller(), self.value()];
-    ProgramChange(self) => vec![0xc0 | (self.channel() - 1), self.program() - 1];
-    ChannelPressure(self) => vec![0xd0 | (self.channel() - 1), self.pressure()];
+    NoteOn(self) => vec![0x90 | (self.resolved_channel()? - 1), self.note(), self.velocity()];
+    NoteOff(self) => vec![0x80 | (self.resolved_channel()? - 1), self.note(), self.velocity()];
+    PolyPressure(self) => vec![0xa0 | (self.resolved_channel()? - 1), self.note(), self.pressure()];
+    ControlChange(self) => vec![0xb0 | (self.resolved_channel()? - 1), self.controller(), self.value()];
+    ProgramChange(self) => vec![0xc0 | (self.resolved_channel()? - 1), self.program() - 1];
+    ChannelPressure(self) => vec![0xd0 | (self.resolved_channel()? - 1), self.pressure()];
     PitchBend(self) => {
         let wire = (i32::from(self.value()) + 8192) as u16;
-        vec![0xe0 | (self.channel() - 1), (wire & 127) as u8, (wire >> 7) as u8]
+        vec![0xe0 | (self.resolved_channel()? - 1), (wire & 127) as u8, (wire >> 7) as u8]
     };
     QuarterFrame(self) => vec![0xf1, (self.message_type() << 4) | self.value()];
     SongPosition(self) => vec![0xf2, (self.position() & 127) as u8, (self.position() >> 7) as u8];

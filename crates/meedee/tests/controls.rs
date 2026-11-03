@@ -15,15 +15,43 @@ fn commands_expand_to_independent_wire_vectors() {
         let name = fields.next().unwrap();
         let v: Vec<i64> = fields.map(|v| v.parse().unwrap()).collect();
         let command = match name {
-            "ControlChange14" => {
-                AnyCommand::ControlChange14(ControlChange14::new(v[0], v[1], v[2]).unwrap())
-            }
-            "RpnSet" => AnyCommand::RpnSet(RpnSet::new(v[0], v[1], v[2], v[3]).unwrap()),
-            "NrpnSet" => AnyCommand::NrpnSet(NrpnSet::new(v[0], v[1], v[2], v[3]).unwrap()),
-            "RpnIncrement" => AnyCommand::RpnIncrement(RpnIncrement::new(v[0], v[1]).unwrap()),
-            "RpnDecrement" => AnyCommand::RpnDecrement(RpnDecrement::new(v[0], v[1]).unwrap()),
-            "NrpnIncrement" => AnyCommand::NrpnIncrement(NrpnIncrement::new(v[0], v[1]).unwrap()),
-            "NrpnDecrement" => AnyCommand::NrpnDecrement(NrpnDecrement::new(v[0], v[1]).unwrap()),
+            "ControlChange14" => AnyCommand::ControlChange14(
+                ControlChange14::new(v[1], v[2])
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
+            "RpnSet" => AnyCommand::RpnSet(
+                RpnSet::new(v[1], v[2])
+                    .and_then(|m| m.with_resolution(v[3]))
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
+            "NrpnSet" => AnyCommand::NrpnSet(
+                NrpnSet::new(v[1], v[2])
+                    .and_then(|m| m.with_resolution(v[3]))
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
+            "RpnIncrement" => AnyCommand::RpnIncrement(
+                RpnIncrement::new(v[1])
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
+            "RpnDecrement" => AnyCommand::RpnDecrement(
+                RpnDecrement::new(v[1])
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
+            "NrpnIncrement" => AnyCommand::NrpnIncrement(
+                NrpnIncrement::new(v[1])
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
+            "NrpnDecrement" => AnyCommand::NrpnDecrement(
+                NrpnDecrement::new(v[1])
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            ),
             _ => panic!("unknown fixture command {name}"),
         };
         let expected: Vec<u8> = wire
@@ -31,20 +59,42 @@ fn commands_expand_to_independent_wire_vectors() {
             .map(|v| u8::from_str_radix(v, 16).unwrap())
             .collect();
         assert_eq!(
-            expand(&command).iter().flat_map(encode).collect::<Vec<_>>(),
+            expand(&command)
+                .unwrap()
+                .iter()
+                .flat_map(|m| encode(m).unwrap())
+                .collect::<Vec<_>>(),
             expected,
             "{line}"
         );
     }
-    assert!(RpnSet::new(1, 16383, 0, 7).is_err());
-    assert!(NrpnSet::new(1, 16383, 127, 7).is_ok());
+    assert!(RpnSet::new(16383, 0)
+        .and_then(|m| m.with_resolution(7))
+        .and_then(|m| m.with_channel(1))
+        .is_err());
+    assert!(NrpnSet::new(16383, 127)
+        .and_then(|m| m.with_resolution(7))
+        .and_then(|m| m.with_channel(1))
+        .is_ok());
     for resolution in [0, 8, 13, 15] {
-        assert!(RpnSet::new(1, 0, 0, resolution).is_err());
+        assert!(RpnSet::new(0, 0)
+            .and_then(|m| m.with_resolution(resolution))
+            .and_then(|m| m.with_channel(1))
+            .is_err());
     }
-    assert!(NrpnSet::new(1, 0, 128, 7).is_err());
-    assert!(ControlChange14::new(0, 0, 0).is_err());
-    assert!(ControlChange14::new(1, 32, 0).is_err());
-    assert!(ControlChange14::new(1, 0, 16384).is_err());
+    assert!(NrpnSet::new(0, 128)
+        .and_then(|m| m.with_resolution(7))
+        .and_then(|m| m.with_channel(1))
+        .is_err());
+    assert!(ControlChange14::new(0, 0)
+        .and_then(|m| m.with_channel(0))
+        .is_err());
+    assert!(ControlChange14::new(32, 0)
+        .and_then(|m| m.with_channel(1))
+        .is_err());
+    assert!(ControlChange14::new(0, 16384)
+        .and_then(|m| m.with_channel(1))
+        .is_err());
 }
 
 #[test]
@@ -175,6 +225,8 @@ fn cc(
     value: i64,
 ) -> Vec<Observation> {
     interpreter.feed(&AnyMessage::ControlChange(
-        ControlChange::new(channel, controller, value).unwrap(),
+        ControlChange::new(controller, value)
+            .and_then(|m| m.with_channel(channel))
+            .unwrap(),
     ))
 }

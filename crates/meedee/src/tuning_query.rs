@@ -60,7 +60,7 @@ impl Query {
         self.report.deadline_ns = Some(tracker.deadline_ns());
         self.tracker = Some(tracker);
         self.report.status = "sending";
-        let wire = self.request.encode();
+        let wire = self.request.encode().expect("validated system message");
         SysEx::new(wire[1..wire.len() - 1].to_vec())
     }
     pub fn confirm(&mut self, now_ns: u64) -> Result<(), ValueError> {

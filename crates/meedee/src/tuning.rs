@@ -372,7 +372,7 @@ macro_rules! message_types {
         impl Message for TuningMessage {}
         $(impl Message for $name {}
         impl From<$name> for TuningMessage {fn from(value:$name)->Self {Self::$name(value)}}
-        impl PrimitiveMessage for $name {fn encode(&self)->Vec<u8> {TuningMessage::from(self.clone()).encode()}})*
+        impl PrimitiveMessage for $name {fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {TuningMessage::from(self.clone()).encode()}})*
     };
 }
 message_types!(
@@ -386,7 +386,7 @@ message_types!(
     ScaleOctaveChange
 );
 impl PrimitiveMessage for TuningMessage {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut payload = Vec::new();
         let mut checksum = false;
         match self {
@@ -470,7 +470,7 @@ impl PrimitiveMessage for TuningMessage {
         wire.push(240);
         wire.extend(payload);
         wire.push(247);
-        wire
+        Ok(wire)
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

@@ -283,13 +283,13 @@ pub(super) fn register_gm(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 pub(super) fn encode_message(value: &Bound<'_, PyAny>) -> Option<Vec<u8>> {
     if let Ok(v) = value.extract::<PyRef<'_, ControllerDestination>>() {
-        return Some(v.value.encode());
+        return Some(v.value.encode().expect("validated system message"));
     }
     if let Ok(v) = value.extract::<PyRef<'_, KeyBasedControl>>() {
-        return Some(v.value.encode());
+        return Some(v.value.encode().expect("validated system message"));
     }
     if let Ok(v) = value.extract::<PyRef<'_, GlobalParameterControl>>() {
-        return Some(v.value.encode());
+        return Some(v.value.encode().expect("validated system message"));
     }
     None
 }

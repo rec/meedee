@@ -248,7 +248,7 @@ macro_rules! message_classes {
         )*
         pub fn encode_message(message: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
             $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {
-                return Ok(value.value.encode());
+                return value.value.encode().map_err(|e| PyValueError::new_err(e.to_string()));
             })*
             Err(PyTypeError::new_err("message must be a supported MIDI 1.0 Message"))
         }

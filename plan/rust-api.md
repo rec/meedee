@@ -49,6 +49,14 @@ Additional work beyond the prompt: None.
   NoteDuration; exact rational beat-to-time conversion; note defaults and validated
   channel/velocity builders. The Rust crate test suite passes (including the new
   duration/default regressions); hardware tests remain ignored.
-- Message constructor/metadata migration, ergonomic Input/Output, scheduling,
+- MIDI 1 constructors now take payload-first defaults with validated builders and
+  optional channels. Encoding and command expansion return checked Results for
+  unresolved channels; transpose clamps notes. Core callers, archive decoding and
+  Python bindings use the new constructors. Native MIDI 2 constructors retain
+  their explicit group/channel API. Independent MIDI/archive fixtures and 117 Rust
+  tests pass (two native-device tests ignored), as do the Rust constructor doctest,
+  core Clippy with warnings denied, and all 525 Python regressions after rebuilding
+  the extension. The bindings now use the core optional channel directly.
+- Message metadata migration, ergonomic Input/Output, scheduling,
   recording/playback integration, cleanup integration and graded examples remain
   pending. Full goal completion is not established.

@@ -27,7 +27,12 @@ fn records() -> Vec<Record> {
                 clock: c,
             }),
             span: None,
-            message: Payload::Midi1(AnyMessage::NoteOn(NoteOn::new(16, 127, 127).unwrap())),
+            message: Payload::Midi1(AnyMessage::NoteOn(
+                NoteOn::new(127)
+                    .and_then(|m| m.with_velocity(127))
+                    .and_then(|m| m.with_channel(16))
+                    .unwrap(),
+            )),
         })),
         Record::Opaque {
             kind: 100,

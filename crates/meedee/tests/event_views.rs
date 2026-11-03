@@ -21,7 +21,11 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
     let mut view = event_views::Controls::new(None).unwrap();
     view.feed(
         &event(
-            AnyMessage::ControlChange(ControlChange::new(1, 7, 64).unwrap()),
+            AnyMessage::ControlChange(
+                ControlChange::new(7, 64)
+                    .and_then(|m| m.with_channel(1))
+                    .unwrap(),
+            ),
             10,
         ),
         None,
@@ -29,7 +33,15 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
     .unwrap();
     for i in 0..2000 {
         view.feed(
-            &event(AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap()), i + 11),
+            &event(
+                AnyMessage::NoteOn(
+                    NoteOn::new(60)
+                        .and_then(|m| m.with_velocity(100))
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap(),
+                ),
+                i + 11,
+            ),
             None,
         )
         .unwrap();
@@ -37,7 +49,11 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
     let out = view
         .feed(
             &event(
-                AnyMessage::ControlChange(ControlChange::new(1, 39, 1).unwrap()),
+                AnyMessage::ControlChange(
+                    ControlChange::new(39, 1)
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap(),
+                ),
                 3000,
             ),
             None,
@@ -60,7 +76,11 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
     let out = view
         .feed(
             &event(
-                AnyMessage::ControlChange(ControlChange::new(1, 39, 2).unwrap()),
+                AnyMessage::ControlChange(
+                    ControlChange::new(39, 2)
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap(),
+                ),
                 4000,
             ),
             None,
@@ -70,7 +90,15 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
         &out[0].value,
         Value::Control(meedee::controls::Observation::Diagnostic(_))
     ));
-    let mut wrong = event(AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap()), 5000);
+    let mut wrong = event(
+        AnyMessage::NoteOn(
+            NoteOn::new(60)
+                .and_then(|m| m.with_velocity(100))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        ),
+        5000,
+    );
     wrong.stream = "another".into();
     assert!(view.feed(&wrong, None).is_err());
 }
@@ -79,7 +107,11 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
     let mut v = event_views::Velocity::new(None).unwrap();
     v.feed(
         &event(
-            AnyMessage::ControlChange(ControlChange::new(1, 88, 127).unwrap()),
+            AnyMessage::ControlChange(
+                ControlChange::new(88, 127)
+                    .and_then(|m| m.with_channel(1))
+                    .unwrap(),
+            ),
             1,
         ),
         None,
@@ -87,7 +119,15 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
     .unwrap();
     let out = v
         .feed(
-            &event(AnyMessage::NoteOn(NoteOn::new(1, 60, 127).unwrap()), 2),
+            &event(
+                AnyMessage::NoteOn(
+                    NoteOn::new(60)
+                        .and_then(|m| m.with_velocity(127))
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap(),
+                ),
+                2,
+            ),
             None,
         )
         .unwrap();
@@ -95,7 +135,15 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
     assert!(matches!(&out[0].value,Value::Velocity(v)if v.velocity==16383));
     let mut assembler = event_views::Ump::new(1024, 8192, 64).unwrap();
     let packets = ump::packetize_sysex7(2, &[125, 1, 2, 3, 4, 5, 6, 7]).unwrap();
-    let mut a = event(AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap()), 10);
+    let mut a = event(
+        AnyMessage::NoteOn(
+            NoteOn::new(60)
+                .and_then(|m| m.with_velocity(100))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        ),
+        10,
+    );
     a.message = Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone()));
     assert!(assembler.feed(&a, None).unwrap().is_empty());
     a.timestamp.as_mut().unwrap().ticks = 20;

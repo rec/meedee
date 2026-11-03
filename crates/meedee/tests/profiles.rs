@@ -17,33 +17,48 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
             .map(|v| u8::from_str_radix(v, 16).unwrap())
             .collect();
         let actual = match name {
-            "BankProgramSelect" => {
-                codecs::expand(&gm::BankProgramSelect::new(v[0], v[1], v[2], v[3]).unwrap())
-                    .iter()
-                    .flat_map(codecs::encode)
-                    .collect()
-            }
+            "BankProgramSelect" => codecs::expand(
+                &gm::BankProgramSelect::new(v[3])
+                    .and_then(|m| m.with_bank_msb(v[1]))
+                    .and_then(|m| m.with_bank_lsb(v[2]))
+                    .and_then(|m| m.with_channel(v[0]))
+                    .unwrap(),
+            )
+            .unwrap()
+            .iter()
+            .flat_map(|m| codecs::encode(m).unwrap())
+            .collect(),
             "ZoneConfiguration" => {
                 codecs::expand(&mpe::ZoneConfiguration::new(v[0], v[1]).unwrap())
+                    .unwrap()
                     .iter()
-                    .flat_map(codecs::encode)
+                    .flat_map(|m| codecs::encode(m).unwrap())
                     .collect()
             }
-            "Gm1On" => gm::Gm1On::new(v[0]).unwrap().encode(),
-            "GmOff" => gm::GmOff::new(v[0]).unwrap().encode(),
-            "Gm2On" => gm::Gm2On::new(v[0]).unwrap().encode(),
-            "IdentityRequest" => universal::IdentityRequest::new(v[0]).unwrap().encode(),
-            "MasterVolume" => universal::MasterVolume::new(v[0], v[1]).unwrap().encode(),
+            "Gm1On" => gm::Gm1On::new(v[0]).unwrap().encode().unwrap(),
+            "GmOff" => gm::GmOff::new(v[0]).unwrap().encode().unwrap(),
+            "Gm2On" => gm::Gm2On::new(v[0]).unwrap().encode().unwrap(),
+            "IdentityRequest" => universal::IdentityRequest::new(v[0])
+                .unwrap()
+                .encode()
+                .unwrap(),
+            "MasterVolume" => universal::MasterVolume::new(v[0], v[1])
+                .unwrap()
+                .encode()
+                .unwrap(),
             "MasterFineTuning" => universal::MasterFineTuning::new(v[0], v[1])
                 .unwrap()
-                .encode(),
+                .encode()
+                .unwrap(),
             "MasterCoarseTuning" => universal::MasterCoarseTuning::new(v[0], v[1])
                 .unwrap()
-                .encode(),
+                .encode()
+                .unwrap(),
             "FullFrame" => {
                 timecode::FullFrame::new(v[0], timecode::FrameRate::Fps30, v[2], v[3], v[4], v[5])
                     .unwrap()
                     .encode()
+                    .unwrap()
             }
             _ => panic!("unknown fixture"),
         };
@@ -65,9 +80,13 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
             }
         }
     }
-    let command = gm::BankProgramSelect::new(1, 0, 0, 1).unwrap();
+    let command = gm::BankProgramSelect::new(1)
+        .and_then(|m| m.with_bank_msb(0))
+        .and_then(|m| m.with_bank_lsb(0))
+        .and_then(|m| m.with_channel(1))
+        .unwrap();
     assert!(matches!(
-        command.expand().last(),
+        command.expand().unwrap().last(),
         Some(AnyMessage::ProgramChange(_))
     ));
 }
@@ -133,7 +152,7 @@ fn identity_and_universal_decoders_preserve_exact_fields_and_reject_corruption()
     for manufacturer in [vec![65], vec![0, 32, 51]] {
         let value =
             universal::IdentityReply::new(3, manufacturer, 257, 16383, vec![0, 1, 2, 127]).unwrap();
-        let wire = value.encode();
+        let wire = value.encode().unwrap();
         let raw = SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap();
         assert_eq!(
             universal::decode(&raw).unwrap(),
@@ -175,11 +194,11 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
     assert_eq!(controls::tuning_program(1, 127).unwrap().parameter(), 3);
     assert_eq!(controls::tuning_bank(1, 0).unwrap().parameter(), 4);
     assert_eq!(
-        controls::local_control(16, true).unwrap().encode(),
+        controls::local_control(16, true).unwrap().encode().unwrap(),
         vec![191, 122, 127]
     );
     assert_eq!(
-        controls::all_notes_off(10).unwrap().encode(),
+        controls::all_notes_off(10).unwrap().encode().unwrap(),
         vec![185, 123, 0]
     );
     assert!(controls::mono_mode(1, 17).is_err());
@@ -192,6 +211,7 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
                 mpe::ZoneConfiguration::new(manager, members)
                     .unwrap()
                     .expand()
+                    .unwrap()
                     .len(),
                 5
             );
@@ -209,7 +229,7 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
             _ => 29,
         };
         let value = timecode::FullFrame::new(127, rate, 23, 59, 59, max).unwrap();
-        let wire = value.encode();
+        let wire = value.encode().unwrap();
         assert_eq!(
             timecode::decode(&SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap()).unwrap(),
             Some(value)
@@ -219,11 +239,15 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
     assert!(timecode::FullFrame::new(1, timecode::FrameRate::Fps30, 0, 0, 0, 0).is_err());
     let mut interpreter = controls::Interpreter::new();
     interpreter.feed(&AnyMessage::ControlChange(
-        meedee::messages::ControlChange::new(1, 7, 1).unwrap(),
+        meedee::messages::ControlChange::new(7, 1)
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
     ));
     interpreter.feed(&gm::Gm2On::new(127).unwrap());
     let result = interpreter.feed(&AnyMessage::ControlChange(
-        meedee::messages::ControlChange::new(1, 39, 2).unwrap(),
+        meedee::messages::ControlChange::new(39, 2)
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
     ));
     assert!(
         matches!(&result[0],controls::Observation::Diagnostic(value) if value.kind==controls::DiagnosticKind::MissingCoarse)

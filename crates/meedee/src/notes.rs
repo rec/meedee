@@ -262,11 +262,11 @@ fn action(message: &Payload) -> Option<(Option<u8>, &'static str, u8, Action)> {
 fn midi1(message: &messages::AnyMessage) -> Option<(u8, Action)> {
     use messages::AnyMessage::*;
     match message {
-        NoteOn(v) if v.velocity() != 0 => Some((v.channel(), Action::On(v.note()))),
-        NoteOn(v) => Some((v.channel(), Action::Off(v.note()))),
-        NoteOff(v) => Some((v.channel(), Action::Off(v.note()))),
+        NoteOn(v) if v.velocity() != 0 => Some((v.channel()?, Action::On(v.note()))),
+        NoteOn(v) => Some((v.channel()?, Action::Off(v.note()))),
+        NoteOff(v) => Some((v.channel()?, Action::Off(v.note()))),
         ControlChange(v) if selected_control(v.controller()) => Some((
-            v.channel(),
+            v.channel()?,
             Action::Control(v.controller(), v.value().into()),
         )),
         SystemReset(_) => Some((0, Action::Reset)),

@@ -4,7 +4,10 @@ use meedee::{events::Payload, messages, notes::Tracker};
 fn sources_are_independent_and_loss_before_notes_remains_visible() {
     let mut tracker = Tracker::default();
     let on = Payload::Midi1(messages::AnyMessage::NoteOn(
-        messages::NoteOn::new(1, 60, 1).unwrap(),
+        messages::NoteOn::new(60)
+            .and_then(|m| m.with_velocity(1))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
     ));
     tracker.feed("left", &on, Some("c"), 3);
     tracker.boundary("right", 3);
@@ -22,7 +25,10 @@ fn sources_are_independent_and_loss_before_notes_remains_visible() {
 fn source_and_channel_storage_are_bounded_without_eviction() {
     let mut tracker = Tracker::default();
     let on = Payload::Midi1(messages::AnyMessage::NoteOn(
-        messages::NoteOn::new(1, 60, 1).unwrap(),
+        messages::NoteOn::new(60)
+            .and_then(|m| m.with_velocity(1))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
     ));
     tracker.feed("first", &on, None, 1);
     tracker.feed("second", &on, None, 1);

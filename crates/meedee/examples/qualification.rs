@@ -17,23 +17,25 @@ fn measure(name: &str, operations: usize, mut action: impl FnMut()) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let message = ControlChange::new(1, 7, 127)?;
-    let wire = message.encode().repeat(2048);
+    let message = ControlChange::new(7, 127).and_then(|m| m.with_channel(1))?;
+    let wire = message.encode().unwrap().repeat(2048);
     measure("rust_cc_decode", 2048, || {
         let values = Decoder::default().feed(black_box(&wire));
         assert_eq!(values.len(), 2048);
         assert!(values.iter().all(|v| matches!(v, DecodeItem::Message(_))));
         black_box(values);
     });
-    let command = NrpnSet::new(1, 1234, 12345, 14)?;
+    let command = NrpnSet::new(1234, 12345)
+        .and_then(|m| m.with_resolution(14))
+        .and_then(|m| m.with_channel(1))?;
     measure("rust_nrpn_expand_encode", 2048, || {
         for _ in 0..2048 {
-            let parts = black_box(&command).expand();
+            let parts = black_box(&command).expand().unwrap();
             assert_eq!(parts.len(), 6);
             assert_eq!(
                 parts
                     .iter()
-                    .map(|p| black_box(p.encode()).len())
+                    .map(|p| black_box(p.encode().unwrap()).len())
                     .sum::<usize>(),
                 18
             );
@@ -41,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
     for size in [1024, 65536, 1048576] {
         let sysex = SysEx::new(vec![0x7d; size])?;
-        let encoded = codecs::encode(&sysex);
+        let encoded = codecs::encode(&sysex).unwrap();
         measure(&format!("rust_sysex_{size}_bytes"), size, || {
             let mut decoder = Decoder::default();
             let mut count = 0;

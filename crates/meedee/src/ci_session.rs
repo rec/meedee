@@ -630,7 +630,7 @@ impl Session {
                 .flat_map(|p| &p.provisional)
                 .map(|(_, n)| n)
                 .sum();
-            let size = message.encode().len();
+            let size = message.encode().expect("validated system message").len();
             let count_limit = if matches!(message.body(), Body::DiscoveryReply { .. }) {
                 self.peer_limit
             } else {
@@ -818,7 +818,9 @@ impl Session {
             .find(|p| p.muid == message.header().destination_muid())
             .ok_or_else(|| err("response requires a discovered peer"))?;
         use crate::messages::PrimitiveMessage;
-        if message.encode().len() > peer.info.max_sysex() as usize {
+        if message.encode().expect("validated system message").len()
+            > peer.info.max_sysex() as usize
+        {
             return Err(err("response exceeds peer receive limit"));
         }
         self.enqueue(message, timeout)

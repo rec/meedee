@@ -196,17 +196,25 @@ fn timestamp(out: &mut Vec<u8>, t: Option<&Timestamp>) -> io::Result<()> {
     }
     Ok(())
 }
-fn command(out: &mut Vec<u8>, c: &m::AnyCommand) {
+fn command(out: &mut Vec<u8>, c: &m::AnyCommand) -> io::Result<()> {
     use m::AnyCommand::*;
     let (id, fields): (u16, Vec<i64>) = match c {
         ControlChange14(v) => (
             1,
-            vec![v.channel().into(), v.controller().into(), v.value().into()],
+            vec![
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
+                v.controller().into(),
+                v.value().into(),
+            ],
         ),
         RpnSet(v) => (
             2,
             vec![
-                v.channel().into(),
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
                 v.parameter().into(),
                 v.value().into(),
                 v.resolution().into(),
@@ -215,20 +223,56 @@ fn command(out: &mut Vec<u8>, c: &m::AnyCommand) {
         NrpnSet(v) => (
             3,
             vec![
-                v.channel().into(),
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
                 v.parameter().into(),
                 v.value().into(),
                 v.resolution().into(),
             ],
         ),
-        RpnIncrement(v) => (4, vec![v.channel().into(), v.parameter().into()]),
-        RpnDecrement(v) => (5, vec![v.channel().into(), v.parameter().into()]),
-        NrpnIncrement(v) => (6, vec![v.channel().into(), v.parameter().into()]),
-        NrpnDecrement(v) => (7, vec![v.channel().into(), v.parameter().into()]),
+        RpnIncrement(v) => (
+            4,
+            vec![
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
+                v.parameter().into(),
+            ],
+        ),
+        RpnDecrement(v) => (
+            5,
+            vec![
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
+                v.parameter().into(),
+            ],
+        ),
+        NrpnIncrement(v) => (
+            6,
+            vec![
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
+                v.parameter().into(),
+            ],
+        ),
+        NrpnDecrement(v) => (
+            7,
+            vec![
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
+                v.parameter().into(),
+            ],
+        ),
         BankProgramSelect(v) => (
             8,
             vec![
-                v.channel().into(),
+                v.channel()
+                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
+                    .into(),
                 v.bank_msb().into(),
                 v.bank_lsb().into(),
                 v.program().into(),
@@ -240,6 +284,7 @@ fn command(out: &mut Vec<u8>, c: &m::AnyCommand) {
     for n in fields {
         out.extend(n.to_be_bytes());
     }
+    Ok(())
 }
 pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
     let mut out = vec![];
@@ -291,7 +336,7 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
             match &e.message {
                 Payload::Midi1(v) => {
                     out.push(1);
-                    out.extend(v.encode());
+                    out.extend(v.encode()?);
                 }
                 Payload::Ump(v) => {
                     out.push(2);
@@ -299,7 +344,7 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
                 }
                 Payload::Command(v) => {
                     out.push(3);
-                    command(&mut out, v);
+                    command(&mut out, v)?;
                 }
             }
             3
@@ -552,23 +597,89 @@ fn decode_command(b: &[u8]) -> io::Result<m::AnyCommand> {
     let id = u16::from_be_bytes(f.source.array()?);
     use m::AnyCommand::*;
     let r = match id {
-        1 => ControlChange14(
-            m::ControlChange14::new(f.i64()?, f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?,
-        ),
-        2 => RpnSet(
-            m::RpnSet::new(f.i64()?, f.i64()?, f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?,
-        ),
-        3 => NrpnSet(
-            m::NrpnSet::new(f.i64()?, f.i64()?, f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?,
-        ),
-        4 => RpnIncrement(m::RpnIncrement::new(f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?),
-        5 => RpnDecrement(m::RpnDecrement::new(f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?),
-        6 => NrpnIncrement(m::NrpnIncrement::new(f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?),
-        7 => NrpnDecrement(m::NrpnDecrement::new(f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?),
-        8 => BankProgramSelect(
-            crate::gm::BankProgramSelect::new(f.i64()?, f.i64()?, f.i64()?, f.i64()?)
-                .map_err(|e| invalid(0, e))?,
-        ),
+        1 => {
+            let channel = f.i64()?;
+            let controller = f.i64()?;
+            let value = f.i64()?;
+            ControlChange14(
+                m::ControlChange14::new(controller, value)
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        2 => {
+            let channel = f.i64()?;
+            let parameter = f.i64()?;
+            let value = f.i64()?;
+            let resolution = f.i64()?;
+            RpnSet(
+                m::RpnSet::new(parameter, value)
+                    .and_then(|m| m.with_resolution(resolution))
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        3 => {
+            let channel = f.i64()?;
+            let parameter = f.i64()?;
+            let value = f.i64()?;
+            let resolution = f.i64()?;
+            NrpnSet(
+                m::NrpnSet::new(parameter, value)
+                    .and_then(|m| m.with_resolution(resolution))
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        4 => {
+            let channel = f.i64()?;
+            let parameter = f.i64()?;
+            RpnIncrement(
+                m::RpnIncrement::new(parameter)
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        5 => {
+            let channel = f.i64()?;
+            let parameter = f.i64()?;
+            RpnDecrement(
+                m::RpnDecrement::new(parameter)
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        6 => {
+            let channel = f.i64()?;
+            let parameter = f.i64()?;
+            NrpnIncrement(
+                m::NrpnIncrement::new(parameter)
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        7 => {
+            let channel = f.i64()?;
+            let parameter = f.i64()?;
+            NrpnDecrement(
+                m::NrpnDecrement::new(parameter)
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
+        8 => {
+            let channel = f.i64()?;
+            let bank_msb = f.i64()?;
+            let bank_lsb = f.i64()?;
+            let program = f.i64()?;
+            BankProgramSelect(
+                crate::gm::BankProgramSelect::new(program)
+                    .and_then(|m| m.with_bank_msb(bank_msb))
+                    .and_then(|m| m.with_bank_lsb(bank_lsb))
+                    .and_then(|m| m.with_channel(channel))
+                    .map_err(|e| invalid(0, e))?,
+            )
+        }
         9 => ZoneConfiguration(
             crate::mpe::ZoneConfiguration::new(f.i64()?, f.i64()?).map_err(|e| invalid(0, e))?,
         ),
@@ -607,7 +718,7 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
         Record::Event(e) => {
             let p = match &e.message {
                 Payload::Midi1(m::AnyMessage::SysEx(v)) => v.data().len() + 2,
-                Payload::Midi1(v) => v.encode().len(),
+                Payload::Midi1(v) => v.encoded_len(),
                 Payload::Ump(v) => v.encode_words().len() * 4,
                 Payload::Command(_) => 34,
             };

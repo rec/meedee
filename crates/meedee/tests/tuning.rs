@@ -67,7 +67,7 @@ fn vectors() -> Vec<(TuningMessage, Vec<u8>)> {
 #[test]
 fn normative_wire_vectors_cover_every_family_and_realtime_variant() {
     for (message, wire) in vectors() {
-        assert_eq!(message.encode(), wire, "{message:?}");
+        assert_eq!(message.encode().unwrap(), wire, "{message:?}");
         let decoded = decode(&SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap())
             .unwrap()
             .unwrap();
@@ -113,7 +113,8 @@ fn recognized_payloads_require_exact_lengths_and_modern_checksums() {
     assert!(decode(&SysEx::new(vec![126, 1, 8]).unwrap()).is_err());
     let mut channels = ScaleOctaveChange::new(1, true, vec![1], scale(7))
         .unwrap()
-        .encode();
+        .encode()
+        .unwrap();
     channels[5] |= 4;
     assert!(decode(&SysEx::new(channels[1..channels.len() - 1].to_vec()).unwrap()).is_err());
 }
@@ -162,7 +163,7 @@ fn exact_pitch_sentinel_and_quantization_boundaries() {
         NoteTuning::new(127, TuningValue::Pitch(Pitch::new(127, 16382).unwrap())).unwrap(),
     ];
     let message: TuningMessage = SingleNoteChange::new(127, 127, notes).unwrap().into();
-    let wire = message.encode();
+    let wire = message.encode().unwrap();
     assert_eq!(&wire[8..11], &[127, 127, 127]);
     assert_eq!(&wire[12..15], &[127, 127, 126]);
     assert_eq!(
@@ -204,7 +205,7 @@ fn scale_offsets_use_signed_exact_units_and_report_error() {
             )
             .unwrap()
             .into();
-            let wire = value.encode();
+            let wire = value.encode().unwrap();
             assert_eq!(
                 decode(&SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap())
                     .unwrap()

@@ -70,7 +70,6 @@ mod gm {
     #[pyclass(frozen, extends=Message, module="meedee.gm")]
     pub(super) struct BankProgramSelect {
         pub(super) value: model::BankProgramSelect,
-        pub(super) assigned: bool,
     }
     #[pymethods]
     impl BankProgramSelect {
@@ -85,20 +84,23 @@ mod gm {
             let channel = channel.map(int).transpose()?;
             Ok(
                 PyClassInitializer::from(Message::default()).add_subclass(Self {
-                    value: model::BankProgramSelect::new(
-                        channel.unwrap_or(1),
-                        bank_msb,
-                        bank_lsb,
-                        program,
-                    )
-                    .map_err(value_error)?,
-                    assigned: channel.is_some(),
+                    value: {
+                        let value = model::BankProgramSelect::new(program)
+                            .and_then(|m| m.with_bank_msb(bank_msb))
+                            .and_then(|m| m.with_bank_lsb(bank_lsb))
+                            .map_err(value_error)?;
+                        if let Some(channel) = channel {
+                            value.with_channel(channel).map_err(value_error)?
+                        } else {
+                            value
+                        }
+                    },
                 }),
             )
         }
         #[getter]
         fn channel(&self) -> Option<u8> {
-            self.assigned.then(|| self.value.channel())
+            self.value.channel()
         }
         #[getter]
         fn program(&self) -> u8 {
@@ -123,10 +125,10 @@ mod gm {
         fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
             other
                 .extract::<PyRef<'_, Self>>()
-                .is_ok_and(|v| self.assigned == v.assigned && self.value == v.value)
+                .is_ok_and(|v| self.value == v.value)
         }
         fn __hash__(&self) -> u64 {
-            hash(&(&self.value, self.assigned))
+            hash(&self.value)
         }
         #[pyo3(signature=(**changes))]
         fn replace<'py>(
@@ -407,7 +409,7 @@ pub fn changes_mode(message: &Bound<'_, PyAny>) -> bool {
 }
 macro_rules! primitives {
     ($($module:ident :: $name:ident),*)=>{
-        pub fn encode_message(message:&Bound<'_,PyAny>)->Option<Vec<u8>> {$(if let Ok(value)=message.extract::<PyRef<'_,$module::$name>>() {return Some(value.value.encode());})*engines::encode_message(message)}
+        pub fn encode_message(message:&Bound<'_,PyAny>)->Option<Vec<u8>> {$(if let Ok(value)=message.extract::<PyRef<'_,$module::$name>>() {return Some(value.value.encode().expect("validated system message"));})*engines::encode_message(message)}
         pub fn is_message(message:&Bound<'_,PyAny>)->bool {engines::is_message(message) $(||message.is_instance_of::<$module::$name>())*}
     };
 }
@@ -426,7 +428,7 @@ pub fn extract_command(
     command: &Bound<'_, PyAny>,
 ) -> PyResult<Option<meedee::messages::AnyCommand>> {
     if let Ok(value) = command.extract::<PyRef<'_, gm::BankProgramSelect>>() {
-        if !value.assigned {
+        if value.value.channel().is_none() {
             return Err(PyValueError::new_err("message channel is unassigned"));
         }
         return Ok(Some(meedee::messages::AnyCommand::BankProgramSelect(
@@ -448,7 +450,10 @@ pub fn command_wire(
         AnyCommand::BankProgramSelect(value) => (
             "BankProgramSelect".into(),
             [
-                ("channel", value.channel()),
+                (
+                    "channel",
+                    value.channel().expect("resolved command channel"),
+                ),
                 ("bank_msb", value.bank_msb()),
                 ("bank_lsb", value.bank_lsb()),
                 ("program", value.program()),

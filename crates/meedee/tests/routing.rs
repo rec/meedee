@@ -6,7 +6,10 @@ fn event(source: &str, note: i64) -> events::Event {
         timestamp: None,
         span: None,
         message: events::Payload::Midi1(messages::AnyMessage::NoteOn(
-            messages::NoteOn::new(1, note, 100).unwrap(),
+            messages::NoteOn::new(note)
+                .and_then(|m| m.with_velocity(100))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
         )),
     }
 }

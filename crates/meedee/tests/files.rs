@@ -153,7 +153,16 @@ fn clip_requires_timing_start_end_and_exact_big_endian_packets() {
     let mut w = clip::Writer::new(vec![]).unwrap();
     assert!(w
         .write(&ump::UmpMessage::Midi1(
-            ump::Midi1Packet::new(1, AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap())).unwrap()
+            ump::Midi1Packet::new(
+                1,
+                AnyMessage::NoteOn(
+                    NoteOn::new(60)
+                        .and_then(|m| m.with_velocity(100))
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap()
+                )
+            )
+            .unwrap()
         ))
         .is_err());
     assert!(w.finish().is_err());

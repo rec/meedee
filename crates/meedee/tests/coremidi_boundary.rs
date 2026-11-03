@@ -54,13 +54,20 @@ fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {
     enable();
     for command in [
         meedee::messages::AnyCommand::NrpnSet(
-            meedee::messages::NrpnSet::new(1, 1234, 10000, 14).unwrap(),
+            meedee::messages::NrpnSet::new(1234, 10000)
+                .and_then(|m| m.with_resolution(14))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
         ),
         meedee::messages::AnyCommand::BankProgramSelect(
-            meedee::gm::BankProgramSelect::new(1, 121, 3, 128).unwrap(),
+            meedee::gm::BankProgramSelect::new(128)
+                .and_then(|m| m.with_bank_msb(121))
+                .and_then(|m| m.with_bank_lsb(3))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
         ),
     ] {
-        let expected = meedee::codecs::expand(&command);
+        let expected = meedee::codecs::expand(&command).unwrap();
         let total = expected.len();
         for accepted in 0..expected.len() {
             let name = format!("compound-failure-{accepted}");
@@ -86,7 +93,7 @@ fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {
             let actual: Vec<_> = receiver.try_iter().collect();
             let expected: Vec<_> = expected[..accepted]
                 .iter()
-                .map(|m| Packet::Bytes(meedee::codecs::encode(m)))
+                .map(|m| Packet::Bytes(meedee::codecs::encode(m).unwrap()))
                 .collect();
             assert_eq!(actual, expected);
             drop(output);
@@ -122,9 +129,12 @@ fn simultaneous_raw_and_compound_sends_do_not_interleave_command_messages() {
             barrier.wait();
             for _ in 0..50 {
                 loop {
-                    match output
-                        .send_command(&meedee::messages::RpnSet::new(1, 0, 128, 14).unwrap())
-                    {
+                    match output.send_command(
+                        &meedee::messages::RpnSet::new(0, 128)
+                            .and_then(|m| m.with_resolution(14))
+                            .and_then(|m| m.with_channel(1))
+                            .unwrap(),
+                    ) {
                         Ok(()) => break,
                         Err(Error::CompoundSend {
                             completed_messages: Some(0),
@@ -149,11 +159,16 @@ fn simultaneous_raw_and_compound_sends_do_not_interleave_command_messages() {
             }
         });
     });
-    let expected: Vec<_> =
-        meedee::codecs::expand(&meedee::messages::RpnSet::new(1, 0, 128, 14).unwrap())
-            .iter()
-            .map(|m| Packet::Bytes(meedee::codecs::encode(m)))
-            .collect();
+    let expected: Vec<_> = meedee::codecs::expand(
+        &meedee::messages::RpnSet::new(0, 128)
+            .and_then(|m| m.with_resolution(14))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
+    )
+    .unwrap()
+    .iter()
+    .map(|m| Packet::Bytes(meedee::codecs::encode(m).unwrap()))
+    .collect();
     let mut received = received.lock().unwrap().clone().into_iter().peekable();
     let mut commands = 0;
     let mut clocks = 0;

@@ -101,6 +101,7 @@ impl Midi1Packet {
         if matches!(message, AnyMessage::SysEx(_)) {
             return Err(ValueError("use SysEx7 packetization for SysEx".into()));
         }
+        message.encode()?;
         Ok(Self {
             group: bounded(group, 1, 16, "group")? as u8,
             message,
@@ -116,7 +117,7 @@ impl Midi1Packet {
 impl Message for Midi1Packet {}
 impl UmpValue for Midi1Packet {
     fn encode_words(&self) -> Vec<u32> {
-        let b = self.message.encode();
+        let b = self.message.encode().expect("validated MIDI 1 packet");
         let mut bytes = [0u8; 4];
         bytes[0] = if b[0] >= 240 { 0x10 } else { 0x20 } | (self.group - 1);
         bytes[1..1 + b.len()].copy_from_slice(&b);
@@ -701,11 +702,13 @@ impl Capabilities {
             | UmpMessage::MixedDataSet(_)
             | UmpMessage::FlexData(_)
             | UmpMessage::Stream(_) => None,
-            UmpMessage::Midi1(v) => Some(if v.message.encode()[0] >= 240 {
-                self.midi1 || self.midi2
-            } else {
-                self.midi1
-            }),
+            UmpMessage::Midi1(v) => Some(
+                if v.message.encode().expect("decoded MIDI 1 message")[0] >= 240 {
+                    self.midi1 || self.midi2
+                } else {
+                    self.midi1
+                },
+            ),
             UmpMessage::SysEx8(v) => Some(v.stream_id() < self.sysex8_streams),
             UmpMessage::SysEx7(_) => Some(self.midi1 || self.midi2),
             _ if message.encode_words()[0] >> 28 == 4 => Some(self.midi2),

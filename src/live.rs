@@ -136,7 +136,13 @@ fn prepare_message(
         match (protocol, p) {
             (Protocol::Midi1, Payload::Midi1(v)) => {
                 use meedee::messages::PrimitiveMessage;
-                return Ok(PyBytes::new(py, &v.encode()).into_any().unbind());
+                return Ok(PyBytes::new(
+                    py,
+                    &v.encode()
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+                )
+                .into_any()
+                .unbind());
             }
             (Protocol::Ump, Payload::Ump(meedee::ump::UmpMessage::Opaque(_))) => {
                 return Err(crate::errors::CapabilityError::new_err(
@@ -203,10 +209,7 @@ pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
     if let Ok(v) = crate::event_values::extract(&item) {
         return Ok(match &v.value.message {
             Payload::Midi1(meedee::messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
-            Payload::Midi1(v) => {
-                use meedee::messages::PrimitiveMessage;
-                v.encode().len()
-            }
+            Payload::Midi1(v) => v.encoded_len(),
             Payload::Ump(v) => {
                 use meedee::ump::UmpValue;
                 v.encode_words().len() * 4

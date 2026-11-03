@@ -10,30 +10,44 @@ pub use extensions::{
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BankProgramSelect {
-    channel: u8,
+    channel: Option<u8>,
     bank_msb: u8,
     bank_lsb: u8,
     program: u8,
 }
 impl BankProgramSelect {
-    pub fn new(
-        channel: i64,
-        bank_msb: i64,
-        bank_lsb: i64,
-        program: i64,
-    ) -> Result<Self, ValueError> {
-        // Reuse the primitive validators; there is no implicit bank or mode.
-        ControlChange::new(channel, 0, bank_msb)?;
-        ControlChange::new(channel, 32, bank_lsb)?;
-        ProgramChange::new(channel, program)?;
+    pub fn new(program: i64) -> Result<Self, ValueError> {
+        let program = ProgramChange::new(program)?.program();
         Ok(Self {
-            channel: channel as u8,
-            bank_msb: bank_msb as u8,
-            bank_lsb: bank_lsb as u8,
-            program: program as u8,
+            channel: None,
+            bank_msb: 0,
+            bank_lsb: 0,
+            program,
         })
     }
-    pub fn channel(&self) -> u8 {
+    pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
+        self.channel = ProgramChange::new(self.program.into())?
+            .with_channel(channel)?
+            .channel();
+        Ok(self)
+    }
+    pub fn without_channel(mut self) -> Self {
+        self.channel = None;
+        self
+    }
+    pub fn with_bank_msb(mut self, value: i64) -> Result<Self, ValueError> {
+        self.bank_msb = ControlChange::new(0, value)?.value();
+        Ok(self)
+    }
+    pub fn with_bank_lsb(mut self, value: i64) -> Result<Self, ValueError> {
+        self.bank_lsb = ControlChange::new(32, value)?.value();
+        Ok(self)
+    }
+    pub fn with_program(mut self, program: i64) -> Result<Self, ValueError> {
+        self.program = ProgramChange::new(program)?.program();
+        Ok(self)
+    }
+    pub fn channel(&self) -> Option<u8> {
         self.channel
     }
     pub fn bank_msb(&self) -> u8 {
@@ -48,21 +62,27 @@ impl BankProgramSelect {
 }
 impl Message for BankProgramSelect {}
 impl Command for BankProgramSelect {
-    fn expand(&self) -> Vec<AnyMessage> {
-        vec![
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        let channel = self
+            .channel
+            .ok_or_else(|| ValueError("message channel is unassigned".into()))?;
+        Ok(vec![
             AnyMessage::ControlChange(
-                ControlChange::new(self.channel.into(), 0, self.bank_msb.into())
+                ControlChange::new(0, self.bank_msb.into())
+                    .and_then(|m| m.with_channel(channel.into()))
                     .expect("validated bank"),
             ),
             AnyMessage::ControlChange(
-                ControlChange::new(self.channel.into(), 32, self.bank_lsb.into())
+                ControlChange::new(32, self.bank_lsb.into())
+                    .and_then(|m| m.with_channel(channel.into()))
                     .expect("validated bank"),
             ),
             AnyMessage::ProgramChange(
-                ProgramChange::new(self.channel.into(), self.program.into())
+                ProgramChange::new(self.program.into())
+                    .and_then(|m| m.with_channel(channel.into()))
                     .expect("validated program"),
             ),
-        ]
+        ])
     }
 }
 
@@ -146,7 +166,7 @@ pub enum ProgramMatch {
     Gm2(BankProgram),
 }
 pub fn program(number: i64) -> Result<Program, ValueError> {
-    ProgramChange::new(1, number)?;
+    ProgramChange::new(number).and_then(|m| m.with_channel(1))?;
     Ok(Program {
         program: number as u8,
         name: GM1_VOICES[number as usize - 1],
@@ -170,8 +190,8 @@ pub fn gm2_programs() -> Vec<BankProgram> {
         .collect()
 }
 pub fn gm2_program(bank_lsb: i64, number: i64) -> Result<Option<BankProgram>, ValueError> {
-    ControlChange::new(1, 32, bank_lsb)?;
-    ProgramChange::new(1, number)?;
+    ControlChange::new(32, bank_lsb).and_then(|m| m.with_channel(1))?;
+    ProgramChange::new(number).and_then(|m| m.with_channel(1))?;
     Ok(GM2_VOICES
         .iter()
         .find(|&&(program, bank, _)| bank as i64 == bank_lsb && program as i64 == number)
@@ -209,7 +229,9 @@ pub fn find_drum_kits(name: &str) -> Vec<DrumKit> {
         .collect()
 }
 pub fn percussion(note: i64) -> Result<Option<Percussion>, ValueError> {
-    crate::messages::NoteOn::new(10, note, 0)?;
+    crate::messages::NoteOn::new(note)
+        .and_then(|m| m.with_velocity(0))
+        .and_then(|m| m.with_channel(10))?;
     Ok(if (35..=81).contains(&note) {
         Some(Percussion {
             note: note as u8,
@@ -222,8 +244,10 @@ pub fn percussion(note: i64) -> Result<Option<Percussion>, ValueError> {
 /// Undefined/silent notes and unsupported kit programs return None. No fallback
 /// instrument is invented, even where a GM2 sound generator should apply one.
 pub fn gm2_percussion(program: i64, note: i64) -> Result<Option<Percussion>, ValueError> {
-    ProgramChange::new(10, program)?;
-    crate::messages::NoteOn::new(10, note, 0)?;
+    ProgramChange::new(program).and_then(|m| m.with_channel(10))?;
+    crate::messages::NoteOn::new(note)
+        .and_then(|m| m.with_velocity(0))
+        .and_then(|m| m.with_channel(10))?;
     if !DRUM_KITS.iter().any(|entry| entry.0 as i64 == program) {
         return Ok(None);
     }
@@ -259,7 +283,7 @@ macro_rules! modes {
         }
         impl Message for $name {}
         impl crate::messages::PrimitiveMessage for $name {
-            fn encode(&self)->Vec<u8> {vec![240,126,self.device_id,9,$code,247]}
+            fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> { Ok(vec![240,126,self.device_id,9,$code,247]) }
         }
     )*};
 }

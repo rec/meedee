@@ -79,8 +79,8 @@ impl FullFrame {
 }
 impl Message for FullFrame {}
 impl PrimitiveMessage for FullFrame {
-    fn encode(&self) -> Vec<u8> {
-        vec![
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
+        Ok(vec![
             240,
             127,
             self.device_id,
@@ -91,7 +91,7 @@ impl PrimitiveMessage for FullFrame {
             self.seconds,
             self.frames,
             247,
-        ]
+        ])
     }
 }
 pub fn decode(message: &SysEx) -> Result<Option<FullFrame>, ValueError> {

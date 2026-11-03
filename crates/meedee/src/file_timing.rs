@@ -104,7 +104,7 @@ impl SmfTimeline {
             .try_into()
             .map_err(|_| invalid(0, "exact file clock exceeds signed 64-bit timestamp range"))?;
         let data = match &event.record {
-            smf::Record::Message(v) => v.encode(),
+            smf::Record::Message(v) => v.encode()?,
             smf::Record::SysEx { status, data } => {
                 let mut bytes = Vec::with_capacity(data.len() + 1);
                 if *status == 240 {
@@ -401,7 +401,7 @@ pub fn export_smf(
         Payload::Midi1(v) => vec![v.clone()],
         Payload::Command(c) => {
             reason.push_str("; command explicitly expanded");
-            c.expand()
+            c.expand()?
         }
         Payload::Ump(v) => {
             let report = ump::to_midi1(v, allow_loss).map_err(|e| invalid(0, e))?;
@@ -422,7 +422,7 @@ pub fn export_smf(
         messages
             .into_iter()
             .map(|m| {
-                let bytes = m.encode();
+                let bytes = m.encode()?;
                 let record = if bytes[0] == 240 {
                     smf::Record::SysEx {
                         status: 240,
@@ -436,13 +436,13 @@ pub fn export_smf(
                 } else {
                     smf::Record::Message(m)
                 };
-                smf::Event {
+                Ok(smf::Event {
                     track,
                     tick,
                     record,
-                }
+                })
             })
-            .collect()
+            .collect::<io::Result<Vec<_>>>()?
     } else {
         vec![]
     };

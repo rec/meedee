@@ -54,12 +54,12 @@ impl ControllerDestination {
 }
 impl Message for ControllerDestination {}
 impl PrimitiveMessage for ControllerDestination {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![240, 127, self.device_id, 9, self.source, self.channel - 1];
         b.extend(self.controller);
         append_pairs(&mut b, &self.entries);
         b.push(247);
-        b
+        Ok(b)
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -108,11 +108,11 @@ impl KeyBasedControl {
 }
 impl Message for KeyBasedControl {}
 impl PrimitiveMessage for KeyBasedControl {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![240, 127, self.device_id, 10, 1, self.channel - 1, self.note];
         append_pairs(&mut b, &self.entries);
         b.push(247);
-        b
+        Ok(b)
     }
 }
 /// IDs are big endian base-128; values are little endian base-128. Raw tuples
@@ -184,7 +184,7 @@ impl GlobalParameterControl {
 }
 impl Message for GlobalParameterControl {}
 impl PrimitiveMessage for GlobalParameterControl {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![
             240,
             127,
@@ -203,7 +203,7 @@ impl PrimitiveMessage for GlobalParameterControl {
             b.extend(v);
         }
         b.push(247);
-        b
+        Ok(b)
     }
 }
 /// GM2 effect slots: 257=reverb, 258=chorus. Unknown IDs/values stay generic.

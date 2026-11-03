@@ -461,9 +461,11 @@ impl OutputConnection {
             ));
         }
         let packets: Vec<Packet> = crate::codecs::expand(command)
+            .map_err(|_| Error::Invalid("command channel is unassigned"))?
             .iter()
-            .map(|message| Packet::Bytes(crate::codecs::encode(message)))
-            .collect();
+            .map(|message| crate::codecs::encode(message).map(Packet::Bytes))
+            .collect::<std::result::Result<_, _>>()
+            .map_err(|_| Error::Invalid("message channel is unassigned"))?;
         let total_messages = packets.len();
         self.worker
             .call(move |native| {

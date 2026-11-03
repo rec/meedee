@@ -126,6 +126,7 @@ fn encode<'py>(py: Python<'py>, message: &Bound<'py, PyAny>) -> PyResult<Bound<'
 #[pyfunction]
 fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
     codecs::expand(&messages::extract_command(command)?)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
         .into_iter()
         .map(|message| messages::to_python(py, message))
         .collect()
@@ -141,7 +142,9 @@ pub fn prepare_command(
             "compound commands require MIDI 1.0 byte transport",
         ));
     }
-    let total = codecs::expand(&command).len();
+    let total = codecs::expand(&command)
+        .map_err(|e| PyValueError::new_err(e.to_string()))?
+        .len();
     let (name, fields) = messages::command_wire(&command);
     Ok((name, fields, total))
 }

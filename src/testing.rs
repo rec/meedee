@@ -225,10 +225,15 @@ impl Output {
         let packet = crate::live::prepare_output(py, self.protocol, value)?;
         if packet.bind(py).is_instance_of::<PyTuple>() {
             let command = crate::messages::extract_command(value)?;
-            let packets = meedee::codecs::expand(&command);
+            let packets = meedee::codecs::expand(&command)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
             use meedee::messages::PrimitiveMessage;
             for (index, message) in packets.iter().enumerate() {
-                if let Err(cause) = self.value.send(transport::Packet::Bytes(message.encode())) {
+                if let Err(cause) = self.value.send(transport::Packet::Bytes(
+                    message
+                        .encode()
+                        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+                )) {
                     return Err(error(transport::Error::CompoundSend {
                         completed_messages: Some(index),
                         total_messages: packets.len(),

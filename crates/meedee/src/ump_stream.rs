@@ -217,7 +217,7 @@ impl Assembler {
         } else {
             None
         };
-        let realtime = matches!(value,UmpMessage::Midi1(v) if v.message().encode()[0]>=248);
+        let realtime = matches!(value,UmpMessage::Midi1(v) if v.message().encode().expect("validated system message")[0]>=248);
         let mut out = Vec::new();
         // A different grouped non-realtime message interrupts SysEx7. FlexData
         // permits only same-message fragments, realtime and groupless JR Clock.

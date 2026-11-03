@@ -23,7 +23,12 @@ fn archive_completion_is_separate_from_capture_loss() {
                 clock: clock.clone(),
             }),
             span: None,
-            message: Payload::Midi1(AnyMessage::NoteOn(NoteOn::new(16, 60, 100).unwrap())),
+            message: Payload::Midi1(AnyMessage::NoteOn(
+                NoteOn::new(60)
+                    .and_then(|m| m.with_velocity(100))
+                    .and_then(|m| m.with_channel(16))
+                    .unwrap(),
+            )),
         })),
         archive::Record::Gap {
             stream: "keys".into(),

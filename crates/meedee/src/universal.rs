@@ -23,27 +23,31 @@ device_messages! {
     MasterCoarseTuning {semitones:i8 = -64..=63};
 }
 impl PrimitiveMessage for IdentityRequest {
-    fn encode(&self) -> Vec<u8> {
-        vec![240, 126, self.device_id, 6, 1, 247]
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
+        Ok(vec![240, 126, self.device_id, 6, 1, 247])
     }
 }
 impl PrimitiveMessage for MasterVolume {
-    fn encode(&self) -> Vec<u8> {
-        device_control(self.device_id, 1, self.value)
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
+        Ok(device_control(self.device_id, 1, self.value))
     }
 }
 impl PrimitiveMessage for MasterFineTuning {
-    fn encode(&self) -> Vec<u8> {
-        device_control(self.device_id, 3, (self.value as i32 + 8192) as u16)
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
+        Ok(device_control(
+            self.device_id,
+            3,
+            (self.value as i32 + 8192) as u16,
+        ))
     }
 }
 impl PrimitiveMessage for MasterCoarseTuning {
-    fn encode(&self) -> Vec<u8> {
-        device_control(
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
+        Ok(device_control(
             self.device_id,
             4,
             ((self.semitones as i16 + 64) as u16) << 7,
-        )
+        ))
     }
 }
 
@@ -105,7 +109,7 @@ impl IdentityReply {
 }
 impl Message for IdentityReply {}
 impl PrimitiveMessage for IdentityReply {
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut bytes = vec![240, 126, self.device_id, 6, 2];
         bytes.extend_from_slice(&self.manufacturer);
         bytes.extend([
@@ -116,7 +120,7 @@ impl PrimitiveMessage for IdentityReply {
         ]);
         bytes.extend(self.revision);
         bytes.push(247);
-        bytes
+        Ok(bytes)
     }
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

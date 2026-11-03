@@ -256,7 +256,10 @@ pub fn send_message(
         Payload::Command(_) => Err(crate::transport::Error::Capability(
             "use send_command for compound commands",
         )),
-        Payload::Midi1(v) => output.send(&Packet::Bytes(v.encode())),
+        Payload::Midi1(v) => output
+            .send(&Packet::Bytes(v.encode().map_err(|_| {
+                crate::transport::Error::Invalid("message channel is unassigned")
+            })?)),
         Payload::Ump(
             ump::UmpMessage::Opaque(_)
             | ump::UmpMessage::DeltaClockstamp(_)

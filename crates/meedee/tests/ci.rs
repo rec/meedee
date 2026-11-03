@@ -68,7 +68,7 @@ fn management_vectors_legacy_versions_and_all_truncations() {
             .split_whitespace()
             .map(|n| u8::from_str_radix(n, 16).unwrap())
             .collect();
-        assert_eq!(message.encode(), wire);
+        assert_eq!(message.encode().unwrap(), wire);
         assert_eq!(ci::decode(&message.sysex()).unwrap(), Some(message.clone()));
         let payload = message.sysex();
         for cut in 3..payload.data().len() {
@@ -126,6 +126,7 @@ fn reserved_identifiers_addresses_versions_and_extensions_are_explicit() {
         )
         .unwrap()
         .encode()
+        .unwrap()
         .len(),
         512
     );

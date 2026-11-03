@@ -73,29 +73,23 @@ impl From<Beats> for NoteDuration {
 pub struct Note {
     duration: NoteDuration,
     attack: NoteOn,
-    channel: Option<u8>,
 }
 
 impl Note {
     pub fn new(duration: impl Into<NoteDuration>, note: i64) -> Result<Self, ValueError> {
         Ok(Self {
             duration: duration.into(),
-            attack: NoteOn::new(1, note, 90)?,
-            channel: None,
+            attack: NoteOn::new(note)?,
         })
     }
-
     pub fn with_velocity(mut self, velocity: i64) -> Result<Self, ValueError> {
-        self.attack = NoteOn::new(self.attack.channel().into(), self.note().into(), velocity)?;
+        self.attack = self.attack.with_velocity(velocity)?;
         Ok(self)
     }
-
     pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
-        self.attack = NoteOn::new(channel, self.note().into(), self.velocity().into())?;
-        self.channel = Some(self.attack.channel());
+        self.attack = self.attack.with_channel(channel)?;
         Ok(self)
     }
-
     pub fn duration(&self) -> NoteDuration {
         self.duration
     }
@@ -109,7 +103,7 @@ impl Note {
     }
 
     pub fn channel(&self) -> Option<u8> {
-        self.channel
+        self.attack.channel()
     }
 }
 

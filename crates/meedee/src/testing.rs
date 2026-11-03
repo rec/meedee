@@ -1,7 +1,6 @@
 //! Deterministic, caller-driven transport doubles. No devices, threads or sleeps.
 use crate::events::{Clock, Payload};
 use crate::live::{Decoder, Item};
-use crate::messages::PrimitiveMessage;
 use crate::transport::{validate_packet, Error, Packet, Protocol, Result};
 use crate::ump::UmpValue;
 use std::collections::VecDeque;
@@ -369,7 +368,7 @@ fn item_size(item: &Item) -> usize {
     match item {
         Item::Diagnostic(v) => v.reason.len(),
         Item::Event(e) => match &e.message {
-            Payload::Midi1(v) => v.encode().len(),
+            Payload::Midi1(v) => v.encoded_len(),
             Payload::Ump(v) => v.encode_words().len() * 4,
             Payload::Command(_) => 64,
         },

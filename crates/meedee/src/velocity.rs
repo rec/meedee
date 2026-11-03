@@ -36,8 +36,8 @@ impl VelocityInterpreter {
         let index = self.next_index;
         self.skip();
         let channel = match message {
-            AnyMessage::NoteOn(v) => Some(v.channel()),
-            AnyMessage::NoteOff(v) => Some(v.channel()),
+            AnyMessage::NoteOn(v) => v.channel(),
+            AnyMessage::NoteOff(v) => v.channel(),
             _ => None,
         };
         let first = channel
@@ -62,12 +62,12 @@ impl VelocityInterpreter {
         let (channel, note, velocity, on) = match message {
             ControlChange(v) => {
                 if v.controller() == 88 {
-                    self.prefix[usize::from(v.channel() - 1)] = Some(Prefix {
+                    self.prefix[usize::from(v.channel()? - 1)] = Some(Prefix {
                         value: v.value(),
                         index,
                     });
                 } else if v.controller() == 121 {
-                    self.prefix[usize::from(v.channel() - 1)] = None;
+                    self.prefix[usize::from(v.channel()? - 1)] = None;
                 }
                 return None;
             }
@@ -75,8 +75,8 @@ impl VelocityInterpreter {
                 self.reset();
                 return None;
             }
-            NoteOn(v) => (v.channel(), v.note(), v.velocity(), true),
-            NoteOff(v) => (v.channel(), v.note(), v.velocity(), false),
+            NoteOn(v) => (v.channel()?, v.note(), v.velocity(), true),
+            NoteOff(v) => (v.channel()?, v.note(), v.velocity(), false),
             _ => return None,
         };
         let prefix = self.prefix[usize::from(channel - 1)].take();

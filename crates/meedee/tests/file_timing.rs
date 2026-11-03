@@ -40,12 +40,22 @@ fn file() -> Vec<u8> {
             Event {
                 track: 1,
                 tick: 240,
-                record: Record::Message(AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap())),
+                record: Record::Message(AnyMessage::NoteOn(
+                    NoteOn::new(60)
+                        .and_then(|m| m.with_velocity(100))
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap(),
+                )),
             },
             Event {
                 track: 1,
                 tick: 480,
-                record: Record::Message(AnyMessage::NoteOn(NoteOn::new(1, 61, 100).unwrap())),
+                record: Record::Message(AnyMessage::NoteOn(
+                    NoteOn::new(61)
+                        .and_then(|m| m.with_velocity(100))
+                        .and_then(|m| m.with_channel(1))
+                        .unwrap(),
+                )),
             },
             Event {
                 track: 1,
@@ -108,7 +118,12 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
         .feed(&Event {
             track: 1,
             tick: 1200,
-            record: Record::Message(AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap())),
+            record: Record::Message(AnyMessage::NoteOn(
+                NoteOn::new(60)
+                    .and_then(|m| m.with_velocity(100))
+                    .and_then(|m| m.with_channel(1))
+                    .unwrap(),
+            )),
         })
         .unwrap();
     let Item::Event(e) = &result[0] else { panic!() };

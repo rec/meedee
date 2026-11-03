@@ -28,8 +28,10 @@ impl ZoneConfiguration {
 }
 impl Message for ZoneConfiguration {}
 impl Command for ZoneConfiguration {
-    fn expand(&self) -> Vec<AnyMessage> {
-        RpnSet::new(self.manager_channel.into(), 6, self.members.into(), 7)
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        RpnSet::new(6, self.members.into())
+            .and_then(|m| m.with_resolution(7))
+            .and_then(|m| m.with_channel(self.manager_channel.into()))
             .expect("validated MPE configuration fields")
             .expand()
     }
@@ -57,7 +59,9 @@ impl Voice {
         self.velocity
     }
     pub fn note_on(&self) -> crate::messages::NoteOn {
-        crate::messages::NoteOn::new(self.channel.into(), self.note.into(), self.velocity.into())
+        crate::messages::NoteOn::new(self.note.into())
+            .and_then(|m| m.with_velocity(self.velocity.into()))
+            .and_then(|m| m.with_channel(self.channel.into()))
             .expect("validated voice")
     }
 }
@@ -80,7 +84,9 @@ impl Allocator {
         }
     }
     pub fn allocate(&mut self, note: i64, velocity: i64) -> Result<Voice, ValueError> {
-        crate::messages::NoteOn::new(1, note, velocity)?;
+        crate::messages::NoteOn::new(note)
+            .and_then(|m| m.with_velocity(velocity))
+            .and_then(|m| m.with_channel(1))?;
         if velocity == 0 {
             return Err(ValueError(
                 "allocation requires a sounding NoteOn velocity".into(),
@@ -119,7 +125,9 @@ impl Allocator {
             return Err(ValueError("voice already released".into()));
         }
         let v = self.voices[i].as_ref().expect("located voice");
-        let message = crate::messages::NoteOff::new(v.channel.into(), v.note.into(), velocity)?;
+        let message = crate::messages::NoteOff::new(v.note.into())
+            .and_then(|m| m.with_velocity(velocity))
+            .and_then(|m| m.with_channel(v.channel.into()))?;
         if self.sustain {
             self.released[i] = true;
         } else {
@@ -137,12 +145,9 @@ impl Allocator {
                 }
             }
         }
-        crate::messages::ControlChange::new(
-            self.zone.manager_channel.into(),
-            64,
-            if enabled { 127 } else { 0 },
-        )
-        .expect("valid sustain")
+        crate::messages::ControlChange::new(64, if enabled { 127 } else { 0 })
+            .and_then(|m| m.with_channel(self.zone.manager_channel.into()))
+            .expect("valid sustain")
     }
     /// Forget local state after known loss/reconfiguration. Does not silence a device.
     pub fn reset(&mut self) {
@@ -257,6 +262,7 @@ impl Tracker {
             ControlChange(v) => v.channel(),
             _ => return Ok(Vec::new()),
         };
+        let channel = channel.ok_or_else(|| ValueError("message channel is unassigned".into()))?;
         let manager = channel == self.zone.manager_channel;
         if !manager && !member_channels(&self.zone).contains(&channel) {
             return Ok(Vec::new());

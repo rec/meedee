@@ -253,7 +253,7 @@ impl Router {
             self.report.filtered += 1;
             return Ok(());
         }
-        let bytes = wire_bytes(&event.message);
+        let bytes = wire_bytes(&event.message)?;
         let total = bytes
             .checked_mul(selected.len())
             .and_then(|v| self.report.queued_bytes.checked_add(v));
@@ -438,7 +438,7 @@ fn remap(payload: &events::Payload, route: &Route) -> io::Result<events::Payload
     let info = classify(payload)?;
     match payload {
         events::Payload::Midi1(v) if info.channel.is_some() && route.remap_channel.is_some() => {
-            let mut bytes = v.encode();
+            let mut bytes = v.encode()?;
             bytes[0] = (bytes[0] & 0xf0) | (route.remap_channel.expect("selected channel") - 1);
             let mut decoder = codecs::Decoder::new(1).map_err(|e| invalid(&e.to_string()))?;
             match decoder.feed(&bytes).as_slice() {
@@ -464,23 +464,23 @@ fn remap(payload: &events::Payload, route: &Route) -> io::Result<events::Payload
 fn midi1_channel(value: &messages::AnyMessage) -> Option<u8> {
     use messages::AnyMessage::*;
     match value {
-        NoteOn(v) => Some(v.channel()),
-        NoteOff(v) => Some(v.channel()),
-        PolyPressure(v) => Some(v.channel()),
-        ControlChange(v) => Some(v.channel()),
-        ProgramChange(v) => Some(v.channel()),
-        ChannelPressure(v) => Some(v.channel()),
-        PitchBend(v) => Some(v.channel()),
+        NoteOn(v) => v.channel(),
+        NoteOff(v) => v.channel(),
+        PolyPressure(v) => v.channel(),
+        ControlChange(v) => v.channel(),
+        ProgramChange(v) => v.channel(),
+        ChannelPressure(v) => v.channel(),
+        PitchBend(v) => v.channel(),
         _ => None,
     }
 }
-fn wire_bytes(payload: &events::Payload) -> usize {
-    match payload {
+fn wire_bytes(payload: &events::Payload) -> io::Result<usize> {
+    Ok(match payload {
         events::Payload::Midi1(messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
-        events::Payload::Midi1(v) => v.encode().len(),
+        events::Payload::Midi1(v) => v.encode()?.len(),
         events::Payload::Ump(v) => ump::encode(v).len() * 4,
         events::Payload::Command(_) => unreachable!("commands rejected during selection"),
-    }
+    })
 }
 fn invalid(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, reason)

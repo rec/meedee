@@ -446,7 +446,9 @@ fn decode(
         .transpose()
 }
 pub fn encode_message(message: &Bound<'_, PyAny>) -> Option<Vec<u8>> {
-    extract(message).ok().map(|v| v.encode())
+    extract(message)
+        .ok()
+        .map(|v| v.encode().expect("validated system message"))
 }
 fn extract(message: &Bound<'_, PyAny>) -> PyResult<model::Management> {
     macro_rules! cases{($($name:ident),*)=>{$(if let Ok(v)=message.extract::<PyRef<'_,$name>>(){return Ok(v.value.clone());})*};}

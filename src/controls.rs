@@ -135,7 +135,8 @@ macro_rules! controllers {
             fn number(&self)->u8 {match self {$(Self::$name=>controls::Controller::$name.number()),*}}
             #[pyo3(signature=(*,channel,value))]
             fn message(&self,py:Python<'_>,channel:&Bound<'_,PyAny>,value:&Bound<'_,PyAny>)->PyResult<Py<PyAny>> {
-                let value=meedee::messages::ControlChange::new(crate::messages::integer(channel,"channel")?,self.number().into(),crate::messages::integer(value,"value")?).map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+                let channel = crate::messages::integer(channel,"channel")?;
+                let value=meedee::messages::ControlChange::new(self.number().into(), crate::messages::integer(value,"value")?).and_then(|m| m.with_channel(channel)).map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
                 crate::messages::to_python(py,meedee::messages::AnyMessage::ControlChange(value))
             }
         }

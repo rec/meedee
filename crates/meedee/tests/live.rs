@@ -29,7 +29,12 @@ fn event(ticks: i64) -> Event {
             clock: clock(),
         }),
         span: None,
-        message: Payload::Midi1(AnyMessage::NoteOn(NoteOn::new(1, 60, 100).unwrap())),
+        message: Payload::Midi1(AnyMessage::NoteOn(
+            NoteOn::new(60)
+                .and_then(|m| m.with_velocity(100))
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        )),
     }
 }
 #[test]

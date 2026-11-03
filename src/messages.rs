@@ -121,14 +121,33 @@ impl SysEx {
     }
 }
 
+macro_rules! channel_value {
+    (NoteOn, $note:expr, $velocity:expr) => { messages::NoteOn::new($note).and_then(|m| m.with_velocity($velocity)) };
+    (NoteOff, $note:expr, $velocity:expr) => { messages::NoteOff::new($note).and_then(|m| m.with_velocity($velocity)) };
+    (PolyPressure, $note:expr, $pressure:expr) => { messages::PolyPressure::new($note).and_then(|m| m.with_pressure($pressure)) };
+    (ChannelPressure, $pressure:expr) => { messages::ChannelPressure::new().and_then(|m| m.with_pressure($pressure)) };
+    (PitchBend, $value:expr) => { messages::PitchBend::new().and_then(|m| m.with_value($value)) };
+    (RpnSet, $parameter:expr, $value:expr, $resolution:expr) => { messages::RpnSet::new($parameter,$value).and_then(|m| m.with_resolution($resolution)) };
+    (NrpnSet, $parameter:expr, $value:expr, $resolution:expr) => { messages::NrpnSet::new($parameter,$value).and_then(|m| m.with_resolution($resolution)) };
+    ($name:ident, $($field:expr),*) => { messages::$name::new($($field),*) };
+}
+macro_rules! wire_field {
+    ($value:ident, channel) => {
+        i64::from($value.channel().expect("resolved command channel"))
+    };
+    ($value:ident, $field:ident) => {
+        i64::from($value.$field())
+    };
+}
+
 macro_rules! channel_message {
     ($name:ident $signature:tt { $($field:ident),* } $(; $($method:item)*)?) => {
         #[pyclass(frozen, extends = Message, module = "meedee.messages")]
-        struct $name { value: messages::$name, assigned: bool }
+        struct $name { value: messages::$name }
         impl $name {
-            fn from_value(value: messages::$name) -> Self { Self { value, assigned: true } }
+            fn from_value(value: messages::$name) -> Self { Self { value } }
             fn resolved(&self) -> PyResult<&messages::$name> {
-                if !self.assigned { return Err(PyValueError::new_err("message channel is unassigned")); }
+                if self.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
                 Ok(&self.value)
             }
         }
@@ -140,21 +159,23 @@ macro_rules! channel_message {
             fn new($(#[pyo3(from_py_with=strict_integer)] $field: i64,)* channel: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
                 let channel = channel.map(|v| integer(v, "channel")).transpose()?;
                 Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
-                    value: messages::$name::new(channel.unwrap_or(1), $($field),*).map_err(value_error)?,
-                    assigned: channel.is_some(),
+                    value: {
+                        let value = channel_value!($name, $($field),*).map_err(value_error)?;
+                        if let Some(channel) = channel { value.with_channel(channel).map_err(value_error)? } else { value }
+                    },
                 }))
             }
             #[getter]
-            fn channel(&self) -> Option<i64> { self.assigned.then(|| i64::from(self.value.channel())) }
+            fn channel(&self) -> Option<i64> { self.value.channel().map(i64::from) }
             $(#[getter] fn $field(&self) -> i64 { i64::from(self.value.$field()) })*
             fn __repr__(&self) -> String {
                 let fields = vec![$(format!("{}={}", stringify!($field), self.value.$field())),*];
                 format!("{}({}, channel={})", stringify!($name), fields.join(", "), self.channel().map_or_else(|| "None".into(), |v| v.to_string()))
             }
             fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
-                other.extract::<PyRef<'_, Self>>().is_ok_and(|v| self.assigned == v.assigned && self.value == v.value)
+                other.extract::<PyRef<'_, Self>>().is_ok_and(|v| self.value == v.value)
             }
-            fn __hash__(&self) -> u64 { value_hash(&(&self.value, self.assigned)) }
+            fn __hash__(&self) -> u64 { value_hash(&self.value) }
             #[pyo3(signature=(**changes))]
             fn replace<'py>(slf: PyRef<'py, Self>, changes: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
         let py = slf.py();
@@ -262,10 +283,10 @@ macro_rules! short_messages {
 
         pub fn encode_message(message: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
             if let Ok(message) = message.extract::<PyRef<'_, SysEx>>() {
-                return Ok(message.value.encode());
+                return message.value.encode().map_err(value_error);
             }
             $(if let Ok(message) = message.extract::<PyRef<'_, $name>>() {
-                return Ok(message.resolved()?.encode());
+                return message.resolved()?.encode().map_err(value_error);
             })*
             if let Some(bytes) = crate::profiles::encode_message(message) { return Ok(bytes); }
             if let Some(bytes) = crate::ci::encode_message(message) { return Ok(bytes); }
@@ -344,7 +365,7 @@ macro_rules! command_messages {
         pub fn command_wire(command: &messages::AnyCommand) -> (String, std::collections::HashMap<String, i64>) {
             match command {
                 $(messages::AnyCommand::$name(value) => (stringify!($name).into(),
-                    [$( (stringify!($field).into(), i64::from(value.$field())) ),*].into_iter().collect()),)*
+                    [$( (stringify!($field).into(), wire_field!(value, $field)) ),*].into_iter().collect()),)*
                 _ => crate::profiles::command_wire(command),
             }
         }

@@ -111,7 +111,9 @@ impl Interpreter {
             InputMessage::Other => Vec::new(),
             InputMessage::SystemReset => self.clear(None, index),
             InputMessage::ControlChange(message) => {
-                let channel = message.channel();
+                let Some(channel) = message.channel() else {
+                    return Vec::new();
+                };
                 if message.controller() == 121 {
                     return self.clear(Some(channel), index);
                 }
@@ -172,7 +174,9 @@ struct Channel {
 
 impl Channel {
     fn feed(&mut self, message: &ControlChange, index: usize) -> Vec<Observation> {
-        let channel = message.channel();
+        let Some(channel) = message.channel() else {
+            return Vec::new();
+        };
         let controller = message.controller();
         let value = message.value();
         let byte = IndexedByte { value, index };
@@ -350,7 +354,9 @@ pub fn pitch_bend_sensitivity(
             "semitones and cents must be seven-bit values".into(),
         ));
     }
-    crate::messages::RpnSet::new(channel, 0, semitones * 128 + cents, 14)
+    crate::messages::RpnSet::new(0, semitones * 128 + cents)
+        .and_then(|m| m.with_resolution(14))
+        .and_then(|m| m.with_channel(channel))
 }
 pub fn channel_fine_tuning(
     channel: i64,
@@ -361,7 +367,9 @@ pub fn channel_fine_tuning(
             "value must be in -8192..=8191".into(),
         ));
     }
-    crate::messages::RpnSet::new(channel, 1, value + 8192, 14)
+    crate::messages::RpnSet::new(1, value + 8192)
+        .and_then(|m| m.with_resolution(14))
+        .and_then(|m| m.with_channel(channel))
 }
 pub fn channel_coarse_tuning(
     channel: i64,
@@ -372,19 +380,25 @@ pub fn channel_coarse_tuning(
             "semitones must be in -64..=63".into(),
         ));
     }
-    crate::messages::RpnSet::new(channel, 2, semitones + 64, 7)
+    crate::messages::RpnSet::new(2, semitones + 64)
+        .and_then(|m| m.with_resolution(7))
+        .and_then(|m| m.with_channel(channel))
 }
 pub fn tuning_program(
     channel: i64,
     program: i64,
 ) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
-    crate::messages::RpnSet::new(channel, 3, program, 7)
+    crate::messages::RpnSet::new(3, program)
+        .and_then(|m| m.with_resolution(7))
+        .and_then(|m| m.with_channel(channel))
 }
 pub fn tuning_bank(
     channel: i64,
     bank: i64,
 ) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
-    crate::messages::RpnSet::new(channel, 4, bank, 7)
+    crate::messages::RpnSet::new(4, bank)
+        .and_then(|m| m.with_resolution(7))
+        .and_then(|m| m.with_channel(channel))
 }
 /// GM2's modulation-depth units are 1/128 semitone; this is not the cents LSB
 /// of Pitch Bend Sensitivity. Other profiles can assign a different response.
@@ -392,7 +406,9 @@ pub fn modulation_depth_range(
     channel: i64,
     value: i64,
 ) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
-    crate::messages::RpnSet::new(channel, 5, value, 14)
+    crate::messages::RpnSet::new(5, value)
+        .and_then(|m| m.with_resolution(14))
+        .and_then(|m| m.with_channel(channel))
 }
 
 /// Common standardized controller identifiers. Values remain wire numbers.
@@ -455,7 +471,8 @@ impl Controller {
         channel: i64,
         value: i64,
     ) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
-        crate::messages::ControlChange::new(channel, self.number().into(), value)
+        crate::messages::ControlChange::new(self.number().into(), value)
+            .and_then(|m| m.with_channel(channel))
     }
 }
 pub fn all_sound_off(

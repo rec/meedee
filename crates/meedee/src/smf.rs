@@ -356,7 +356,7 @@ impl<W: Write + Seek> Writer<W> {
         let mut bytes = vlq(delta as u32);
         match &event.record {
             Record::Message(m) => {
-                let b = m.encode();
+                let b = m.encode()?;
                 if !(0x80..=0xef).contains(&b[0]) {
                     return Err(invalid(0, "SMF channel event required; use SysEx record"));
                 }
@@ -595,7 +595,7 @@ impl<R: Read + Seek> Iterator for MergedReader<R> {
 fn record_size(r: &Record) -> usize {
     match r {
         Record::Message(AnyMessage::SysEx(v)) => v.data().len() + 2,
-        Record::Message(v) => v.encode().len(),
+        Record::Message(v) => v.encoded_len(),
         Record::Meta { data, .. } | Record::SysEx { data, .. } | Record::Chunk { data, .. } => {
             data.len()
         }
