@@ -1,4 +1,5 @@
 //! Bounded MIDI 1 SysEx transfers. The caller owns time and transport handoff.
+use crate::messages::Message;
 use crate::{messages::SysEx, syx};
 use std::io::{self, Read};
 use std::sync::Arc;
@@ -310,13 +311,13 @@ impl Capture {
                 self.fail(&format!("input diagnostic {:?}: {}", d.kind, d.reason));
                 return Ok(());
             }
-            Item::Event(e) => e,
+            Item::Message(e) => e,
         };
-        if event.stream != self.stream {
+        if event.source().unwrap_or_default() != self.stream {
             self.fail("capture received an unrelated source");
             return Ok(());
         }
-        let message = match &event.message {
+        let message = match event.as_ref() {
             Payload::Midi1(AnyMessage::SysEx(m)) => m,
             Payload::Midi1(_) => {
                 self.ignored = self

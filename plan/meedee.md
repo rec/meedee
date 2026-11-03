@@ -226,17 +226,18 @@ mutable input must be snapshotted. Any exception to the usual model collection
 rules must be reviewed rather than hiding mutable lists inside `Message`.
 Hashability is offered only when the complete value has a stable hash.
 
-### Timestamped events are separate
+### Optional occurrence metadata
 
-A `Message` describes musical content, independent of when it was captured,
-stored, or played. An immutable `Event` holds a message, a stream identity, and
-an optional `Timestamp`. The same message can be reused in different events.
+A `Message` describes musical content and may carry optional timestamp, source
+identity and packet-span metadata. Builders and transformations preserve metadata;
+equality and hashing describe musical content only. There is no generic Event
+wrapper in either public API. Low-level SMF Event records remain distinct.
 Do not overload a message field to mean file ticks in one context and hardware
 microseconds in another.
 
-Raw receive returns typed events. Optional semantic interpretation produces
+Decoded receive returns messages. Optional semantic interpretation produces
 separate derived updates with their source timestamp range; it must not destroy
-or overwrite the primitive events needed for exact capture and diagnosis.
+or overwrite the primitive messages needed for exact capture and diagnosis.
 Recording raw input and requesting a semantic view are different operations,
 not two simultaneously maintained copies of one mutable message stream.
 
@@ -561,7 +562,7 @@ readable from both Rust and Python.
 ## 13. Live API, ownership, and failure handling
 
 Keep discovery/port opening explicit and separate from pure musical values.
-The new high-level input delivers `Event`; output sends a `Message` and resolves
+High-level input delivers messages; output sends a message and resolves
 its packet sequence against advertised transport capabilities. Timestamps do
 not imply scheduled send; scheduling is a separate operation with a selected
 clock and cancellation policy.

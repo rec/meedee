@@ -1,4 +1,5 @@
 //! Python values over the shared, caller-driven note observer.
+use meedee::messages::Message;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 
@@ -27,16 +28,13 @@ impl Tracker {
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
         if let Ok(e) = crate::event_values::extract(&item) {
-            if e.value.stream != self.stream {
+            if e.source() != Some(self.stream.as_str()) {
                 return Err(PyValueError::new_err("tracker belongs to one source"));
             }
-            e.value
-                .validate()
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
             self.value.feed(
                 &self.stream,
-                &e.value.message,
-                e.value.timestamp.as_ref().map(|t| t.clock.identity()),
+                &e,
+                e.timestamp().map(|t| t.clock.identity()),
                 self.detail_limit,
             );
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {

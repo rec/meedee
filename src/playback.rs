@@ -1,5 +1,5 @@
 //! Clock planning and caller-thread replay, sharing the Rust scheduler.
-use crate::event_values::{payload_python, Rational, Timestamp};
+use crate::event_values::{to_python, Rational, Timestamp};
 use crate::files::{frozen, os_error};
 use crate::packets::Clock;
 use meedee::playback as model;
@@ -56,14 +56,11 @@ impl PlaybackPlan {
         })
     }
     fn deadline(&mut self, event: &Bound<'_, PyAny>) -> PyResult<PlannedEvent> {
-        let mut event = crate::event_values::extract(event)?;
-        if event.value.stream.is_empty() {
-            event.value.stream = "playback".into();
-        }
+        let event = crate::event_values::extract(event)?;
         Ok(PlannedEvent {
             value: self
                 .value
-                .deadline(&event.value)
+                .deadline(&event)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
         })
     }
@@ -137,7 +134,7 @@ struct Source {
     iterator: Py<PyAny>,
 }
 impl Iterator for Source {
-    type Item = std::io::Result<meedee::events::Event>;
+    type Item = std::io::Result<meedee::events::Payload>;
     fn next(&mut self) -> Option<Self::Item> {
         Python::attach(|py| loop {
             let item = match self.iterator.bind(py).call_method0("__next__") {
@@ -145,11 +142,8 @@ impl Iterator for Source {
                 Err(e) if e.is_instance_of::<PyStopIteration>(py) => return None,
                 Err(e) => return Some(Err(std::io::Error::other(e.to_string()))),
             };
-            if let Ok(mut event) = crate::event_values::extract(&item) {
-                if event.value.stream.is_empty() {
-                    event.value.stream = "playback".into();
-                }
-                return Some(Ok(event.value.clone()));
+            if let Ok(event) = crate::event_values::extract(&item) {
+                return Some(Ok(event));
             }
             match crate::archive::extract(&item){Ok(meedee::archive::Record::Clock(_)|meedee::archive::Record::Stream{..}|meedee::archive::Record::Metadata{..})=>continue,Ok(_)=>return Some(Err(std::io::Error::other("gap, discontinuity or opaque data requires an explicit replay policy; no automatic skipping"))),Err(e)=>return Some(Err(std::io::Error::other(e.to_string())))}
         })
@@ -191,8 +185,7 @@ fn play(
             &cancel,
             |message| {
                 Python::attach(|py| {
-                    send.bind(py)
-                        .call1((payload_python(py, message.clone())?,))?;
+                    send.bind(py).call1((to_python(py, message.clone())?,))?;
                     Ok::<(), PyErr>(())
                 })
             },

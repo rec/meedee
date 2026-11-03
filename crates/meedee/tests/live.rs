@@ -1,6 +1,7 @@
+use meedee::messages::Message;
 use meedee::{
     archive::{self, Record},
-    events::{Clock, Event, Payload, Rational, Timestamp},
+    events::{Clock, Payload, Rational, Timestamp},
     live::{Decoder, DiagnosticKind, Item},
     messages::{AnyMessage, NoteOn},
     playback::{self, Cancellation, PlaybackClock},
@@ -21,21 +22,22 @@ fn clock() -> Clock {
     .unwrap()
     .with_transport(1, true)
 }
-fn event(ticks: i64) -> Event {
-    Event {
-        stream: "s".into(),
+fn event(ticks: i64) -> Payload {
+    (Payload::Midi1(AnyMessage::NoteOn(
+        NoteOn::new(60)
+            .and_then(|m| m.with_velocity(100))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
+    )))
+    .with_metadata(meedee::messages::Metadata {
+        source: Some("s".into()),
         timestamp: Some(Timestamp {
             ticks,
             clock: clock(),
         }),
         span: None,
-        message: Payload::Midi1(AnyMessage::NoteOn(
-            NoteOn::new(60)
-                .and_then(|m| m.with_velocity(100))
-                .and_then(|m| m.with_channel(1))
-                .unwrap(),
-        )),
-    }
+    })
+    .unwrap()
 }
 #[test]
 fn completion_timestamps_and_spans_survive_realtime_and_running_status() {
@@ -53,17 +55,17 @@ fn completion_timestamps_and_spans_survive_realtime_and_running_status() {
         )
         .unwrap();
     assert_eq!(out.len(), 3);
-    let Item::Event(e) = &out[1] else { panic!() };
-    assert_eq!(e.timestamp.as_ref().unwrap().ticks, 20);
-    let span = e.span.as_ref().unwrap();
+    let Item::Message(e) = &out[1] else { panic!() };
+    assert_eq!(e.timestamp().unwrap().ticks, 20);
+    let span = e.span().unwrap();
     assert_eq!((span.first_packet, span.last_packet), (0, 1));
     assert_eq!(span.first_timestamp.as_ref().unwrap().ticks, 10);
-    let Item::Event(rt) = &out[0] else { panic!() };
-    assert_eq!(rt.span.as_ref().unwrap().first_packet, 1);
-    let Item::Event(running) = &out[2] else {
+    let Item::Message(rt) = &out[0] else { panic!() };
+    assert_eq!(rt.span().unwrap().first_packet, 1);
+    let Item::Message(running) = &out[2] else {
         panic!()
     };
-    assert_eq!(running.span.as_ref().unwrap().first_packet, 1);
+    assert_eq!(running.span().unwrap().first_packet, 1);
     assert!(d.finish().is_empty());
 }
 #[test]
@@ -75,7 +77,7 @@ fn gaps_protocol_errors_and_clock_changes_cannot_join_old_fragments() {
         .feed(&Packet::Bytes(vec![100]), &clock(), Some(2), Some(2))
         .unwrap();
     assert!(matches!(&out[0],Item::Diagnostic(v)if v.kind==DiagnosticKind::Loss&&v.lost==1));
-    assert!(out.iter().all(|v| !matches!(v, Item::Event(_))));
+    assert!(out.iter().all(|v| !matches!(v, Item::Message(_))));
     let c = Clock::new(
         "new".into(),
         1,
@@ -89,8 +91,8 @@ fn gaps_protocol_errors_and_clock_changes_cannot_join_old_fragments() {
         .feed(&Packet::Bytes(vec![0x90, 60, 100]), &c, None, Some(3))
         .unwrap();
     assert!(matches!(&out[0],Item::Diagnostic(v)if v.kind==DiagnosticKind::ClockChange));
-    let Item::Event(e) = &out[1] else { panic!() };
-    assert!(e.timestamp.is_none());
+    let Item::Message(e) = &out[1] else { panic!() };
+    assert!(e.timestamp().is_none());
     let mut d = Decoder::new("u".into(), Protocol::Ump, 1024).unwrap();
     assert!(d
         .feed(&Packet::Ump(vec![0x40903c00]), &clock(), Some(4), Some(0))
@@ -99,8 +101,8 @@ fn gaps_protocol_errors_and_clock_changes_cannot_join_old_fragments() {
     let out = d
         .feed(&Packet::Ump(vec![0xffff0000]), &clock(), Some(5), Some(1))
         .unwrap();
-    let Item::Event(e) = &out[0] else { panic!() };
-    assert_eq!(e.span.as_ref().unwrap().first_packet, 0);
+    let Item::Message(e) = &out[0] else { panic!() };
+    assert_eq!(e.span().unwrap().first_packet, 0);
 }
 #[derive(Default)]
 struct FakeClock {
@@ -224,12 +226,20 @@ fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
     )
     .unwrap();
     let mut a = event(0);
-    a.timestamp = Some(Timestamp {
-        ticks: 0,
-        clock: c.clone(),
-    });
+    a = a
+        .with_timestamp(Timestamp {
+            ticks: 0,
+            clock: c.clone(),
+        })
+        .unwrap();
     assert_eq!(p.deadline(&a).unwrap().delay_ns, 0);
-    a.timestamp.as_mut().unwrap().ticks = 1;
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 1,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
     assert!(p.deadline(&a).is_err());
     let mut p = playback::Planner::new(
         Timestamp {
@@ -240,9 +250,21 @@ fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
         true,
     )
     .unwrap();
-    a.timestamp.as_mut().unwrap().ticks = 0;
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 0,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
     p.deadline(&a).unwrap();
-    a.timestamp.as_mut().unwrap().ticks = 1;
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 1,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
     let planned = p.deadline(&a).unwrap();
     assert_eq!(planned.delay_ns, 333_333_333);
     assert_eq!(planned.rounding_error_ns, Rational::new(-1, 3).unwrap());
@@ -401,4 +423,19 @@ fn a_blocked_file_cannot_block_record_admission_or_exceed_stop_deadline() {
     let report = r.stop(Duration::from_secs(2)).unwrap();
     assert!(!report.complete && report.failure.is_some());
     assert_eq!(report.pressure, Some(pressure));
+}
+
+#[test]
+fn playback_timing_does_not_require_a_source_identity() {
+    let message = event(0)
+        .without_metadata()
+        .with_timestamp(Timestamp {
+            ticks: 123,
+            clock: clock(),
+        })
+        .unwrap();
+    let mut planner =
+        playback::Planner::new(message.timestamp().unwrap().clone(), vec![], false).unwrap();
+    assert_eq!(planner.deadline(&message).unwrap().delay_ns, 0);
+    assert_eq!(message.source(), None);
 }

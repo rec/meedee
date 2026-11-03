@@ -1,5 +1,6 @@
+use meedee::messages::Message;
 use meedee::{
-    events::{Event, Payload},
+    events::Payload,
     live::{Diagnostic, DiagnosticKind, Item},
     messages::SysEx,
     tuning::{BankedDumpRequest, BulkDumpRequest, ChecksumStatus},
@@ -24,12 +25,15 @@ fn dump(kind: &str) -> SysEx {
     SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap()
 }
 fn event(raw: SysEx) -> Item {
-    Item::Event(Box::new(Event {
-        stream: "s".into(),
-        timestamp: None,
-        span: None,
-        message: Payload::Midi1(meedee::messages::AnyMessage::SysEx(raw)),
-    }))
+    Item::Message(Box::new(
+        (Payload::Midi1(meedee::messages::AnyMessage::SysEx(raw)))
+            .with_metadata(meedee::messages::Metadata {
+                source: Some("s".into()),
+                timestamp: None,
+                span: None,
+            })
+            .unwrap(),
+    ))
 }
 fn query() -> Query {
     Query::new(BulkDumpRequest::new(1, 2).unwrap().into(), "s".into(), 10).unwrap()

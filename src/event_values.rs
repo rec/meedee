@@ -1,7 +1,8 @@
-//! Native immutable event values, shared by files and typed transport.
+//! Native timing values and message conversion shared by files and transport.
 use crate::files::{frozen, uint};
 use crate::packets::Clock;
 use meedee::events as model;
+use meedee::messages::Message;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyInt, PyTuple};
@@ -24,32 +25,18 @@ frozen!(SourceSpan;first_packet,last_packet,first_timestamp,last_timestamp;{
 if let(Some(a),Some(b))=(&value.first_timestamp,&value.last_timestamp){if a.clock!=b.clock{return Err(PyValueError::new_err("a span cannot combine clock generations"));}}Ok(Self{value})}
 #[getter]fn first_packet(&self)->u64{self.value.first_packet}#[getter]fn last_packet(&self)->u64{self.value.last_packet}#[getter]fn first_timestamp(&self)->Option<Timestamp>{self.value.first_timestamp.clone().map(|value|Timestamp{value})}#[getter]fn last_timestamp(&self)->Option<Timestamp>{self.value.last_timestamp.clone().map(|value|Timestamp{value})}
 });
-pub struct Event {
-    pub value: model::Event,
-}
-pub fn extract(object: &Bound<'_, PyAny>) -> PyResult<Event> {
+pub fn extract(object: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
     let metadata = object
         .extract::<PyRef<'_, crate::messages::Message>>()?
         .metadata();
-    let value = model::Event {
-        stream: metadata.stream.unwrap_or_default(),
-        message: payload(object)?,
-        timestamp: metadata.timestamp,
-        span: metadata.span,
-    };
-    Ok(Event { value })
-}
-pub fn to_python(py: Python<'_>, value: model::Event) -> PyResult<Py<PyAny>> {
-    let object = payload_python(py, value.message)?;
-    object
-        .bind(py)
-        .extract::<PyRef<'_, crate::messages::Message>>()?
-        .attach(crate::messages::Metadata {
-            timestamp: value.timestamp,
-            stream: Some(value.stream),
-            span: value.span,
-        })?;
-    Ok(object)
+    let value = payload(object)?
+        .with_metadata(meedee::messages::Metadata {
+            source: metadata.stream,
+            timestamp: metadata.timestamp,
+            span: metadata.span,
+        })
+        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    Ok(value)
 }
 pub fn payload(v: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
     if let Ok(v) = crate::messages::extract_primitive(v) {
@@ -63,8 +50,9 @@ pub fn payload(v: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
     }
     Err(PyTypeError::new_err("Message requires a primitive MIDI message, UMP value or supported command; explicitly encode profile messages as SysEx"))
 }
-pub fn payload_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
-    match v {
+pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
+    let metadata = v.metadata().cloned().unwrap_or_default();
+    let object = match v.without_metadata() {
         model::Payload::Midi1(v) => crate::messages::to_python(py, v),
         model::Payload::Ump(v) => crate::ump::to_python(py, v),
         model::Payload::Command(v) => {
@@ -83,7 +71,16 @@ pub fn payload_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> 
                 .call((), Some(&kwargs))?
                 .unbind())
         }
-    }
+    }?;
+    object
+        .bind(py)
+        .extract::<PyRef<'_, crate::messages::Message>>()?
+        .attach(crate::messages::Metadata {
+            timestamp: metadata.timestamp,
+            stream: metadata.source,
+            span: metadata.span,
+        })?;
+    Ok(object)
 }
 #[pyclass(frozen, module = "meedee.events")]
 pub struct Rational {

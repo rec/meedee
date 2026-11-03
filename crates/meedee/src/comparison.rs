@@ -1,4 +1,5 @@
 //! Streaming same-format record comparison. No alignment or resynchronization.
+use crate::messages::Message;
 use crate::{archive, clip, events, file_io, inspection::Format, smf, syx, ump};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, BufReader, Read};
@@ -222,7 +223,7 @@ fn advance<R: Read>(
 fn tick_equal(a: i128, b: i128, o: &Options) -> bool {
     o.ignore_timestamps || a.abs_diff(b) <= u128::from(o.tick_tolerance)
 }
-fn time_equal(a: &Option<events::Timestamp>, b: &Option<events::Timestamp>, o: &Options) -> bool {
+fn time_equal(a: Option<&events::Timestamp>, b: Option<&events::Timestamp>, o: &Options) -> bool {
     if o.ignore_timestamps {
         return true;
     }
@@ -273,12 +274,16 @@ fn map_record(r: &mut archive::Record, o: &Options) -> io::Result<()> {
             }
         }
         archive::Record::Event(e) => {
-            map_id(&mut e.stream, &o.sources);
-            map_time(&mut e.timestamp, o)?;
-            if let Some(s) = &mut e.span {
-                map_time(&mut s.first_timestamp, o)?;
-                map_time(&mut s.last_timestamp, o)?;
+            let mut metadata = e.metadata().cloned().unwrap_or_default();
+            if let Some(source) = &mut metadata.source {
+                map_id(source, &o.sources);
             }
+            map_time(&mut metadata.timestamp, o)?;
+            if let Some(span) = &mut metadata.span {
+                map_time(&mut span.first_timestamp, o)?;
+                map_time(&mut span.last_timestamp, o)?;
+            }
+            **e = (**e).clone().with_metadata(metadata)?;
         }
         archive::Record::Gap { stream, .. } | archive::Record::Discontinuity { stream, .. } => {
             map_id(stream, &o.sources)
@@ -298,16 +303,16 @@ fn map_record(r: &mut archive::Record, o: &Options) -> io::Result<()> {
 fn archive_equal(a: &archive::Record, b: &archive::Record, o: &Options) -> bool {
     match (a, b) {
         (archive::Record::Event(a), archive::Record::Event(b)) => {
-            a.stream == b.stream
-                && a.message == b.message
-                && time_equal(&a.timestamp, &b.timestamp, o)
-                && match (&a.span, &b.span) {
+            a.source().unwrap_or_default() == b.source().unwrap_or_default()
+                && a == b
+                && time_equal(a.timestamp(), b.timestamp(), o)
+                && match (&a.span(), &b.span()) {
                     (None, None) => true,
                     (Some(a), Some(b)) => {
                         a.first_packet == b.first_packet
                             && a.last_packet == b.last_packet
-                            && time_equal(&a.first_timestamp, &b.first_timestamp, o)
-                            && time_equal(&a.last_timestamp, &b.last_timestamp, o)
+                            && time_equal(a.first_timestamp.as_ref(), b.first_timestamp.as_ref(), o)
+                            && time_equal(a.last_timestamp.as_ref(), b.last_timestamp.as_ref(), o)
                     }
                     _ => false,
                 }
@@ -325,7 +330,7 @@ fn archive_equal(a: &archive::Record, b: &archive::Record, o: &Options) -> bool 
                 stream: bs,
                 timestamp: bt,
             },
-        ) => ak == bk && ad == bd && as_ == bs && time_equal(at, bt, o),
+        ) => ak == bk && ad == bd && as_ == bs && time_equal(at.as_ref(), bt.as_ref(), o),
         _ => a == b,
     }
 }

@@ -1,4 +1,5 @@
 //! Read-only file inspection using the canonical streaming readers.
+use crate::messages::Message;
 use crate::{archive, clip, events, messages, smf, syx, ump};
 use std::collections::BTreeMap;
 use std::io::{self, BufReader, Read};
@@ -80,14 +81,19 @@ impl Observer {
         })
     }
     pub fn feed(&mut self, item: &crate::live::Item) -> io::Result<()> {
-        if let crate::live::Item::Event(e) = item {
-            e.validate()?;
+        if let crate::live::Item::Message(e) = item {
+            if e.source().is_none() {
+                return Err(crate::file_io::invalid(
+                    0,
+                    "observation requires a source identity",
+                ));
+            }
         }
         let stream = match item {
-            crate::live::Item::Event(e) => &e.stream,
+            crate::live::Item::Message(e) => e.source().unwrap_or_default(),
             crate::live::Item::Diagnostic(d) => &d.stream,
         };
-        if stream != &self.stream {
+        if stream != self.stream {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "observer belongs to one source",
@@ -95,7 +101,7 @@ impl Observer {
         }
         self.report.records += 1;
         match item {
-            crate::live::Item::Event(e) => {
+            crate::live::Item::Message(e) => {
                 self.report
                     .observe_event(e, Some(self.clock.identity()), self.detail_limit)
             }
@@ -198,7 +204,7 @@ impl Report {
                             let clock = self.streams.iter().find_map(|r| match r {
                                 archive::Record::Stream {
                                     id, clock_identity, ..
-                                } if id == &e.stream => clock_identity.clone(),
+                                } if id == e.source().unwrap_or_default() => clock_identity.clone(),
                                 _ => None,
                             });
                             self.observe_event(&e, clock.as_deref(), detail_limit);
@@ -298,25 +304,22 @@ impl Report {
 
     fn observe_event(
         &mut self,
-        e: &events::Event,
+        e: &events::Payload,
         default_clock: Option<&str>,
         detail_limit: usize,
     ) {
-        let clock = e
-            .timestamp
-            .as_ref()
-            .map(|t| t.clock.identity())
-            .or(default_clock);
-        self.notes.feed(&e.stream, &e.message, clock, detail_limit);
+        let clock = e.timestamp().map(|t| t.clock.identity()).or(default_clock);
+        self.notes
+            .feed(e.source().unwrap_or_default(), e, clock, detail_limit);
         self.timing.observe(
-            &e.stream,
+            e.source().unwrap_or_default(),
             clock,
-            e.timestamp.as_ref().map(|t| i128::from(t.ticks)),
+            e.timestamp().map(|t| i128::from(t.ticks)),
             self.records - 1,
             detail_limit,
         );
-        self.untimed_events += u64::from(e.timestamp.is_none());
-        match &e.message {
+        self.untimed_events += u64::from(e.timestamp().is_none());
+        match e {
             events::Payload::Midi1(v) => self.count(midi1_kind(v)),
             events::Payload::Ump(v) => self.count_ump(v),
             events::Payload::Command(v) => self.count(command_kind(v)),

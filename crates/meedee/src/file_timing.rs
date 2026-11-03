@@ -1,7 +1,8 @@
 //! Exact standard-file clocks and explicit conversion to/from timed live values.
+use crate::messages::Message;
 use crate::{
     clip,
-    events::{timestamp_seconds, Clock, Event, Payload, Rational, Timestamp},
+    events::{timestamp_seconds, Clock, Payload, Rational, Timestamp},
     file_io::invalid,
     live,
     messages::{Command, PrimitiveMessage},
@@ -319,7 +320,7 @@ pub struct ExportReport {
     pub events: Vec<smf::Event>,
 }
 pub fn export_smf(
-    event: &Event,
+    event: &Payload,
     header: &smf::Header,
     origin: &Timestamp,
     track: u16,
@@ -327,7 +328,6 @@ pub fn export_smf(
     mapping: Option<&Mapping>,
     allow_loss: bool,
 ) -> io::Result<ExportReport> {
-    event.validate()?;
     if origin.clock.mode() == Some(false) {
         return Err(invalid(0, "disabled export origin"));
     }
@@ -341,7 +341,7 @@ pub fn export_smf(
     if track >= header.tracks() || tempo == 0 || tempo > 0xffffff {
         return Err(invalid(0, "invalid target track or tempo"));
     }
-    let Some(t) = &event.timestamp else {
+    let Some(t) = &event.timestamp() else {
         return Ok(denied(
             ump::TranslationStatus::ContextRequired,
             "timestamp is absent; supply an explicit timing policy",
@@ -397,7 +397,7 @@ pub fn export_smf(
         "timing requires rounding"
     }
     .to_string();
-    let messages = match &event.message {
+    let messages = match &event {
         Payload::Midi1(v) => vec![v.clone()],
         Payload::Command(c) => {
             reason.push_str("; command explicitly expanded");

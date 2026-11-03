@@ -1,3 +1,4 @@
+use meedee::messages::Message;
 use meedee::{
     events::Clock,
     live::Item,
@@ -24,10 +25,10 @@ fn dropped_new_packets_advance_sequence_and_silence_still_reports_loss() {
     assert!(i
         .inject(Packet::Bytes(vec![0x90, 61, 100]), clock(), Some(5))
         .unwrap());
-    let Item::Event(event) = i.receive().unwrap().unwrap() else {
+    let Item::Message(event) = i.receive().unwrap().unwrap() else {
         panic!()
     };
-    assert_eq!(event.span.as_ref().unwrap().first_packet, 2);
+    assert_eq!(event.span().unwrap().first_packet, 2);
     assert!(i.receive().unwrap().is_none());
 }
 #[test]
@@ -39,10 +40,10 @@ fn framing_and_overflow_are_shared_and_each_retained_stage_is_bounded() {
         Some(12),
     )
     .unwrap();
-    let Item::Event(event) = i.receive().unwrap().unwrap() else {
+    let Item::Message(event) = i.receive().unwrap().unwrap() else {
         panic!()
     };
-    assert_eq!(event.timestamp.as_ref().unwrap().ticks, 12);
+    assert_eq!(event.timestamp().unwrap().ticks, 12);
     let Item::Diagnostic(d) = i.receive().unwrap().unwrap() else {
         panic!()
     };
@@ -101,7 +102,7 @@ fn an_oversized_diagnostic_cannot_let_later_events_overtake_the_loss_boundary() 
     let mut i = Input::new("s".into(), Protocol::Midi1, 4, 8, 4, 64).unwrap();
     i.inject(Packet::Bytes(vec![0xf8]), clock(), None).unwrap();
     i.lose(1).unwrap();
-    assert!(matches!(i.receive().unwrap(), Some(Item::Event(_))));
+    assert!(matches!(i.receive().unwrap(), Some(Item::Message(_))));
     i.inject(Packet::Bytes(vec![0xf8]), clock(), None).unwrap();
     assert!(matches!(i.receive().unwrap(), Some(Item::Diagnostic(_))));
     assert_eq!(i.snapshot().dropped_events, 2);

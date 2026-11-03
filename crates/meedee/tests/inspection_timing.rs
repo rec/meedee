@@ -1,21 +1,25 @@
 use meedee::inspection_timing::Timing;
+use meedee::messages::Message;
 
 #[test]
 fn live_observer_reuses_timing_without_double_counting_loss_counters() {
     use meedee::{
-        events::{Clock, Event, Payload},
+        events::{Clock, Payload},
         inspection::Observer,
         live::{Diagnostic, DiagnosticKind, Item},
         messages::{AnyMessage, TimingClock},
     };
     let c = Clock::new("c".into(), 1, 1000, "native".into(), None).unwrap();
     let mut o = Observer::new("s".into(), c, 2).unwrap();
-    let e = Item::Event(Box::new(Event {
-        stream: "s".into(),
-        message: Payload::Midi1(AnyMessage::TimingClock(TimingClock::new().unwrap())),
-        timestamp: None,
-        span: None,
-    }));
+    let e = Item::Message(Box::new(
+        (Payload::Midi1(AnyMessage::TimingClock(TimingClock::new().unwrap())))
+            .with_metadata(meedee::messages::Metadata {
+                source: Some("s".into()),
+                timestamp: None,
+                span: None,
+            })
+            .unwrap(),
+    ));
     o.feed(&e).unwrap();
     o.feed(&Item::Diagnostic(Diagnostic {
         stream: "s".into(),

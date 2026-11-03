@@ -1,6 +1,7 @@
 //! Explicit clock mapping and cancellable caller-thread replay. No automatic cleanup sends.
+use crate::messages::Message;
 use crate::{
-    events::{timestamp_seconds, Clock, Event, Payload, Rational, Timestamp},
+    events::{timestamp_seconds, Clock, Payload, Rational, Timestamp},
     file_io::invalid,
 };
 use std::fmt;
@@ -93,11 +94,9 @@ impl Planner {
             allow_rounding,
         })
     }
-    pub fn deadline(&mut self, event: &Event) -> io::Result<Planned> {
-        event.validate()?;
+    pub fn deadline(&mut self, event: &Payload) -> io::Result<Planned> {
         let timestamp = event
-            .timestamp
-            .as_ref()
+            .timestamp()
             .ok_or_else(|| invalid(0, "playback requires an explicit timestamp"))?;
         let seconds = if timestamp.clock == self.clock {
             timestamp_seconds(timestamp)?
@@ -225,7 +224,7 @@ impl<E: std::error::Error + 'static> std::error::Error for Failure<E> {
     }
 }
 pub fn play<E>(
-    mut source: impl Iterator<Item = io::Result<Event>>,
+    mut source: impl Iterator<Item = io::Result<Payload>>,
     mut planner: Planner,
     clock: &mut impl PlaybackClock,
     cancel: &Cancellation,
@@ -264,7 +263,7 @@ pub fn play<E>(
             return Ok(report);
         }
         let lateness = clock.now_ns().saturating_sub(planned.delay_ns);
-        send(&event.message).map_err(|e| Failure {
+        send(&event).map_err(|e| Failure {
             report: report.clone(),
             cause: Cause::Send(e),
         })?;

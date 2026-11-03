@@ -1,7 +1,8 @@
 //! Source-local typed decoding with explicit packet loss and completion-time spans.
+use crate::messages::Message;
 use crate::{
     codecs,
-    events::{Clock, Event, Payload, Span, Timestamp},
+    events::{Clock, Payload, Span, Timestamp},
     file_io::invalid,
     transport::{Packet, Protocol},
     ump,
@@ -24,7 +25,7 @@ pub struct Diagnostic {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Item {
-    Event(Box<Event>),
+    Message(Box<Payload>),
     Diagnostic(Diagnostic),
 }
 #[derive(Clone)]
@@ -193,8 +194,8 @@ impl Decoder {
                     } else {
                         &current
                     };
-                    let event = Event {
-                        stream: self.stream.clone(),
+                    let event = (message).with_metadata(crate::messages::Metadata {
+                        source: Some(self.stream.clone()),
                         timestamp: time.clone(),
                         span: Some(Span {
                             first_packet: first.index,
@@ -202,10 +203,9 @@ impl Decoder {
                             first_timestamp: first.time.clone(),
                             last_timestamp: time.clone(),
                         }),
-                        message,
-                    };
-                    event.validate()?;
-                    out.push(Item::Event(Box::new(event)));
+                    })?;
+
+                    out.push(Item::Message(Box::new(event)));
                 }
                 Err(reason) => {
                     out.push(self.diagnostic(DiagnosticKind::Malformed, 0, reason, index))

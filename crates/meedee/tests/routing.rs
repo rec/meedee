@@ -1,17 +1,19 @@
+use meedee::messages::Message;
 use meedee::{archive, events, messages, routing, transport::Protocol, ump};
 
-fn event(source: &str, note: i64) -> events::Event {
-    events::Event {
-        stream: source.into(),
+fn event(source: &str, note: i64) -> events::Payload {
+    (events::Payload::Midi1(messages::AnyMessage::NoteOn(
+        messages::NoteOn::new(note)
+            .and_then(|m| m.with_velocity(100))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
+    )))
+    .with_metadata(meedee::messages::Metadata {
+        source: Some(source.into()),
         timestamp: None,
         span: None,
-        message: events::Payload::Midi1(messages::AnyMessage::NoteOn(
-            messages::NoteOn::new(note)
-                .and_then(|m| m.with_velocity(100))
-                .and_then(|m| m.with_channel(1))
-                .unwrap(),
-        )),
-    }
+    })
+    .unwrap()
 }
 fn route(name: &str, source: &str) -> routing::Route {
     routing::Route::new(
@@ -86,19 +88,23 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
     let mut router = routing::Router::new(vec![route], 128, 1024).unwrap();
     let clock = events::Clock::new("c".into(), 1, 30000, "test".into(), None).unwrap();
     let mut e = event("s", 60);
-    e.timestamp = Some(events::Timestamp { ticks: -5, clock });
-    e.message = events::Payload::Ump(ump::UmpMessage::Midi2ControlChange(
+    e = e
+        .with_timestamp(events::Timestamp { ticks: -5, clock })
+        .unwrap();
+    e = events::Payload::Ump(ump::UmpMessage::Midi2ControlChange(
         ump::Midi2ControlChange::new(16, 16, 74, 0xfedcba98).unwrap(),
-    ));
+    ))
+    .with_metadata(e.metadata().unwrap().clone())
+    .unwrap();
     router.feed(&e).unwrap();
     let d = router.peek().unwrap();
-    assert_eq!(d.event.stream, "s");
-    assert_eq!(d.event.timestamp, e.timestamp);
-    let events::Payload::Ump(v) = &d.event.message else {
+    assert_eq!(d.event.source().unwrap(), "s");
+    assert_eq!(d.event.timestamp(), e.timestamp());
+    let events::Payload::Ump(v) = &d.event else {
         panic!("expected UMP")
     };
     assert_eq!(ump::encode(v), [0x40b04a00, 0xfedcba98]);
-    let events::Payload::Ump(v) = &e.message else {
+    let events::Payload::Ump(v) = &e else {
         panic!("expected UMP")
     };
     assert_eq!(ump::encode(v), [0x4fbf4a00, 0xfedcba98]);

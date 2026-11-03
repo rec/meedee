@@ -1,6 +1,7 @@
+use meedee::messages::Message;
 use meedee::{
     archive::{self, Record},
-    events::{Clock, Event, Payload, Rational, Timestamp},
+    events::{Clock, Payload, Rational, Timestamp},
     messages::{AnyMessage, NoteOn},
 };
 use std::io::{self, Cursor};
@@ -20,20 +21,23 @@ fn records() -> Vec<Record> {
             label: "keys".into(),
             clock_identity: None,
         },
-        Record::Event(Box::new(Event {
-            stream: "source".into(),
-            timestamp: Some(Timestamp {
-                ticks: i64::MIN,
-                clock: c,
-            }),
-            span: None,
-            message: Payload::Midi1(AnyMessage::NoteOn(
+        Record::Event(Box::new(
+            (Payload::Midi1(AnyMessage::NoteOn(
                 NoteOn::new(127)
                     .and_then(|m| m.with_velocity(127))
                     .and_then(|m| m.with_channel(16))
                     .unwrap(),
-            )),
-        })),
+            )))
+            .with_metadata(meedee::messages::Metadata {
+                source: Some("source".into()),
+                timestamp: Some(Timestamp {
+                    ticks: i64::MIN,
+                    clock: c,
+                }),
+                span: None,
+            })
+            .unwrap(),
+        )),
         Record::Opaque {
             kind: 100,
             data: vec![0, 255],

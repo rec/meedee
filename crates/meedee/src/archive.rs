@@ -1,12 +1,13 @@
 //! meedee archive v1. Big endian, CRC-32/ISO-HDLC frames, explicit completion.
-use crate::events::{Clock, Event, Payload, Span, Timestamp};
+use crate::events::{Clock, Payload, Span, Timestamp};
 use crate::file_io::{invalid, Source};
+use crate::messages::Message;
 use crate::messages::{self as m, PrimitiveMessage};
 use crate::ump::{self, UmpValue};
 use std::collections::BTreeMap;
 use std::io::{self, Cursor, Read, Write};
 pub const MAGIC: &[u8; 12] = b"MEEDEE\r\n\0\x01\0\0";
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub enum Record {
     Clock(Clock),
     Stream {
@@ -14,7 +15,7 @@ pub enum Record {
         label: String,
         clock_identity: Option<String>,
     },
-    Event(Box<Event>),
+    Event(Box<Payload>),
     Gap {
         stream: String,
         lost: u64,
@@ -34,6 +35,95 @@ pub enum Record {
         kind: u16,
         data: Vec<u8>,
     },
+}
+// Records compare occurrences, unlike musical message values.
+impl PartialEq for Record {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Clock(a), Self::Clock(b)) => a == b,
+            (
+                Self::Stream {
+                    id: a,
+                    label: b,
+                    clock_identity: c,
+                },
+                Self::Stream {
+                    id: x,
+                    label: y,
+                    clock_identity: z,
+                },
+            ) => (a, b, c) == (x, y, z),
+            (Self::Event(a), Self::Event(b)) => a == b && a.metadata() == b.metadata(),
+            (
+                Self::Gap {
+                    stream: a,
+                    lost: b,
+                    reason: c,
+                },
+                Self::Gap {
+                    stream: x,
+                    lost: y,
+                    reason: z,
+                },
+            ) => (a, b, c) == (x, y, z),
+            (
+                Self::Metadata {
+                    key: a,
+                    data: b,
+                    stream: c,
+                    timestamp: d,
+                },
+                Self::Metadata {
+                    key: w,
+                    data: x,
+                    stream: y,
+                    timestamp: z,
+                },
+            ) => (a, b, c, d) == (w, x, y, z),
+            (
+                Self::Discontinuity {
+                    stream: a,
+                    reason: b,
+                },
+                Self::Discontinuity {
+                    stream: x,
+                    reason: y,
+                },
+            ) => (a, b) == (x, y),
+            (Self::Opaque { kind: a, data: b }, Self::Opaque { kind: x, data: y }) => {
+                (a, b) == (x, y)
+            }
+            _ => false,
+        }
+    }
+}
+impl Eq for Record {}
+impl std::hash::Hash for Record {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Clock(c) => c.hash(state),
+            Self::Stream {
+                id,
+                label,
+                clock_identity,
+            } => (id, label, clock_identity).hash(state),
+            Self::Event(m) => (m, m.metadata()).hash(state),
+            Self::Gap {
+                stream,
+                lost,
+                reason,
+            } => (stream, lost, reason).hash(state),
+            Self::Metadata {
+                key,
+                data,
+                stream,
+                timestamp,
+            } => (key, data, stream, timestamp).hash(state),
+            Self::Discontinuity { stream, reason } => (stream, reason).hash(state),
+            Self::Opaque { kind, data } => (kind, data).hash(state),
+        }
+    }
 }
 #[derive(Default)]
 struct Registry {
@@ -122,7 +212,7 @@ impl Registry {
                     .insert(id.clone(), (label.clone(), clock_identity.clone()));
             }
             Record::Event(e) => {
-                self.check_event_header(&e.stream, e.timestamp.as_ref(), e.span.as_ref())?;
+                self.check_event_header(e.source().unwrap_or_default(), e.timestamp(), e.span())?;
             }
             Record::Metadata {
                 stream, timestamp, ..
@@ -323,17 +413,19 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
             2
         }
         Record::Event(e) => {
-            e.validate()?;
-            string(&mut out, &e.stream)?;
-            timestamp(&mut out, e.timestamp.as_ref())?;
-            out.push(u8::from(e.span.is_some()));
-            if let Some(s) = &e.span {
+            if e.source().is_none() {
+                return Err(invalid(0, "empty stream identity"));
+            }
+            string(&mut out, e.source().unwrap_or_default())?;
+            timestamp(&mut out, e.timestamp())?;
+            out.push(u8::from(e.span().is_some()));
+            if let Some(s) = &e.span() {
                 out.extend(s.first_packet.to_be_bytes());
                 out.extend(s.last_packet.to_be_bytes());
                 timestamp(&mut out, s.first_timestamp.as_ref())?;
                 timestamp(&mut out, s.last_timestamp.as_ref())?;
             }
-            match &e.message {
+            match e.as_ref() {
                 Payload::Midi1(v) => {
                     out.push(1);
                     out.extend(v.encode()?);
@@ -553,12 +645,13 @@ fn decode(body: &[u8], registry: &Registry, preserve: bool) -> io::Result<Record
                     return Err(invalid(0, "unknown message representation"));
                 }
             };
-            Record::Event(Box::new(Event {
-                stream,
-                timestamp,
-                span,
-                message,
-            }))
+            Record::Event(Box::new((message).with_metadata(
+                crate::messages::Metadata {
+                    source: Some(stream),
+                    timestamp,
+                    span,
+                },
+            )?))
         }
         4 => Record::Gap {
             stream: f.string()?,
@@ -716,16 +809,16 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
             clock_identity,
         } => 11 + id.len() + label.len() + clock_identity.as_ref().map_or(0, |id| 4 + id.len()),
         Record::Event(e) => {
-            let p = match &e.message {
+            let p = match e.as_ref() {
                 Payload::Midi1(m::AnyMessage::SysEx(v)) => v.data().len() + 2,
                 Payload::Midi1(v) => v.encoded_len(),
                 Payload::Ump(v) => v.encode_words().len() * 4,
                 Payload::Command(_) => 34,
             };
-            7 + e.stream.len()
-                + timestamp_size(e.timestamp.as_ref())
+            7 + e.source().unwrap_or_default().len()
+                + timestamp_size(e.timestamp())
                 + 1
-                + e.span.as_ref().map_or(0, |s| {
+                + e.span().map_or(0, |s| {
                     16 + timestamp_size(s.first_timestamp.as_ref())
                         + timestamp_size(s.last_timestamp.as_ref())
                 })

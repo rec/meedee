@@ -1,17 +1,21 @@
+use meedee::messages::Message;
 use meedee::{
-    events::{Event, Payload},
+    events::Payload,
     live::{Diagnostic, DiagnosticKind, Item},
     messages::{AnyMessage, SysEx},
     transfer::Capture,
 };
 
 fn event(data: &[u8]) -> Item {
-    Item::Event(Box::new(Event {
-        stream: "s".into(),
-        timestamp: None,
-        span: None,
-        message: Payload::Midi1(AnyMessage::SysEx(SysEx::new(data.to_vec()).unwrap())),
-    }))
+    Item::Message(Box::new(
+        (Payload::Midi1(AnyMessage::SysEx(SysEx::new(data.to_vec()).unwrap())))
+            .with_metadata(meedee::messages::Metadata {
+                source: Some("s".into()),
+                timestamp: None,
+                span: None,
+            })
+            .unwrap(),
+    ))
 }
 fn capture(count: usize, bytes: usize, payload: usize) -> Capture {
     Capture::new("s".into(), count, 10, bytes, payload).unwrap()

@@ -1,7 +1,8 @@
 //! Optional source-scoped semantic observations. Original events remain unchanged.
+use crate::messages::Message;
 use crate::{
     controls,
-    events::{Clock, Event, Payload, Timestamp},
+    events::{Clock, Payload, Timestamp},
     file_io::invalid,
     live::{Diagnostic, DiagnosticKind},
     messages::{AnyMessage, SysEx},
@@ -42,27 +43,32 @@ struct Context {
     markers: BTreeMap<usize, Marker>,
 }
 impl Context {
-    fn event(&mut self, event: &Event) -> io::Result<(usize, bool)> {
-        event.validate()?;
-        if self.stream.as_ref().is_some_and(|s| s != &event.stream) {
+    fn event(&mut self, event: &Payload) -> io::Result<(usize, bool)> {
+        if event.source().is_none() {
+            return Err(invalid(0, "observation requires a source identity"));
+        }
+        if self
+            .stream
+            .as_ref()
+            .is_some_and(|s| s != event.source().unwrap_or_default())
+        {
             return Err(invalid(
                 0,
                 "one event view belongs to one source; reset before rebinding",
             ));
         }
-        self.stream = Some(event.stream.clone());
+        self.stream = Some(event.source().unwrap_or_default().to_owned());
         let index = self.index;
         self.index = self
             .index
             .checked_add(1)
             .ok_or_else(|| invalid(0, "view event index exhausted"))?;
-        let (first, last) = match &event.span {
+        let (first, last) = match &event.span() {
             Some(span) => (span.first_timestamp.clone(), span.last_timestamp.clone()),
-            None => (event.timestamp.clone(), event.timestamp.clone()),
+            None => (event.timestamp().cloned(), event.timestamp().cloned()),
         };
         let clock = event
-            .timestamp
-            .as_ref()
+            .timestamp()
             .or(first.as_ref())
             .or(last.as_ref())
             .map(|t| t.clock.clone());
@@ -117,11 +123,11 @@ impl Context {
         let retained = retained.into_iter().collect::<BTreeSet<_>>();
         self.markers.retain(|i, _| retained.contains(i));
     }
-    fn clock_change(&self, event: &Event, index: usize, group: Option<u8>) -> Observation {
+    fn clock_change(&self, event: &Payload, index: usize, group: Option<u8>) -> Observation {
         self.observation(
             Value::Boundary(Diagnostic {
-                stream: event.stream.clone(),
-                packet: event.span.as_ref().map_or(index as u64, |s| s.last_packet),
+                stream: event.source().unwrap_or_default().to_owned(),
+                packet: event.span().map_or(index as u64, |s| s.last_packet),
                 kind: DiagnosticKind::ClockChange,
                 lost: 0,
                 reason: "observed clock generation changed; view state reset".into(),
@@ -138,8 +144,8 @@ fn group(value: Option<u8>) -> io::Result<Option<u8>> {
     }
     Ok(value)
 }
-fn midi1(event: &Event, group: Option<u8>) -> io::Result<Option<Cow<'_, AnyMessage>>> {
-    match &event.message {
+fn midi1(event: &Payload, group: Option<u8>) -> io::Result<Option<Cow<'_, AnyMessage>>> {
+    match &event {
         Payload::Midi1(v) => {
             if group.is_none() {
                 Ok(Some(Cow::Borrowed(v)))
@@ -173,7 +179,7 @@ fn resets(message: &AnyMessage) -> bool {
         || matches!(message,AnyMessage::SysEx(v)if crate::gm::decode(v).ok().flatten().is_some())
 }
 pub trait View {
-    fn feed(&mut self, event: &Event, now_ns: Option<u64>) -> io::Result<Vec<Observation>>;
+    fn feed(&mut self, event: &Payload, now_ns: Option<u64>) -> io::Result<Vec<Observation>>;
     fn boundary(&mut self, d: &Diagnostic) -> io::Result<Vec<Observation>>;
     fn reset(&mut self);
 }
@@ -192,7 +198,7 @@ impl Controls {
     }
 }
 impl View for Controls {
-    fn feed(&mut self, event: &Event, _: Option<u64>) -> io::Result<Vec<Observation>> {
+    fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
         let (index, changed) = self.context.event(event)?;
         let mut out = vec![];
@@ -255,7 +261,7 @@ impl Velocity {
     }
 }
 impl View for Velocity {
-    fn feed(&mut self, event: &Event, _: Option<u64>) -> io::Result<Vec<Observation>> {
+    fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
         let (index, changed) = self.context.event(event)?;
         let mut out = vec![];
@@ -314,7 +320,7 @@ impl Mpe {
     }
 }
 impl View for Mpe {
-    fn feed(&mut self, event: &Event, _: Option<u64>) -> io::Result<Vec<Observation>> {
+    fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
         let (index, changed) = self.context.event(event)?;
         let mut out = vec![];
@@ -367,8 +373,8 @@ impl Ump {
     }
 }
 impl View for Ump {
-    fn feed(&mut self, event: &Event, _: Option<u64>) -> io::Result<Vec<Observation>> {
-        let Payload::Ump(message) = &event.message else {
+    fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
+        let Payload::Ump(message) = &event else {
             return Err(invalid(0, "UMP events required"));
         };
         let (index, changed) = self.context.event(event)?;
@@ -443,7 +449,7 @@ impl Tuning {
     }
 }
 impl View for Tuning {
-    fn feed(&mut self, event: &Event, _: Option<u64>) -> io::Result<Vec<Observation>> {
+    fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
         let (index, changed) = self.context.event(event)?;
         let mut out = vec![];
@@ -461,8 +467,8 @@ impl View for Tuning {
                 Ok(None) => {}
                 Err(e) => out.push(self.context.observation(
                     Value::Boundary(Diagnostic {
-                        stream: event.stream.clone(),
-                        packet: event.span.as_ref().map_or(index as u64, |s| s.last_packet),
+                        stream: event.source().unwrap_or_default().to_owned(),
+                        packet: event.span().map_or(index as u64, |s| s.last_packet),
                         kind: DiagnosticKind::Malformed,
                         lost: 0,
                         reason: e.to_string(),
@@ -523,7 +529,7 @@ impl Timecode {
     }
 }
 impl View for Timecode {
-    fn feed(&mut self, event: &Event, now: Option<u64>) -> io::Result<Vec<Observation>> {
+    fn feed(&mut self, event: &Payload, now: Option<u64>) -> io::Result<Vec<Observation>> {
         let now = now.ok_or_else(|| invalid(0, "MTC view needs explicit monotonic now_ns"))?;
         let message = midi1(event, self.group)?;
         let (index, changed) = self.context.event(event)?;

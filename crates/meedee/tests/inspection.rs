@@ -1,5 +1,6 @@
-use meedee::events::{Clock, Event, Payload, Timestamp};
+use meedee::events::{Clock, Payload, Timestamp};
 use meedee::inspection::{inspect, Format};
+use meedee::messages::Message;
 use meedee::messages::{AnyMessage, NoteOn};
 use meedee::{archive, file_io};
 use std::io::{self, Read};
@@ -16,20 +17,23 @@ fn archive_completion_is_separate_from_capture_loss() {
             label: "Keyboard".into(),
             clock_identity: Some("c".into()),
         },
-        archive::Record::Event(Box::new(Event {
-            stream: "keys".into(),
-            timestamp: Some(Timestamp {
-                ticks: -3,
-                clock: clock.clone(),
-            }),
-            span: None,
-            message: Payload::Midi1(AnyMessage::NoteOn(
+        archive::Record::Event(Box::new(
+            (Payload::Midi1(AnyMessage::NoteOn(
                 NoteOn::new(60)
                     .and_then(|m| m.with_velocity(100))
                     .and_then(|m| m.with_channel(16))
                     .unwrap(),
-            )),
-        })),
+            )))
+            .with_metadata(meedee::messages::Metadata {
+                source: Some("keys".into()),
+                timestamp: Some(Timestamp {
+                    ticks: -3,
+                    clock: clock.clone(),
+                }),
+                span: None,
+            })
+            .unwrap(),
+        )),
         archive::Record::Gap {
             stream: "keys".into(),
             lost: u64::MAX,

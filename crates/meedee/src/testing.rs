@@ -367,7 +367,7 @@ fn packet_size(packet: &Packet) -> usize {
 fn item_size(item: &Item) -> usize {
     match item {
         Item::Diagnostic(v) => v.reason.len(),
-        Item::Event(e) => match &e.message {
+        Item::Message(e) => match e.as_ref() {
             Payload::Midi1(v) => v.encoded_len(),
             Payload::Ump(v) => v.encode_words().len() * 4,
             Payload::Command(_) => 64,

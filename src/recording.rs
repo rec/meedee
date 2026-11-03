@@ -1,6 +1,7 @@
 //! Explicit path-only background recording; Python-owned streams use synchronous Writer.
 use crate::files::{limit, os_error};
 use crate::packets::Clock;
+use meedee::messages::Message;
 use meedee::{archive::Record, recording as model};
 use pyo3::exceptions::{PyTimeoutError, PyValueError};
 use pyo3::prelude::*;
@@ -105,7 +106,7 @@ impl Recorder {
         }
         let r = crate::archive::extract(record)?;
         if let Record::Event(e) = &r {
-            if e.stream != self.stream {
+            if e.source() != Some(self.stream.as_str()) {
                 return Err(PyValueError::new_err(
                     "recording source differs from event stream",
                 ));

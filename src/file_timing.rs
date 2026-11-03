@@ -262,7 +262,7 @@ fn export_event(
         .map_err(|_| pyo3::exceptions::PyValueError::new_err("tempo exceeds u32"))?;
     Ok(ExportReport {
         value: model::export_smf(
-            &event.value,
+            &event,
             &header.value,
             &origin.value,
             track,

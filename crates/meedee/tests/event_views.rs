@@ -1,20 +1,22 @@
+use meedee::messages::Message;
 use meedee::{
     event_views::{self, Value, View},
-    events::{Clock, Event, Payload, Timestamp},
+    events::{Clock, Payload, Timestamp},
     live::{Diagnostic, DiagnosticKind},
     messages::{AnyMessage, ControlChange, NoteOn},
     ump,
 };
-fn event(message: AnyMessage, ticks: i64) -> Event {
-    Event {
-        stream: "s".into(),
-        timestamp: Some(Timestamp {
-            ticks,
-            clock: Clock::new("c".into(), 1, 1_000_000_000, "test".into(), None).unwrap(),
-        }),
-        span: None,
-        message: Payload::Midi1(message),
-    }
+fn event(message: AnyMessage, ticks: i64) -> Payload {
+    (Payload::Midi1(message))
+        .with_metadata(meedee::messages::Metadata {
+            source: Some("s".into()),
+            timestamp: Some(Timestamp {
+                ticks,
+                clock: Clock::new("c".into(), 1, 1_000_000_000, "test".into(), None).unwrap(),
+            }),
+            span: None,
+        })
+        .unwrap()
 }
 #[test]
 fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
@@ -99,7 +101,7 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
         ),
         5000,
     );
-    wrong.stream = "another".into();
+    wrong = wrong.with_source("another").unwrap();
     assert!(view.feed(&wrong, None).is_err());
 }
 #[test]
@@ -144,10 +146,20 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
         ),
         10,
     );
-    a.message = Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone()));
+    a = Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone()))
+        .with_metadata(a.metadata().unwrap().clone())
+        .unwrap();
     assert!(assembler.feed(&a, None).unwrap().is_empty());
-    a.timestamp.as_mut().unwrap().ticks = 20;
-    a.message = Payload::Ump(ump::UmpMessage::SysEx7(packets[1].clone()));
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 20,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
+    a = Payload::Ump(ump::UmpMessage::SysEx7(packets[1].clone()))
+        .with_metadata(a.metadata().unwrap().clone())
+        .unwrap();
     let out = assembler.feed(&a, None).unwrap();
     assert_eq!(
         (out[0].group, out[0].first_index, out[0].last_index),

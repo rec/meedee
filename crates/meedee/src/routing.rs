@@ -1,4 +1,5 @@
 //! Static, one-hop routing. The caller owns input ordering and output delivery.
+use crate::messages::Message;
 use crate::messages::PrimitiveMessage;
 use crate::{archive, codecs, events, messages, transport::Protocol, ump};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -89,7 +90,7 @@ pub struct Delivery {
     pub route: String,
     pub destination: String,
     /// Transformed message, with the original source, timestamp and span.
-    pub event: events::Event,
+    pub event: events::Payload,
     pub wire_bytes: usize,
 }
 #[derive(Clone, Debug, Default)]
@@ -203,7 +204,7 @@ impl Router {
         }
     }
     /// All copies of this event are admitted together, or none are enqueued.
-    pub fn feed(&mut self, event: &events::Event) -> io::Result<()> {
+    pub fn feed(&mut self, event: &events::Payload) -> io::Result<()> {
         if self.report.stopped {
             return Err(invalid("router is stopped"));
         }
@@ -220,8 +221,10 @@ impl Router {
             Ok(())
         }
     }
-    fn admit(&mut self, event: &events::Event) -> io::Result<()> {
-        event.validate()?;
+    fn admit(&mut self, event: &events::Payload) -> io::Result<()> {
+        if event.source().is_none() {
+            return Err(invalid("routing requires a source identity"));
+        }
         self.report.received = self
             .report
             .received
@@ -232,9 +235,9 @@ impl Router {
             .routes
             .iter()
             .enumerate()
-            .filter(|(_, r)| r.source == event.stream)
+            .filter(|(_, r)| r.source == event.source().unwrap_or_default())
         {
-            let info = classify(&event.message)?;
+            let info = classify(event)?;
             if info.protocol != r.protocol
                 || r.group.is_some_and(|g| Some(g) != info.group)
                 || info
@@ -253,7 +256,7 @@ impl Router {
             self.report.filtered += 1;
             return Ok(());
         }
-        let bytes = wire_bytes(&event.message)?;
+        let bytes = wire_bytes(event)?;
         let total = bytes
             .checked_mul(selected.len())
             .and_then(|v| self.report.queued_bytes.checked_add(v));
@@ -284,12 +287,8 @@ impl Router {
         let mut deliveries = Vec::with_capacity(selected.len());
         for (n, i) in selected.into_iter().enumerate() {
             let r = &self.routes[i];
-            let outgoing = events::Event {
-                stream: event.stream.clone(),
-                timestamp: event.timestamp.clone(),
-                span: event.span.clone(),
-                message: remap(&event.message, r)?,
-            };
+            let outgoing =
+                remap(event, r)?.with_metadata(event.metadata().cloned().unwrap_or_default())?;
             deliveries.push(Delivery {
                 id: self.report.admitted + n as u64,
                 route: r.name.clone(),

@@ -61,11 +61,15 @@ Additional work beyond the prompt: None.
   the common Message trait, across MIDI 1, UMP, SysEx and device-management types.
   Builders and clamped note transposition preserve it. Equality/hash use only
   musical payload fields; expansion copies command provenance onto primitives.
-  The public Event wrapper and its live/archive consumers still require migration
-  to these metadata-bearing values; Python's existing metadata bridge also needs
-  integration before this part is complete. Verification: 121 Rust tests plus the
-  constructor/metadata doctest, core Clippy with warnings denied, and all 525 Python
-  tests pass after rebuilding the extension. Native-device tests remain ignored.
-- Event removal/integration, ergonomic Input/Output, scheduling,
+  Verified by the cross-family metadata and command-expansion regressions.
+- Removed the generic Rust Event wrapper without an alias. Live decoding yields
+  Item::Message with a metadata-bearing Payload; archives, routing, inspection,
+  observation, file timing and playback consume it directly. The Python bridge
+  copies metadata between its message base and the same Rust value. Archive bytes
+  and occurrence comparison are preserved; playback no longer invents a source.
+  Verification: 123 Rust tests plus one doctest, core Clippy with warnings denied,
+  independent archive byte fixtures, and 525 Python regressions pass after the
+  extension rebuild. Two native-device tests remain ignored.
+- Ergonomic Input/Output, scheduling,
   recording/playback integration, cleanup integration and graded examples remain
   pending. Full goal completion is not established.

@@ -65,7 +65,7 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
         });
     }
     if let Ok(v) = crate::event_values::extract(&v) {
-        return Ok(model::Record::Event(Box::new(v.value.clone())));
+        return Ok(model::Record::Event(Box::new(v)));
     }
     if let Ok(v) = v.extract::<PyRef<'_, Gap>>() {
         return Ok(model::Record::Gap {

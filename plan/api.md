@@ -335,14 +335,14 @@ message schema, assemble packets or implement SysEx8. Do not use its generic
 payload validation as evidence that an arbitrary payload is a recognized
 musical command. Native upstream allocation limits remain an independent audit.
 
-## Event, clock and Rust stream design
+## Message metadata, clocks and Rust streams
 
-Retain the main plan's separate immutable event model: `Event` contains a
-message, stream identity and optional timestamp. Absence differs from a zero
+Rust messages own optional timestamp, source identity and packet-span metadata;
+there is no separate public `events::Event` wrapper. Absence differs from a zero
 timestamp. A timestamp holds exact integer ticks and clock identity; a clock
 descriptor carries an exact rational tick unit, origin/mode and known resolution.
 Clock identity must distinguish reconnect generations. Equality of musical
-messages does not depend on event timestamps.
+messages does not depend on timestamps or other provenance.
 
 Define clock descriptor construction and concrete identity allocation alongside
 the shared core in slice 2; capture defaults and cross-clock mapping require
@@ -408,7 +408,7 @@ are available; do not add timing thresholds to unit tests.
 - Integrate native public modules without starting transport workers for value use.
 - Promote the prototype once into the shared Rust core and binding, removing
   the test-only implementation; retain the behavior checks.
-- Add production Event/clock types, complete MIDI 1.0 types and wire fixtures
+- Add production message metadata/clock types, complete MIDI 1.0 types and wire fixtures
   in their planned slices rather than publishing placeholder classes.
 - Qualify libremidi's C boundary and build before backend replacement.
 - Record each test host's OS/architecture, ABI and hardware before performance claims.
@@ -935,7 +935,7 @@ sends. MIDI-CI profile negotiation remains slice 11.
 
 meedee.ci adds frozen management Message values and an explicit decode(SysEx),
 plus a pure caller-driven Session backed by Rust ci/ci_session. Raw receive,
-codec, Event and archive behavior stays primitive. Callers supply randomized
+codec, message metadata and archive behavior stay primitive. Callers supply randomized
 MUIDs and explicit routes; channels/groups remain 1–16. Format 1/2 management,
 reserved identifiers, compatible future extensions and bounded management
 transactions are covered. Session optional-category declarations are zero.
@@ -1701,6 +1701,10 @@ The public events.Event wrapper is removed with no compatibility alias. Decoded
 input, archive reading, timed SMF/Clip reading, routing deliveries, recording,
 inspection, observation and playback use messages directly. Routing Delivery
 exposes its message as `.message`. Low-level smf.Event remains a file record with
-track/tick information and supports non-message file records. Internal Rust
-Event values and archive bytes are unchanged. Archive and source-aware operations
-still require a stream identity; playback also requires timestamp information.
+track/tick information and supports non-message file records. Rust also removes
+its generic Event wrapper: the existing `events::Payload` enum carries metadata
+through its underlying message value, and live decoding yields `Item::Message`.
+Archive bytes remain unchanged. Archive record equality and capture comparison
+include occurrence metadata, even though musical message equality ignores it.
+Archive and source-aware operations still require a stream identity; playback
+requires timestamps but does not invent or require a source identity.

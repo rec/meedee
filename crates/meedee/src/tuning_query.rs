@@ -1,4 +1,5 @@
 //! One unicast MTS dump request. Caller owns time, decoding and transport.
+use crate::messages::Message;
 use crate::{
     events::Payload,
     live::Item,
@@ -98,13 +99,13 @@ impl Query {
                 self.fail(&format!("input diagnostic {:?}: {}", d.kind, d.reason));
                 return Ok(());
             }
-            Item::Event(e) => e,
+            Item::Message(e) => e,
         };
-        if event.stream != self.stream {
+        if event.source().unwrap_or_default() != self.stream {
             self.fail("query received an unrelated source");
             return Ok(());
         }
-        match &event.message {
+        match event.as_ref() {
             Payload::Midi1(AnyMessage::SysEx(raw)) => {
                 let decoded = match tuning::decode(raw) {
                     Ok(v) => v,

@@ -97,7 +97,7 @@ fn feed(
     now: Option<u64>,
 ) -> PyResult<Vec<Observation>> {
     let values = if let Ok(e) = crate::event_values::extract(&value) {
-        view.feed(&e.value, now)
+        view.feed(&e, now)
     } else if let Ok(d) = value.extract::<PyRef<'_, StreamDiagnostic>>() {
         view.boundary(&d.value)
     } else {

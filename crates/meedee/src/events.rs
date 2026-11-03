@@ -107,31 +107,11 @@ pub enum Payload {
     Ump(UmpMessage),
     Command(AnyCommand),
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Event {
-    pub stream: String,
-    pub timestamp: Option<Timestamp>,
-    pub span: Option<Span>,
-    pub message: Payload,
-}
-impl Event {
-    pub fn validate(&self) -> io::Result<()> {
-        if self.stream.is_empty() {
-            return Err(invalid(0, "empty stream identity"));
-        }
-        if self
-            .timestamp
-            .as_ref()
-            .is_some_and(|t| t.clock.mode() == Some(false))
-        {
-            return Err(invalid(0, "disabled clock cannot have a timestamp"));
-        }
-        if let Some(s) = &self.span {
-            s.validate(self.timestamp.as_ref())?;
-        }
-        Ok(())
-    }
-}
+crate::messages::enum_metadata!(Payload {
+    Midi1,
+    Ump,
+    Command
+});
 /// Checked rational seconds, reduced on construction. Floating point is never used.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rational {

@@ -106,7 +106,7 @@ fn items(py: Python<'_>, v: Vec<model::Item>) -> PyResult<Vec<Py<PyAny>>> {
 }
 pub(crate) fn item(py: Python<'_>, v: model::Item) -> PyResult<Py<PyAny>> {
     match v {
-        model::Item::Event(value) => crate::event_values::to_python(py, *value),
+        model::Item::Message(value) => crate::event_values::to_python(py, *value),
         model::Item::Diagnostic(value) => Ok(Py::new(py, StreamDiagnostic { value })?.into_any()),
     }
 }
@@ -207,7 +207,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
     if let Ok(v) = crate::event_values::extract(&item) {
-        return Ok(match &v.value.message {
+        return Ok(match &v {
             Payload::Midi1(meedee::messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
             Payload::Midi1(v) => v.encoded_len(),
             Payload::Ump(v) => {

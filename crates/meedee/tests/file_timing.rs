@@ -1,3 +1,4 @@
+use meedee::messages::Message;
 use meedee::{
     events::{Payload, Rational, Timestamp},
     file_timing,
@@ -88,20 +89,26 @@ fn merged_tracks_apply_tempo_in_stable_order_and_preserve_leading_silence() {
     let result = timed.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
     let events = result
         .into_iter()
-        .map(|v| if let Item::Event(v) = v { *v } else { panic!() })
+        .map(|v| {
+            if let Item::Message(v) = v {
+                *v
+            } else {
+                panic!()
+            }
+        })
         .collect::<Vec<_>>();
     assert_eq!(events.len(), 2);
-    assert_eq!(events[0].timestamp.as_ref().unwrap().ticks, 120_000_000);
+    assert_eq!(events[0].timestamp().unwrap().ticks, 120_000_000);
     assert_eq!(
-        events[0].timestamp.as_ref().unwrap().clock.denominator(),
+        events[0].timestamp().unwrap().clock.denominator(),
         480_000_000
     );
     assert_eq!(
-        meedee::events::timestamp_seconds(events[0].timestamp.as_ref().unwrap()).unwrap(),
+        meedee::events::timestamp_seconds(events[0].timestamp().unwrap()).unwrap(),
         Rational::new(1, 4).unwrap()
     );
     assert_eq!(
-        meedee::events::timestamp_seconds(events[1].timestamp.as_ref().unwrap()).unwrap(),
+        meedee::events::timestamp_seconds(events[1].timestamp().unwrap()).unwrap(),
         Rational::new(3, 8).unwrap()
     );
     let mut plan = meedee::playback::Planner::new(origin, vec![], false).unwrap();
@@ -126,9 +133,11 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
             )),
         })
         .unwrap();
-    let Item::Event(e) = &result[0] else { panic!() };
+    let Item::Message(e) = &result[0] else {
+        panic!()
+    };
     assert_eq!(
-        meedee::events::timestamp_seconds(e.timestamp.as_ref().unwrap()).unwrap(),
+        meedee::events::timestamp_seconds(e.timestamp().unwrap()).unwrap(),
         Rational::new(1001, 1000).unwrap()
     );
     let target = Header::new(0, 1, 480, vec![]).unwrap();
@@ -141,7 +150,9 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
     assert_eq!(report.events[0].tick, 961);
     assert_eq!(report.rounding_error_ticks, Rational::new(1, 25).unwrap());
     let mut missing = (**e).clone();
-    missing.timestamp = None;
+    let mut metadata = missing.metadata().unwrap().clone();
+    metadata.timestamp = None;
+    missing = missing.with_metadata(metadata).unwrap();
     assert_eq!(
         file_timing::export_smf(
             &missing,
@@ -192,14 +203,15 @@ fn large_escape_records_stream_and_group_routing_is_not_silently_discarded() {
         ticks: 0,
         clock: clock.clone(),
     };
-    let event = meedee::events::Event {
-        stream: "s".into(),
+    let event = (Payload::Ump(ump::UmpMessage::Midi2NoteOn(
+        ump::Midi2NoteOn::new(2, 1, 60, 65535, 0, 0).unwrap(),
+    )))
+    .with_metadata(meedee::messages::Metadata {
+        source: Some("s".into()),
         timestamp: Some(origin.clone()),
         span: None,
-        message: Payload::Ump(ump::UmpMessage::Midi2NoteOn(
-            ump::Midi2NoteOn::new(2, 1, 60, 65535, 0, 0).unwrap(),
-        )),
-    };
+    })
+    .unwrap();
     let report = file_timing::export_smf(
         &event,
         &Header::new(0, 1, 480, vec![]).unwrap(),
