@@ -36,3 +36,6 @@ pub mod playback;
 pub mod recording;
 pub mod smf;
 pub mod syx;
+
+mod sequence;
+pub use sequence::{Beats, Note, NoteDuration, Rest};
