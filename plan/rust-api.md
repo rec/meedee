@@ -96,5 +96,12 @@ Additional work beyond the prompt: None.
   diagnostics or system messages. Native health is checked while waiting for input. Device-free tests
   cover MIDI 1/UMP filtering, queue overflow, partial-message loss, callback-thread
   delivery, terminal decoding errors and ownership release.
-- Recording integration and graded examples remain
+- Input::record(Duration) now consumes/closes the input and returns a Recording
+  that feeds Output::play directly. It retains declarations, message provenance,
+  gaps and discontinuities, including errors and finalization diagnostics.
+  Input::record_to captures the same records, then writes a strict archive with an
+  explicit overwrite boolean. Memory grows with the retained capture, matching
+  Python; receive admission remains bounded. Tests cover silent timeout, receiver
+  release, diagnostic retention, file round-trips and overwrite preservation.
+- Graded examples and the final migration audit remain
   pending. Full goal completion is not established.

@@ -44,4 +44,4 @@ mod output;
 pub use archive::Reader;
 pub use output::{Output, OutputValue};
 mod input;
-pub use input::{Input, InputErrors};
+pub use input::{Input, InputErrors, Recording};

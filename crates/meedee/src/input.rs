@@ -7,6 +7,9 @@ use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
+#[path = "input_recording.rs"]
+mod recording;
+pub use recording::Recording;
 
 /// Iterate over messages from the first input, reporting diagnostics to stderr.
 /// No native client is created until discovery or receiving. Drop closes input.
@@ -28,6 +31,7 @@ pub struct Input {
     connection: Option<transport::InputConnection>,
     decoder: Option<Decoder>,
     clock: Option<Clock>,
+    stream: Option<String>,
     pending: VecDeque<io::Result<Item>>,
     reported_loss: u64,
     expected: u64,
@@ -55,6 +59,7 @@ impl Input {
             connection: None,
             decoder: None,
             clock: None,
+            stream: None,
             pending: VecDeque::new(),
             reported_loss: 0,
             expected: 0,
@@ -177,7 +182,7 @@ impl Input {
     fn connect_port(&mut self, port: &Port) -> io::Result<()> {
         self.client()?;
         let stream = events::fresh_identity("input")?;
-        let decoder = Decoder::new(stream, self.options.protocol, self.sysex_limit)?;
+        let decoder = Decoder::new(stream.clone(), self.options.protocol, self.sysex_limit)?;
         let queue = self.queue.clone();
         let client = self.client.take().expect("initialized input");
         let connection = client
@@ -207,6 +212,7 @@ impl Input {
             .with_transport(native_clock.backend as i32, enabled),
         );
         self.decoder = Some(decoder);
+        self.stream = Some(stream);
         self.connection = Some(connection);
         Ok(())
     }
@@ -431,6 +437,7 @@ mod tests {
         let mut input = Input::new();
         input.options.protocol = protocol;
         input.decoder = Some(Decoder::new("keyboard".into(), protocol, 1024).unwrap());
+        input.stream = Some("keyboard".into());
         input.clock =
             Some(Clock::new("test-clock".into(), 1, 1_000_000_000, "test".into(), None).unwrap());
         input
@@ -586,6 +593,98 @@ mod tests {
         producer.join().unwrap();
         input.close().unwrap();
         assert!(input.next().is_none());
+    }
+
+    #[test]
+    fn recording_preserves_messages_loss_and_finalization_diagnostics() {
+        use crate::archive::Record;
+        let input = input(transport::Protocol::Midi1);
+        input.queue.push(packet(0, &[0x90, 60, 90]));
+        input.queue.push(packet(2, &[0x90, 62]));
+        let recording = input.record(Duration::ZERO).unwrap();
+        assert!(matches!(&recording.records[0], Record::Clock(_)));
+        assert!(matches!(&recording.records[1], Record::Stream { id, .. } if id=="keyboard"));
+        assert!(
+            matches!(&recording.records[2], Record::Event(m) if m.timestamp().unwrap().ticks==0)
+        );
+        assert!(matches!(&recording.records[3], Record::Gap { lost: 1, .. }));
+        assert!(matches!(&recording.records[4], Record::Gap { lost: 0, .. }));
+        assert_eq!(
+            recording
+                .clone()
+                .into_iter()
+                .collect::<io::Result<Vec<_>>>()
+                .unwrap(),
+            recording.records
+        );
+    }
+
+    #[test]
+    fn recording_retains_terminal_receive_failure_as_a_discontinuity() {
+        let input = input(transport::Protocol::Midi1);
+        input.queue.push(packet(u64::MAX, &[0x90, 60, 90]));
+        let recording = input.record(Duration::ZERO).unwrap();
+        assert!(
+            matches!(recording.records.last().unwrap(), crate::archive::Record::Discontinuity { reason, .. } if reason.contains("sequence exhausted"))
+        );
+        assert_eq!(recording.records.len(), 3);
+        assert!(Input::new()
+            .record(Duration::MAX)
+            .unwrap_err()
+            .to_string()
+            .contains("clock range"));
+    }
+
+    #[test]
+    fn recording_times_out_on_silence_and_releases_the_receiver() {
+        let input = input(transport::Protocol::Midi1);
+        let queue = Arc::downgrade(&input.queue);
+        let recording = input.record(Duration::from_millis(1)).unwrap();
+        assert_eq!(recording.records.len(), 2);
+        assert!(queue.upgrade().is_none());
+    }
+
+    #[test]
+    fn file_recording_roundtrips_and_requires_explicit_overwrite() {
+        let path = std::env::temp_dir().join(format!(
+            "meedee-record-{}-{}.meedee",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let first = input(transport::Protocol::Midi1);
+        first.queue.push(packet(0, &[0x90, 60, 90, 0x80, 60, 0]));
+        let recording = first.record_to(Duration::ZERO, &path, false).unwrap();
+        let original = std::fs::read(&path).unwrap();
+        assert_eq!(
+            crate::Reader::open(&path)
+                .unwrap()
+                .collect::<io::Result<Vec<_>>>()
+                .unwrap(),
+            recording.records
+        );
+        assert_eq!(
+            input(transport::Protocol::Midi1)
+                .record_to(Duration::ZERO, &path, false)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::AlreadyExists
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        let second = input(transport::Protocol::Midi1)
+            .record_to(Duration::ZERO, &path, true)
+            .unwrap();
+        assert_eq!(
+            crate::Reader::open(&path)
+                .unwrap()
+                .collect::<io::Result<Vec<_>>>()
+                .unwrap(),
+            second.records
+        );
+        assert!(std::fs::metadata(&path).unwrap().len() < original.len() as u64);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]
