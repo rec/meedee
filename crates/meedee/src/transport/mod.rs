@@ -600,6 +600,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn convenience_selection_requires_a_unique_pattern_match() {
+        let owner = Arc::new(());
+        let ports: Vec<_> = ["Keyboard", "FLOW 8", "Café1", "Duplicate", "Duplicate"]
+            .into_iter()
+            .enumerate()
+            .map(|(index, name)| Port {
+                owner: Arc::downgrade(&owner),
+                generation: 1,
+                index,
+                backend: Backend::CoreMidi,
+                backend_id: index as u64,
+                name: name.into(),
+            })
+            .collect();
+        let select = crate::output::select_port;
+        assert_eq!(select(&ports, None).unwrap(), &ports[0]);
+        assert_eq!(select(&ports, Some("FLOW")).unwrap(), &ports[1]);
+        assert_eq!(select(&ports, Some("*é?")).unwrap(), &ports[2]);
+        assert_eq!(
+            select(&ports, Some("Duplicate")).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            select(&ports, Some("*")).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            select(&ports, Some("flow")).unwrap_err().kind(),
+            std::io::ErrorKind::NotFound
+        );
+        assert_eq!(
+            select(&[], None).unwrap_err().kind(),
+            std::io::ErrorKind::NotFound
+        );
+    }
+
+    #[test]
     fn ump_framing_preserves_wide_packets_and_rejects_truncation() {
         assert!(validate_ump(&[0x20903c64, 0x40903c00, 0xc0000000]).is_ok());
         assert!(validate_ump(&[0x40903c00]).is_err());

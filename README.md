@@ -5,8 +5,8 @@ using vendored [libremidi](https://github.com/celtera/libremidi) for native tran
 imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
 `meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`,
 `meedee.timecode`, `meedee.ump`, `meedee.smf`, `meedee.syx`, `meedee.clip` and
-`meedee.archive` and `meedee.ci`; the package root is empty. There are no Python
-runtime dependencies.
+`meedee.archive` and `meedee.ci`; the package root is empty. The Python convenience
+API uses reccy for unit parsing; the Rust crate needs no Python interpreter.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented but native platform qualification remains incomplete. Immutable
@@ -46,6 +46,15 @@ programs and tuning alone. UMP retains explicit addressing and does not support
 full-note values or automatic cleanup.
 
 ## Files, typed I/O and exact time
+
+Rust users can start with the [practical Rust examples](doc/rust-examples.md).
+The crate exports `Input`, `Output`, `Note`, `Rest`, `Beats`, `Recording` and
+`Reader`. Use `Duration` for elapsed time and `Beats` with output tempo for music.
+`Input::new()` iterates messages; `Output::send` accepts individual values and
+`send_all` schedules heterogeneous sequences. `Input::record(Duration)` returns
+a capture accepted directly by `Output::play`; `Reader::open(path)` reads the
+same archive records. Connections close on drop, with checked explicit `close()`
+available for cleanup errors. The `transport` module retains advanced native I/O.
 
 ```python
 from meedee import archive, events, messages, smf

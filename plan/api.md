@@ -344,18 +344,48 @@ descriptor carries an exact rational tick unit, origin/mode and known resolution
 Clock identity must distinguish reconnect generations. Equality of musical
 messages does not depend on timestamps or other provenance.
 
-Define clock descriptor construction and concrete identity allocation alongside
-the shared core in slice 2; capture defaults and cross-clock mapping require
-the actual backend evidence before live integration. Do not hard-code
-microseconds, unsigned time or a shared origin from the previous backend.
-No file-format discriminator or persistence layout is frozen in this slice.
+Native input allocates a distinct clock identity for each connection. It retains
+the transport's signed absolute-nanosecond timestamps, backend and enabled mode;
+it does not assert a shared origin across connections. Archive v1 persists these
+descriptors with message provenance, independently of message equality.
 
 Rust uses validated immutable structs implementing the common `Message` trait
 and a closed `AnyMessage` enum for heterogeneous streams. Store short messages
 inline, avoiding one trait-object allocation per message. Payload-bearing
 variants own their storage. The prototype separates Rust validation values
-from their PyO3 wrappers so extraction can promote the same constructors into
-the interpreter-independent core without reimplementing validation.
+from their PyO3 wrappers; both use the interpreter-independent core validation.
+
+### Ergonomic Rust I/O
+
+The crate root exports Input, Output, Note, Rest, Beats, Recording and Reader.
+MIDI 1 channel constructors use payload-first defaults and optional channels;
+validated `with_*` builders replace payload fields and preserve metadata.
+Input defaults to lazy first-port selection and message iteration. Its borrowed
+`with_errors()` iterator yields live Items in io::Result, retaining diagnostics;
+default iteration prints diagnostics and stops on terminal errors. Channel filters
+accept a single channel or an iterator of channels and retain system messages.
+
+Output `send` accepts one value; `send_all` accepts heterogeneous OutputValues.
+Duration is elapsed time and Beats requires explicit output tempo. Sequence
+deadlines accumulate exactly before nanosecond rounding; validation precedes any
+send. Explicit output channels override MIDI 1 message channels; otherwise the
+message channel survives, with channel 1 filling an unset channel. MIDI 2/UMP
+keeps explicit group/channel addressing. No protocol conversion is implicit.
+
+Close/Drop releases confirmed MIDI 1 note counts and resets only changed pitch
+bend, CC1/64/66/67 and channel/polyphonic pressure. Drop reports errors best-effort;
+explicit close returns them. Cleanup always attempts transport closure after a
+send failure. UMP has no automatic state cleanup.
+
+Input `record(Duration)` consumes/closes the input and returns a memory Recording,
+including receive diagnostics as archive gaps/discontinuities. `record_to` writes
+the same records after capture, with explicit overwrite permission. Retained
+capture memory grows with traffic; native and application receive queues remain
+bounded. Reader::open uses strict archive validation and a 1 MiB payload limit.
+Output::play accepts recordings/readers and infers its origin from the first
+message. It stops on loss, discontinuity, malformed records, timestamp regression
+or unmapped clocks, retaining confirmed send progress. The lower-level playback
+API supplies explicit mappings, rounding, cancellation and metrics.
 
 ## Evidence and measurements
 
@@ -1575,8 +1605,8 @@ pressure and pitch bend default to zero; RPN/NRPN resolution defaults to 14.
 the output channel.
 Controller/value and parameter/value choices remain explicit. MIDI 1 system
 payloads are positional. Decoded values always carry explicit channels. An
-unresolved message cannot be encoded or placed in a timestamped event until
-`replace(channel=...)` resolves it; output calls resolve it using their channel.
+unresolved message cannot be encoded or serialized into an archive until
+`replace(channel=...)` resolves it; output calls apply their channel policy.
 UMP and management constructor signatures are unchanged.
 
 Explicit close/context exit releases outstanding confirmed MIDI 1 NoteOns,

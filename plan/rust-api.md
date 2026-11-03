@@ -103,5 +103,29 @@ Additional work beyond the prompt: None.
   explicit overwrite boolean. Memory grows with the retained capture, matching
   Python; receive admission remains bounded. Tests cover silent timeout, receiver
   release, diagnostic retention, file round-trips and overwrite preservation.
-- Graded examples and the final migration audit remain
-  pending. Full goal completion is not established.
+- Added doc/rust-examples.md with ten graded sections, linked from the documentation
+  index, Python guide and README. All twelve snippets compile as independent Rust
+  function bodies without running native I/O. The API contract records the Rust
+  convenience methods and the distinction between elapsed time and beats.
+
+## Completion audit, 2026-11-03
+
+| Requirement | Authoritative implementation and verification |
+| --- | --- |
+| Typed Duration/Beats, Note/Rest defaults and exact beat arithmetic | src/sequence.rs and tests/sequence.rs in crates/meedee; fractional accumulation and invalid tempo/unit tests pass. |
+| Replace MIDI 1 constructors and migrate callers | messages.rs, gm.rs and repository callers; full workspace compilation/tests and rebuilt Python regressions pass. byte_codec.rs checks defaults, unset-channel encoding, builders, expansion and clamped transpose. |
+| Preserve optional provenance; ignore it in message equality/hash | Message trait and metadata macros in messages.rs; message_metadata.rs tests builders, transpose, multiple message families and expanded commands. Archive/comparison tests retain occurrence equality. |
+| Remove generic Event while retaining SMF records | events.rs exposes metadata-bearing Payload, with live Item::Message and direct archive/playback consumers. Source review finds no generic events.Event export; smf.Event and archive Record::Event remain for their specified low-level roles. |
+| Lazy discovery, first/unique-pattern selection and channel policy | input.rs and output.rs use the same selector; the added transport unit regression checks first/default, Unicode wildcard, missing and duplicate matches. Output tests cover preserved, default and overridden channels. |
+| Input iteration, filtering, diagnostics and lifecycle | input.rs tests cover MIDI 1/UMP, provenance, callback-thread admission, overflow followed by silence, partial-state reset, finalization and terminal errors. Source ownership has no reference back from callbacks to Input. |
+| Output sequencing, commands and cleanup | output.rs tests exact cumulative timing, overlap counts, agreed controller/pressure resets, pre-send validation, partial command progress, failure closure and UMP boundaries. Waiting uses the existing monotonic scheduler/condition variable. |
+| Memory/file recording and replay | input_recording.rs uses existing archive records/writer; input tests verify retained diagnostics, timeout, receiver release, round-trip and overwrite semantics. Output replay tests use real archive encoding and fake output, including missing trailers, loss and regressions. |
+| Graded examples and contracts | doc/rust-examples.md contains all agreed high-level workflows; 12/12 snippets compile with rustdoc no_run wrappers against the built crate. README, doc/index.md, doc/examples.md and plan/api.md link or describe the final API. |
+| Regression and documentation gates | Full current-toolchain Rust workspace suite passed (192 tests including six doctests), followed by the additional passing port-selection test. Two hardware tests are ignored; three interpreter-finalization tests run through the separate fresh-process Python harness. Rebuilt extension: 525 Python tests passed. Core Clippy with warnings denied, cargo fmt and git diff checks passed. Strict Zensical documentation build reports no issues and generates the Rust guide page. |
+
+All scoped migration requirements are verified. No physical ports were opened,
+and no old Rust toolchain was tested locally. Hardware/platform qualification
+remains separate from this API migration, as agreed. Capture retention grows with
+traffic; scoped cleanup is best effort on transport failure; UMP retains explicit
+addressing and has no automatic full-note/cleanup behavior. These documented
+boundaries are intentional, not unimplemented parts of this migration.

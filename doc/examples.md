@@ -1,5 +1,7 @@
 # Practical Python MIDI examples
 
+For the Rust API, see the [practical Rust examples](rust-examples.md).
+
 Start with one note, then work through timing, live input, files and instrument
 management. Each code block is a separate script. Use Python 3.13 and install
 with `uv sync --locked`; the tuning example also needs `--extra ufor`.
