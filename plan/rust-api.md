@@ -86,5 +86,15 @@ Additional work beyond the prompt: None.
   strict defaults for a file path. Replay tests cover prior output activity,
   malformed archive completion, loss, regression and empty input without opening
   ports. A file-replay doctest compiles without running native transport.
-- Ergonomic Input, recording integration and graded examples remain
+- Added root-level Input with lazy first-port/name selection, explicit connection,
+  channel/container filtering, and scoped close/Drop ownership. Default iteration
+  yields metadata-bearing messages and prints diagnostics; with_errors retains
+  diagnostics and terminal Results. Raw callbacks feed a packet/byte-bounded
+  queue; caller-thread decoding resets on sequence gaps. Queue loss is reported
+  after the accepted prefix even if the sender goes silent; remaining native tail
+  loss and truncated messages are reported at close. Filters never remove
+  diagnostics or system messages. Native health is checked while waiting for input. Device-free tests
+  cover MIDI 1/UMP filtering, queue overflow, partial-message loss, callback-thread
+  delivery, terminal decoding errors and ownership release.
+- Recording integration and graded examples remain
   pending. Full goal completion is not established.

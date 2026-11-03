@@ -415,6 +415,12 @@ impl Output {
 }
 
 impl InputConnection {
+    pub(crate) fn check_health(&self) -> Result<()> {
+        self.worker
+            .as_ref()
+            .ok_or(Error::Closed)?
+            .call(|native| native.check_health())
+    }
     pub fn diagnostics(&self) -> InputDiagnostics {
         InputDiagnostics {
             receiver: Arc::clone(&self.receiver),

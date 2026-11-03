@@ -399,13 +399,13 @@ pub fn preview<R: Read>(
     Ok(result)
 }
 
-struct Info {
+pub(crate) struct Info {
     protocol: Protocol,
     group: Option<u8>,
-    channel: Option<u8>,
+    pub(crate) channel: Option<u8>,
     forwardable: bool,
 }
-fn classify(payload: &events::Payload) -> io::Result<Info> {
+pub(crate) fn classify(payload: &events::Payload) -> io::Result<Info> {
     match payload {
         events::Payload::Midi1(v) => Ok(Info {
             protocol: Protocol::Midi1,
