@@ -39,11 +39,11 @@ def test_query_exports_original_checksum_bytes_and_freezes_snapshots(
     assert not path.exists()
     assert codecs.encode(q.prepare(0)) == b"\xf0\x7e\x01\x08\x00\x02\xf7"
     q.confirm(1)
-    q.feed(events.Event(stream="s", message=messages.TimingClock()), 2)
+    q.feed((messages.TimingClock()).replace(stream="s"), 2)
     saved = q.snapshot()
     raw = bytearray(reply())
     raw[-2] ^= 1
-    q.feed(events.Event(stream="s", message=messages.SysEx(data=raw[1:-1])), 3)
+    q.feed((messages.SysEx(data=raw[1:-1])).replace(stream="s"), 3)
     report = q.snapshot()
     assert (
         report.status == "completed"
@@ -158,12 +158,12 @@ def test_fault_at_final_receive_or_during_send_cannot_complete_a_query(
         dropped_packets = 0
         failure: Exception | None = None
 
-        def receive(self, *, timeout: float) -> events.Event:
+        def receive(self, *, timeout: float) -> messages.Message:
             if fault == "loss":
                 self.dropped_packets = 1
             else:
                 self.failure = midi.WorkerError("failed during receive")
-            return events.Event(stream="s", message=messages.SysEx(data=reply()[1:-1]))
+            return (messages.SysEx(data=reply()[1:-1])).replace(stream="s")
 
     class Output:
         def __call__(self, message: messages.Message) -> None:

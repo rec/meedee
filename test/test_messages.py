@@ -77,3 +77,62 @@ def test_note_transposition_clamps_and_preserves_channel_and_velocity() -> None:
         assert note.transpose(-100).note == 0
         assert note.transpose(100).note == 127
         assert constructor(120, 50, 3).transpose(12).channel == 3
+
+
+def test_transformations_preserve_metadata_and_payload_identity() -> None:
+    from meedee import codecs, events, gm, ump
+
+    clock = events.Clock(identity="capture")
+    timestamp = events.Timestamp(ticks=12, clock=clock)
+    span = events.SourceSpan(first_packet=1, last_packet=1)
+    for m in [
+        messages.NoteOn(60, channel=2),
+        messages.SysEx(b"\x7d\x01"),
+        messages.TimingClock(),
+        gm.BankProgramSelect(12, channel=2),
+        ump.Midi1Packet(group=1, message=messages.NoteOn(60, channel=2)),
+    ]:
+        tagged = m.replace(timestamp=timestamp, stream="keyboard", span=span)
+        assert tagged == m and hash(tagged) == hash(m)
+        assert tagged.replace().timestamp == timestamp
+        assert tagged.replace().stream == "keyboard"
+        assert tagged.replace().span == span
+        assert m.timestamp is None and m.stream is None and m.span is None
+        cleared = tagged.replace(timestamp=None, stream=None, span=None)
+        assert (
+            cleared.timestamp is None
+            and cleared.stream is None
+            and cleared.span is None
+        )
+    for m in [messages.NoteOn(120, channel=2), messages.NoteOff(120, channel=2)]:
+        tagged = m.replace(timestamp=timestamp, stream="keyboard", span=span)
+        changed = tagged.transpose(12).replace(velocity=33)
+        assert changed.note == 127 and changed.velocity == 33
+        assert (changed.timestamp, changed.stream, changed.span) == (
+            timestamp,
+            "keyboard",
+            span,
+        )
+        assert codecs.encode(tagged) == codecs.encode(m)
+    assert not hasattr(events, "Event")
+
+
+def test_metadata_rejects_empty_source_and_inconsistent_span() -> None:
+    import pytest
+
+    from meedee import events
+
+    clock = events.Clock(identity="one")
+    other = events.Clock(identity="two")
+    span = events.SourceSpan(
+        first_packet=0,
+        last_packet=0,
+        first_timestamp=events.Timestamp(ticks=0, clock=clock),
+        last_timestamp=events.Timestamp(ticks=1, clock=clock),
+    )
+    with pytest.raises(ValueError, match="empty stream"):
+        messages.NoteOn(60).replace(stream="")
+    with pytest.raises(ValueError):
+        messages.NoteOn(60).replace(
+            span=span, timestamp=events.Timestamp(ticks=2, clock=other)
+        )

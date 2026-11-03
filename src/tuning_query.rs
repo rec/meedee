@@ -100,12 +100,12 @@ impl Query {
         item: &Bound<'_, PyAny>,
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
-        let item = if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
+        let item = if let Ok(e) = crate::event_values::extract(&item) {
             meedee::live::Item::Event(Box::new(e.value.clone()))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             meedee::live::Item::Diagnostic(d.value.clone())
         } else {
-            return Err(PyTypeError::new_err("expected Event or StreamDiagnostic"));
+            return Err(PyTypeError::new_err("expected Message or StreamDiagnostic"));
         };
         self.value.feed(&item, now_ns).map_err(error)
     }

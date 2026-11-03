@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from measure import emit
 
-from meedee import archive, events, messages, midi
+from meedee import archive, messages, midi
 
 
 @pytest.mark.parametrize("isolated", [False, True], ids=["in_process", "isolated"])
@@ -39,14 +39,14 @@ def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
                 start = perf_counter_ns()
                 output(value)
                 received = receiver.receive(timeout=2)
-                assert isinstance(received, events.Event), received
-                assert received.message == value
+                assert isinstance(received, messages.Message), received
+                assert received == value
                 samples.append(perf_counter_ns() - start)
             report = receiver.stop_recording()
             assert report.complete and report.gap_records == 0, report.failure
             reader = archive.Reader(tmp_path / "loopback.meedee")
             try:
-                assert sum(isinstance(e, events.Event) for e in reader) == 256
+                assert sum(isinstance(e, messages.Message) for e in reader) == 256
                 assert reader.complete
             finally:
                 reader.close()

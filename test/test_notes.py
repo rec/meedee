@@ -7,10 +7,9 @@ from meedee import events, messages, midi, notes, ump
 
 def event(
     message: messages.Message, *, stream: str = "s", clock: str = "c"
-) -> events.Event:
-    return events.Event(
+) -> messages.Message:
+    return (message).replace(
         stream=stream,
-        message=message,
         timestamp=events.Timestamp(ticks=0, clock=events.Clock(identity=clock)),
     )
 

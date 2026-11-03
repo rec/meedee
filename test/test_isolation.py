@@ -1227,7 +1227,6 @@ def test_typed_input_exposes_receive_drops_without_another_packet(
 def test_typed_queue_reports_overflow_and_retains_primitive_events(
     workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from meedee.events import Event
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "twice")
     source = midi.Input(timeout=1, event_limit=1)
@@ -1237,8 +1236,8 @@ def test_typed_queue_reports_overflow_and_retains_primitive_events(
             sleep(0.01)
         assert isinstance(connection.failure, midi.ResourceError)
         value = connection.receive(timeout=0)
-        assert isinstance(value, Event)
-        assert isinstance(value.message, messages.NoteOn)
+        assert isinstance(value, messages.Message)
+        assert isinstance(value, messages.NoteOn)
         with pytest.raises(midi.ResourceError, match="overflow"):
             connection.receive(timeout=0)
 
@@ -1280,7 +1279,7 @@ def test_typed_callback_retains_the_blocking_operation_guard(
     monkeypatch.setenv("MEEDEE_TEST_MODE", "early")
     called = Event()
 
-    def callback(value: events.Event | events.StreamDiagnostic) -> None:
+    def callback(value: messages.Message | events.StreamDiagnostic) -> None:
         with pytest.raises(midi.CallbackThreadError):
             midi.Output(isolated=True, timeout=1)
         called.set()
@@ -1303,13 +1302,9 @@ def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
         output(messages.ControlChange14(channel=1, controller=7, value=128))
         report = output.play(
             [
-                events.Event(stream="test", timestamp=origin, message=note),
-                events.Event(
-                    stream="test",
-                    timestamp=origin,
-                    message=messages.ControlChange14(
-                        channel=1, controller=7, value=128
-                    ),
+                (note).replace(stream="test", timestamp=origin),
+                (messages.ControlChange14(channel=1, controller=7, value=128)).replace(
+                    stream="test", timestamp=origin
                 ),
             ],
             origin=origin,

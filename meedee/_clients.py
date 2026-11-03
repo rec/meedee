@@ -27,7 +27,7 @@ from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery, ReceiveQu
 from .events import Clock
 
 
-class Input[T = events.Event | events.StreamDiagnostic]:
+class Input[T = messages.Message | events.StreamDiagnostic]:
     __slots__ = (
         "_native",
         "_context",
@@ -169,7 +169,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
     ) -> list[
         events.Clock
         | archive.Stream
-        | events.Event
+        | messages.Message
         | archive.Gap
         | archive.Discontinuity
     ]:
@@ -182,7 +182,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
         records: list[
             events.Clock
             | archive.Stream
-            | events.Event
+            | messages.Message
             | archive.Gap
             | archive.Discontinuity
         ] = []
@@ -539,7 +539,7 @@ class OutputConnection:
             prefix: list[object] = []
             for item in iterator:
                 prefix.append(item)
-                if isinstance(item, events.Event):
+                if isinstance(item, messages.Message):
                     if item.timestamp is None:
                         raise ValueError("playback requires timestamped events")
                     origin = item.timestamp
@@ -740,7 +740,7 @@ class OutputConnection:
             self._client._context.defer_close(self._generation)
 
 
-class InputConnection[T = events.Event | events.StreamDiagnostic]:
+class InputConnection[T = messages.Message | events.StreamDiagnostic]:
     _raw: _InputTransport[T] | None
     _channels: frozenset[int] | None
     _stream: str
@@ -835,7 +835,7 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
 
     def _accept(
         self,
-        items: list[events.Event | events.StreamDiagnostic | events.ReceivedPacket],
+        items: list[messages.Message | events.StreamDiagnostic | events.ReceivedPacket],
     ) -> None:
         for item in items:
             if isinstance(item, events.StreamDiagnostic) and item.kind == "loss":
@@ -859,14 +859,14 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
                 self._ignored_on_close += 1
                 return
             items: list[
-                events.Event | events.StreamDiagnostic | events.ReceivedPacket
+                messages.Message | events.StreamDiagnostic | events.ReceivedPacket
             ] = [packet] if self._decoder is None else list(self._decoder.feed(packet))
             if self._channels is not None:
                 items = [
                     i
                     for i in items
-                    if not isinstance(i, events.Event)
-                    or getattr(i.message, "channel", None) in self._channels
+                    if not isinstance(i, messages.Message)
+                    or getattr(i, "channel", None) in self._channels
                 ]
             self._accept(items)
         if self._bridge is not None:
@@ -898,8 +898,8 @@ class InputConnection[T = events.Event | events.StreamDiagnostic]:
                 if self.failure is not None or not self.closed:
                     yield error
                 return
-            if isinstance(item, events.Event):
-                yield item.message
+            if isinstance(item, messages.Message):
+                yield item
             elif isinstance(item, (events.StreamDiagnostic, events.ReceivedPacket)):
                 yield item
             lost = self.dropped_packets
@@ -1089,14 +1089,14 @@ def append_record(
     records: list[
         events.Clock
         | archive.Stream
-        | events.Event
+        | messages.Message
         | archive.Gap
         | archive.Discontinuity
     ],
     item: object,
     clocks: set[str],
 ) -> None:
-    if isinstance(item, events.Event):
+    if isinstance(item, messages.Message):
         if item.timestamp is not None and item.timestamp.clock.identity not in clocks:
             records.append(item.timestamp.clock)
             clocks.add(item.timestamp.clock.identity)
@@ -1212,7 +1212,7 @@ def input_size(item: object) -> int:
             if isinstance(item.packet, midi.UmpPacket)
             else len(item.packet)
         )
-    return _native.live_size(cast(events.Event | events.StreamDiagnostic, item))
+    return _native.live_size(cast(messages.Message | events.StreamDiagnostic, item))
 
 
 INPUT_ERRORS = (

@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from meedee import events, messages, midi, ump
+from meedee import messages, midi, ump
 
 
 def main() -> None:
@@ -32,8 +32,8 @@ def main() -> None:
                         )
                         output(value)
                         received = receiver.receive(timeout=2)
-                        assert isinstance(received, events.Event), received
-                        assert received.message == value
+                        assert isinstance(received, messages.Message), received
+                        assert received == value
                         assert received.timestamp is not None
                         print(
                             f"delivery passed; closing connections: {context}",

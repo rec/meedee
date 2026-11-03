@@ -81,7 +81,7 @@ class Port:
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]
 
-class Input[T = events.Event | events.StreamDiagnostic]:
+class Input[T = messages.Message | events.StreamDiagnostic]:
     @overload
     def __init__(
         self: Input[events.ReceivedPacket],
@@ -99,7 +99,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
     ) -> None: ...
     @overload
     def __init__(
-        self: Input[events.Event | events.StreamDiagnostic],
+        self: Input[messages.Message | events.StreamDiagnostic],
         *,
         raw: Literal[False] = False,
         channel: int | Iterable[int] | None = None,
@@ -114,7 +114,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
     ) -> None: ...
     @overload
     def __init__(
-        self: Input[events.Event | events.StreamDiagnostic | events.ReceivedPacket],
+        self: Input[messages.Message | events.StreamDiagnostic | events.ReceivedPacket],
         *,
         raw: bool,
         channel: int | Iterable[int] | None = None,
@@ -136,7 +136,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
     ) -> list[
         events.Clock
         | archive.Stream
-        | events.Event
+        | messages.Message
         | archive.Gap
         | archive.Discontinuity
     ]: ...
@@ -162,7 +162,7 @@ class Input[T = events.Event | events.StreamDiagnostic]:
     ) -> Iterator[events.ReceivedPacket]: ...
     @overload
     def __iter__(
-        self: Input[events.Event | events.StreamDiagnostic],
+        self: Input[messages.Message | events.StreamDiagnostic],
     ) -> Iterator[messages.Message]: ...
     @overload
     def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]: ...
@@ -239,14 +239,14 @@ class OutputConnection:
         traceback: TracebackType | None,
     ) -> None: ...
 
-class InputConnection[T = events.Event | events.StreamDiagnostic]:
+class InputConnection[T = messages.Message | events.StreamDiagnostic]:
     @overload
     def __iter__(
         self: InputConnection[events.ReceivedPacket],
     ) -> Iterator[events.ReceivedPacket]: ...
     @overload
     def __iter__(
-        self: InputConnection[events.Event | events.StreamDiagnostic],
+        self: InputConnection[messages.Message | events.StreamDiagnostic],
     ) -> Iterator[messages.Message]: ...
     @overload
     def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]: ...

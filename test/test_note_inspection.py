@@ -2,7 +2,7 @@
 
 from io import BytesIO
 
-from meedee import archive, events, inspection, messages, smf
+from meedee import archive, inspection, messages, smf
 
 
 def test_archive_loss_and_incomplete_tail_keep_only_observed_state() -> None:
@@ -11,10 +11,10 @@ def test_archive_loss_and_incomplete_tail_keep_only_observed_state() -> None:
     for s in ["a", "b"]:
         writer.write(archive.Stream(id=s, label=""))
     on = messages.NoteOn(channel=1, note=60, velocity=100)
-    writer.write(events.Event(stream="a", message=on))
-    writer.write(events.Event(stream="b", message=on))
+    writer.write((on).replace(stream="a"))
+    writer.write((on).replace(stream="b"))
     writer.write(archive.Gap(stream="a", lost=1, reason="loss"))
-    writer.write(events.Event(stream="a", message=on))
+    writer.write((on).replace(stream="a"))
     writer.finish()
     report = inspection.inspect_file(BytesIO(data.getvalue()), format="archive")
     a, b = report.note_state.channels

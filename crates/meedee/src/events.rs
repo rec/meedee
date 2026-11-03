@@ -79,7 +79,7 @@ pub struct Span {
     pub last_timestamp: Option<Timestamp>,
 }
 impl Span {
-    pub(crate) fn validate(&self, timestamp: Option<&Timestamp>) -> io::Result<()> {
+    pub fn validate(&self, timestamp: Option<&Timestamp>) -> io::Result<()> {
         if self.first_packet > self.last_packet {
             return Err(invalid(0, "reversed packet span"));
         }

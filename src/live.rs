@@ -1,5 +1,4 @@
 //! Native pure packet decoder and typed-send preparation.
-use crate::event_values::Event;
 use crate::files::{limit, os_error, uint};
 use crate::packets::{Protocol, ReceivedPacket, UmpPacket};
 use meedee::{events::Payload, live as model};
@@ -107,7 +106,7 @@ fn items(py: Python<'_>, v: Vec<model::Item>) -> PyResult<Vec<Py<PyAny>>> {
 }
 pub(crate) fn item(py: Python<'_>, v: model::Item) -> PyResult<Py<PyAny>> {
     match v {
-        model::Item::Event(value) => Ok(Py::new(py, Event { value: *value })?.into_any()),
+        model::Item::Event(value) => crate::event_values::to_python(py, *value),
         model::Item::Diagnostic(value) => Ok(Py::new(py, StreamDiagnostic { value })?.into_any()),
     }
 }
@@ -201,7 +200,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
-    if let Ok(v) = item.extract::<PyRef<'_, Event>>() {
+    if let Ok(v) = crate::event_values::extract(&item) {
         return Ok(match &v.value.message {
             Payload::Midi1(meedee::messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
             Payload::Midi1(v) => {
@@ -219,6 +218,6 @@ pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
         return Ok(v.value.reason.len());
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
-        "expected Event or StreamDiagnostic",
+        "expected Message or StreamDiagnostic",
     ))
 }

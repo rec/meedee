@@ -28,13 +28,13 @@ macro_rules! scalar {
     (Noop [$first:expr,$second:expr] {}; $($name:ident [$a:expr,$b:expr] {$($field:ident:$ty:ty = $lo:literal ..= $hi:literal => [$word:literal,$shift:literal,$mask:literal,$bias:literal]),*};)*)=>{
         #[pyclass(frozen,extends=Message,module="meedee.ump")]
         struct Noop {value:model::Noop}
-        value_methods!(Noop;;{#[new]fn new()->PyClassInitializer<Self>{PyClassInitializer::from(Message).add_subclass(Self{value:model::Noop::new().expect("constant Noop")})}});
+        value_methods!(Noop;;{#[new]fn new()->PyClassInitializer<Self>{PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::Noop::new().expect("constant Noop")})}});
         $(#[pyclass(frozen,extends=Message,module="meedee.ump")]
         struct $name{value:model::$name}
         value_methods!($name;$($field),*;{
             #[new]#[pyo3(signature=(*,$($field),*))]
             #[allow(clippy::too_many_arguments)]
-            fn new($($field:&Bound<'_,PyAny>),*)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::$name::new($(integer($field,stringify!($field))?),*).map_err(error)?}))}
+            fn new($($field:&Bound<'_,PyAny>),*)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::$name::new($(integer($field,stringify!($field))?),*).map_err(error)?}))}
             $(#[getter]fn $field(&self)->$ty{self.value.$field()})*
             #[classattr]fn __annotations__(py:Python<'_>)->PyResult<Bound<'_,PyDict>>{let d=PyDict::new(py);$(d.set_item(stringify!($field),py.get_type::<PyInt>())?;)*Ok(d)}
         });)*
@@ -64,7 +64,7 @@ struct Midi1Packet {
 }
 value_methods!(Midi1Packet;group,message;{
     #[new]#[pyo3(signature=(*,group,message))]
-    fn new(group:&Bound<'_,PyAny>,message:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::Midi1Packet::new(int(group)?,messages::extract_primitive(message)?).map_err(error)?}))}
+    fn new(group:&Bound<'_,PyAny>,message:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::Midi1Packet::new(int(group)?,messages::extract_primitive(message)?).map_err(error)?}))}
     #[getter]fn group(&self)->u8{self.value.group()}
     #[getter]fn message(&self,py:Python<'_>)->PyResult<Py<PyAny>>{messages::to_python(py,self.value.message().clone())}
 });
@@ -74,7 +74,7 @@ struct SysEx7Packet {
 }
 value_methods!(SysEx7Packet;group,format,data;{
     #[new]#[pyo3(signature=(*,group,format,data))]
-    fn new(py:Python<'_>,group:&Bound<'_,PyAny>,format:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::SysEx7Packet::new(int(group)?,int(format)?,buffer(py,data,6)?).map_err(error)?}))}
+    fn new(py:Python<'_>,group:&Bound<'_,PyAny>,format:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::SysEx7Packet::new(int(group)?,int(format)?,buffer(py,data,6)?).map_err(error)?}))}
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn format(&self)->u8{self.value.format()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
@@ -84,7 +84,7 @@ struct SysEx8Packet {
 }
 value_methods!(SysEx8Packet;group,format,stream_id,data,aborted;{
     #[new]#[pyo3(signature=(*,group,format,stream_id,data,aborted=false))]
-    fn new(py:Python<'_>,group:&Bound<'_,PyAny>,format:&Bound<'_,PyAny>,stream_id:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>,#[pyo3(from_py_with=boolean)] aborted:bool)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::SysEx8Packet::new(int(group)?,int(format)?,int(stream_id)?,buffer(py,data,13)?,aborted).map_err(error)?}))}
+    fn new(py:Python<'_>,group:&Bound<'_,PyAny>,format:&Bound<'_,PyAny>,stream_id:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>,#[pyo3(from_py_with=boolean)] aborted:bool)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::SysEx8Packet::new(int(group)?,int(format)?,int(stream_id)?,buffer(py,data,13)?,aborted).map_err(error)?}))}
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn format(&self)->u8{self.value.format()}#[getter]fn stream_id(&self)->u8{self.value.stream_id()}#[getter]fn aborted(&self)->bool{self.value.aborted()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
@@ -94,7 +94,7 @@ struct MixedDataSet {
 }
 value_methods!(MixedDataSet;group,header,mds_id,data;{
     #[new]#[pyo3(signature=(*,group,header,mds_id,data))]
-    fn new(py:Python<'_>,group:&Bound<'_,PyAny>,header:&Bound<'_,PyAny>,mds_id:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::MixedDataSet::new(int(group)?,boolean(header)?,int(mds_id)?,buffer(py,data,14)?).map_err(error)?}))}
+    fn new(py:Python<'_>,group:&Bound<'_,PyAny>,header:&Bound<'_,PyAny>,mds_id:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::MixedDataSet::new(int(group)?,boolean(header)?,int(mds_id)?,buffer(py,data,14)?).map_err(error)?}))}
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn header(&self)->bool{self.value.header()}#[getter]fn mds_id(&self)->u8{self.value.mds_id()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
@@ -104,7 +104,7 @@ struct FlexData {
 }
 value_methods!(FlexData;group,format,channel,status_bank,status,data;{
     #[new]#[pyo3(signature=(*,group,format,channel,status_bank,status,data))]
-    fn new(group:&Bound<'_,PyAny>,format:&Bound<'_,PyAny>,channel:&Bound<'_,PyAny>,status_bank:&Bound<'_,PyAny>,status:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::FlexData::new(int(group)?,int(format)?,optional_int(channel)?,int(status_bank)?,int(status)?,words(data,3)?).map_err(error)?}))}
+    fn new(group:&Bound<'_,PyAny>,format:&Bound<'_,PyAny>,channel:&Bound<'_,PyAny>,status_bank:&Bound<'_,PyAny>,status:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::FlexData::new(int(group)?,int(format)?,optional_int(channel)?,int(status_bank)?,int(status)?,words(data,3)?).map_err(error)?}))}
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn format(&self)->u8{self.value.format()}#[getter]fn channel(&self)->Option<u8>{self.value.channel()}#[getter]fn status_bank(&self)->u8{self.value.status_bank()}#[getter]fn status(&self)->u8{self.value.status()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->PyResult<Bound<'py,PyTuple>>{tuple(py,self.value.data())}
 });
@@ -114,7 +114,7 @@ struct StreamMessage {
 }
 value_methods!(StreamMessage;format,status,data;{
     #[new]#[pyo3(signature=(*,format,status,data))]
-    fn new(py:Python<'_>,format:&Bound<'_,PyAny>,status:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::StreamMessage::new(int(format)?,int(status)?,buffer(py,data,14)?).map_err(error)?}))}
+    fn new(py:Python<'_>,format:&Bound<'_,PyAny>,status:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::StreamMessage::new(int(format)?,int(status)?,buffer(py,data,14)?).map_err(error)?}))}
     #[getter]fn format(&self)->u8{self.value.format()}#[getter]fn status(&self)->u16{self.value.status()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
@@ -124,7 +124,7 @@ struct OpaquePacket {
 }
 value_methods!(OpaquePacket;words;{
     #[new]#[pyo3(signature=(*,words))]
-    fn new(words:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message).add_subclass(Self{value:model::OpaquePacket::new(self::words(words,4)?).map_err(error)?}))}
+    fn new(words:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::OpaquePacket::new(self::words(words,4)?).map_err(error)?}))}
     #[getter]fn words<'py>(&self,py:Python<'py>)->PyResult<Bound<'py,PyTuple>>{tuple(py,self.value.words())}
 });
 fn extract_packet(value: &Bound<'_, PyAny>) -> PyResult<model::UmpMessage> {
@@ -546,7 +546,11 @@ fn register_packets(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_helpers(module)
 }
 fn object<T: pyo3::PyClass<BaseType = Message>>(py: Python<'_>, value: T) -> PyResult<Py<PyAny>> {
-    Ok(Py::new(py, PyClassInitializer::from(Message).add_subclass(value))?.into_any())
+    Ok(Py::new(
+        py,
+        PyClassInitializer::from(Message::default()).add_subclass(value),
+    )?
+    .into_any())
 }
 fn error(v: meedee::messages::ValueError) -> PyErr {
     PyValueError::new_err(v.to_string())

@@ -33,17 +33,13 @@ def values() -> list[object]:
     return [
         clock,
         archive.Stream(id="source", label="keys", clock_identity=clock.identity),
-        events.Event(
-            stream="source",
-            timestamp=time,
-            span=span,
-            message=messages.NoteOn(channel=16, note=127, velocity=127),
+        (messages.NoteOn(channel=16, note=127, velocity=127)).replace(
+            stream="source", timestamp=time, span=span
         ),
-        events.Event(
-            stream="source",
-            message=ump.Midi2PitchBend(group=16, channel=16, value=2**31 - 1),
+        (ump.Midi2PitchBend(group=16, channel=16, value=2**31 - 1)).replace(
+            stream="source"
         ),
-        *[events.Event(stream="source", message=c) for c in commands],
+        *[(c).replace(stream="source") for c in commands],
         archive.Metadata(
             key="tempo", data=b"\x07\xa1\x20", stream="source", timestamp=time
         ),
@@ -70,7 +66,7 @@ def test_archive_roundtrip_preserves_all_commands_exact_ticks_and_absence() -> N
     reader = archive.Reader(BytesIO(data), preserve_unknown=True)
     restored = list(reader)
     assert restored == records and reader.complete and reader.problem is None
-    assert isinstance(restored[2], events.Event)
+    assert isinstance(restored[2], messages.Message)
     assert restored[2].timestamp is not None
     assert restored[2].timestamp.ticks == -(2**63)
     assert save(restored) == data
@@ -175,17 +171,17 @@ def test_v1_independent_vectors_check_future_headers_and_preserve_exact_bytes() 
         assert clock.backend == midi.Backend.CoreMidi
         assert clock.mode == midi.TimestampMode.Absolute and clock.resolution_ticks == 1
         note = restored[2]
-        assert isinstance(note, events.Event) and note.timestamp is not None
+        assert isinstance(note, messages.Message) and note.timestamp is not None
         assert note.timestamp.ticks == -(2**63)
-        assert note.message == messages.NoteOn(channel=16, note=127, velocity=127)
+        assert note == messages.NoteOn(channel=16, note=127, velocity=127)
         assert note.span is not None and note.span.last_timestamp is not None
         assert note.span.first_packet == 1 and note.span.last_packet == 2
         assert note.span.last_timestamp.ticks == -1
         wide = restored[4]
-        assert isinstance(wide, events.Event)
-        assert wide.message == ump.Midi2ControlChange(
+        assert isinstance(wide, messages.Message)
+        assert wide == ump.Midi2ControlChange(
             group=16, channel=16, controller=7, value=0xFEDCBA98
         )
-        assert [r.message for r in restored[5:14] if isinstance(r, events.Event)] == [
-            r.message for r in values()[4:13] if isinstance(r, events.Event)
+        assert [r for r in restored[5:14] if isinstance(r, messages.Message)] == [
+            r for r in values()[4:13] if isinstance(r, messages.Message)
         ]

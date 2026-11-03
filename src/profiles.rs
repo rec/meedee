@@ -20,7 +20,7 @@ macro_rules! classes {
             #[new]
             #[pyo3(signature=(*,$($field),*))]
             fn new($($field:&Bound<'_,PyAny>),*)->PyResult<PyClassInitializer<Self>> {
-                Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
                     value:model::$name::new($(self::$read(&crate::units::field($field,stringify!($field))?)?),*).map_err(value_error)?,
                 }))
             }
@@ -83,16 +83,18 @@ mod gm {
             channel: Option<&Bound<'_, PyAny>>,
         ) -> PyResult<PyClassInitializer<Self>> {
             let channel = channel.map(int).transpose()?;
-            Ok(PyClassInitializer::from(Message).add_subclass(Self {
-                value: model::BankProgramSelect::new(
-                    channel.unwrap_or(1),
-                    bank_msb,
-                    bank_lsb,
-                    program,
-                )
-                .map_err(value_error)?,
-                assigned: channel.is_some(),
-            }))
+            Ok(
+                PyClassInitializer::from(Message::default()).add_subclass(Self {
+                    value: model::BankProgramSelect::new(
+                        channel.unwrap_or(1),
+                        bank_msb,
+                        bank_lsb,
+                        program,
+                    )
+                    .map_err(value_error)?,
+                    assigned: channel.is_some(),
+                }),
+            )
         }
         #[getter]
         fn channel(&self) -> Option<u8> {
@@ -472,7 +474,11 @@ fn object<T>(py: Python<'_>, value: T) -> PyResult<Py<PyAny>>
 where
     T: pyo3::PyClass<BaseType = Message>,
 {
-    Ok(Py::new(py, PyClassInitializer::from(Message).add_subclass(value))?.into_any())
+    Ok(Py::new(
+        py,
+        PyClassInitializer::from(Message::default()).add_subclass(value),
+    )?
+    .into_any())
 }
 fn value_error(error: meedee::messages::ValueError) -> PyErr {
     PyValueError::new_err(error.to_string())

@@ -93,14 +93,14 @@ class Receiver:
 
     def __init__(self, clock: list[int]) -> None:
         self.clock = clock
-        self.items: deque[events.Event | events.StreamDiagnostic] = deque()
+        self.items: deque[messages.Message | events.StreamDiagnostic] = deque()
         self.dropped_packets = 0
         self.failure: Exception | None = None
         self.closed = False
 
     def receive(
         self, *, timeout: float
-    ) -> events.Event | events.StreamDiagnostic | None:
+    ) -> messages.Message | events.StreamDiagnostic | None:
         if self.items:
             self.clock[0] += 1
             return self.items.popleft()
@@ -168,9 +168,7 @@ class Output:
                     group=self.group, data=codecs.encode(response)[1:-1]
                 )
             )
-        self.receiver.items.extend(
-            events.Event(stream="in", message=p) for p in packets
-        )
+        self.receiver.items.extend((p).replace(stream="in") for p in packets)
 
     def __enter__(self) -> Self:
         return self
@@ -358,9 +356,7 @@ def test_ump_assembly_diagnostics_stop_the_scan(
     monkeypatch.setattr(ci_live, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
     receiver.items.append(
-        events.Event(
-            stream="in", message=ump.SysEx7Packet(group=1, format=2, data=b"\x01")
-        )
+        (ump.SysEx7Packet(group=1, format=2, data=b"\x01")).replace(stream="in")
     )
     output = Output(receiver, 1, answer=False)
     report = run(browser(1), receiver, output)

@@ -370,10 +370,8 @@ def test_client_play_infers_origin_and_closes_reader_and_output(
     writer.write(clock)
     writer.write(archive.Stream(id="s", label=""))
     writer.write(
-        events.Event(
-            stream="s",
-            timestamp=events.Timestamp(ticks=123_000_000_000, clock=clock),
-            message=messages.NoteOn(60, channel=2),
+        (messages.NoteOn(60, channel=2)).replace(
+            stream="s", timestamp=events.Timestamp(ticks=123_000_000_000, clock=clock)
         )
     )
     writer.finish()
@@ -413,3 +411,16 @@ def test_output_is_automatically_collected_and_releases_notes(
     if connected:
         assert transport.closed
         assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
+
+
+def test_playback_accepts_timing_without_source_metadata(
+    transport: NativeConnection,
+) -> None:
+    from meedee import events
+
+    note = messages.NoteOn(60, channel=1).replace(
+        timestamp=events.Timestamp(ticks=100, clock=events.Clock(identity="score"))
+    )
+    assert midi.Output().play([note]).sent_events == 1
+    assert note.stream is None
+    assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]

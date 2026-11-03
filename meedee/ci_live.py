@@ -88,16 +88,11 @@ def run(
                 browser.stop("received event from an unrelated stream")
                 break
             if route.group is None:
-                if isinstance(item.message, messages.SysEx):
+                if isinstance(item, messages.SysEx):
                     queue.extend(
-                        browser.feed(
-                            item.message, input=route.input, now_ns=monotonic_ns()
-                        )
+                        browser.feed(item, input=route.input, now_ns=monotonic_ns())
                     )
-            elif (
-                isinstance(item.message, ump.SysEx7Packet)
-                and item.message.group == route.group
-            ):
+            elif isinstance(item, ump.SysEx7Packet) and item.group == route.group:
                 for observation in assembler.feed(item):
                     value = observation.value
                     if isinstance(value, ump.AssembledData):

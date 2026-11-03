@@ -4,7 +4,7 @@ from secrets import randbelow
 from time import monotonic_ns
 from uuid import uuid4
 
-from meedee import ci, codecs, events, messages, midi, ump
+from meedee import ci, codecs, messages, midi, ump
 
 
 def dispatch(
@@ -26,7 +26,7 @@ def receive(
 ) -> messages.SysEx:
     while True:
         value = receiver.receive(timeout=3)
-        assert isinstance(value, events.Event), value
+        assert isinstance(value, messages.Message), value
         for o in assembler.feed(value):
             data = o.value
             if isinstance(data, ump.AssembledData):

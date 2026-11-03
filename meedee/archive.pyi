@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from os import PathLike
 from typing import BinaryIO
 
-from . import events, metrics
+from . import events, messages, metrics
 
 class Stream:
     def __init__(
@@ -76,12 +76,24 @@ class Reader:
     def __iter__(
         self,
     ) -> Iterator[
-        events.Clock | Stream | events.Event | Gap | Metadata | Discontinuity | Opaque
+        events.Clock
+        | Stream
+        | messages.Message
+        | Gap
+        | Metadata
+        | Discontinuity
+        | Opaque
     ]: ...
     def __next__(
         self,
     ) -> (
-        events.Clock | Stream | events.Event | Gap | Metadata | Discontinuity | Opaque
+        events.Clock
+        | Stream
+        | messages.Message
+        | Gap
+        | Metadata
+        | Discontinuity
+        | Opaque
     ): ...
     @property
     def complete(self) -> bool: ...
@@ -99,7 +111,7 @@ class Writer:
         self,
         record: events.Clock
         | Stream
-        | events.Event
+        | messages.Message
         | Gap
         | Metadata
         | Discontinuity
@@ -137,7 +149,11 @@ class Recorder:
     ) -> None: ...
     def record(
         self,
-        record: events.Event | events.StreamDiagnostic | Gap | Discontinuity | Metadata,
+        record: messages.Message
+        | events.StreamDiagnostic
+        | Gap
+        | Discontinuity
+        | Metadata,
     ) -> bool: ...
     def fail(self, reason: str) -> None: ...
     @property

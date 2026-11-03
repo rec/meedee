@@ -21,10 +21,9 @@ def route(
     )
 
 
-def event(message: messages.Message) -> events.Event:
-    return events.Event(
+def event(message: messages.Message) -> messages.Message:
+    return (message).replace(
         stream="s",
-        message=message,
         timestamp=events.Timestamp(ticks=-2, clock=events.Clock(identity="c")),
     )
 
@@ -43,11 +42,11 @@ def test_midi1_remap_retains_source_span_and_immutable_snapshot() -> None:
     router.feed(original)
     delivery = router.peek()
     assert delivery is not None
-    assert delivery.event.message == messages.ProgramChange(channel=16, program=128)
-    assert delivery.event.stream == original.stream
-    assert delivery.event.timestamp == original.timestamp
-    assert delivery.event.span == original.span
-    assert original.message == messages.ProgramChange(channel=1, program=128)
+    assert delivery.message == messages.ProgramChange(channel=16, program=128)
+    assert delivery.message.stream == original.stream
+    assert delivery.message.timestamp == original.timestamp
+    assert delivery.message.span == original.span
+    assert original == messages.ProgramChange(channel=1, program=128)
     before = router.snapshot()
     with pytest.raises(ValueError, match="queue head"):
         router.confirm(delivery.id + 1)
@@ -67,7 +66,7 @@ def test_nonchannel_opt_in_and_group_selection_are_explicit() -> None:
     reset = event(messages.SystemReset())
     opted.feed(reset)
     delivery = opted.peek()
-    assert delivery is not None and delivery.event == reset
+    assert delivery is not None and delivery.message == reset
     selected = routing.Router(
         routes=[
             routing.Route(
@@ -98,7 +97,7 @@ def test_nonchannel_opt_in_and_group_selection_are_explicit() -> None:
     )
     delivery = selected.peek()
     assert delivery is not None
-    assert delivery.event.message == ump.Midi1Packet(
+    assert delivery.message == ump.Midi1Packet(
         group=16, message=messages.NoteOn(channel=1, note=60, velocity=0)
     )
 

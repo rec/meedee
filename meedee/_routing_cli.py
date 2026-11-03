@@ -78,8 +78,7 @@ def run_preview(config: RoutePreview) -> int:
 
 
 def delivery_data(delivery: routing.Delivery, preview_bytes: int) -> dict[str, object]:
-    event = delivery.event
-    message = event.message
+    message = delivery.message
     preview = (
         f"SysEx({message.data[:preview_bytes].hex()}; {len(message.data)} bytes)"
         if isinstance(message, messages.SysEx)
@@ -88,8 +87,10 @@ def delivery_data(delivery: routing.Delivery, preview_bytes: int) -> dict[str, o
     return {
         "route": delivery.route,
         "destination": delivery.destination,
-        "stream": event.stream,
-        "ticks": None if event.timestamp is None else event.timestamp.ticks,
-        "clock": None if event.timestamp is None else event.timestamp.clock.identity,
+        "stream": message.stream,
+        "ticks": None if message.timestamp is None else message.timestamp.ticks,
+        "clock": None
+        if message.timestamp is None
+        else message.timestamp.clock.identity,
         "preview": preview,
     }

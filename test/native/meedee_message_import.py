@@ -47,7 +47,7 @@ def main() -> None:
         simulated = testing.Input(stream="pure", protocol="midi1")
         synthetic_clock = events.Clock(identity="simulation", origin="manual")
         simulated.inject(b"\xf8", clock=synthetic_clock)
-        assert isinstance(simulated.receive(), events.Event)
+        assert isinstance(simulated.receive(), messages.Message)
         output = testing.Output(protocol="midi1")
         output(messages.TimingClock())
         assert output.take_packet() == b"\xf8"
@@ -59,7 +59,7 @@ def main() -> None:
         recorded = ump_output.take_packet()
         assert recorded is not None
         ump_input.inject(recorded, clock=synthetic_clock)
-        assert isinstance(ump_input.receive(), events.Event)
+        assert isinstance(ump_input.receive(), messages.Message)
         ump_output.close()
         ump_input.close()
         time = testing.ManualClock()
@@ -146,13 +146,11 @@ def main() -> None:
         ).equal
         clock = events.Clock(identity="file", tick_numerator=1, tick_denominator=480)
         observer = inspection.Observer(stream="pure", clock=clock)
-        observer.feed(events.Event(stream="pure", message=messages.TimingClock()))
+        observer.feed((messages.TimingClock()).replace(stream="pure"))
         assert observer.snapshot().records == 1
         tracker = notes.Tracker(stream="pure")
         tracker.feed(
-            events.Event(
-                stream="pure", message=messages.NoteOn(channel=1, note=60, velocity=1)
-            )
+            (messages.NoteOn(channel=1, note=60, velocity=1)).replace(stream="pure")
         )
         assert tracker.snapshot().channels[0].notes[0].held == 1
         router = routing.Router(
@@ -163,9 +161,7 @@ def main() -> None:
             ]
         )
         router.feed(
-            events.Event(
-                stream="pure", message=messages.NoteOn(channel=1, note=60, velocity=1)
-            )
+            (messages.NoteOn(channel=1, note=60, velocity=1)).replace(stream="pure")
         )
         assert router.snapshot().admitted == 1
         tracker = topology.Tracker()
@@ -175,9 +171,7 @@ def main() -> None:
         assert callable(transfer_output.run)
         capture = transfer.Capture(stream="pure", expected_messages=1, timeout="10 ns")
         capture.start(0)
-        capture.feed(
-            events.Event(stream="pure", message=messages.SysEx(data=b"\x7d")), 1
-        )
+        capture.feed((messages.SysEx(data=b"\x7d")).replace(stream="pure"), 1)
         assert capture.snapshot().status == "completed" and callable(transfer_input.run)
         from meedee import discovery
 
@@ -186,7 +180,7 @@ def main() -> None:
         poller.close()
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
         view = controls.EventInterpreter()
-        assert view.feed(events.Event(stream="s", message=messages.TimingClock())) == []
+        assert view.feed((messages.TimingClock()).replace(stream="s")) == []
 
         assert "meedee.midi" not in sys.modules
         assert "meedee._native" not in sys.modules

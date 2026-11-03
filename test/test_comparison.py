@@ -15,9 +15,8 @@ def take(source: str, clock_id: str, tick: int) -> BytesIO:
     writer.write(clock)
     writer.write(archive.Stream(id=source, label="keys", clock_identity=clock_id))
     writer.write(
-        events.Event(
+        (messages.NoteOn(channel=1, note=60, velocity=100)).replace(
             stream=source,
-            message=messages.NoteOn(channel=1, note=60, velocity=100),
             timestamp=timestamp,
             span=events.SourceSpan(
                 first_packet=0,

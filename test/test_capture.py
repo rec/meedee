@@ -8,8 +8,8 @@ import pytest
 from meedee import events, messages, testing, transfer, transfer_input, ump
 
 
-def event(message: messages.Message, stream: str = "s") -> events.Event:
-    return events.Event(stream=stream, message=message)
+def event(message: messages.Message, stream: str = "s") -> messages.Message:
+    return (message).replace(stream=stream)
 
 
 def capture(count: int = 2, timeout: int = 100) -> transfer.Capture:
@@ -132,7 +132,7 @@ def test_final_receive_cannot_hide_input_failure(
         dropped_packets = 0
         failure: Exception | None = None
 
-        def receive(self, *, timeout: float) -> events.Event:
+        def receive(self, *, timeout: float) -> messages.Message:
             if fault == "interrupt":
                 raise KeyboardInterrupt
             if fault == "loss":

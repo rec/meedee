@@ -23,8 +23,8 @@ def exercise(isolated: bool, destination: Path) -> None:
             for n in notes:
                 output(n)
             received = [receiver.receive(timeout=3) for _ in notes]
-            assert all(isinstance(e, events.Event) for e in received), received
-            assert [e.message for e in received if isinstance(e, events.Event)] == notes
+            assert all(isinstance(e, messages.Message) for e in received), received
+            assert [e for e in received if isinstance(e, messages.Message)] == notes
             report = receiver.stop_recording()
             assert report.complete and report.gap_records == 0, report.failure
             pressure = report.pressure
@@ -36,7 +36,7 @@ def exercise(isolated: bool, destination: Path) -> None:
             records = list(reader)
             assert reader.complete
             reader.close()
-            captured = [e for e in records if isinstance(e, events.Event)]
+            captured = [e for e in records if isinstance(e, messages.Message)]
             assert len(captured) == 2 and captured[0].timestamp is not None
             replay = output.play(captured, origin=captured[0].timestamp, metrics=True)
             assert replay.sent_events == 2 and not replay.cancelled
@@ -45,9 +45,9 @@ def exercise(isolated: bool, destination: Path) -> None:
             assert sum(lateness.buckets) == 2
             assert lateness.maximum_ns == replay.max_lateness_ns
             assert [
-                e.message
+                e
                 for _ in notes
-                if isinstance(e := receiver.receive(timeout=3), events.Event)
+                if isinstance(e := receiver.receive(timeout=3), messages.Message)
             ] == notes
             cancel = events.Cancellation()
             failures: list[BaseException] = []

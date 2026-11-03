@@ -33,7 +33,7 @@ with Output(bpm=120) as out:
 `Rest(duration)` advances time without sending. With `bpm`, numeric durations
 are quarter-note beats; without it they are seconds. Explicit time units such
 as `Note("500 ms", 60)` retain their meaning at every tempo. Explicit beats need
-`bpm`. Scheduling and clocks are automatic, without `Event` objects or sleeps.
+`bpm`. Scheduling and clocks are automatic, without explicit clocks or sleeps.
 
 Output() preserves message channels and supplies channel 1 when unassigned.
 An explicit Output(channel=N) overrides MIDI 1 message and note channels.
@@ -51,11 +51,7 @@ full-note values or automatic cleanup.
 from meedee import archive, events, messages, smf
 
 clock = events.Clock(identity="score", tick_numerator=1, tick_denominator=480)
-note = events.Event(
-    stream="piano",
-    timestamp=events.Timestamp(ticks=480, clock=clock),
-    message=messages.NoteOn(channel=1, note=60, velocity=100),
-)
+note = (messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="piano", timestamp=events.Timestamp(ticks=480, clock=clock))
 writer = archive.Writer("take.meedee")
 writer.write(clock)
 writer.write(archive.Stream(id="piano", label="Piano", clock_identity=clock.identity))
@@ -96,8 +92,10 @@ encoded bytes/UMP packets, and `play()` for timestamped events. Both use the sam
 native transport. Inputs default to process isolation; outputs default to in-process
 transport, with `isolated=True` available. Typed input connections
 provide either a callback or `receive(timeout=..., cancel=...)`, returning an
-immutable `events.Event` or `events.StreamDiagnostic`. Events preserve primitive
-messages, the completion packet's timestamp and their contributing packet span. Optional `EventInterpreter`,
+immutable `messages.Message` or `events.StreamDiagnostic`. Messages carry optional
+`timestamp`, `stream` and `span` fields directly. `replace()` and `transpose()`
+preserve this metadata; equality and hashing compare MIDI content only.
+Optional `EventInterpreter`,
 `EventVelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
@@ -618,7 +616,7 @@ that selection without looking it up again by ID. Virtual endpoints use
 real-connection names are not configurable through the pinned C API. CoreMIDI
 virtual names still use the fork's existing ASCII input conversion.
 
-Decoded callbacks accept an `Event` or `StreamDiagnostic`. With `raw=True`,
+Decoded callbacks accept a `Message` or `StreamDiagnostic`. With `raw=True`,
 callbacks accept one immutable `ReceivedPacket` from `meedee.events`.
 Its `packet` is owned `bytes` or an immutable `UmpPacket` whose `words` are a
 tuple of unsigned 32-bit integers. Its `timestamp_ns` is an exact signed integer
@@ -804,9 +802,7 @@ opening a device. For example:
 from meedee import events, messages, notes
 
 tracker = notes.Tracker(stream="keyboard")
-tracker.feed(events.Event(
-    stream="keyboard", message=messages.NoteOn(channel=1, note=60, velocity=100)
-))
+tracker.feed((messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="keyboard"))
 channel = tracker.snapshot().channels[0]
 assert channel.notes[0].held == 1
 ```
@@ -843,11 +839,9 @@ router = routing.Router(routes=[routing.Route(
     name="keys-to-synth", source="keys", destination="synth",
     protocol="midi1", remap_channel=2,
 )])
-router.feed(events.Event(
-    stream="keys", message=messages.NoteOn(channel=1, note=60, velocity=100)
-))
+router.feed((messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="keys"))
 delivery = router.peek()
-# The host sends delivery.event.message to the selected destination.
+# The host sends delivery.message to the selected destination.
 # After success: router.confirm(delivery.id)
 # After a failed/uncertain send: router.fail(delivery.id, reason)
 ```
@@ -980,7 +974,7 @@ for bounds, cancellation, reporting, local identity and qualification limits.
 manual clock. It opens no devices and starts no threads or MIDI lifecycle:
 
 ```python
-from meedee import events, testing
+from meedee import events, messages, testing
 
 clock = events.Clock(identity="test-clock", origin="manual")
 receiver = testing.Input(stream="keys", protocol="midi1")
@@ -988,8 +982,8 @@ receiver.inject(b"\x90\x3c\x64", clock=clock, timestamp_ns=10)
 event = receiver.receive()  # Decoded by the production packet decoder.
 
 sink = testing.Output(protocol="midi1")
-if isinstance(event, events.Event):
-    sink(event.message)
+if isinstance(event, messages.Message):
+    sink(event)
 assert sink.take_packet() == b"\x90\x3c\x64"
 ```
 

@@ -5,12 +5,10 @@ import pytest
 from meedee import controls, events, messages, midi, mpe, timecode, tuning, ump
 
 
-def event(message: messages.Message, ticks: int) -> events.Event:
+def event(message: messages.Message, ticks: int) -> messages.Message:
     clock = events.Clock(identity="c", origin="test")
-    return events.Event(
-        stream="s",
-        message=message,
-        timestamp=events.Timestamp(ticks=ticks, clock=clock),
+    return (message).replace(
+        stream="s", timestamp=events.Timestamp(ticks=ticks, clock=clock)
     )
 
 

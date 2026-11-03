@@ -7,10 +7,9 @@ import pytest
 from meedee import archive, events, messages, metrics, midi
 
 
-def event() -> events.Event:
-    return events.Event(
+def event() -> messages.Message:
+    return (messages.TimingClock()).replace(
         stream="s",
-        message=messages.TimingClock(),
         timestamp=events.Timestamp(ticks=0, clock=events.Clock(identity="source")),
     )
 

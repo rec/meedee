@@ -28,7 +28,7 @@ class Session:
         self.transport_drops = 0
 
     def feed(
-        self, item: events.Event | events.StreamDiagnostic
+        self, item: messages.Message | events.StreamDiagnostic
     ) -> list[dict[str, object]]:
         self.observer.feed(item)
         if isinstance(item, events.StreamDiagnostic):
@@ -45,7 +45,7 @@ class Session:
             }
         else:
             observations = [o for v in self.views for o in v.feed(item)]
-            message = item.message
+            message = item
             inner = message.message if isinstance(message, ump.Midi1Packet) else message
             channel = getattr(inner, "channel", None)
             group = getattr(message, "group", None)
@@ -190,7 +190,7 @@ def watch(connection: midi.InputConnection, config: Monitor) -> int:
                     )
                     item = connection.receive(timeout=remaining)
                     if item is not None:
-                        if delivery is not None and isinstance(item, events.Event):
+                        if delivery is not None and isinstance(item, messages.Message):
                             delivery.observe(monotonic_ns())
                         for r in session.feed(item):
                             emit(r, config.output)

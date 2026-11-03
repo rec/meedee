@@ -108,7 +108,7 @@ impl Router {
         })
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
+        if let Ok(e) = crate::event_values::extract(&item) {
             self.value.feed(&e.value).map_err(error)
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             self.value.boundary(
@@ -117,7 +117,7 @@ impl Router {
             );
             Ok(())
         } else {
-            Err(PyTypeError::new_err("expected Event or StreamDiagnostic"))
+            Err(PyTypeError::new_err("expected Message or StreamDiagnostic"))
         }
     }
     fn peek(&self) -> Option<Delivery> {
@@ -158,10 +158,8 @@ impl Delivery {
         &self.value.destination
     }
     #[getter]
-    fn event(&self) -> crate::event_values::Event {
-        crate::event_values::Event {
-            value: self.value.event.clone(),
-        }
+    fn message(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        crate::event_values::to_python(py, self.value.event.clone())
     }
     #[getter]
     fn wire_bytes(&self) -> usize {

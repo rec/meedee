@@ -97,10 +97,8 @@ def test_ump_tempo_strings_encode_the_same_midi_values(tempo: str) -> None:
 def test_smf_tempo_conversion_preserves_event_ticks() -> None:
     clock = events.Clock(identity="test")
     origin = events.Timestamp(ticks=0, clock=clock)
-    event = events.Event(
-        stream="test",
-        message=messages.NoteOn(channel=1, note=60, velocity=90),
-        timestamp=events.Timestamp(ticks="1e9 tick", clock=clock),
+    event = (messages.NoteOn(channel=1, note=60, velocity=90)).replace(
+        stream="test", timestamp=events.Timestamp(ticks="1e9 tick", clock=clock)
     )
     header = smf.Header(format=0, tracks=1, division=480)
     assert (

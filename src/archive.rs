@@ -1,5 +1,4 @@
 //! Streaming Python archive bridge; schema and validation live in Rust core.
-use crate::event_values::Event;
 use crate::files::{bytes, closed, frozen, limit, os_error, uint, Stream as IoStream};
 use crate::packets::Clock;
 use meedee::archive as model;
@@ -65,7 +64,7 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
             clock_identity: v.value.2.clone(),
         });
     }
-    if let Ok(v) = v.extract::<PyRef<'_, Event>>() {
+    if let Ok(v) = crate::event_values::extract(&v) {
         return Ok(model::Record::Event(Box::new(v.value.clone())));
     }
     if let Ok(v) = v.extract::<PyRef<'_, Gap>>() {
@@ -96,7 +95,7 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
         });
     }
     Err(PyTypeError::new_err(
-        "expected an archive record, Clock or Event",
+        "expected an archive record, Clock or Message",
     ))
 }
 pub fn to_python(py: Python<'_>, r: model::Record) -> PyResult<Py<PyAny>> {
@@ -113,7 +112,7 @@ pub fn to_python(py: Python<'_>, r: model::Record) -> PyResult<Py<PyAny>> {
             },
         )?
         .into_any()),
-        model::Record::Event(value) => Ok(Py::new(py, Event { value: *value })?.into_any()),
+        model::Record::Event(value) => crate::event_values::to_python(py, *value),
         model::Record::Gap {
             stream,
             lost,

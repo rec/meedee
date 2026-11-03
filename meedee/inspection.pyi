@@ -3,7 +3,7 @@
 from os import PathLike
 from typing import BinaryIO, Literal
 
-from . import archive, events, notes, smf
+from . import archive, events, messages, notes, smf
 
 def inspect_file(
     source: str | PathLike[str] | BinaryIO,
@@ -133,6 +133,6 @@ class Observer:
     def __init__(
         self, *, stream: str, clock: events.Clock, detail_limit: int = 128
     ) -> None: ...
-    def feed(self, item: events.Event | events.StreamDiagnostic) -> None: ...
+    def feed(self, item: messages.Message | events.StreamDiagnostic) -> None: ...
     def loss_counter_changed(self) -> None: ...
     def snapshot(self) -> Report: ...

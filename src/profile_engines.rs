@@ -36,7 +36,7 @@ frozen!(ControllerDestination;device_id,channel,source,controller,entries;{
         entries: &Bound<'_, PyAny>,
         #[pyo3(from_py_with=limit)] max_entries: usize,
     ) -> PyResult<PyClassInitializer<Self>> {
-        Ok(PyClassInitializer::from(Message).add_subclass(Self {
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
             value: gm_model::ControllerDestination::new(
                 int(device_id)?,
                 int(channel)?,
@@ -95,7 +95,7 @@ frozen!(KeyBasedControl;device_id,channel,note,entries;{
         entries: &Bound<'_, PyAny>,
         #[pyo3(from_py_with=limit)] max_entries: usize,
     ) -> PyResult<PyClassInitializer<Self>> {
-        Ok(PyClassInitializer::from(Message).add_subclass(Self {
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
             value: gm_model::KeyBasedControl::new(
                 int(device_id)?,
                 int(channel)?,
@@ -168,7 +168,7 @@ frozen!(GlobalParameterControl;device_id,slot_path,parameter_width,value_width,e
             .iter()
             .map(int)
             .collect::<PyResult<_>>()?;
-        Ok(PyClassInitializer::from(Message).add_subclass(Self {
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
             value: gm_model::GlobalParameterControl::new(
                 int(device_id)?,
                 path,

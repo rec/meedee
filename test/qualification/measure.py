@@ -153,7 +153,7 @@ def test_clip_and_archive(tmp_path: Path) -> None:
     def read_clip() -> None:
         reader = clip.Reader(path)
         try:
-            assert sum(isinstance(e.message, ump.Midi2NoteOn) for e in reader) == 2048
+            assert sum(isinstance(e, ump.Midi2NoteOn) for e in reader) == 2048
         finally:
             reader.close()
 
@@ -173,16 +173,14 @@ def test_clip_and_archive(tmp_path: Path) -> None:
             )
         for n in range(2048):
             writer.write(
-                events.Event(
-                    stream=str(n % 4),
-                    timestamp=events.Timestamp(ticks=n, clock=clock),
-                    message=note1,
+                (note1).replace(
+                    stream=str(n % 4), timestamp=events.Timestamp(ticks=n, clock=clock)
                 )
             )
         writer.finish()
         reader = archive.Reader(path)
         try:
-            assert sum(isinstance(e, events.Event) for e in reader) == 2048
+            assert sum(isinstance(e, messages.Message) for e in reader) == 2048
             assert reader.complete
         finally:
             reader.close()
@@ -212,10 +210,9 @@ def test_recording_admission(tmp_path: Path) -> None:
             for n in range(100 if paced else 2048):
                 for i, recorder in enumerate(recorders):
                     accepted += recorder.record(
-                        events.Event(
+                        (note).replace(
                             stream=str(i),
                             timestamp=events.Timestamp(ticks=n, clock=clock),
-                            message=note,
                         )
                     )
                 if paced:
@@ -235,7 +232,7 @@ def test_recording_admission(tmp_path: Path) -> None:
         for i, report in enumerate(reports):
             reader = archive.Reader(tmp_path / f"{paced}-{i}.meedee", recover=True)
             try:
-                count = sum(isinstance(e, events.Event) for e in reader)
+                count = sum(isinstance(e, messages.Message) for e in reader)
                 assert reader.complete == report.complete
                 assert count + 2 == report.records
                 if report.complete:

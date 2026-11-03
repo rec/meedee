@@ -29,9 +29,9 @@ def test_fragments_reuse_running_status_and_preserve_signed_timestamp_spans() ->
     assert i.inject(b"\x64\x3d\x65", clock=clock(), timestamp_ns=20)
     first = i.receive()
     second = i.receive()
-    assert isinstance(first, events.Event) and isinstance(second, events.Event)
-    assert first.message == messages.NoteOn(channel=1, note=60, velocity=100)
-    assert second.message == messages.NoteOn(channel=1, note=61, velocity=101)
+    assert isinstance(first, messages.Message) and isinstance(second, messages.Message)
+    assert first == messages.NoteOn(channel=1, note=60, velocity=100)
+    assert second == messages.NoteOn(channel=1, note=61, velocity=101)
     assert first.timestamp is not None and first.timestamp.ticks == 20
     assert (
         first.span is not None
@@ -55,7 +55,7 @@ def test_raw_overflow_keeps_older_packets_and_reports_loss_even_after_silence() 
     assert i.dropped_packets == 1 and saved.next_sequence == 2
     assert i.inject(b"\x90\x3d\x64", clock=clock())
     event = i.receive()
-    assert isinstance(event, events.Event) and event.span is not None
+    assert isinstance(event, messages.Message) and event.span is not None
     assert event.span.first_packet == 2 and i.receive() is None
     assert saved.queued_packets == 1 and i.snapshot().queued_packets == 0
     with pytest.raises(AttributeError):
@@ -65,7 +65,7 @@ def test_raw_overflow_keeps_older_packets_and_reports_loss_even_after_silence() 
 def test_decoded_overflow_and_explicit_loss_reset_interpretation() -> None:
     i = testing.Input(stream="s", protocol="midi1", event_limit=1)
     i.inject(b"\x90\x3c\x64\x3d\x65", clock=clock())
-    assert isinstance(i.receive(), events.Event)
+    assert isinstance(i.receive(), messages.Message)
     loss = i.receive()
     assert isinstance(loss, events.StreamDiagnostic) and loss.kind == "loss"
     assert i.snapshot().dropped_events == 1 and i.dropped_packets == 0
@@ -84,7 +84,7 @@ def test_ump_values_keep_native_width_and_protocol_mismatches_are_rejected() -> 
     i = testing.Input(stream="s", protocol="ump")
     i.inject(packet, clock=clock())
     result = i.receive()
-    assert isinstance(result, events.Event) and result.message == message
+    assert isinstance(result, messages.Message) and result == message
     with pytest.raises(ValueError):
         i.inject(b"\xf8", clock=clock())
     with pytest.raises(midi.CapabilityError):
@@ -96,7 +96,7 @@ def test_worker_failure_is_visible_and_close_retires_input_without_devices() -> 
     i.inject(b"\xf8", clock=clock())
     i.fail("simulated disconnect")
     assert isinstance(i.failure, midi.WorkerError)
-    assert isinstance(i.receive(), events.Event)
+    assert isinstance(i.receive(), messages.Message)
     with pytest.raises(midi.WorkerError, match="disconnect"):
         i.receive()
     with pytest.raises(midi.WorkerError):
@@ -168,11 +168,11 @@ def test_routing_conformance_uses_shared_injected_decode_and_recorded_output() -
     )
     i.inject(b"\x90\x3c\x64", clock=clock(), timestamp_ns=10)
     event = i.receive()
-    assert isinstance(event, events.Event)
+    assert isinstance(event, messages.Message)
     router.feed(event)
     delivery = router.peek()
     assert delivery is not None
-    o(delivery.event.message)
+    o(delivery.message)
     router.confirm(delivery.id)
     assert o.take_packet() == b"\x91\x3c\x64" and router.snapshot().confirmed == 1
     i.lose(1)
@@ -247,9 +247,9 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
             i.inject(p, clock=clock(), timestamp_ns=time.now_ns)
         assembler = ump.EventAssembler()
         while (item := i.receive()) is not None:
-            assert isinstance(item, events.Event)
+            assert isinstance(item, messages.Message)
             if group is None:
-                return b.feed(item.message, input="s", now_ns=time.now_ns)
+                return b.feed(item, input="s", now_ns=time.now_ns)
             for observation in assembler.feed(item):
                 value = observation.value
                 assert isinstance(value, ump.AssembledData)

@@ -32,8 +32,8 @@ def respond(
     reply: messages.SysEx,
 ) -> None:
     received = receiver.receive(timeout=3)
-    assert isinstance(received, events.Event), received
-    assert codecs.encode(received.message) == codecs.encode(request)
+    assert isinstance(received, messages.Message), received
+    assert codecs.encode(received) == codecs.encode(request)
     # Keep nonmatching traffic observable without pretending it is a reply.
     output(messages.TimingClock())
     output(messages.SysEx(data=b"\x7d\x01"))
@@ -136,8 +136,8 @@ def exercise(isolated: bool, directory: Path) -> None:
             and not result.uncertain_send
         )
         received = peer.receive(timeout=1)
-        assert isinstance(received, events.Event)
-        assert codecs.encode(received.message) == codecs.encode(silent_request)
+        assert isinstance(received, messages.Message)
+        assert codecs.encode(received) == codecs.encode(silent_request)
         token = events.Cancellation()
         token.cancel()
         cancelled = tuning.Query(

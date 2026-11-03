@@ -23,7 +23,7 @@ Public definitions belong to these modules, without top-level re-exports:
 | `meedee.messages` | `Message` and concrete musical values/commands |
 | `meedee.codecs` | Pure byte encoding and incremental decoding; no native I/O |
 | `meedee.controls` | Optional per-source control and parameter observations |
-| `meedee.events` | `Event`, `Timestamp`, and clock descriptors |
+| `meedee.events` | `Timestamp`, source spans, diagnostics, and clock descriptors |
 | `meedee.midi` | Discovery, transport capabilities, clients, connections and transport errors |
 
 Keep `__init__.py` empty. Rust modules mirror responsibilities, using idiomatic
@@ -985,7 +985,7 @@ README.md documents CLI selection, filters, resource bounds and examples.
 
 ## Observed note activity
 
-`meedee.notes.Tracker(stream=..., detail_limit=128)` accepts `Event` or
+`meedee.notes.Tracker(stream=..., detail_limit=128)` accepts `Message` or
 `StreamDiagnostic` through `feed`, returns frozen `notes.Report` snapshots, and
 offers explicit `invalidate()` for asynchronous loss. It owns no transport.
 Rust `notes::Tracker` supplies the same state machine, taking an explicit source,
@@ -1042,7 +1042,7 @@ use 1-16; byte MIDI rejects group options. Python routes are frozen; Rust fields
 are private and constructor-validated. No mandatory dependency is added.
 
 `Router(routes=..., event_limit=128, byte_limit=8388608)` accepts 1-128 uniquely
-named routes. A destination must have one protocol. `feed(Event)` selects routes
+named routes. A destination must have one protocol. `feed(Message)` selects routes
 in configuration order, preserving caller event order without timestamp sorting.
 Several matching routes may deliberately deliver multiple copies to one output.
 No protocol conversion, command expansion, musical transformation or autonomous
@@ -1277,7 +1277,7 @@ admission dropped that packet; protocol/clock/closed/failed-state errors do not
 pretend to be packet loss. Caller buffers are copied.
 
 `receive(timeout=None, cancel=None)` never blocks, sleeps or advances time,
-regardless of a finite nonnegative timeout. It returns one Event/StreamDiagnostic
+regardless of a finite nonnegative timeout. It returns one Message/StreamDiagnostic
 or None. A cancelled token raises InterruptedError. Decode order and completion
 spans, running status, UMP words, clock changes and recovery use production logic.
 When count or shared queued-byte capacity is exhausted, older queued content is
@@ -1380,7 +1380,7 @@ Live snapshots are independent values. Final metrics survive failed/incomplete
 recording and do not change structural completeness or best-effort rules.
 
 `meedee monitor --metrics` adds a `metrics` object to its final summary. It counts
-all decoded Events delivered to the host before display filters, excluding
+all decoded messages delivered to the host before display filters, excluding
 StreamDiagnostic items. `clock="host_monotonic"`, events, elapsed_ns,
 events_per_second and delivery_intervals describe host receive observations;
 source event timestamps remain untouched and are diagnosed separately. The window
@@ -1403,7 +1403,7 @@ Budgets exclude object/metadata overhead, decoder state, caller copies and nativ
 queues. This is passive MIDI 1 byte capture, not UMP or a dump-request protocol.
 
 `start(now_ns)` starts a fresh session and checks deadline arithmetic. `poll(now_ns)`
-notices expiry, and `feed(item, now_ns)` consumes existing typed Event or
+notices expiry, and `feed(item, now_ns)` consumes existing typed Message or
 StreamDiagnostic values using the same unsigned, nondecreasing host clock.
 Source timestamps are preserved in the input events but do not set deadlines.
 At or after the overall deadline, the session times out before accepting another
@@ -1479,7 +1479,7 @@ message handoff and enters waiting, or timed_out if the send consumed the deadli
 `poll(now_ns)` checks expiry while sending/waiting. All time comes from one
 caller-supplied unsigned, nondecreasing host clock, independent of event timestamps.
 `feed(item, now_ns)` requires a confirmed send and checks expiry before accepting
-an Event/StreamDiagnostic. A reply at or after the deadline cannot complete.
+a Message/StreamDiagnostic. A reply at or after the deadline cannot complete.
 Invalid operations/clock regression raise without silently restarting the query.
 
 All decoder diagnostics, wrong-source events, UMP/compound events and recognized
@@ -1612,7 +1612,7 @@ and advanced playback workflows.
 ## Unified Python input
 
 `Input(raw=False, ...)` is the sole public input client. Decoded input is the
-default, yielding `events.Event` and `events.StreamDiagnostic`; `raw=True` yields
+default, yielding `messages.Message` and `events.StreamDiagnostic`; `raw=True` yields
 unchanged `events.ReceivedPacket` values, including partial SysEx and UMP chunks.
 The former TypedInput and TypedInputConnection classes are removed without aliases.
 Both modes return InputConnection and share discovery, isolation, port lifetime,
@@ -1627,7 +1627,7 @@ Decoded mode retains assembly diagnostics, stream identity and archive recording
 Raw recording is rejected explicitly because archive recording requires decoded
 events. The worker_failure and last_message_time properties remain available.
 
-Type hints infer InputConnection[ReceivedPacket] for raw=True and decoded event
+Type hints infer InputConnection[ReceivedPacket] for raw=True and decoded message
 unions by default; a dynamic boolean yields the union of both modes.
 
 
@@ -1635,13 +1635,12 @@ unions by default; a dynamic boolean yields the union of both modes.
 
 `Input()` can be iterated directly, opening the first discovered input and closing
 it when iteration finishes. `with Input() as input` scopes the connection explicitly.
-Decoded iteration yields Message values rather than Event wrappers; full Note
+Decoded iteration yields Message values carrying optional timing and source metadata; full Note
 values are never synthesized. Raw iteration yields ReceivedPacket values.
 `with_errors()` additionally yields StreamDiagnostic and terminal input exceptions.
 Ordinary iteration prints these to stderr, continues after decoder diagnostics,
 and stops after a terminal failure. Setup errors in explicit contexts, invalid
-arguments, close failures and output sends retain their exception behavior. `receive()` retains
-its existing timestamped, checked interface.
+arguments, close failures and output sends retain their exception behavior. `receive()` returns the same messages and retains its checked error interface.
 
 `Input(channel=1)` selects one channel; an iterable of integers selects several.
 Only channels 1..16 are valid. With a channel selection, channel-less messages
@@ -1657,7 +1656,7 @@ Encoded packets and timestamped play() retain their explicit addressing.
 
 `Input.record(duration, output=None, overwrite=False)` captures decoded input
 from the first port for a duration in seconds (unit strings are accepted). It
-returns a list of archive-compatible Clock, Stream, Event, Gap and Discontinuity
+returns a list of archive-compatible Clock, Stream, Message, Gap and Discontinuity
 records. Decoder diagnostics and terminal receive failures remain in the capture;
 terminal failures end recording early. The input closes before returning, with
 final partial-message and loss diagnostics retained. Raw mode is rejected.
@@ -1666,7 +1665,7 @@ capture, using exclusive creation unless overwrite=True. File errors raise.
 
 `Output.play(source)` opens the selected output and closes it on completion or
 failure. A passed archive Reader is consumed and closed. Connection-level play
-also allows omission of origin, inferred from the first Event timestamp. Initial
+also allows omission of origin, inferred from the first Message timestamp. Initial
 silence is trimmed; inter-event timing is retained. Empty captures send no events.
 Existing checked replay rejects gaps and discontinuities rather than silently
 skipping them. Explicit origin/mapping options remain on the connection method.
@@ -1678,3 +1677,21 @@ ownership cycles do not prevent collection after application references are
 released. A live connection intentionally retains its client. Python finalization
 is not guaranteed.
 The record/play convenience methods use deterministic context cleanup, not GC.
+
+
+### Message timing and source metadata
+
+Python messages carry optional `timestamp: events.Timestamp`, `stream: str`, and
+`span: events.SourceSpan` fields. Newly constructed messages leave these unset;
+`replace(timestamp=..., stream=..., span=...)` assigns or clears them. Every
+message replacement and note transposition preserves fields not explicitly
+changed. Equality, hashing, repr and MIDI wire encoding continue to describe
+payload only, independent of timing/source metadata.
+
+The public events.Event wrapper is removed with no compatibility alias. Decoded
+input, archive reading, timed SMF/Clip reading, routing deliveries, recording,
+inspection, observation and playback use messages directly. Routing Delivery
+exposes its message as `.message`. Low-level smf.Event remains a file record with
+track/tick information and supports non-message file records. Internal Rust
+Event values and archive bytes are unchanged. Archive and source-aware operations
+still require a stream identity; playback also requires timestamp information.

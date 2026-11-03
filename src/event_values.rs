@@ -24,15 +24,33 @@ frozen!(SourceSpan;first_packet,last_packet,first_timestamp,last_timestamp;{
 if let(Some(a),Some(b))=(&value.first_timestamp,&value.last_timestamp){if a.clock!=b.clock{return Err(PyValueError::new_err("a span cannot combine clock generations"));}}Ok(Self{value})}
 #[getter]fn first_packet(&self)->u64{self.value.first_packet}#[getter]fn last_packet(&self)->u64{self.value.last_packet}#[getter]fn first_timestamp(&self)->Option<Timestamp>{self.value.first_timestamp.clone().map(|value|Timestamp{value})}#[getter]fn last_timestamp(&self)->Option<Timestamp>{self.value.last_timestamp.clone().map(|value|Timestamp{value})}
 });
-#[pyclass(frozen, skip_from_py_object, module = "meedee.events")]
-#[derive(Clone)]
 pub struct Event {
     pub value: model::Event,
 }
-frozen!(Event;stream,message,timestamp,span;{
-#[new]#[pyo3(signature=(*,stream,message,timestamp=None,span=None))]fn new(stream:String,message:&Bound<'_,PyAny>,timestamp:Option<PyRef<'_,Timestamp>>,span:Option<PyRef<'_,SourceSpan>>)->PyResult<Self>{let value=model::Event{stream,message:payload(message)?,timestamp:timestamp.map(|v|v.value.clone()),span:span.map(|v|v.value.clone())};value.validate().map_err(value_error)?;Ok(Self{value})}
-#[getter]fn stream(&self)->&str{&self.value.stream}#[getter]fn message(&self,py:Python<'_>)->PyResult<Py<PyAny>>{payload_python(py,self.value.message.clone())}#[getter]fn timestamp(&self)->Option<Timestamp>{self.value.timestamp.clone().map(|value|Timestamp{value})}#[getter]fn span(&self)->Option<SourceSpan>{self.value.span.clone().map(|value|SourceSpan{value})}
-});
+pub fn extract(object: &Bound<'_, PyAny>) -> PyResult<Event> {
+    let metadata = object
+        .extract::<PyRef<'_, crate::messages::Message>>()?
+        .metadata();
+    let value = model::Event {
+        stream: metadata.stream.unwrap_or_default(),
+        message: payload(object)?,
+        timestamp: metadata.timestamp,
+        span: metadata.span,
+    };
+    Ok(Event { value })
+}
+pub fn to_python(py: Python<'_>, value: model::Event) -> PyResult<Py<PyAny>> {
+    let object = payload_python(py, value.message)?;
+    object
+        .bind(py)
+        .extract::<PyRef<'_, crate::messages::Message>>()?
+        .attach(crate::messages::Metadata {
+            timestamp: value.timestamp,
+            stream: Some(value.stream),
+            span: value.span,
+        })?;
+    Ok(object)
+}
 pub fn payload(v: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
     if let Ok(v) = crate::messages::extract_primitive(v) {
         return Ok(model::Payload::Midi1(v));
@@ -43,7 +61,7 @@ pub fn payload(v: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
     if let Ok(v) = crate::ump::extract(v) {
         return Ok(model::Payload::Ump(v));
     }
-    Err(PyTypeError::new_err("Event requires a primitive MIDI message, UMP value or supported command; explicitly encode profile messages as SysEx"))
+    Err(PyTypeError::new_err("Message requires a primitive MIDI message, UMP value or supported command; explicitly encode profile messages as SysEx"))
 }
 pub fn payload_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
     match v {
@@ -86,7 +104,6 @@ fn int128(v: &Bound<'_, PyAny>) -> PyResult<i128> {
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Timestamp>()?;
     m.add_class::<SourceSpan>()?;
-    m.add_class::<Event>()?;
     m.add_class::<Rational>()
 }
 

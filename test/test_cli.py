@@ -18,9 +18,7 @@ def test_route_preview_is_offline_and_labels_simulated_deliveries(
     writer = archive.Writer(path)
     writer.write(archive.Stream(id="s", label=""))
     writer.write(
-        events.Event(
-            stream="s", message=messages.NoteOn(channel=1, note=60, velocity=100)
-        )
+        (messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="s")
     )
     writer.finish()
     before = path.read_bytes()
@@ -115,7 +113,7 @@ def test_cli_identity_maps_and_quality_verdict(
         clock = events.Clock(identity=f"clock-{s}")
         writer.write(clock)
         writer.write(archive.Stream(id=s, label="", clock_identity=clock.identity))
-        writer.write(events.Event(stream=s, message=messages.TimingClock()))
+        writer.write((messages.TimingClock()).replace(stream=s))
         writer.write(archive.Gap(stream=s, lost=1, reason="loss"))
         writer.finish()
     with pytest.raises(SystemExit) as result:

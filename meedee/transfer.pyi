@@ -1,7 +1,7 @@
 from os import PathLike
 from typing import BinaryIO
 
-from . import events
+from . import events, messages
 from .messages import SysEx
 
 class Plan:
@@ -95,7 +95,7 @@ class Capture:
     def start(self, now_ns: int | str) -> None: ...
     def poll(self, now_ns: int | str) -> None: ...
     def feed(
-        self, item: events.Event | events.StreamDiagnostic, now_ns: int | str
+        self, item: messages.Message | events.StreamDiagnostic, now_ns: int | str
     ) -> None: ...
     def fail(self, reason: str) -> None: ...
     def cancel(self, reason: str) -> None: ...

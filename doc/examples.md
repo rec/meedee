@@ -50,7 +50,7 @@ with Output(bpm=120) as out:  # Numeric durations are beats.
 
 One beat is a quarter note. Without `bpm`, numeric durations mean seconds.
 Explicit time units keep their meaning at any tempo; explicit beats require
-`bpm`. The clock and scheduling are automatic, with no `Event` objects or sleeps.
+`bpm`. The clock and scheduling are automatic, without explicit clocks or sleeps.
 
 `Output(port="FLOW 8")` selects a unique name substring; `*` and `?` support
 wildcard matching. Two-stage `client.connect(client.ports()[0])` also works.
@@ -78,7 +78,8 @@ for message in Input():
 Iteration yields individual MIDI messages, never `Note` values. Recoverable input
 errors are printed to stderr and reception continues; a terminal input failure
 is reported and ends iteration. Setup, close and output failures still raise.
-Use `receive()` when you need timestamped events, or `Input(raw=True)` for raw
+Each message carries optional `timestamp`, `stream` and `span` fields.
+`replace()` and `transpose()` preserve them. Use `Input(raw=True)` for raw
 transport packets.
 
 ## 4. Transpose a keyboard up an octave
@@ -194,7 +195,8 @@ Input().record(10, output=filename, overwrite=True)
 Output().play(Reader(filename))
 ```
 
-`record()` returns the captured records, including any diagnostics. File output
+`record()` returns messages with their timing and source information, together
+with archive declarations and any diagnostics. File output
 writes the same capture; existing files are protected unless `overwrite=True`.
 Playback preserves timing between messages and trims initial silence. Both calls
 close their connections automatically, and `play()` closes an archive reader.
@@ -320,9 +322,7 @@ origin = events.Timestamp(ticks=0, clock=clock)
 releases = [allocator.release(voice_id=v.id, velocity=0) for v in [root, moving]]
 ending = [*releases, messages.PitchBend(channel=moving.channel, value=0)]
 sequence = [
-    events.Event(
-        stream="mpe", timestamp=events.Timestamp(ticks=b, clock=clock), message=m
-    )
+    m.replace(stream="mpe", timestamp=events.Timestamp(ticks=b, clock=clock))
     for b, m in [
         (0, root.note_on),
         (0, moving.note_on),

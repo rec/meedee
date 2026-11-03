@@ -33,12 +33,12 @@ def test_merged_tempo_map_is_exact_and_keeps_leading_silence() -> None:
     reader = smf.TimedReader(BytesIO(song()), stream="song")
     origin = reader.origin
     values = list(reader)
-    assert len(values) == 2 and all(isinstance(v, events.Event) for v in values)
+    assert len(values) == 2 and all(isinstance(v, messages.Message) for v in values)
     first = values[0]
-    assert isinstance(first, events.Event) and first.timestamp is not None
+    assert isinstance(first, messages.Message) and first.timestamp is not None
     assert first.timestamp.seconds == events.Rational(numerator=1, denominator=4)
     second = values[1]
-    assert isinstance(second, events.Event) and second.timestamp is not None
+    assert isinstance(second, messages.Message) and second.timestamp is not None
     assert second.timestamp.seconds == events.Rational(numerator=3, denominator=8)
     assert events.PlaybackPlan(origin=origin).deadline(first).delay_ns == 250_000_000
     merged = list(smf.MergedReader(BytesIO(song())))
@@ -62,7 +62,7 @@ def test_independent_sequences_and_smpte_export_have_explicit_loss_reports() -> 
     reader = smf.TimedReader(BytesIO(data), stream="s", sequence=1)
     values = list(reader)
     value = values[0]
-    assert isinstance(value, events.Event)
+    assert isinstance(value, messages.Message)
     header = smf.Header(format=0, tracks=1, division=480)
     denied = smf.export_event(value, header=header, origin=reader.origin)
     assert denied.status == ump.TranslationStatus.Quantized and denied.events == []
@@ -70,16 +70,14 @@ def test_independent_sequences_and_smpte_export_have_explicit_loss_reports() -> 
         value, header=header, origin=reader.origin, allow_loss=True
     )
     assert accepted.events and accepted.rounding_error_ticks.numerator != 0
-    wide = value.replace(
-        message=ump.Midi2NoteOn(
-            group=2,
-            channel=1,
-            note=60,
-            velocity=65535,
-            attribute_type=0,
-            attribute_data=0,
-        )
-    )
+    wide = ump.Midi2NoteOn(
+        group=2,
+        channel=1,
+        note=60,
+        velocity=65535,
+        attribute_type=0,
+        attribute_data=0,
+    ).replace(stream=value.stream, timestamp=value.timestamp, span=value.span)
     assert (
         smf.export_event(
             wide, header=header, origin=reader.origin, allow_loss=True
@@ -113,9 +111,9 @@ def test_clip_timed_reader_omits_file_markers_and_preserves_tempo() -> None:
     writer.finish()
     reader = clip.TimedReader(BytesIO(stream.getvalue()), stream="clip")
     values = list(reader)
-    assert len(values) == 2 and all(isinstance(v, events.Event) for v in values)
+    assert len(values) == 2 and all(isinstance(v, messages.Message) for v in values)
     note = values[1]
-    assert isinstance(note, events.Event) and note.timestamp is not None
+    assert isinstance(note, messages.Message) and note.timestamp is not None
     assert note.timestamp.seconds == events.Rational(numerator=1, denominator=2)
     assert (
         events.PlaybackPlan(origin=reader.origin).deadline(note).delay_ns == 500_000_000
@@ -142,10 +140,10 @@ def test_split_sysex_is_assembled_per_track_when_other_tracks_interleave() -> No
     writer.finish()
     values = list(smf.TimedReader(BytesIO(stream.getvalue()), stream="s"))
     assert len(values) == 2
-    assert [v.message for v in values if isinstance(v, events.Event)] == [
+    assert [v for v in values if isinstance(v, messages.Message)] == [
         messages.NoteOn(channel=1, note=60, velocity=1),
         messages.SysEx(data=b"\x7d\x01\x02"),
     ]
     sysex = values[1]
-    assert isinstance(sysex, events.Event) and sysex.span is not None
+    assert isinstance(sysex, messages.Message) and sysex.span is not None
     assert sysex.span.first_packet == 0 and sysex.span.last_packet == 2

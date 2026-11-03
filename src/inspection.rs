@@ -193,13 +193,13 @@ impl Observer {
         })
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
-        let item = if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
+        let item = if let Ok(e) = crate::event_values::extract(&item) {
             meedee::live::Item::Event(Box::new(e.value.clone()))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             meedee::live::Item::Diagnostic(d.value.clone())
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
-                "expected Event or StreamDiagnostic",
+                "expected Message or StreamDiagnostic",
             ));
         };
         self.value

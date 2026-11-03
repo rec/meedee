@@ -1,5 +1,5 @@
 //! File performance views and explicit export through the shared Rust clocks/codecs.
-use crate::event_values::{Event, Rational, Timestamp};
+use crate::event_values::{Rational, Timestamp};
 use crate::files::{closed, limit, os_error, uint, Event as SmfEvent, Header, Stream};
 use crate::packets::Clock;
 use crate::playback::ClockMapping;
@@ -245,7 +245,7 @@ impl ExportReport {
 #[pyo3(signature=(event,*,header,origin,track=0,tempo=500_000,mapping=None,allow_loss=false), text_signature="(event, *, header, origin, track=0, tempo=120.0, mapping=None, allow_loss=False)")]
 #[allow(clippy::too_many_arguments)]
 fn export_event(
-    event: PyRef<'_, Event>,
+    event: &Bound<'_, PyAny>,
     header: PyRef<'_, Header>,
     origin: PyRef<'_, Timestamp>,
     #[pyo3(from_py_with=uint)] track: u64,
@@ -253,6 +253,7 @@ fn export_event(
     mapping: Option<PyRef<'_, ClockMapping>>,
     #[pyo3(from_py_with=crate::ump::boolean)] allow_loss: bool,
 ) -> PyResult<ExportReport> {
+    let event = crate::event_values::extract(event)?;
     let track = track
         .try_into()
         .map_err(|_| pyo3::exceptions::PyValueError::new_err("track exceeds u16"))?;

@@ -13,10 +13,9 @@ from meedee._cli import Monitor
 from meedee._monitor import Session, select_port, watch
 
 
-def event(message: messages.Message, ticks: int = 0) -> events.Event:
-    return events.Event(
+def event(message: messages.Message, ticks: int = 0) -> messages.Message:
+    return (message).replace(
         stream="s",
-        message=message,
         timestamp=events.Timestamp(ticks=ticks, clock=events.Clock(identity="c")),
     )
 
@@ -81,7 +80,7 @@ def test_filtered_notes_update_state_and_loss_invalidates_it() -> None:
 
 
 class Feed:
-    def __init__(self, items: list[events.Event]) -> None:
+    def __init__(self, items: list[messages.Message]) -> None:
         self.stream = "s"
         self.clock = events.Clock(identity="c")
         self.dropped_packets = 0
@@ -96,7 +95,7 @@ class Feed:
     def __exit__(self, *args: object) -> None:
         self.closed = True
 
-    def receive(self, *, timeout: float) -> events.Event:
+    def receive(self, *, timeout: float) -> messages.Message:
         self.elapsed += 1
         if not self.items:
             raise KeyboardInterrupt

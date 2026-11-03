@@ -1,5 +1,5 @@
 //! Native event-view adapters. All interpretation and contributor bookkeeping are Rust-owned.
-use crate::event_values::{Event, Timestamp};
+use crate::event_values::Timestamp;
 use crate::files::{limit, uint};
 use crate::live::StreamDiagnostic;
 use meedee::event_views::{self as model, Value, View};
@@ -96,12 +96,12 @@ fn feed(
     value: &Bound<'_, PyAny>,
     now: Option<u64>,
 ) -> PyResult<Vec<Observation>> {
-    let values = if let Ok(e) = value.extract::<PyRef<'_, Event>>() {
+    let values = if let Ok(e) = crate::event_values::extract(&value) {
         view.feed(&e.value, now)
     } else if let Ok(d) = value.extract::<PyRef<'_, StreamDiagnostic>>() {
         view.boundary(&d.value)
     } else {
-        return Err(PyTypeError::new_err("Event or StreamDiagnostic required"));
+        return Err(PyTypeError::new_err("Message or StreamDiagnostic required"));
     };
     Ok(output(values.map_err(error)?))
 }

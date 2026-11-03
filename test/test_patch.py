@@ -49,10 +49,8 @@ class Input:
         self.dropped_packets = 0
         self.failure: Exception | None = None
         self.closed = False
-        self.items: list[events.Event | events.StreamDiagnostic] = [
-            events.Event(
-                stream="s", message=messages.NoteOn(channel=1, note=60, velocity=1)
-            )
+        self.items: list[messages.Message | events.StreamDiagnostic] = [
+            (messages.NoteOn(channel=1, note=60, velocity=1)).replace(stream="s")
         ]
 
     def ports(self) -> list[SimpleNamespace]:
@@ -67,7 +65,7 @@ class Input:
     def __exit__(self, *args: object) -> None:
         self.closed = True
 
-    def receive(self, *, timeout: float) -> events.Event | events.StreamDiagnostic:
+    def receive(self, *, timeout: float) -> messages.Message | events.StreamDiagnostic:
         if self.items:
             return self.items.pop(0)
         raise KeyboardInterrupt

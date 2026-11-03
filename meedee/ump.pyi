@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from . import events
+from . import events, messages
 from .messages import Message
 
 class Noop(Message):
@@ -574,6 +574,6 @@ class EventAssembler:
         max_streams: int = 64,
     ) -> None: ...
     def feed(
-        self, value: events.Event | events.StreamDiagnostic
+        self, value: messages.Message | events.StreamDiagnostic
     ) -> list[events.Observation]: ...
     def reset(self) -> None: ...

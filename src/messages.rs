@@ -11,10 +11,52 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyTuple};
 
 #[pyclass(frozen, subclass, module = "meedee.messages")]
-pub(crate) struct Message;
+#[derive(Default)]
+pub(crate) struct Message {
+    metadata: std::sync::OnceLock<Metadata>,
+}
+#[derive(Clone, Default)]
+pub(crate) struct Metadata {
+    pub timestamp: Option<meedee::events::Timestamp>,
+    pub stream: Option<String>,
+    pub span: Option<meedee::events::Span>,
+}
+impl Message {
+    pub(crate) fn metadata(&self) -> Metadata {
+        self.metadata.get().cloned().unwrap_or_default()
+    }
+    pub(crate) fn attach(&self, metadata: Metadata) -> PyResult<()> {
+        if metadata.stream.as_ref().is_some_and(|s| s.is_empty()) {
+            return Err(PyValueError::new_err("empty stream identity"));
+        }
+        if let Some(span) = &metadata.span {
+            span.validate(metadata.timestamp.as_ref())
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        }
+        self.metadata
+            .set(metadata)
+            .map_err(|_| PyValueError::new_err("message metadata is already set"))
+    }
+}
 
 #[pymethods]
 impl Message {
+    #[getter]
+    fn timestamp(&self) -> Option<crate::event_values::Timestamp> {
+        self.metadata()
+            .timestamp
+            .map(|value| crate::event_values::Timestamp { value })
+    }
+    #[getter]
+    fn stream(&self) -> Option<String> {
+        self.metadata().stream
+    }
+    #[getter]
+    fn span(&self) -> Option<crate::event_values::SourceSpan> {
+        self.metadata()
+            .span
+            .map(|value| crate::event_values::SourceSpan { value })
+    }
     #[new]
     fn new() -> PyResult<Self> {
         Err(PyTypeError::new_err("Message is abstract"))
@@ -31,9 +73,11 @@ impl SysEx {
     #[new]
     #[pyo3(signature = (data))]
     fn new(data: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
-        Ok(PyClassInitializer::from(Message).add_subclass(Self {
-            value: payload(data)?,
-        }))
+        Ok(
+            PyClassInitializer::from(Message::default()).add_subclass(Self {
+                value: payload(data)?,
+            }),
+        )
     }
 
     #[getter]
@@ -56,20 +100,12 @@ impl SysEx {
     }
 
     #[pyo3(signature = (**changes))]
-    fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
-        let mut value = self.value.clone();
-        if let Some(changes) = changes {
-            for (name, data) in changes.iter() {
-                if name.extract::<String>()? != "data" {
-                    return Err(PyTypeError::new_err(format!("unknown field: {name}")));
-                }
-                value = payload(&data)?;
-            }
-        }
-        Py::new(
-            py,
-            PyClassInitializer::from(Message).add_subclass(Self { value }),
-        )
+    fn replace<'py>(
+        slf: PyRef<'py, Self>,
+        changes: Option<&Bound<'py, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let py = slf.py();
+        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["data"], changes)
     }
 
     #[classattr]
@@ -103,7 +139,7 @@ macro_rules! channel_message {
             #[pyo3(signature = $signature)]
             fn new($(#[pyo3(from_py_with=strict_integer)] $field: i64,)* channel: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
                 let channel = channel.map(|v| integer(v, "channel")).transpose()?;
-                Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
                     value: messages::$name::new(channel.unwrap_or(1), $($field),*).map_err(value_error)?,
                     assigned: channel.is_some(),
                 }))
@@ -120,23 +156,10 @@ macro_rules! channel_message {
             }
             fn __hash__(&self) -> u64 { value_hash(&(&self.value, self.assigned)) }
             #[pyo3(signature=(**changes))]
-            fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
-                let mut channel = self.channel();
-                $(let mut $field = i64::from(self.value.$field());)*
-                if let Some(changes) = changes {
-                    for (name, value) in changes.iter() {
-                        match name.extract::<String>()?.as_str() {
-                            "channel" => channel = if value.is_none() { None } else { Some(integer(&value, "channel")?) },
-                            $(stringify!($field) => $field = integer(&value, stringify!($field))?,)*
-                            _ => return Err(PyTypeError::new_err(format!("unknown field: {name}"))),
-                        }
-                    }
-                }
-                Py::new(py, PyClassInitializer::from(Message).add_subclass(Self {
-                    value: messages::$name::new(channel.unwrap_or(1), $($field),*).map_err(value_error)?,
-                    assigned: channel.is_some(),
-                }))
-            }
+            fn replace<'py>(slf: PyRef<'py, Self>, changes: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
+        let py = slf.py();
+        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["channel", $(stringify!($field)),*], changes)
+    }
             #[classattr]
             fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
                 let annotations = PyDict::new(py);
@@ -153,15 +176,11 @@ macro_rules! channel_message {
 macro_rules! note_message {
     ($name:ident $signature:tt) => {
         channel_message! { $name $signature { note, velocity };
-            fn transpose(
-                &self, py: Python<'_>,
-                #[pyo3(from_py_with=strict_integer)] semitones: i64,
-            ) -> PyResult<Py<Self>> {
-                let note = i64::from(self.value.note()).saturating_add(semitones).clamp(0, 127);
-                Py::new(py, PyClassInitializer::from(Message).add_subclass(Self {
-                    value: messages::$name::new(i64::from(self.value.channel()), note, i64::from(self.value.velocity())).map_err(value_error)?,
-                    assigned: self.assigned,
-                }))
+            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with=strict_integer)] semitones: i64) -> PyResult<Py<PyAny>> {
+                let py = slf.py();
+                let changes = PyDict::new(py);
+                changes.set_item("note", i64::from(slf.value.note()).saturating_add(semitones).clamp(0,127))?;
+                Ok(crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["note", "velocity", "channel"], Some(&changes))?.unbind())
             }
         }
     };
@@ -193,7 +212,7 @@ macro_rules! message_classes {
                 #[new]
                 #[pyo3(signature = $signature)]
                 fn new($($field: &Bound<'_, PyAny>),*) -> PyResult<PyClassInitializer<Self>> {
-                    Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                    Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
                         value: messages::$name::new($(integer($field, stringify!($field))?),*)
                             .map_err(value_error)?,
                     }))
@@ -211,24 +230,10 @@ macro_rules! message_classes {
                 fn __hash__(&self) -> u64 { value_hash(&self.value) }
 
                 #[pyo3(signature = (**changes))]
-                fn replace(&self, py: Python<'_>, changes: Option<&Bound<'_, PyDict>>) -> PyResult<Py<Self>> {
-                    // Fixed-size field arrays also handle zero-field messages without
-                    // special unchecked indexing or a second replacement code path.
-                    let mut values = [$(i64::from(self.value.$field())),*];
-                    let names: &[&str] = &[$(stringify!($field)),*];
-                    if let Some(changes) = changes {
-                        for (name, value) in changes.iter() {
-                            let name = name.extract::<String>()?;
-                            let index = names.iter().position(|field| *field == name)
-                                .ok_or_else(|| PyTypeError::new_err(format!("unknown field: {name}")))?;
-                            values[index] = integer(&value, &name)?;
-                        }
-                    }
-                    let [$($field),*] = values;
-                    Py::new(py, PyClassInitializer::from(Message).add_subclass(Self {
-                        value: messages::$name::new($($field),*).map_err(value_error)?,
-                    }))
-                }
+                fn replace<'py>(slf: PyRef<'py, Self>, changes: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
+        let py = slf.py();
+        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &[$(stringify!($field)),*], changes)
+    }
                 #[classattr]
                 fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
                     let annotations = PyDict::new(py);
@@ -276,9 +281,9 @@ macro_rules! short_messages {
         pub fn to_python(py: Python<'_>, message: messages::AnyMessage) -> PyResult<Py<PyAny>> {
             match message {
                 messages::AnyMessage::SysEx(value) => Ok(Py::new(py,
-                    PyClassInitializer::from(Message).add_subclass(SysEx { value }))?.into_any()),
+                    PyClassInitializer::from(Message::default()).add_subclass(SysEx { value }))?.into_any()),
                 $(messages::AnyMessage::$name(value) => Ok(Py::new(py,
-                    PyClassInitializer::from(Message).add_subclass($name::from_value(value)))?.into_any()),)*
+                    PyClassInitializer::from(Message::default()).add_subclass($name::from_value(value)))?.into_any()),)*
             }
         }
 
@@ -359,7 +364,7 @@ command_messages! {
 pub(crate) fn rpn_to_python(py: Python<'_>, value: messages::RpnSet) -> PyResult<Py<PyAny>> {
     Ok(Py::new(
         py,
-        PyClassInitializer::from(Message).add_subclass(RpnSet::from_value(value)),
+        PyClassInitializer::from(Message::default()).add_subclass(RpnSet::from_value(value)),
     )?
     .into_any())
 }

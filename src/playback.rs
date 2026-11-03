@@ -1,5 +1,5 @@
 //! Clock planning and caller-thread replay, sharing the Rust scheduler.
-use crate::event_values::{payload_python, Event, Rational, Timestamp};
+use crate::event_values::{payload_python, Rational, Timestamp};
 use crate::files::{frozen, os_error};
 use crate::packets::Clock;
 use meedee::playback as model;
@@ -55,7 +55,11 @@ impl PlaybackPlan {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
         })
     }
-    fn deadline(&mut self, event: PyRef<'_, Event>) -> PyResult<PlannedEvent> {
+    fn deadline(&mut self, event: &Bound<'_, PyAny>) -> PyResult<PlannedEvent> {
+        let mut event = crate::event_values::extract(event)?;
+        if event.value.stream.is_empty() {
+            event.value.stream = "playback".into();
+        }
         Ok(PlannedEvent {
             value: self
                 .value
@@ -141,7 +145,10 @@ impl Iterator for Source {
                 Err(e) if e.is_instance_of::<PyStopIteration>(py) => return None,
                 Err(e) => return Some(Err(std::io::Error::other(e.to_string()))),
             };
-            if let Ok(event) = item.extract::<PyRef<'_, Event>>() {
+            if let Ok(mut event) = crate::event_values::extract(&item) {
+                if event.value.stream.is_empty() {
+                    event.value.stream = "playback".into();
+                }
                 return Some(Ok(event.value.clone()));
             }
             match crate::archive::extract(&item){Ok(meedee::archive::Record::Clock(_)|meedee::archive::Record::Stream{..}|meedee::archive::Record::Metadata{..})=>continue,Ok(_)=>return Some(Err(std::io::Error::other("gap, discontinuity or opaque data requires an explicit replay policy; no automatic skipping"))),Err(e)=>return Some(Err(std::io::Error::other(e.to_string())))}

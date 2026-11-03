@@ -208,7 +208,7 @@ macro_rules! message_classes {
                 #[new]
                 #[pyo3(signature = (*, $($field),*))]
                 fn new($($field: &Bound<'_, PyAny>),*) -> PyResult<PyClassInitializer<Self>> {
-                    Ok(PyClassInitializer::from(Message).add_subclass(Self {
+                    Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
                         value: model::$name::new($(self::$read($field)?),*)
                             .map_err(value_error)?,
                     }))
@@ -264,7 +264,7 @@ macro_rules! message_classes {
         fn message_object(py: Python<'_>, message: model::TuningMessage) -> PyResult<Py<PyAny>> {
             match message {
                 $(model::TuningMessage::$name(value) => Ok(Py::new(py,
-                    PyClassInitializer::from(Message).add_subclass($name { value }))?.into_any())),*
+                    PyClassInitializer::from(Message::default()).add_subclass($name { value }))?.into_any())),*
             }
         }
         fn register_messages(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -590,6 +590,10 @@ pub(crate) fn replacement<'py>(
     fields: &[&str],
     changes: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    let mut metadata = object
+        .extract::<PyRef<'_, Message>>()
+        .ok()
+        .map(|m| m.metadata());
     let values = PyDict::new(object.py());
     for field in fields {
         values.set_item(*field, object.getattr(*field)?)?;
@@ -597,13 +601,38 @@ pub(crate) fn replacement<'py>(
     if let Some(changes) = changes {
         for (name, value) in changes {
             let name = name.extract::<String>()?;
+            if let Some(metadata) = &mut metadata {
+                match name.as_str() {
+                    "timestamp" => {
+                        metadata.timestamp = value
+                            .extract::<Option<PyRef<'_, crate::event_values::Timestamp>>>()?
+                            .map(|v| v.value.clone());
+                        continue;
+                    }
+                    "stream" => {
+                        metadata.stream = value.extract()?;
+                        continue;
+                    }
+                    "span" => {
+                        metadata.span = value
+                            .extract::<Option<PyRef<'_, crate::event_values::SourceSpan>>>()?
+                            .map(|v| v.value.clone());
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
             if !fields.contains(&name.as_str()) {
                 return Err(PyTypeError::new_err(format!("unknown field: {name}")));
             }
             values.set_item(name, value)?;
         }
     }
-    object.get_type().call((), Some(&values))
+    let result = object.get_type().call((), Some(&values))?;
+    if let Some(metadata) = metadata {
+        result.extract::<PyRef<'_, Message>>()?.attach(metadata)?;
+    }
+    Ok(result)
 }
 
 pub(crate) fn decoded_object(py: Python<'_>, value: model::Decoded) -> PyResult<Py<PyAny>> {

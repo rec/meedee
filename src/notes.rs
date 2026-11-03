@@ -26,7 +26,7 @@ impl Tracker {
         })
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let Ok(e) = item.extract::<PyRef<'_, crate::event_values::Event>>() {
+        if let Ok(e) = crate::event_values::extract(&item) {
             if e.value.stream != self.stream {
                 return Err(PyValueError::new_err("tracker belongs to one source"));
             }
@@ -45,7 +45,7 @@ impl Tracker {
             }
             self.value.boundary(&self.stream, self.detail_limit);
         } else {
-            return Err(PyTypeError::new_err("expected Event or StreamDiagnostic"));
+            return Err(PyTypeError::new_err("expected Message or StreamDiagnostic"));
         }
         Ok(())
     }

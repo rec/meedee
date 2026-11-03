@@ -26,11 +26,9 @@ def packet(
     )
 
 
-def event(ticks: int) -> events.Event:
-    return events.Event(
-        stream="s",
-        timestamp=events.Timestamp(ticks=ticks, clock=clock()),
-        message=messages.NoteOn(channel=1, note=60, velocity=100),
+def event(ticks: int) -> messages.Message:
+    return (messages.NoteOn(channel=1, note=60, velocity=100)).replace(
+        stream="s", timestamp=events.Timestamp(ticks=ticks, clock=clock())
     )
 
 
@@ -42,10 +40,10 @@ def test_native_packet_spans_use_completion_time_without_realtime_contamination(
     result = decoder.feed(packet(b"\xf8\x64\x3d\x65", 1, 20))
     assert len(result) == 3
     first, note, running = result
-    assert isinstance(first, events.Event) and first.span is not None
+    assert isinstance(first, messages.Message) and first.span is not None
     assert first.span.first_packet == first.span.last_packet == 1
     assert (
-        isinstance(note, events.Event)
+        isinstance(note, messages.Message)
         and note.timestamp is not None
         and note.span is not None
     )
@@ -55,7 +53,7 @@ def test_native_packet_spans_use_completion_time_without_realtime_contamination(
     )
     assert (note.span.first_packet, note.span.last_packet) == (0, 1)
     assert (
-        isinstance(running, events.Event)
+        isinstance(running, messages.Message)
         and running.span is not None
         and running.span.first_packet == 1
     )
@@ -67,19 +65,17 @@ def test_native_packet_spans_use_completion_time_without_realtime_contamination(
         and lost[0].kind == "loss"
         and lost[0].lost == 1
     )
-    assert not any(isinstance(v, events.Event) for v in lost)
+    assert not any(isinstance(v, messages.Message) for v in lost)
 
 
 def test_ump_framing_and_typed_send_never_downgrade_or_send_opaque_values() -> None:
     decoder = events.PacketDecoder(stream="u", protocol=midi.Protocol.Ump)
     assert decoder.feed(packet(midi.UmpPacket(words=(0x40903C00,)), 0, 1)) == []
     value = decoder.feed(packet(midi.UmpPacket(words=(0xFFFF0000,)), 1, 2))[0]
-    assert isinstance(value, events.Event) and isinstance(
-        value.message, ump.Midi2NoteOn
-    )
+    assert isinstance(value, messages.Message) and isinstance(value, ump.Midi2NoteOn)
     assert value.span is not None and value.span.first_packet == 0
     with pytest.raises(midi.CapabilityError):
-        _native.prepare_output(midi.Protocol.Midi1, value.message)
+        _native.prepare_output(midi.Protocol.Midi1, value)
     opaque = ump.decode((0x60000000,), preserve_unknown=True)
     with pytest.raises(midi.CapabilityError, match="opaque"):
         _native.prepare_output(midi.Protocol.Ump, opaque)
@@ -236,14 +232,14 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
     callback = callbacks[0]
     callback(packet(b"\x90\x3c\x64", 0, 1))
     value = receiver.receive(timeout=0)
-    assert isinstance(value, events.Event) and value.message == event(1).message
+    assert isinstance(value, messages.Message) and value == event(1)
     connection.dropped_packets = int(lost)
     report = receiver.stop_recording()
     assert report.complete is not lost
     receiver.close()
     reader = archive.Reader(path, recover=lost)
     values = list(reader)
-    assert len([v for v in values if isinstance(v, events.Event)]) == 1
+    assert len([v for v in values if isinstance(v, messages.Message)]) == 1
     assert reader.complete is not lost
     reader.close()
 
@@ -305,8 +301,8 @@ def test_unified_input_delivers_decoded_messages_or_unchanged_packets(
         else:
             assert len(observed) == 1
             message = observed[0]
-            assert isinstance(message, events.Event)
-            assert message.message == messages.SysEx(b"\x7d\x01\x02")
+            assert isinstance(message, messages.Message)
+            assert message == messages.SysEx(b"\x7d\x01\x02")
             assert message.timestamp is not None and message.timestamp.ticks == 200
     assert receiver.closed
 
@@ -467,7 +463,7 @@ def test_raw_input_rejects_channel_selection() -> None:
 def test_channel_selection_applies_to_callbacks_and_recordings(
     iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
 ) -> None:
-    observed: list[events.Event | events.StreamDiagnostic] = []
+    observed: list[messages.Message | events.StreamDiagnostic] = []
     client = midi.Input(channel=[1], isolated=False)
     path = tmp_path / "selected.meedee"
     with client.connect(client.ports()[0], observed.append) as receiver:
@@ -475,13 +471,13 @@ def test_channel_selection_applies_to_callbacks_and_recordings(
         iterable_input[0](packet(b"\x91\x3d\x64\x90\x3e\x64\xf8", 1, 2))
         report = receiver.stop_recording()
     assert report.complete
-    assert [i.message for i in observed if isinstance(i, events.Event)] == [
+    assert [i for i in observed if isinstance(i, messages.Message)] == [
         messages.NoteOn(60, 100, 1),
         messages.NoteOn(62, 100, 1),
     ]
     reader = archive.Reader(path)
     try:
-        assert [i.message for i in reader if isinstance(i, events.Event)] == [
+        assert [i for i in reader if isinstance(i, messages.Message)] == [
             messages.NoteOn(62, 100, 1)
         ]
     finally:
@@ -494,7 +490,7 @@ def test_record_returns_memory_capture_and_file_round_trip(
     path = tmp_path / "rec.meedee"
     client = midi.Input(isolated=False)
     records = client.record(0, output=path)
-    assert [r.message for r in records if isinstance(r, events.Event)] == [
+    assert [r for r in records if isinstance(r, messages.Message)] == [
         messages.NoteOn(60, 100, 1)
     ]
     original = path.read_bytes()
@@ -504,7 +500,7 @@ def test_record_returns_memory_capture_and_file_round_trip(
     client.record("0 seconds", output=path, overwrite=True)
     reader = archive.Reader(path)
     try:
-        assert [r.message for r in reader if isinstance(r, events.Event)] == [
+        assert [r for r in reader if isinstance(r, messages.Message)] == [
             messages.NoteOn(60, 100, 1)
         ]
         assert reader.complete
@@ -551,7 +547,7 @@ def test_record_uses_duration_deadline_and_retains_terminal_failure(
     ticks = iter([100.0, 100.0, 100.0, 110.0])
     monkeypatch.setattr(_clients, "monotonic", lambda: next(ticks, 110.0))
     records = midi.Input(isolated=False).record(10)
-    assert len([r for r in records if isinstance(r, events.Event)]) == 1
+    assert len([r for r in records if isinstance(r, messages.Message)]) == 1
 
     def failed_receive(self: midi.InputConnection, *, timeout: float) -> None:
         raise midi.ResourceError("capture overflow")

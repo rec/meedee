@@ -14,15 +14,11 @@ def capture(*, complete: bool = True, opaque: bool = False) -> bytes:
     clock = events.Clock(identity="native", origin="test")
     writer.write(clock)
     writer.write(archive.Stream(id="keys", label="Keyboard", clock_identity="native"))
-    writer.write(events.Event(stream="keys", message=messages.TimingClock()))
+    writer.write((messages.TimingClock()).replace(stream="keys"))
     writer.write(
-        events.Event(
-            stream="keys",
-            timestamp=events.Timestamp(ticks=-1, clock=clock),
-            message=ump.Midi2ControlChange(
-                group=16, channel=16, controller=7, value=0xFEDCBA98
-            ),
-        )
+        (
+            ump.Midi2ControlChange(group=16, channel=16, controller=7, value=0xFEDCBA98)
+        ).replace(stream="keys", timestamp=events.Timestamp(ticks=-1, clock=clock))
     )
     writer.write(archive.Gap(stream="keys", lost=3, reason="queue overflow"))
     writer.write(archive.Discontinuity(stream="keys", reason="reset"))
@@ -176,18 +172,15 @@ def test_timing_segments_preserve_exact_ranges_and_reset_after_loss() -> None:
     writer.write(archive.Stream(id="s", label="", clock_identity="c"))
     for t in [5, 3, None]:
         writer.write(
-            events.Event(
+            (messages.TimingClock()).replace(
                 stream="s",
-                message=messages.TimingClock(),
                 timestamp=None if t is None else events.Timestamp(ticks=t, clock=clock),
             )
         )
     writer.write(archive.Gap(stream="s", lost=1, reason="loss"))
     writer.write(
-        events.Event(
-            stream="s",
-            message=messages.TimingClock(),
-            timestamp=events.Timestamp(ticks=-100, clock=clock),
+        (messages.TimingClock()).replace(
+            stream="s", timestamp=events.Timestamp(ticks=-100, clock=clock)
         )
     )
     writer.finish()
