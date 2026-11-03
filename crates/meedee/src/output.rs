@@ -1,7 +1,7 @@
 //! Convenient caller-thread output with exact sequence timing and scoped cleanup.
 use crate::codecs::{DecodeItem, Decoder};
 use crate::events::{Payload, Rational};
-use crate::messages::{self, AnyCommand, AnyMessage, Command, PrimitiveMessage};
+use crate::messages::{self, AnyCommand, AnyMessage, Command, Message, PrimitiveMessage};
 use crate::playback::{Cancellation, MonotonicClock, PlaybackClock};
 use crate::transport::{self, Packet, Port, Protocol};
 use crate::{Beats, Note, NoteDuration, Rest};
@@ -132,6 +132,70 @@ impl Output {
     pub fn send_all(&mut self, values: impl IntoIterator<Item = OutputValue>) -> io::Result<()> {
         let plan = self.prepare(values)?;
         self.execute(plan)
+    }
+    /// Replay a recording or archive reader using the first message as time zero.
+    /// Clock/stream declarations and metadata do not send traffic. Loss markers,
+    /// unknown records, timestamp regressions and unrelated clocks stop replay.
+    /// The failure report counts successfully sent messages before the failure.
+    /// This output stays open; its normal close/Drop cleanup policy applies.
+    /// Fractional nanosecond deadlines require the lower-level playback API's
+    /// explicit rounding option, as do clock mappings and cancellation.
+    ///
+    /// ```no_run
+    /// use meedee::{Output, Reader};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let report = Output::new().play(Reader::open("rec.meedee")?)?;
+    /// println!("{report:?}");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn play(
+        &mut self,
+        source: impl IntoIterator<Item = io::Result<crate::archive::Record>>,
+    ) -> Result<crate::playback::Report, crate::playback::Failure<io::Error>> {
+        use crate::playback::{Cause, Failure, Planner, Report};
+        let input_error = |error| Failure {
+            report: Report::default(),
+            cause: Cause::Input(error),
+        };
+        if self.closed {
+            return Err(input_error(io::Error::new(
+                io::ErrorKind::NotConnected,
+                "output is closed",
+            )));
+        }
+        let mut messages = source.into_iter().filter_map(replay_message);
+        let Some(first) = messages.next() else {
+            return Ok(Report::default());
+        };
+        let first = first.map_err(input_error)?;
+        let origin = first
+            .timestamp()
+            .cloned()
+            .ok_or_else(|| input_error(invalid("playback requires a timestamp")))?;
+        let planner = Planner::new(origin, Vec::new(), false).map_err(input_error)?;
+        self.prepare_message(first.clone()).map_err(input_error)?;
+        self.open().map_err(|error| Failure {
+            report: Report::default(),
+            cause: Cause::Send(error),
+        })?;
+        // The scheduler uses deadlines relative to replay start, independent of
+        // earlier sends on this output and time spent opening the native port.
+        let mut clock = std::mem::replace(&mut self.clock, Box::new(MonotonicClock::default()));
+        let origin = clock.now_ns();
+        let result = crate::playback::play(
+            std::iter::once(Ok(first)).chain(messages),
+            planner,
+            &mut ReplayClock {
+                clock: clock.as_mut(),
+                origin,
+            },
+            &Cancellation::default(),
+            |message| self.transmit(self.prepare_message(message.clone())?),
+            false,
+        );
+        self.clock = clock;
+        result
     }
     /// Cleanup covers held note counts, pitch bend, CC1/64/66/67 and channel/poly
     /// pressure changed by confirmed sends. Other controller/program state is
@@ -344,6 +408,35 @@ enum Prepared {
         command: AnyCommand,
         packets: Vec<Vec<u8>>,
     },
+}
+struct ReplayClock<'a> {
+    clock: &'a mut dyn PlaybackClock,
+    origin: u64,
+}
+impl PlaybackClock for ReplayClock<'_> {
+    fn now_ns(&mut self) -> u64 {
+        self.clock.now_ns().saturating_sub(self.origin)
+    }
+    fn wait_until(&mut self, deadline: u64, cancel: &Cancellation) -> io::Result<bool> {
+        let absolute = self
+            .origin
+            .checked_add(deadline)
+            .ok_or_else(|| invalid("playback deadline overflow"))?;
+        self.clock.wait_until(absolute, cancel)
+    }
+}
+fn replay_message(record: io::Result<crate::archive::Record>) -> Option<io::Result<Payload>> {
+    use crate::archive::Record;
+    match record {
+        Ok(Record::Event(message)) => Some(Ok(*message)),
+        Ok(Record::Clock(_) | Record::Stream { .. } | Record::Metadata { .. }) => None,
+        Ok(Record::Gap { .. }) => Some(Err(invalid("cannot replay across input loss"))),
+        Ok(Record::Discontinuity { .. }) => {
+            Some(Err(invalid("cannot replay across a discontinuity")))
+        }
+        Ok(Record::Opaque { .. }) => Some(Err(invalid("cannot replay an unknown archive record"))),
+        Err(error) => Some(Err(error)),
+    }
 }
 enum Connection {
     Native(transport::OutputConnection),
@@ -729,6 +822,117 @@ mod tests {
     }
     fn bytes(values: &[&[u8]]) -> Vec<Packet> {
         values.iter().map(|v| Packet::Bytes(v.to_vec())).collect()
+    }
+
+    fn recorded(ticks: i64, note: u8) -> crate::archive::Record {
+        let clock =
+            crate::events::Clock::new("test".into(), 1, 1_000_000_000, "capture".into(), None)
+                .unwrap();
+        let message = messages::NoteOn::new(note.into())
+            .unwrap()
+            .with_channel(1)
+            .unwrap()
+            .with_timestamp(crate::events::Timestamp { ticks, clock })
+            .unwrap()
+            .with_source("input")
+            .unwrap();
+        crate::archive::Record::Event(Box::new(Payload::Midi1(AnyMessage::NoteOn(message))))
+    }
+
+    #[test]
+    fn replay_uses_first_message_as_origin_after_previous_output_activity() {
+        let mut f = Fixture::new();
+        f.output.send(Duration::from_secs(2)).unwrap();
+        let report = f
+            .output
+            .play([
+                Ok(recorded(9_000_000_000, 60)),
+                Ok(recorded(9_500_000_000, 62)),
+            ])
+            .unwrap();
+        assert_eq!(report.sent_events, 2);
+        assert_eq!(report.max_lateness_ns, 0);
+        assert_eq!(
+            *f.deadlines.borrow(),
+            [2_000_000_000, 2_000_000_000, 2_500_000_000]
+        );
+        assert_eq!(f.packets(), bytes(&[&[0x90, 60, 90], &[0x90, 62, 90]]));
+        f.output.close().unwrap();
+        assert_eq!(f.packets(), bytes(&[&[0x80, 60, 0], &[0x80, 62, 0]]));
+    }
+
+    #[test]
+    fn replay_stops_at_loss_or_regression_and_reports_confirmed_prefix() {
+        let mut f = Fixture::new();
+        let failure = f
+            .output
+            .play([
+                Ok(recorded(100, 60)),
+                Ok(crate::archive::Record::Gap {
+                    stream: "input".into(),
+                    lost: 1,
+                    reason: "test".into(),
+                }),
+                Ok(recorded(200, 62)),
+            ])
+            .unwrap_err();
+        assert_eq!(failure.report.sent_events, 1);
+        assert!(matches!(failure.cause, crate::playback::Cause::Input(_)));
+        assert_eq!(f.packets(), bytes(&[&[0x90, 60, 90]]));
+        let failure = f
+            .output
+            .play([Ok(recorded(200, 64)), Ok(recorded(100, 65))])
+            .unwrap_err();
+        assert_eq!(failure.report.sent_events, 1);
+        assert_eq!(f.packets(), bytes(&[&[0x90, 64, 90]]));
+    }
+
+    #[test]
+    fn replay_accepts_a_strict_archive_reader_and_detects_missing_trailer() {
+        use crate::archive::{Reader, Record, Writer};
+        let first = recorded(100, 60);
+        let Record::Event(message) = &first else {
+            unreachable!()
+        };
+        let clock = message.timestamp().unwrap().clock.clone();
+        let mut data = Vec::new();
+        {
+            let mut writer = Writer::new(&mut data, 1024).unwrap();
+            writer.write(&Record::Clock(clock)).unwrap();
+            writer
+                .write(&Record::Stream {
+                    id: "input".into(),
+                    label: "keyboard".into(),
+                    clock_identity: Some("test".into()),
+                })
+                .unwrap();
+            writer.write(&first).unwrap();
+            writer.finish(true, "").unwrap();
+        }
+        let mut f = Fixture::new();
+        assert_eq!(
+            f.output
+                .play(Reader::new(data.as_slice(), 1024, false, false).unwrap())
+                .unwrap()
+                .sent_events,
+            1
+        );
+        data.pop();
+        let failure = f
+            .output
+            .play(Reader::new(data.as_slice(), 1024, false, false).unwrap())
+            .unwrap_err();
+        assert_eq!(failure.report.sent_events, 1);
+        assert!(matches!(failure.cause, crate::playback::Cause::Input(_)));
+    }
+
+    #[test]
+    fn empty_replay_and_invalid_first_record_do_not_open_ports() {
+        let mut output = Output::new();
+        assert_eq!(output.play([]).unwrap().sent_events, 0);
+        assert!(output.play([Err(invalid("bad capture"))]).is_err());
+        assert!(output.client.is_none());
+        assert!(output.connection.is_none());
     }
 
     #[test]

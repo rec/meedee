@@ -79,5 +79,12 @@ Additional work beyond the prompt: None.
   and closes even when cleanup fails. Device-free tests cover timing, channels,
   partial compound sends, cleanup failures and UMP protocol boundaries. The output
   doctest compiles without opening devices.
-- Ergonomic Input, recording/playback integration and graded examples remain
+- Output::play now accepts archive record iterators, including Reader directly,
+  infers the first message's time origin, and reuses the playback scheduler.
+  Replay rejects loss/discontinuity/unknown records, unrelated clocks, regressions
+  and implicit rounding; failures retain confirmed progress. Reader::open supplies
+  strict defaults for a file path. Replay tests cover prior output activity,
+  malformed archive completion, loss, regression and empty input without opening
+  ports. A file-replay doctest compiles without running native transport.
+- Ergonomic Input, recording integration and graded examples remain
   pending. Full goal completion is not established.

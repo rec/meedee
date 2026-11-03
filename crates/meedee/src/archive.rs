@@ -935,6 +935,18 @@ pub struct Reader<R> {
     pub complete: bool,
     pub problem: Option<String>,
 }
+impl Reader<std::io::BufReader<std::fs::File>> {
+    /// Open a strict archive reader with the default 1 MiB record payload limit.
+    /// Dropping the reader closes the file. Use `new` for custom limits/streams.
+    pub fn open(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Self::new(
+            std::io::BufReader::new(std::fs::File::open(path)?),
+            1_048_576,
+            false,
+            false,
+        )
+    }
+}
 impl<R: Read> Reader<R> {
     pub fn new(inner: R, limit: usize, recover: bool, preserve: bool) -> io::Result<Self> {
         let mut source = Source::new(inner, limit)?;

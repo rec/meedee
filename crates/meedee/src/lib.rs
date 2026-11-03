@@ -41,4 +41,5 @@ mod sequence;
 pub use sequence::{Beats, Note, NoteDuration, Rest};
 
 mod output;
+pub use archive::Reader;
 pub use output::{Output, OutputValue};
