@@ -118,6 +118,14 @@ pub struct Rational {
     numerator: i128,
     denominator: i128,
 }
+impl From<i32> for Rational {
+    fn from(value: i32) -> Self {
+        Self {
+            numerator: value.into(),
+            denominator: 1,
+        }
+    }
+}
 impl Rational {
     pub fn new(numerator: i128, denominator: i128) -> io::Result<Self> {
         if denominator <= 0 {

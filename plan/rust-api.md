@@ -70,6 +70,14 @@ Additional work beyond the prompt: None.
   Verification: 123 Rust tests plus one doctest, core Clippy with warnings denied,
   independent archive byte fixtures, and 525 Python regressions pass after the
   extension rebuild. Two native-device tests remain ignored.
-- Ergonomic Input/Output, scheduling,
-  recording/playback integration, cleanup integration and graded examples remain
+- Added root-level Output with lazy first-port discovery, unique name matching,
+  explicit channel override, direct message/command/packet sending and heterogeneous
+  send_all sequences. Duration remains elapsed time; Beats requires output tempo.
+  Cumulative rational deadlines use the existing cancellable monotonic clock.
+  Complete sequence validation precedes sending. Drop releases confirmed MIDI 1
+  note counts and the agreed changed-state set; explicit close reports failures
+  and closes even when cleanup fails. Device-free tests cover timing, channels,
+  partial compound sends, cleanup failures and UMP protocol boundaries. The output
+  doctest compiles without opening devices.
+- Ergonomic Input, recording/playback integration and graded examples remain
   pending. Full goal completion is not established.

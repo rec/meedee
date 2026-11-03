@@ -39,3 +39,6 @@ pub mod syx;
 
 mod sequence;
 pub use sequence::{Beats, Note, NoteDuration, Rest};
+
+mod output;
+pub use output::{Output, OutputValue};
