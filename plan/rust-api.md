@@ -57,6 +57,15 @@ Additional work beyond the prompt: None.
   tests pass (two native-device tests ignored), as do the Rust constructor doctest,
   core Clippy with warnings denied, and all 525 Python regressions after rebuilding
   the extension. The bindings now use the core optional channel directly.
-- Message metadata migration, ergonomic Input/Output, scheduling,
+- Rust message values now carry optional timestamp/source/span metadata through
+  the common Message trait, across MIDI 1, UMP, SysEx and device-management types.
+  Builders and clamped note transposition preserve it. Equality/hash use only
+  musical payload fields; expansion copies command provenance onto primitives.
+  The public Event wrapper and its live/archive consumers still require migration
+  to these metadata-bearing values; Python's existing metadata bridge also needs
+  integration before this part is complete. Verification: 121 Rust tests plus the
+  constructor/metadata doctest, core Clippy with warnings denied, and all 525 Python
+  tests pass after rebuilding the extension. Native-device tests remain ignored.
+- Event removal/integration, ergonomic Input/Output, scheduling,
   recording/playback integration, cleanup integration and graded examples remain
   pending. Full goal completion is not established.

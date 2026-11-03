@@ -2,11 +2,15 @@
 //!
 //! Constructors take the essential payload and leave the channel unassigned.
 //! Builders validate their values; encoding requires a channel to be assigned.
+//! The `Message` trait also exposes optional timestamp, source and packet-span
+//! metadata. Builders and note transposition retain it; equality, hashing and
+//! wire encoding ignore it.
 //!
 //! ```
-//! use meedee::messages::{NoteOn, PrimitiveMessage, ValueError};
+//! use meedee::messages::{Message, NoteOn, PrimitiveMessage, ValueError};
 //!
-//! let note = NoteOn::new(60)?.with_velocity(70)?.with_channel(2)?;
+//! let note = NoteOn::new(60)?.with_velocity(70)?.with_channel(2)?
+//!     .with_source("keyboard")?;
 //! println!("{:?}", note.transpose(12).encode()?);
 //! # Ok::<(), ValueError>(())
 //! ```
@@ -14,8 +18,119 @@
 use std::error::Error;
 use std::fmt;
 
+/// Optional provenance. It does not affect message equality, hashing or encoding.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Metadata {
+    pub timestamp: Option<crate::events::Timestamp>,
+    pub source: Option<String>,
+    pub span: Option<crate::events::Span>,
+}
+impl Metadata {
+    pub fn validate(&self) -> Result<(), ValueError> {
+        if self.source.as_ref().is_some_and(|s| s.is_empty()) {
+            return Err(ValueError("empty source identity".into()));
+        }
+        if self
+            .timestamp
+            .as_ref()
+            .is_some_and(|t| t.clock.mode() == Some(false))
+        {
+            return Err(ValueError("disabled clock cannot have a timestamp".into()));
+        }
+        if let Some(span) = &self.span {
+            span.validate(self.timestamp.as_ref())
+                .map_err(|e| ValueError(e.to_string()))?;
+        }
+        Ok(())
+    }
+}
+
 /// Common immutable musical value, primitive message or compound command.
-pub trait Message: fmt::Debug {}
+/// Metadata describes an occurrence; equality and hashing describe its MIDI value.
+pub trait Message: fmt::Debug {
+    fn metadata(&self) -> Option<&Metadata>;
+    fn with_metadata(self, metadata: Metadata) -> Result<Self, ValueError>
+    where
+        Self: Sized;
+    fn without_metadata(self) -> Self
+    where
+        Self: Sized;
+
+    fn timestamp(&self) -> Option<&crate::events::Timestamp> {
+        self.metadata().and_then(|m| m.timestamp.as_ref())
+    }
+    fn source(&self) -> Option<&str> {
+        self.metadata().and_then(|m| m.source.as_deref())
+    }
+    fn span(&self) -> Option<&crate::events::Span> {
+        self.metadata().and_then(|m| m.span.as_ref())
+    }
+    fn with_timestamp(self, timestamp: crate::events::Timestamp) -> Result<Self, ValueError>
+    where
+        Self: Sized,
+    {
+        let mut metadata = self.metadata().cloned().unwrap_or_default();
+        metadata.timestamp = Some(timestamp);
+        self.with_metadata(metadata)
+    }
+    fn with_source(self, source: impl Into<String>) -> Result<Self, ValueError>
+    where
+        Self: Sized,
+    {
+        let mut metadata = self.metadata().cloned().unwrap_or_default();
+        metadata.source = Some(source.into());
+        self.with_metadata(metadata)
+    }
+    fn with_span(self, span: crate::events::Span) -> Result<Self, ValueError>
+    where
+        Self: Sized,
+    {
+        let mut metadata = self.metadata().cloned().unwrap_or_default();
+        metadata.span = Some(span);
+        self.with_metadata(metadata)
+    }
+}
+
+macro_rules! value_metadata {
+    ($name:ident { $($field:ident),* $(,)? }) => {
+        impl crate::messages::Message for $name {
+            fn metadata(&self) -> Option<&crate::messages::Metadata> { self.metadata.as_deref() }
+            fn with_metadata(mut self, metadata: crate::messages::Metadata) -> Result<Self, crate::messages::ValueError> {
+                metadata.validate()?;
+                self.metadata = Some(Box::new(metadata));
+                Ok(self)
+            }
+            fn without_metadata(mut self) -> Self { self.metadata = None; self }
+        }
+        impl PartialEq for $name {
+            fn eq(&self, _other: &Self) -> bool { true $(&& self.$field == _other.$field)* }
+        }
+        impl Eq for $name {}
+        impl std::hash::Hash for $name {
+            fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
+                $(std::hash::Hash::hash(&self.$field, _state);)*
+            }
+        }
+    };
+}
+pub(crate) use value_metadata;
+
+macro_rules! enum_metadata {
+    ($name:ident { $($variant:ident),* $(,)? }) => {
+        impl crate::messages::Message for $name {
+            fn metadata(&self) -> Option<&crate::messages::Metadata> {
+                match self { $(Self::$variant(v) => crate::messages::Message::metadata(v)),* }
+            }
+            fn with_metadata(self, metadata: crate::messages::Metadata) -> Result<Self, crate::messages::ValueError> {
+                match self { $(Self::$variant(v) => Ok(Self::$variant(crate::messages::Message::with_metadata(v, metadata)?))),* }
+            }
+            fn without_metadata(self) -> Self {
+                match self { $(Self::$variant(v) => Self::$variant(crate::messages::Message::without_metadata(v))),* }
+            }
+        }
+    };
+}
+pub(crate) use enum_metadata;
 
 pub trait PrimitiveMessage: Message {
     /// Encode one complete message, always including its status byte.
@@ -30,12 +145,12 @@ pub trait Command: Message {
 macro_rules! channel_messages {
     ($($name:ident ($($arg:ident),*) { $($field:ident: $ty:ty => $setter:ident = $low:literal ..= $high:literal => $initial:expr),* };)*) => {
         $(
-            #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-            pub struct $name { channel: Option<u8>, $($field: $ty),* }
-            impl Message for $name {}
+            #[derive(Clone, Debug)]
+            pub struct $name { metadata: Option<Box<Metadata>>, channel: Option<u8>, $($field: $ty),* }
+            value_metadata!($name { channel, $($field),* });
             impl $name {
                 pub fn new($($arg: i64),*) -> Result<Self, ValueError> {
-                    let result = Self { channel: None, $($field: bounded($initial, stringify!($field), $low, $high)? as $ty),* };
+                    let result = Self { metadata: None, channel: None, $($field: bounded($initial, stringify!($field), $low, $high)? as $ty),* };
                     check_parameter!($name, result)?;
                     Ok(result)
                 }
@@ -98,12 +213,12 @@ transpose_note!(NoteOn, NoteOff);
 
 macro_rules! system_messages {
     ($($name:ident { $($field:ident: $ty:ty = $low:literal ..= $high:literal),* };)*) => {
-        $(#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-        pub struct $name { $($field: $ty),* }
-        impl Message for $name {}
+        $(#[derive(Clone, Debug)]
+        pub struct $name { metadata: Option<Box<Metadata>>, $($field: $ty),* }
+        value_metadata!($name { $($field),* });
         impl $name {
             pub fn new($($field: i64),*) -> Result<Self, ValueError> {
-                Ok(Self { $($field: bounded($field, stringify!($field), $low, $high)? as $ty),* })
+                Ok(Self { metadata: None, $($field: bounded($field, stringify!($field), $low, $high)? as $ty),* })
             }
             $(pub fn $field(&self) -> $ty { self.$field })*
         })*
@@ -137,7 +252,26 @@ pub enum AnyMessage {
     SystemReset(SystemReset),
     SysEx(SysEx),
 }
-impl Message for AnyMessage {}
+enum_metadata!(AnyMessage {
+    NoteOn,
+    NoteOff,
+    PolyPressure,
+    ControlChange,
+    ProgramChange,
+    ChannelPressure,
+    PitchBend,
+    QuarterFrame,
+    SongPosition,
+    SongSelect,
+    TuneRequest,
+    TimingClock,
+    Start,
+    Continue,
+    Stop,
+    ActiveSensing,
+    SystemReset,
+    SysEx
+});
 impl AnyMessage {
     /// Encoded byte count, independent of channel assignment.
     pub fn encoded_len(&self) -> usize {
@@ -159,11 +293,12 @@ impl AnyMessage {
 }
 
 /// Seven-bit SysEx payload, without the F0/F7 framing bytes.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct SysEx {
+    metadata: Option<Box<crate::messages::Metadata>>,
     data: Box<[u8]>,
 }
-impl Message for SysEx {}
+crate::messages::value_metadata!(SysEx { data });
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AnyCommand {
@@ -177,7 +312,17 @@ pub enum AnyCommand {
     BankProgramSelect(crate::gm::BankProgramSelect),
     ZoneConfiguration(crate::mpe::ZoneConfiguration),
 }
-impl Message for AnyCommand {}
+enum_metadata!(AnyCommand {
+    ControlChange14,
+    RpnSet,
+    NrpnSet,
+    RpnIncrement,
+    RpnDecrement,
+    NrpnIncrement,
+    NrpnDecrement,
+    BankProgramSelect,
+    ZoneConfiguration
+});
 
 fn validate_resolution(value: i64, resolution: i64) -> Result<(), ValueError> {
     if resolution != 7 && resolution != 14 {
@@ -193,6 +338,7 @@ impl SysEx {
             return Err(ValueError("SysEx payload bytes must be in 0..=127".into()));
         }
         Ok(Self {
+            metadata: None,
             data: data.into_boxed_slice(),
         })
     }
@@ -224,6 +370,21 @@ fn bounded(value: i64, field: &str, low: i64, high: i64) -> Result<i64, ValueErr
         return Err(ValueError(format!("{field} must be in {low}..={high}")));
     }
     Ok(value)
+}
+
+/// Preserve occurrence information when one value expands into several messages.
+pub(crate) fn inherit_metadata<M: Message>(
+    source: &(impl Message + ?Sized),
+    messages: Vec<M>,
+) -> Result<Vec<M>, ValueError> {
+    if let Some(metadata) = source.metadata() {
+        messages
+            .into_iter()
+            .map(|m| m.with_metadata(metadata.clone()))
+            .collect()
+    } else {
+        Ok(messages)
+    }
 }
 
 #[cfg(test)]

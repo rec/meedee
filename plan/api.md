@@ -253,7 +253,11 @@ including after NRPN operations. No selector caching or NRPN-null convention is
 introduced. Generic values represent raw data bits, not profile-specific physical
 units. Increment/decrement has no amount field or guessed absolute value.
 
-Rust `Message` is now the common marker trait. The existing encoding method
+Rust `Message` is the common metadata-bearing trait. Its optional `Metadata`
+contains timestamp, source identity and packet span; `with_metadata`,
+`with_timestamp`, `with_source` and `with_span` validate replacements, while
+`without_metadata` clears provenance. MIDI builders and transposition preserve
+metadata; message equality, hashing and wire encoding ignore it. The existing encoding method
 moves to `PrimitiveMessage: Message`; method-style encoding callers import that
 subtrait. Both method and free `codecs::encode` return a checked Result and
 reject an unassigned channel. MIDI 1 constructors leave channels unassigned;

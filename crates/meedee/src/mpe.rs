@@ -1,8 +1,9 @@
 //! Pure MPE zone configuration, explicit allocation and bounded channel tracking.
-use crate::messages::{AnyMessage, Command, Message, RpnSet, ValueError};
+use crate::messages::{AnyMessage, Command, RpnSet, ValueError};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ZoneConfiguration {
+    metadata: Option<Box<crate::messages::Metadata>>,
     manager_channel: u8,
     members: u8,
 }
@@ -15,6 +16,7 @@ impl ZoneConfiguration {
             return Err(ValueError("members must be in 0..=15".into()));
         }
         Ok(Self {
+            metadata: None,
             manager_channel: manager_channel as u8,
             members: members as u8,
         })
@@ -26,14 +28,20 @@ impl ZoneConfiguration {
         self.members
     }
 }
-impl Message for ZoneConfiguration {}
+crate::messages::value_metadata!(ZoneConfiguration {
+    manager_channel,
+    members
+});
 impl Command for ZoneConfiguration {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-        RpnSet::new(6, self.members.into())
-            .and_then(|m| m.with_resolution(7))
-            .and_then(|m| m.with_channel(self.manager_channel.into()))
-            .expect("validated MPE configuration fields")
-            .expand()
+        crate::messages::inherit_metadata(
+            self,
+            RpnSet::new(6, self.members.into())
+                .and_then(|m| m.with_resolution(7))
+                .and_then(|m| m.with_channel(self.manager_channel.into()))
+                .expect("validated MPE configuration fields")
+                .expand()?,
+        )
     }
 }
 

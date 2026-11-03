@@ -163,12 +163,22 @@ impl Decoder {
         // interpreting its effects on an instrument is outside the codec.
         if byte >= 0xf8 {
             let message = match byte {
-                0xf8 => Some(AnyMessage::TimingClock(TimingClock {})),
-                0xfa => Some(AnyMessage::Start(Start {})),
-                0xfb => Some(AnyMessage::Continue(Continue {})),
-                0xfc => Some(AnyMessage::Stop(Stop {})),
-                0xfe => Some(AnyMessage::ActiveSensing(ActiveSensing {})),
-                0xff => Some(AnyMessage::SystemReset(SystemReset {})),
+                0xf8 => Some(AnyMessage::TimingClock(
+                    TimingClock::new().expect("valid system message"),
+                )),
+                0xfa => Some(AnyMessage::Start(
+                    Start::new().expect("valid system message"),
+                )),
+                0xfb => Some(AnyMessage::Continue(
+                    Continue::new().expect("valid system message"),
+                )),
+                0xfc => Some(AnyMessage::Stop(Stop::new().expect("valid system message"))),
+                0xfe => Some(AnyMessage::ActiveSensing(
+                    ActiveSensing::new().expect("valid system message"),
+                )),
+                0xff => Some(AnyMessage::SystemReset(
+                    SystemReset::new().expect("valid system message"),
+                )),
                 _ => None,
             };
             if let Some(message) = message {
@@ -231,7 +241,9 @@ impl Decoder {
         match byte {
             0xf0 => self.sysex = SysExState::Collecting(Vec::new()),
             0xf4 | 0xf5 => self.report(output, DiagnosticKind::UndefinedStatus, Some(byte)),
-            0xf6 => output.push(DecodeItem::Message(AnyMessage::TuneRequest(TuneRequest {}))),
+            0xf6 => output.push(DecodeItem::Message(AnyMessage::TuneRequest(
+                TuneRequest::new().expect("valid system message"),
+            ))),
             0xf7 => self.report(output, DiagnosticKind::UnexpectedEnd, Some(byte)),
             _ => self.pending = Some(byte),
         }
@@ -361,21 +373,24 @@ fn parameter_command(channel: u8, parameter: u16, msb: u8, data: &[(u8, u8)]) ->
 
 impl Command for ControlChange14 {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-        Ok(vec![
-            cc(
-                self.resolved_channel()?,
-                self.controller(),
-                (self.value() >> 7) as u8,
-            ),
-            cc(
-                self.resolved_channel()?,
-                self.controller() + 32,
-                (self.value() & 127) as u8,
-            ),
-        ]
-        .into_iter()
-        .map(AnyMessage::ControlChange)
-        .collect())
+        inherit_metadata(
+            self,
+            vec![
+                cc(
+                    self.resolved_channel()?,
+                    self.controller(),
+                    (self.value() >> 7) as u8,
+                ),
+                cc(
+                    self.resolved_channel()?,
+                    self.controller() + 32,
+                    (self.value() & 127) as u8,
+                ),
+            ]
+            .into_iter()
+            .map(AnyMessage::ControlChange)
+            .collect(),
+        )
     }
 }
 
@@ -388,12 +403,12 @@ macro_rules! parameter_commands {
                 } else {
                     vec![(6, (self.value() >> 7) as u8), (38, (self.value() & 127) as u8)]
                 };
-                Ok(parameter_command(self.resolved_channel()?, self.parameter(), $selector, &data))
+                inherit_metadata(self, parameter_command(self.resolved_channel()?, self.parameter(), $selector, &data))
             }
         })*
         $(impl Command for $step {
             fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-                Ok(parameter_command(self.resolved_channel()?, self.parameter(), $family, &[($controller, 0)]))
+                inherit_metadata(self, parameter_command(self.resolved_channel()?, self.parameter(), $family, &[($controller, 0)]))
             }
         })*
         impl Command for AnyCommand {

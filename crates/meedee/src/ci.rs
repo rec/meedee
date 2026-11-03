@@ -1,5 +1,5 @@
 //! MIDI-CI 1.2.1 management messages. Profile/property rules are deliberately deferred.
-use crate::messages::{Message, PrimitiveMessage, SysEx, ValueError};
+use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 
 pub const BROADCAST_MUID: u32 = 0x0fff_ffff;
 pub const MAX_MUID: u32 = 0x0fff_feff;
@@ -207,8 +207,9 @@ pub enum Body {
     Ack(Notice),
     Nak(Option<Notice>),
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Management {
+    metadata: Option<Box<crate::messages::Metadata>>,
     header: Header,
     body: Body,
     extensions: Vec<u8>,
@@ -286,6 +287,7 @@ impl Management {
             ));
         }
         Ok(Self {
+            metadata: None,
             header,
             body,
             extensions,
@@ -316,7 +318,11 @@ impl Management {
         SysEx::new(bytes[1..bytes.len() - 1].to_vec()).expect("validated CI message")
     }
 }
-impl Message for Management {}
+crate::messages::value_metadata!(Management {
+    header,
+    body,
+    extensions
+});
 impl PrimitiveMessage for Management {
     fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![

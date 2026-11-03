@@ -1,6 +1,6 @@
 //! MIDI Tuning Standard (CA-020/CA-021/RP-020, RP-025/amd1).
 //! No transport, clocks, sleeping, or instrument operations occur here.
-use crate::messages::{Message, PrimitiveMessage, SysEx, ValueError};
+use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 
 const STEPS: f64 = 16384.0;
 const MAX_PITCH: u32 = 2_097_150; // 7F 7F 7F is not a frequency.
@@ -213,11 +213,12 @@ pub struct ScaleConversion {
 
 macro_rules! requests {
     ($($name:ident { $($field:ident),* };)*) => { $(
-        #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-        pub struct $name { device_id:u8, $($field:u8),* }
+        #[derive(Clone, Debug)]
+        pub struct $name { metadata: Option<Box<crate::messages::Metadata>>, device_id:u8, $($field:u8),* }
+        crate::messages::value_metadata!($name { device_id, $($field),* });
         impl $name {
             pub fn new(device_id:i64, $($field:i64),*) -> Result<Self,ValueError> {
-                Ok(Self {device_id:range(device_id,127,"device_id")? as u8, $($field:range($field,127,stringify!($field))? as u8),*})
+                Ok(Self {metadata: None, device_id:range(device_id,127,"device_id")? as u8, $($field:range($field,127,stringify!($field))? as u8),*})
             }
             pub fn device_id(&self)->u8 {self.device_id}
             $(pub fn $field(&self)->u8 {self.$field})*
@@ -228,12 +229,13 @@ requests! { BulkDumpRequest {program}; BankedDumpRequest {bank,program}; }
 
 macro_rules! dumps {
     ($($name:ident {$($extra:ident),*} $value:ident : $ty:ty;)*) => { $(
-        #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-        pub struct $name {device_id:u8, $($extra:u8,)* program:u8, name:String, $value:$ty}
+        #[derive(Clone, Debug)]
+        pub struct $name {metadata: Option<Box<crate::messages::Metadata>>, device_id:u8, $($extra:u8,)* program:u8, name:String, $value:$ty}
+        crate::messages::value_metadata!($name { device_id, $($extra,)* program, name, $value });
         impl $name {
             pub fn new(device_id:i64, $($extra:i64,)* program:i64, name:String, $value:$ty)->Result<Self,ValueError> {
                 if !name.is_ascii() || name.len()>16 {return Err(error("tuning name must be at most 16 ASCII characters"));}
-                Ok(Self {device_id:range(device_id,127,"device_id")? as u8,$($extra:range($extra,127,stringify!($extra))? as u8,)* program:range(program,127,"program")? as u8,name:format!("{name:<16}"),$value})
+                Ok(Self {metadata: None, device_id:range(device_id,127,"device_id")? as u8,$($extra:range($extra,127,stringify!($extra))? as u8,)* program:range(program,127,"program")? as u8,name:format!("{name:<16}"),$value})
             }
             pub fn device_id(&self)->u8 {self.device_id}
             $(pub fn $extra(&self)->u8 {self.$extra})*
@@ -248,8 +250,9 @@ dumps! {
     KeyBasedDump {bank} table:TuningTable;
     ScaleOctaveDump {bank} offsets:ScaleOffsets;
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct SingleNoteChange {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     program: u8,
     changes: Box<[NoteTuning]>,
@@ -258,6 +261,7 @@ impl SingleNoteChange {
     pub fn new(device_id: i64, program: i64, changes: Vec<NoteTuning>) -> Result<Self, ValueError> {
         check_changes(&changes)?;
         Ok(Self {
+            metadata: None,
             device_id: range(device_id, 127, "device_id")? as u8,
             program: range(program, 127, "program")? as u8,
             changes: changes.into_boxed_slice(),
@@ -273,8 +277,9 @@ impl SingleNoteChange {
         &self.changes
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct BankedNoteChange {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     bank: u8,
     program: u8,
@@ -291,6 +296,7 @@ impl BankedNoteChange {
     ) -> Result<Self, ValueError> {
         check_changes(&changes)?;
         Ok(Self {
+            metadata: None,
             device_id: range(device_id, 127, "device_id")? as u8,
             bank: range(bank, 127, "bank")? as u8,
             program: range(program, 127, "program")? as u8,
@@ -314,8 +320,9 @@ impl BankedNoteChange {
         &self.changes
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ScaleOctaveChange {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     realtime: bool,
     channels: Box<[u8]>,
@@ -345,6 +352,7 @@ impl ScaleOctaveChange {
             return Err(error("channels must be distinct"));
         }
         Ok(Self {
+            metadata: None,
             device_id: range(device_id, 127, "device_id")? as u8,
             realtime,
             channels: selected.into_boxed_slice(),
@@ -369,8 +377,8 @@ macro_rules! message_types {
     ($($name:ident),*) => {
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
         pub enum TuningMessage {$($name($name)),*}
-        impl Message for TuningMessage {}
-        $(impl Message for $name {}
+        crate::messages::enum_metadata!(TuningMessage { $($name),* });
+        $(
         impl From<$name> for TuningMessage {fn from(value:$name)->Self {Self::$name(value)}}
         impl PrimitiveMessage for $name {fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {TuningMessage::from(self.clone()).encode()}})*
     };
@@ -727,3 +735,24 @@ fn decode_table(data: &[u8]) -> TuningTable {
     }
     TuningTable(values)
 }
+
+crate::messages::value_metadata!(SingleNoteChange {
+    device_id,
+    program,
+    changes
+});
+
+crate::messages::value_metadata!(BankedNoteChange {
+    device_id,
+    bank,
+    program,
+    realtime,
+    changes
+});
+
+crate::messages::value_metadata!(ScaleOctaveChange {
+    device_id,
+    realtime,
+    channels,
+    offsets
+});

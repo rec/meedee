@@ -1,8 +1,9 @@
 //! Universal GM2-related SysEx. Unknown valid identifiers remain raw numbers.
-use crate::messages::{Message, PrimitiveMessage, SysEx, ValueError};
+use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct ControllerDestination {
+    metadata: Option<Box<crate::messages::Metadata>>,
     pub(crate) device_id: u8,
     pub(crate) channel: u8,
     pub(crate) source: u8,
@@ -29,6 +30,7 @@ impl ControllerDestination {
                 )),
             };
         Ok(Self {
+            metadata: None,
             device_id: bounded(device_id, 0, 127)?,
             channel: bounded(channel, 1, 16)?,
             source,
@@ -52,7 +54,13 @@ impl ControllerDestination {
         &self.entries
     }
 }
-impl Message for ControllerDestination {}
+crate::messages::value_metadata!(ControllerDestination {
+    device_id,
+    channel,
+    source,
+    controller,
+    entries
+});
 impl PrimitiveMessage for ControllerDestination {
     fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![240, 127, self.device_id, 9, self.source, self.channel - 1];
@@ -62,8 +70,9 @@ impl PrimitiveMessage for ControllerDestination {
         Ok(b)
     }
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct KeyBasedControl {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     channel: u8,
     note: u8,
@@ -87,6 +96,7 @@ impl KeyBasedControl {
             ));
         }
         Ok(Self {
+            metadata: None,
             device_id: bounded(device_id, 0, 127)?,
             channel: bounded(channel, 1, 16)?,
             note: bounded(note, 0, 127)?,
@@ -106,7 +116,12 @@ impl KeyBasedControl {
         &self.entries
     }
 }
-impl Message for KeyBasedControl {}
+crate::messages::value_metadata!(KeyBasedControl {
+    device_id,
+    channel,
+    note,
+    entries
+});
 impl PrimitiveMessage for KeyBasedControl {
     fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![240, 127, self.device_id, 10, 1, self.channel - 1, self.note];
@@ -117,8 +132,9 @@ impl PrimitiveMessage for KeyBasedControl {
 }
 /// IDs are big endian base-128; values are little endian base-128. Raw tuples
 /// support all protocol widths without overflowing machine-sized integers.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct GlobalParameterControl {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     slot_path: Vec<u16>,
     parameter_width: u8,
@@ -159,6 +175,7 @@ impl GlobalParameterControl {
             })
             .collect::<Result<_, _>>()?;
         Ok(Self {
+            metadata: None,
             device_id: bounded(device_id, 0, 127)?,
             slot_path,
             parameter_width: pw,
@@ -182,7 +199,13 @@ impl GlobalParameterControl {
         &self.entries
     }
 }
-impl Message for GlobalParameterControl {}
+crate::messages::value_metadata!(GlobalParameterControl {
+    device_id,
+    slot_path,
+    parameter_width,
+    value_width,
+    entries
+});
 impl PrimitiveMessage for GlobalParameterControl {
     fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut b = vec![

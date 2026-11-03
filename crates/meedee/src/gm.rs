@@ -1,5 +1,5 @@
 //! General MIDI profiles. Opening a port never selects a mode or bank.
-use crate::messages::{AnyMessage, Command, ControlChange, Message, ProgramChange, ValueError};
+use crate::messages::{AnyMessage, Command, ControlChange, ProgramChange, ValueError};
 
 #[path = "gm_extensions.rs"]
 mod extensions;
@@ -8,8 +8,9 @@ pub use extensions::{
     GlobalParameterControl, KeyBasedControl,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct BankProgramSelect {
+    metadata: Option<Box<crate::messages::Metadata>>,
     channel: Option<u8>,
     bank_msb: u8,
     bank_lsb: u8,
@@ -19,6 +20,7 @@ impl BankProgramSelect {
     pub fn new(program: i64) -> Result<Self, ValueError> {
         let program = ProgramChange::new(program)?.program();
         Ok(Self {
+            metadata: None,
             channel: None,
             bank_msb: 0,
             bank_lsb: 0,
@@ -60,29 +62,37 @@ impl BankProgramSelect {
         self.program
     }
 }
-impl Message for BankProgramSelect {}
+crate::messages::value_metadata!(BankProgramSelect {
+    channel,
+    bank_msb,
+    bank_lsb,
+    program
+});
 impl Command for BankProgramSelect {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
         let channel = self
             .channel
             .ok_or_else(|| ValueError("message channel is unassigned".into()))?;
-        Ok(vec![
-            AnyMessage::ControlChange(
-                ControlChange::new(0, self.bank_msb.into())
-                    .and_then(|m| m.with_channel(channel.into()))
-                    .expect("validated bank"),
-            ),
-            AnyMessage::ControlChange(
-                ControlChange::new(32, self.bank_lsb.into())
-                    .and_then(|m| m.with_channel(channel.into()))
-                    .expect("validated bank"),
-            ),
-            AnyMessage::ProgramChange(
-                ProgramChange::new(self.program.into())
-                    .and_then(|m| m.with_channel(channel.into()))
-                    .expect("validated program"),
-            ),
-        ])
+        crate::messages::inherit_metadata(
+            self,
+            vec![
+                AnyMessage::ControlChange(
+                    ControlChange::new(0, self.bank_msb.into())
+                        .and_then(|m| m.with_channel(channel.into()))
+                        .expect("validated bank"),
+                ),
+                AnyMessage::ControlChange(
+                    ControlChange::new(32, self.bank_lsb.into())
+                        .and_then(|m| m.with_channel(channel.into()))
+                        .expect("validated bank"),
+                ),
+                AnyMessage::ProgramChange(
+                    ProgramChange::new(self.program.into())
+                        .and_then(|m| m.with_channel(channel.into()))
+                        .expect("validated program"),
+                ),
+            ],
+        )
     }
 }
 
@@ -272,16 +282,16 @@ pub fn gm2_percussion(program: i64, note: i64) -> Result<Option<Percussion>, Val
 
 macro_rules! modes {
     ($($name:ident => $code:literal),*) => {$(
-        #[derive(Clone,Debug,PartialEq,Eq,Hash)]
-        pub struct $name {device_id:u8}
+        #[derive(Clone,Debug)]
+        pub struct $name {metadata: Option<Box<crate::messages::Metadata>>, device_id:u8}
         impl $name {
             pub fn new(device_id:i64)->Result<Self,ValueError> {
                 if !(0..=127).contains(&device_id) {return Err(ValueError("device_id must be in 0..=127".into()));}
-                Ok(Self {device_id:device_id as u8})
+                Ok(Self {metadata: None, device_id:device_id as u8})
             }
             pub fn device_id(&self)->u8 {self.device_id}
         }
-        impl Message for $name {}
+        crate::messages::value_metadata!($name { device_id });
         impl crate::messages::PrimitiveMessage for $name {
             fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> { Ok(vec![240,126,self.device_id,9,$code,247]) }
         }

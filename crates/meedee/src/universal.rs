@@ -1,19 +1,19 @@
 //! Selected universal MIDI 1.0 messages. Explicit device addressing, no I/O.
-use crate::messages::{Message, PrimitiveMessage, SysEx, ValueError};
+use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 
 macro_rules! device_messages {
     ($($name:ident { $($field:ident : $ty:ty = $low:literal ..= $high:literal),* };)*) => {$(
-        #[derive(Clone,Debug,PartialEq,Eq,Hash)]
-        pub struct $name {device_id:u8,$($field:$ty),*}
+        #[derive(Clone,Debug)]
+        pub struct $name {metadata: Option<Box<crate::messages::Metadata>>, device_id:u8,$($field:$ty),*}
         impl $name {
             pub fn new(device_id:i64,$($field:i64),*)->Result<Self,ValueError> {
-                Ok(Self {device_id:bounded(device_id,"device_id",0,127)? as u8,
+                Ok(Self {metadata: None, device_id:bounded(device_id,"device_id",0,127)? as u8,
                     $($field:bounded($field,stringify!($field),$low,$high)? as $ty),*})
             }
             pub fn device_id(&self)->u8 {self.device_id}
             $(pub fn $field(&self)->$ty {self.$field})*
         }
-        impl Message for $name {}
+        crate::messages::value_metadata!($name { device_id, $($field),* });
     )*};
 }
 device_messages! {
@@ -51,8 +51,9 @@ impl PrimitiveMessage for MasterCoarseTuning {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct IdentityReply {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     manufacturer: Box<[u8]>,
     family: u16,
@@ -84,6 +85,7 @@ impl IdentityReply {
             .try_into()
             .map_err(|_| ValueError("revision must contain four seven-bit bytes".into()))?;
         Ok(Self {
+            metadata: None,
             device_id: bounded(device_id, "device_id", 0, 127)? as u8,
             manufacturer: manufacturer.into_boxed_slice(),
             family: bounded(family, "family", 0, 16383)? as u16,
@@ -107,7 +109,13 @@ impl IdentityReply {
         &self.revision
     }
 }
-impl Message for IdentityReply {}
+crate::messages::value_metadata!(IdentityReply {
+    device_id,
+    manufacturer,
+    family,
+    model,
+    revision
+});
 impl PrimitiveMessage for IdentityReply {
     fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         let mut bytes = vec![240, 126, self.device_id, 6, 2];

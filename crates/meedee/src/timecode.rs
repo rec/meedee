@@ -1,5 +1,5 @@
 //! MTC wire values, SMPTE labels and caller-driven quarter-frame sequence lock.
-use crate::messages::{Message, PrimitiveMessage, SysEx, ValueError};
+use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum FrameRate {
@@ -8,8 +8,9 @@ pub enum FrameRate {
     DropFrame30 = 2,
     Fps30 = 3,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug)]
 pub struct FullFrame {
+    metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     rate: FrameRate,
     hours: u8,
@@ -50,6 +51,7 @@ impl FullFrame {
             ));
         }
         Ok(Self {
+            metadata: None,
             device_id: device_id as u8,
             rate,
             hours: hours as u8,
@@ -77,7 +79,14 @@ impl FullFrame {
         self.frames
     }
 }
-impl Message for FullFrame {}
+crate::messages::value_metadata!(FullFrame {
+    device_id,
+    rate,
+    hours,
+    minutes,
+    seconds,
+    frames
+});
 impl PrimitiveMessage for FullFrame {
     fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> {
         Ok(vec![
