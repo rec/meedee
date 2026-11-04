@@ -419,3 +419,32 @@ The driver stops all routes on known loss, overload or send failure. After an
 exception, `router.snapshot()` retains confirmed sends and any uncertain delivery.
 It leaves connections open; the surrounding contexts close them using their normal
 cleanup policy. Non-channel traffic requires `include_nonchannel=True` on the route.
+
+## Monitor with typed observations
+
+Inspect ten seconds of input without forwarding it. The callback receives typed
+entries; this example prints each message, diagnostic or loss-counter total.
+
+```python
+from meedee import inspection, midi
+
+
+def show(entry: inspection.MonitorEntry) -> None:
+    print(entry.message or entry.diagnostic or entry.transport_drop_total)
+
+
+with midi.Input() as source:
+    monitor = inspection.Monitor(stream=source.stream, clock=source.clock)
+    print(inspection.run(monitor, source, duration=10, callback=show, metrics=True))
+```
+
+Entries also provide `observations` and `note_state`. Set `types=["NoteOn"]`,
+`channel=1`, or an explicit UMP `group` on the monitor to select displayed traffic.
+Filtering still updates interpretation; diagnostics and loss notifications always
+reach the callback. Known loss resets interpretation and monitoring continues.
+Terminal input failures raise, with progress available from `monitor.snapshot()`.
+
+The driver requires a fresh monitor and leaves the input open. Omit `callback`
+for a summary alone. Callbacks must not reenter the same monitor. No payload
+history is retained by the library; the CLI owns bounded previews and display
+history. Metrics use host delivery times, independently of source timestamps.

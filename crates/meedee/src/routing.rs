@@ -509,7 +509,7 @@ pub fn preview<R: Read>(
 
 pub(crate) struct Info {
     protocol: Protocol,
-    group: Option<u8>,
+    pub(crate) group: Option<u8>,
     pub(crate) channel: Option<u8>,
     forwardable: bool,
 }

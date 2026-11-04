@@ -1024,6 +1024,25 @@ claims. Asynchronous transport drop totals may overlap sequence-gap diagnostics;
 counter notices reset source context without double counting sequence loss.
 README.md documents CLI selection, filters, resource bounds and examples.
 
+`inspection.Monitor` and Rust `inspection::Monitor` combine this observer with
+control/velocity interpretation and type/channel/group selection. `feed` returns
+an optional typed `MonitorEntry`; `counter(total)` returns a loss notification
+only when the cumulative count increases. `MonitorReport` contains the inspection
+snapshot, filtered/diagnostic/drop totals, interruption status and optional host
+delivery metrics. Entries carry the original message, semantic observations and
+the affected channel's note-state snapshot, or a diagnostic/loss counter.
+
+`inspection.run(monitor, receiver, callback=None, duration=None, cancel=None,
+metrics=False)` and Rust `inspection::run` drive a fresh monitor through a
+caller-owned input. Rust takes a callback closure, with `|_| Ok(())` for no
+callback work, typed duration, optional cancellation and a metrics boolean.
+Known loss resets interpretation and continues; terminal failures propagate,
+with progress retained by `snapshot()`. Callbacks run synchronously and must not
+reenter the monitor. The driver never closes connections. Payloads are not
+retained as history: bounded text previews, display history and terminal
+formatting belong to the Python CLI. Rust `Input::clock()` exposes the same
+opened source clock as Python `Input.clock`.
+
 ## Observed note activity
 
 `meedee.notes.Tracker(stream=..., detail_limit=128)` accepts `Message` or
@@ -1119,6 +1138,13 @@ Confirmation means caller-reported handoff, not instrument acceptance. Python
 `feed(StreamDiagnostic)` stops for diagnostics belonging to configured sources;
 Rust callers use `boundary(source, reason)`. There is no retry, replay, reconnect,
 cleanup generation or reset send.
+
+`routing.run(router, receiver, outputs, duration=None, cancel=None)` and Rust
+`routing::run` own the arrival-order forwarding loop over caller-owned
+connections. Destination names map to output connections. The shared driver
+checks loss/failure before delivery, confirms only successful handoffs, and
+retains uncertain sends on failure. It leaves connections open and generates
+no cleanup traffic; the CLI owns selection, connection closure and presentation.
 
 `routing.preview_file` and Rust `routing::preview` read an archive through its
 canonical reader and simulate queue draining. Structural completion is verified

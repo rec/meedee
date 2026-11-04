@@ -1,9 +1,66 @@
 """Streaming file inspection. Counts cover the verified prefix on failure."""
 
+from collections.abc import Callable
 from os import PathLike
 from typing import BinaryIO, Literal
 
-from . import archive, events, messages, notes, smf
+from . import archive, events, messages, metrics, midi, notes, smf
+
+def run(
+    monitor: Monitor,
+    receiver: midi.Input,
+    *,
+    callback: Callable[[MonitorEntry], None] | None = None,
+    duration: float | str | None = None,
+    cancel: events.Cancellation | None = None,
+    metrics: bool = False,
+) -> MonitorReport: ...
+
+class Monitor:
+    def __init__(
+        self,
+        *,
+        stream: str,
+        clock: events.Clock,
+        protocol: Literal["midi1", "ump"] = "midi1",
+        types: list[str] = [],
+        channel: int | None = None,
+        group: int | None = None,
+        detail_limit: int = 128,
+    ) -> None: ...
+    def feed(
+        self, item: messages.Message | events.StreamDiagnostic
+    ) -> MonitorEntry | None: ...
+    def counter(self, total: int) -> MonitorEntry | None: ...
+    def snapshot(self) -> MonitorReport: ...
+
+class MonitorEntry:
+    @property
+    def kind(self) -> Literal["event", "diagnostic", "loss_counter"]: ...
+    @property
+    def message(self) -> messages.Message | None: ...
+    @property
+    def diagnostic(self) -> events.StreamDiagnostic | None: ...
+    @property
+    def transport_drop_total(self) -> int | None: ...
+    @property
+    def observations(self) -> list[events.Observation]: ...
+    @property
+    def note_state(self) -> list[notes.ChannelState]: ...
+
+class MonitorReport:
+    @property
+    def inspection(self) -> Report: ...
+    @property
+    def filtered(self) -> int: ...
+    @property
+    def diagnostics(self) -> int: ...
+    @property
+    def transport_drops(self) -> int: ...
+    @property
+    def interrupted(self) -> bool: ...
+    @property
+    def delivery(self) -> metrics.DeliveryReport | None: ...
 
 def inspect_file(
     source: str | PathLike[str] | BinaryIO,

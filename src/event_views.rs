@@ -7,7 +7,7 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 #[pyclass(frozen, module = "meedee.events")]
 pub struct Observation {
-    value: meedee::events::Observation,
+    pub(crate) value: meedee::events::Observation,
 }
 #[pymethods]
 impl Observation {

@@ -5,8 +5,20 @@ use std::time::Duration;
 pub trait Receiver {
     fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>>;
     fn check(&self) -> midi::Result<()>;
+    fn dropped_packets(&self) -> midi::Result<u64> {
+        Ok(0)
+    }
+    fn check_monitor(&self) -> midi::Result<()> {
+        self.check()
+    }
 }
 impl Receiver for midi::Input {
+    fn dropped_packets(&self) -> midi::Result<u64> {
+        Ok(self.dropped_packets())
+    }
+    fn check_monitor(&self) -> midi::Result<()> {
+        self.check_health()
+    }
     fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>> {
         self.receive(Some(timeout))
     }

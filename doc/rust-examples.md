@@ -480,3 +480,33 @@ Known loss, overload or send failure stops all routes. On error,
 leaves connections open and generates no cleanup messages; closing the outputs
 applies their normal cleanup policy. The route's final boolean opts into non-channel
 traffic when `true`.
+
+## Monitor with typed observations
+
+This is the same ten-second passive monitor, with native typed entries:
+
+```rust
+use meedee::{inspection, midi::Input};
+use std::time::Duration;
+
+let mut input = Input::new();
+let source = input.stream()?.to_owned();
+let clock = input.clock()?.clone();
+let mut monitor = inspection::Monitor::new(source, clock, Default::default())?;
+let report = inspection::run(
+    &mut monitor, &mut input,
+    |entry| { println!("{entry:?}"); Ok(()) },
+    Some(Duration::from_secs(10)), None, true,
+)?;
+println!("{report:?}");
+input.close()?;
+```
+
+`MonitorOptions` selects message type names, channel, protocol and UMP group.
+`MonitorEntry` contains a message with semantic observations and note-state
+snapshots, a diagnostic, or a loss-counter total. Filtering still updates state;
+loss notifications are never filtered. Known loss resets interpretation and
+continues; terminal failures return an error with progress retained in
+`monitor.snapshot()`. The driver requires a fresh monitor and leaves the input
+open. Use `|_| Ok(())` when only the report is needed. The final boolean enables
+host delivery metrics. The library retains no payload history or formatted text.

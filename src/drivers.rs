@@ -80,6 +80,21 @@ struct Input<'a, 'py> {
     object: Bound<'py, PyAny>,
 }
 impl Receiver for Input<'_, '_> {
+    fn dropped_packets(&self) -> midi::Result<u64> {
+        self.calls.convert(
+            self.object
+                .getattr("dropped_packets")
+                .and_then(|v| v.extract()),
+        )
+    }
+    fn check_monitor(&self) -> midi::Result<()> {
+        self.calls.check()?;
+        let failure = self.calls.convert(self.object.getattr("failure"))?;
+        if !failure.is_none() {
+            return self.calls.convert(Err(PyErr::from_value(failure)));
+        }
+        Ok(())
+    }
     fn check(&self) -> midi::Result<()> {
         self.calls.check()?;
         let dropped: u64 = self.calls.convert(
@@ -92,11 +107,7 @@ impl Receiver for Input<'_, '_> {
                 "input packet loss reported by transport counter",
             )));
         }
-        let failure = self.calls.convert(self.object.getattr("failure"))?;
-        if !failure.is_none() {
-            return self.calls.convert(Err(PyErr::from_value(failure)));
-        }
-        Ok(())
+        self.check_monitor()
     }
     fn receive(&mut self, timeout: Duration) -> midi::Result<Option<InputItem>> {
         self.calls.check()?;
@@ -454,4 +465,57 @@ impl DiscoveryPollState {
     fn close(&mut self) {
         self.value.close();
     }
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_monitor(
+    py: Python<'_>,
+    mut monitor: PyRefMut<'_, crate::inspection::Monitor>,
+    receiver: Bound<'_, PyAny>,
+    callback: Bound<'_, PyAny>,
+    duration: Bound<'_, PyAny>,
+    cancel: Bound<'_, PyAny>,
+    now: Bound<'_, PyAny>,
+    metrics: bool,
+) -> PyResult<crate::inspection::MonitorReport> {
+    let duration = if duration.is_none() {
+        None
+    } else {
+        Some(Duration::from_nanos(crate::units::duration(&duration)?))
+    };
+    let token = cancel
+        .extract::<PyRef<'_, crate::playback::Cancellation>>()?
+        .value
+        .clone();
+    let calls = Calls::new(py);
+    let mut receiver = Input {
+        calls: &calls,
+        object: receiver,
+    };
+    let mut clock = Clock {
+        calls: &calls,
+        now,
+        cancel,
+        last: 0,
+    };
+    let result = meedee::inspection::run_with(
+        &mut monitor.value,
+        &mut receiver,
+        |entry| {
+            if !callback.is_none() {
+                calls.convert(callback.call1((crate::inspection::MonitorEntry {
+                    value: entry.clone(),
+                },)))?;
+            }
+            Ok(())
+        },
+        &mut clock,
+        duration,
+        &token,
+        metrics,
+    );
+    calls
+        .finish(result, true)
+        .map(|value| crate::inspection::MonitorReport { value })
 }

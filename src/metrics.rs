@@ -82,8 +82,8 @@ impl Pressure {
     }
 }
 #[pyclass(frozen, module = "meedee.metrics")]
-struct DeliveryReport {
-    value: metrics::DeliveryReport,
+pub(crate) struct DeliveryReport {
+    pub(crate) value: metrics::DeliveryReport,
 }
 #[pymethods]
 impl DeliveryReport {

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import archive, events, inspection, messages, smf, ump
+from meedee import archive, events, inspection, messages, midi, smf, testing, ump
 
 
 def capture(*, complete: bool = True, opaque: bool = False) -> bytes:
@@ -195,3 +195,47 @@ def test_timing_segments_preserve_exact_ranges_and_reset_after_loss() -> None:
     assert segment.untimed == 1 and segment.regressions == 1
     assert report.omitted_segments == 1 and report.omitted_diagnostics == 2
     assert report.timing_diagnostics[0].kind == "timestamp_regression"
+
+
+def test_live_monitor_reports_loss_and_typed_entries_without_owning_connection() -> (
+    None
+):
+    source = testing.Input(stream="s", protocol="midi1")
+    clock = events.Clock(identity="c")
+    source.lose(2)
+    source.inject(b"\x90\x3c\x5a", clock=clock)
+    monitor = inspection.Monitor(stream="s", clock=clock, types=["NoteOn"])
+    cancel = events.Cancellation()
+    entries: list[inspection.MonitorEntry] = []
+
+    def accept(entry: inspection.MonitorEntry) -> None:
+        entries.append(entry)
+        if entry.message is not None:
+            cancel.cancel()
+
+    report = inspection.run(
+        monitor, source, callback=accept, cancel=cancel, metrics=True
+    )  # ty: ignore[invalid-argument-type]
+    assert report.interrupted and report.transport_drops == 2
+    assert entries[0].kind == "loss_counter" and entries[0].transport_drop_total == 2
+    assert entries[-1].message == messages.NoteOn(60, channel=1)
+    assert entries[-1].note_state[0].notes[0].held == 1
+    assert report.delivery is not None and report.delivery.events == 1
+    assert not source.closed
+    with pytest.raises(ValueError, match="fresh monitor"):
+        inspection.run(monitor, source, cancel=cancel)  # ty: ignore[invalid-argument-type]
+
+
+def test_live_monitor_propagates_terminal_failure_and_preserves_snapshot() -> None:
+    source = testing.Input(stream="s", protocol="midi1")
+    clock = events.Clock(identity="c")
+    source.inject(b"\x90\x3c\x5a", clock=clock)
+    monitor = inspection.Monitor(stream="s", clock=clock)
+
+    def fail_after_message(entry: inspection.MonitorEntry) -> None:
+        source.fail("receiver stopped")
+
+    with pytest.raises(midi.WorkerError, match="receiver stopped"):
+        inspection.run(monitor, source, callback=fail_after_message)  # ty: ignore[invalid-argument-type]
+    assert monitor.snapshot().inspection.records == 1
+    assert not source.closed

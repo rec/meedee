@@ -48,6 +48,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(drivers::run_transfer_input, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
+    module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
     module.add_function(wrap_pyfunction!(populate_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ci, module)?)?;

@@ -1,7 +1,17 @@
 from collections.abc import Callable
 from types import ModuleType
 
-from . import ci, events, topology, transfer, tuning
+from . import ci, events, inspection, topology, transfer, tuning
+
+def run_monitor(
+    monitor: inspection.Monitor,
+    receiver: object,
+    callback: Callable[[inspection.MonitorEntry], None] | None,
+    duration: float | str | None,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+    metrics: bool,
+) -> inspection.MonitorReport: ...
 
 class DiscoveryPollState:
     def __init__(

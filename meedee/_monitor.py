@@ -1,9 +1,8 @@
 """Passive CLI presentation over the existing typed input and Rust interpreters."""
 
 from collections import deque
-from time import monotonic, monotonic_ns
 
-from . import controls, events, inspection, messages, midi, ump
+from . import events, inspection, messages, midi, ump
 from ._cli import Monitor, channel_state_data, emit, inspection_data
 
 
@@ -11,55 +10,33 @@ class Session:
     def __init__(self, config: Monitor, stream: str, clock: events.Clock) -> None:
         self.config = config
         self.clock = clock
-        self.observer = inspection.Observer(
-            stream=stream, clock=clock, detail_limit=config.detail_limit
+        self.monitor = inspection.Monitor(
+            stream=stream,
+            clock=clock,
+            protocol=config.protocol,
+            types=config.types,
+            channel=config.channel,
+            group=config.group,
+            detail_limit=config.detail_limit,
         )
         self.history: deque[dict[str, object]] = deque(maxlen=config.history_limit)
-        self.views = (
-            [
-                controls.EventInterpreter(group=config.group),
-                controls.EventVelocityInterpreter(group=config.group),
-            ]
-            if config.protocol == "midi1" or config.group is not None
-            else []
-        )
-        self.filtered = 0
-        self.diagnostics = 0
-        self.transport_drops = 0
 
-    def feed(
-        self, item: messages.Message | events.StreamDiagnostic
-    ) -> list[dict[str, object]]:
-        self.observer.feed(item)
-        if isinstance(item, events.StreamDiagnostic):
-            for v in self.views:
-                v.reset()
-            self.diagnostics += 1
-            row: dict[str, object] = {
+    def present(self, entry: inspection.MonitorEntry) -> None:
+        row: dict[str, object]
+        if (diagnostic := entry.diagnostic) is not None:
+            row = {
                 "kind": "diagnostic",
-                "stream": item.stream,
-                "packet": item.packet,
-                "diagnostic": item.kind,
-                "lost": item.lost,
-                "reason": item.reason[: self.config.preview_bytes * 2],
+                "stream": diagnostic.stream,
+                "packet": diagnostic.packet,
+                "diagnostic": diagnostic.kind,
+                "lost": diagnostic.lost,
+                "reason": diagnostic.reason[: self.config.preview_bytes * 2],
             }
-        else:
-            observations = [o for v in self.views for o in v.feed(item)]
+        elif (item := entry.message) is not None:
             message = item
             inner = message.message if isinstance(message, ump.Midi1Packet) else message
             channel = getattr(inner, "channel", None)
             group = getattr(message, "group", None)
-            if (
-                (
-                    self.config.types
-                    and type(message).__name__ not in self.config.types
-                    and type(inner).__name__ not in self.config.types
-                )
-                or (self.config.channel is not None and channel != self.config.channel)
-                or (self.config.group is not None and group != self.config.group)
-            ):
-                self.filtered += 1
-                return []
             if isinstance(inner, messages.SysEx):
                 payload = inner.data
                 preview = (
@@ -84,32 +61,20 @@ class Session:
                         "type": type(o.value).__name__,
                         "preview": repr(o.value)[: self.config.preview_bytes * 2],
                     }
-                    for o in observations
+                    for o in entry.observations
                 ],
-                "note_state": [
-                    channel_state_data(c)
-                    for c in self.observer.channel_states(channel=channel, group=group)
-                ]
+                "note_state": [channel_state_data(c) for c in entry.note_state]
                 if channel is not None
                 else [],
             }
+        else:
+            row = {
+                "kind": "loss_counter",
+                "transport_drop_total": entry.transport_drop_total,
+                "reason": "asynchronous counter; may overlap sequence-gap diagnostics",
+            }
         self.history.append(row)
-        return [row]
-
-    def counter(self, total: int) -> list[dict[str, object]]:
-        if total <= self.transport_drops:
-            return []
-        self.transport_drops = total
-        self.observer.loss_counter_changed()
-        for v in self.views:
-            v.reset()
-        row: dict[str, object] = {
-            "kind": "loss_counter",
-            "transport_drop_total": total,
-            "reason": "asynchronous counter; may overlap sequence-gap diagnostics",
-        }
-        self.history.append(row)
-        return [row]
+        emit(row, self.config.output)
 
 
 def select_port(
@@ -165,37 +130,16 @@ def run_monitor(config: Monitor) -> int:
 
 def watch(connection: midi.Input, config: Monitor) -> int:
     session = Session(config, connection.stream, connection.clock)
-    start = monotonic()
-    interrupted = False
     failure: str | None = None
-    delivery = None
-    if config.metrics:
-        from . import metrics
-
-        delivery = metrics.Delivery(start_ns=monotonic_ns())
     try:
         with connection:
-            try:
-                while config.duration is None or monotonic() - start < config.duration:
-                    for r in session.counter(connection.dropped_packets):
-                        emit(r, config.output)
-                    if (error := connection.failure) is not None:
-                        raise error
-                    remaining = (
-                        0.05
-                        if config.duration is None
-                        else min(
-                            0.05, max(0.0, config.duration - (monotonic() - start))
-                        )
-                    )
-                    item = connection.receive(timeout=remaining)
-                    if item is not None:
-                        if delivery is not None and isinstance(item, messages.Message):
-                            delivery.observe(monotonic_ns())
-                        for r in session.feed(item):
-                            emit(r, config.output)
-            except KeyboardInterrupt:
-                interrupted = True
+            inspection.run(
+                session.monitor,
+                connection,
+                callback=session.present,
+                duration=config.duration,
+                metrics=config.metrics,
+            )
     except (
         midi.MidiError,
         midi.StateError,
@@ -208,9 +152,10 @@ def watch(connection: midi.Input, config: Monitor) -> int:
     ) as error:
         failure = str(error)[: config.preview_bytes * 2]
         emit({"kind": "failure", "reason": failure}, config.output)
-    for r in session.counter(connection.dropped_packets):
-        emit(r, config.output)
-    report = session.observer.snapshot()
+    if (entry := session.monitor.counter(connection.dropped_packets)) is not None:
+        session.present(entry)
+    summary = session.monitor.snapshot()
+    report = summary.inspection
     data = inspection_data(report)
     data.pop("complete")
     data.pop("problem")
@@ -218,15 +163,14 @@ def watch(connection: midi.Input, config: Monitor) -> int:
         {
             "kind": "summary",
             "live": True,
-            "interrupted": interrupted,
+            "interrupted": summary.interrupted,
             "failure": failure,
-            "filtered": session.filtered,
-            "transport_drop_total": session.transport_drops,
+            "filtered": summary.filtered,
+            "transport_drop_total": summary.transport_drops,
             "history": list(session.history),
         }
     )
-    if delivery is not None:
-        measurement = delivery.snapshot(monotonic_ns())
+    if (measurement := summary.delivery) is not None:
         intervals = measurement.intervals
         data["metrics"] = {
             "clock": "host_monotonic",
@@ -255,8 +199,8 @@ def watch(connection: midi.Input, config: Monitor) -> int:
         if failure is not None
         else int(
             bool(
-                session.transport_drops
-                or session.diagnostics
+                summary.transport_drops
+                or summary.diagnostics
                 or report.timestamp_regressions
             )
         )

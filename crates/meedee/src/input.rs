@@ -151,6 +151,11 @@ impl Input {
         self.open()?;
         Ok(self.stream.as_deref().expect("opened input stream"))
     }
+    /// The opened input's timestamp clock, for source-scoped observers.
+    pub fn clock(&mut self) -> crate::midi::Result<&Clock> {
+        self.stream()?;
+        Ok(self.clock.as_ref().expect("opened input clock"))
+    }
     pub fn dropped_packets(&self) -> u64 {
         let queued = self
             .queue

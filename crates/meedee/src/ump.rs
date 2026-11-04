@@ -44,6 +44,13 @@ macro_rules! scalar {
         }})*
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
         pub enum UmpMessage {$($name($name),)* Midi1(Midi1Packet),SysEx7(SysEx7Packet),SysEx8(SysEx8Packet),MixedDataSet(MixedDataSet),FlexData(FlexData),Stream(StreamMessage),Opaque(OpaquePacket)}
+        impl UmpMessage { pub(crate) fn kind(&self) -> &'static str { match self {
+            $(Self::$name(_) => stringify!($name),)*
+            Self::Midi1(_) => "Midi1Packet", Self::SysEx7(_) => "SysEx7Packet",
+            Self::SysEx8(_) => "SysEx8Packet", Self::MixedDataSet(_) => "MixedDataSet",
+            Self::FlexData(_) => "FlexData", Self::Stream(_) => "StreamMessage",
+            Self::Opaque(_) => "OpaquePacket",
+        } } }
         crate::messages::enum_metadata!(UmpMessage { $($name,)* Midi1, SysEx7, SysEx8, MixedDataSet, FlexData, Stream, Opaque });
         impl UmpValue for UmpMessage {fn encode_words(&self)->Vec<u32>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::Midi1(v)=>v.encode_words(),Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
         fn scalar_decode(words:&[u32])->Result<Option<UmpMessage>,ValueError>{
