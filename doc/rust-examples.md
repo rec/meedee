@@ -226,6 +226,8 @@ expand internally. The complete sequence is validated before its first send.
 
 Close releases tracked MIDI 1 note counts and resets changed pitch bend,
 modulation, sustain, sostenuto, soft pedal and channel/polyphonic pressure.
+Cleanup sends note-offs first, sorted by channel and note, then controller resets
+in the same deterministic order as Python.
 Volume, pan, expression, programs, tuning and other parameters are left alone.
 The pitch-bend sensitivity set above therefore remains in effect. `Drop` performs
 best-effort cleanup; explicit `close()` returns cleanup errors. Use channels owned

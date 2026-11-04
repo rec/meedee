@@ -524,7 +524,8 @@ impl Connection {
         }
     }
 }
-struct OutputState {
+#[doc(hidden)]
+pub struct OutputState {
     decoder: Decoder,
     held: BTreeMap<(u8, u8), u64>,
     resets: BTreeMap<(u8, u8, u8), AnyMessage>,
@@ -539,7 +540,7 @@ impl Default for OutputState {
     }
 }
 impl OutputState {
-    fn feed(&mut self, bytes: &[u8]) -> io::Result<()> {
+    pub fn feed(&mut self, bytes: &[u8]) -> io::Result<()> {
         for item in self.decoder.feed(bytes) {
             let DecodeItem::Message(message) = item else {
                 continue;
@@ -609,7 +610,7 @@ impl OutputState {
             self.resets.remove(&key);
         }
     }
-    fn cleanup(self) -> impl Iterator<Item = AnyMessage> {
+    pub fn cleanup(self) -> impl Iterator<Item = AnyMessage> {
         self.held
             .into_iter()
             .flat_map(|((channel, note), count)| {

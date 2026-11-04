@@ -10,6 +10,30 @@ use pyo3::{PyTraverseError, PyVisit};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+/// Binding to the same confirmed-output tracker used by Rust's Output.
+#[pyclass(module = "meedee._native")]
+pub(crate) struct OutputState {
+    value: meedee::midi::OutputState,
+}
+#[pymethods]
+impl OutputState {
+    #[new]
+    fn new() -> Self {
+        Self {
+            value: Default::default(),
+        }
+    }
+    fn feed(&mut self, packet: &[u8]) -> PyResult<()> {
+        self.value.feed(packet).map_err(crate::files::os_error)
+    }
+    fn cleanup(&mut self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
+        std::mem::take(&mut self.value)
+            .cleanup()
+            .map(|m| crate::messages::to_python(py, m))
+            .collect()
+    }
+}
+
 #[pyclass(frozen, module = "meedee._native")]
 pub struct Output {
     state: Arc<Client<transport::Output>>,

@@ -64,6 +64,8 @@ same tempo rule as notes and rests.
 
 Context exit releases outstanding tracked MIDI 1 notes and resets changed pitch
 bend, modulation, sustain, sostenuto, soft pedal and channel/polyphonic pressure.
+Cleanup sends note-offs first, sorted by channel and note, then controller resets
+in the same deterministic order as Rust.
 Volume, pan, expression, programs and tuning are left alone. Reserve the channels
 for these examples; transport failure can prevent cleanup. UMP requires explicit
 addressing and does not support these full-note values or automatic cleanup.

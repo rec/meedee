@@ -22,7 +22,6 @@ from uuid import uuid4
 
 from . import _native, _units, archive, codecs, events, gm, messages, midi
 from ._errors import CompoundSendError
-from ._output_state import OutputState
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery, ReceiveQueue
 from .events import Clock
 
@@ -755,7 +754,7 @@ class _OutputState:
     def _create(cls, client: Output) -> _OutputState:
         connection = object.__new__(cls)
         connection._context = client._context
-        connection._state = OutputState()
+        connection._state = _native.OutputState()
         connection._protocol = client._protocol
         connection._channel = client._channel
         connection._beat_period = client._beat_period

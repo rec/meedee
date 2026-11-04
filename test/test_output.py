@@ -153,13 +153,28 @@ def test_cleanup_resets_only_changed_controls_and_tracks_raw_packets(
     assert len(sent) == 13
     assert transport.packets() == [
         b"\x80\x3c\x00",
-        b"\xe0\x00\x40",
-        b"\xd0\x00",
-        b"\xa0\x3c\x00",
         b"\xb0\x40\x00",
         b"\xb0\x42\x00",
         b"\xb0\x43\x00",
+        b"\xe0\x00\x40",
+        b"\xd0\x00",
+        b"\xa0\x3c\x00",
     ]
+
+
+def test_cleanup_orders_channels_and_notes_and_preserves_held_counts(
+    transport: NativeConnection,
+) -> None:
+    with midi.Output() as out:
+        out(
+            messages.NoteOn(70, channel=3),
+            messages.NoteOn(65, channel=1),
+            messages.NoteOn(60, channel=1),
+            messages.NoteOn(60, channel=1),
+            messages.NoteOff(60, channel=1),
+        )
+        transport.packets()
+    assert transport.packets() == [b"\x80\x3c\x00", b"\x80\x41\x00", b"\x82\x46\x00"]
 
 
 def test_cleanup_runs_on_body_failure_and_always_closes_transport(
