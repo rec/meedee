@@ -336,7 +336,7 @@ encoding a MIDI message.
 **Use:** Design a tuning once, audition it and prepare an explicit transfer.
 
 **Implemented foundation:** the optional Python
-[`meedee.ufor_tuning` bridge](ufor-tuning.md) previews selected keys and constructs
+[`meedee.tuning` bridge](ufor-tuning.md) previews selected keys and constructs
 ordinary/banked per-key MTS messages with explicit preservation and error policy.
 It opens no ports. Bounded bulk transfer-plan composition and optional offline
 CLI preview/exclusive SYX export now accept existing uFor Tuning JSON and Scala

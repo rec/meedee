@@ -284,12 +284,12 @@ from pathlib import Path
 
 from ufor.tuning import RatioTable, Tuning
 
-from meedee import codecs, messages, syx, ufor_tuning
+from meedee import codecs, messages, syx, tuning
 
 source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
-preview = ufor_tuning.preview(source, notes=[69, 70, 71])
+preview = tuning.preview(source, notes=[69, 70, 71])
 print(preview)
-dump = ufor_tuning.bulk_dump(
+dump = tuning.bulk_dump(
     preview,
     device_id=0,
     program=2,

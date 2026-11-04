@@ -14,7 +14,7 @@ def run_ufor(config: UforPreview) -> int:
         if error.name != "ufor":
             raise
         raise ValueError("Install meedee[cli,ufor] for uFor tuning commands") from error
-    from . import ufor_tuning
+    from . import tuning
 
     text = config.source.read_text()
     if config.source_format == "tuning-json":
@@ -26,12 +26,10 @@ def run_ufor(config: UforPreview) -> int:
             root_note=config.root_note,
             root_frequency=config.root_frequency,
         )
-    result = ufor_tuning.preview(
+    result = tuning.preview(
         source, notes=list(range(config.first_note, config.last_note + 1))
     )
-    converted = sum(
-        k.status == ufor_tuning.PitchStatus.CONVERTED for k in result.entries
-    )
+    converted = sum(k.status == tuning.PitchStatus.CONVERTED for k in result.entries)
     data: dict[str, object] = {
         "selected_keys": len(result.entries),
         "converted_keys": converted,
@@ -53,7 +51,7 @@ def run_ufor(config: UforPreview) -> int:
         data.update({"kind": "ufor_preview", "dry_run": True})
         emit(data, config.output)
         return 0 if converted == len(result.entries) else 1
-    plan = ufor_tuning.bulk_plan(
+    plan = tuning.bulk_plan(
         result,
         device_id=config.device_id,
         program=config.program,

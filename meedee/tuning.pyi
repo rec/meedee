@@ -1,10 +1,16 @@
 """MTS exact values. Device IDs and tuning banks/programs are 0–127."""
 
-from enum import Enum
+from enum import Enum, StrEnum, auto
+from fractions import Fraction
 from os import PathLike
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
-from . import events, messages
+from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from ufor.tuning import Tuning
+
+from . import events, messages, transfer
 
 class Pitch:
     def __init__(self, *, semitone: int, fraction: int) -> None: ...
@@ -413,3 +419,51 @@ class Query:
     def cancel(self, reason: str) -> None: ...
     def snapshot(self) -> QueryReport: ...
     def write(self, destination: str | PathLike[str] | BinaryIO) -> None: ...
+
+class PitchStatus(StrEnum):
+    CONVERTED = auto()
+    UNMAPPED = auto()
+    OUT_OF_RANGE = auto()
+    EVALUATION_ERROR = auto()
+
+class KeyPreview(BaseModel, frozen=True):
+    note: int
+    status: PitchStatus
+    frequency: float | int | Fraction | None = None
+    pitch: Pitch | None = None
+    encoded_frequency_hz: float | None = None
+    error_cents: float | None = None
+    reason: str | None = None
+
+class Preview(BaseModel, frozen=True):
+    entries: list[KeyPreview]
+
+def preview(source: Tuning, *, notes: list[int]) -> Preview: ...
+def bulk_dump(
+    result: Preview,
+    *,
+    device_id: int,
+    program: int,
+    name: str,
+    bank: int | None = None,
+    preserve_unmapped: bool = False,
+) -> BulkDump | KeyBasedDump: ...
+def bulk_plan(
+    result: Preview,
+    *,
+    device_id: int,
+    program: int,
+    name: str,
+    gap: float | str,
+    bank: int | None = None,
+    preserve_unmapped: bool = False,
+) -> transfer.Plan: ...
+def note_changes(
+    result: Preview,
+    *,
+    device_id: int,
+    program: int,
+    realtime: bool,
+    bank: int | None = None,
+    preserve_unmapped: bool = False,
+) -> list[SingleNoteChange | BankedNoteChange]: ...

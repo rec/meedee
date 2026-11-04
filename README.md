@@ -410,7 +410,7 @@ for units, names, checksum behavior and request tracking.
 ## Optional uFor tuning bridge
 
 Install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
-`meedee.ufor_tuning.preview(source, notes=[...])` resolves an existing uFor
+`meedee.tuning.preview(source, notes=[...])` resolves an existing uFor
 `Tuning`, retaining exact frequencies where available, encoded pitches and signed
 MTS rounding errors. Finite-source gaps and evaluation/range failures stay
 explicit. `bulk_dump()` and `note_changes()` construct messages with explicit

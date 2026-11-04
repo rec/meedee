@@ -1,6 +1,8 @@
 # uFor tuning previews and MTS message construction
 
-`meedee.ufor_tuning` is an optional Python integration. uFor resolves pitch
+`meedee.tuning` combines the core MTS API with optional uFor source resolution.
+Core values, preview result models and message builders do not require uFor;
+`preview()` imports uFor when resolving a source. uFor resolves pitch
 mathematics and Scala-derived tunings; meedee's existing Rust-backed MTS types
 perform quantization and encoding. The bridge adds no tuning engine, Rust uFor
 interpreter, transport, clock or audio host. Optional offline CLI preview/export
@@ -28,11 +30,11 @@ message, MTS and transport APIs retain their numeric representations and wire be
 from fractions import Fraction
 from ufor import scala
 from ufor.tuning import Tuning
-from meedee import ufor_tuning
+from meedee import tuning
 
 scale = scala.parse_scala("Three steps\n3\n9/8\n3/2\n2/1\n", name="three")
 source = Tuning(source=scale, root_note=69, root_frequency="440")
-report = ufor_tuning.preview(source, notes=[69, 70, 71, 72])
+report = tuning.preview(source, notes=[69, 70, 71, 72])
 assert report.entries[1].frequency == Fraction(495)
 assert report.entries[1].pitch is not None
 ```
@@ -93,7 +95,7 @@ for arbitrary user-authored tuning definitions.
 ```python
 from meedee import codecs
 
-outgoing = ufor_tuning.note_changes(
+outgoing = tuning.note_changes(
     report,
     device_id=1,
     program=0,
