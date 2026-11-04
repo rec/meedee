@@ -20,6 +20,15 @@ def command_vectors() -> Iterator[tuple[object, bytes]]:
         fields, wire = line.split("|")
         name, *values = fields.split()
         constructor = getattr(messages, name)
+        if name == "ParameterStep":
+            channel, parameter, direction, family = values
+            yield (
+                constructor(
+                    int(parameter), int(direction), int(channel), family=family
+                ),
+                bytes.fromhex(wire),
+            )
+            continue
         yield (
             constructor(
                 **dict(
@@ -53,6 +62,8 @@ def test_commands_expand_to_shared_independent_wire_vectors() -> None:
 
 def test_commands_are_frozen_positional_values_with_checked_replacement() -> None:
     for c, _ in command_vectors():
+        if isinstance(c, messages.ParameterStep):
+            continue  # Its keyword-only family is covered separately below.
         constructor = getattr(messages, type(c).__name__)
         assert isinstance(c, messages.Message)
         fields = constructor.__annotations__
@@ -112,7 +123,7 @@ def test_command_ranges_and_null_parameter_are_explicit() -> None:
         with pytest.raises(ValueError):
             constructor(channel=1, parameter=0, value=128, resolution=7)
         assert constructor(channel=1, parameter=0, value=0).resolution == 14
-    for name in ("RpnSet", "RpnIncrement", "RpnDecrement"):
+    for name in ("RpnSet", "ParameterStep"):
         fields = {"channel": 1, "parameter": 16383}
         if name == "RpnSet":
             fields |= {"value": 0, "resolution": 7}
@@ -355,3 +366,46 @@ def test_observations_are_frozen_owned_values_and_raw_input_is_unchanged() -> No
             == []
         )
     assert interpreter.feed(messages.SysEx(data=b"\x7d")) == []
+
+
+def test_parameter_step_defaults_validation_and_metadata_replacement() -> None:
+    from meedee import events
+
+    default = messages.ParameterStep(7)
+    assert (default.parameter, default.direction, default.channel, default.family) == (
+        7,
+        1,
+        None,
+        "rpn",
+    )
+    clock = events.Clock(identity="source")
+    step = default.replace(
+        family="nrpn",
+        parameter=16383,
+        direction=-1,
+        channel=2,
+        stream="keys",
+        timestamp=events.Timestamp(ticks=10, clock=clock),
+    )
+    assert step == messages.ParameterStep(16383, -1, 2, family="nrpn")
+    assert hash(step) == hash(step.replace(timestamp=None, stream=None))
+    assert step.replace(channel=3).timestamp == step.timestamp
+    assert step.replace(direction=1).stream == "keys"
+    assert (
+        repr(default)
+        == 'ParameterStep(parameter=7, direction=1, channel=None, family="rpn")'
+    )
+    with pytest.raises(AttributeError):
+        step.direction = 1  # ty: ignore[invalid-assignment]
+    with pytest.raises(ValueError):
+        step.replace(family="rpn")
+    for direction in (0, 2, -2):
+        with pytest.raises(ValueError, match="direction"):
+            messages.ParameterStep(7, direction)  # ty: ignore[invalid-argument-type]
+    for direction in (True, 1.0, "1"):
+        with pytest.raises(TypeError):
+            messages.ParameterStep(7, direction)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(ValueError, match="family"):
+        messages.ParameterStep(7, family="other")  # ty: ignore[invalid-argument-type]
+    with pytest.raises(TypeError):
+        messages.ParameterStep(7, 1, 1, "nrpn")  # ty: ignore[too-many-positional-arguments]

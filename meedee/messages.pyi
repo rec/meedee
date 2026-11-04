@@ -1,6 +1,6 @@
 """Immutable values backed by the shared Rust MIDI toolkit."""
 
-from typing import Self
+from typing import Literal, Self
 
 from . import events
 
@@ -380,66 +380,31 @@ class NrpnSet(Message):
         span: events.SourceSpan | None = ...,
     ) -> NrpnSet: ...
 
-class RpnIncrement(Message):
-    def __init__(self, parameter: int, channel: int | None = None) -> None: ...
+class ParameterStep(Message):
+    def __init__(
+        self,
+        parameter: int,
+        direction: Literal[-1, 1] = 1,
+        channel: int | None = None,
+        *,
+        family: Literal["rpn", "nrpn"] = "rpn",
+    ) -> None: ...
+    @property
+    def parameter(self) -> int: ...
+    @property
+    def direction(self) -> Literal[-1, 1]: ...
     @property
     def channel(self) -> int | None: ...
     @property
-    def parameter(self) -> int: ...
+    def family(self) -> Literal["rpn", "nrpn"]: ...
     def replace(
         self,
         *,
-        channel: int | None = ...,
         parameter: int = ...,
+        direction: Literal[-1, 1] = ...,
+        channel: int | None = ...,
+        family: Literal["rpn", "nrpn"] = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
-    ) -> RpnIncrement: ...
-
-class RpnDecrement(Message):
-    def __init__(self, parameter: int, channel: int | None = None) -> None: ...
-    @property
-    def channel(self) -> int | None: ...
-    @property
-    def parameter(self) -> int: ...
-    def replace(
-        self,
-        *,
-        channel: int | None = ...,
-        parameter: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> RpnDecrement: ...
-
-class NrpnIncrement(Message):
-    def __init__(self, parameter: int, channel: int | None = None) -> None: ...
-    @property
-    def channel(self) -> int | None: ...
-    @property
-    def parameter(self) -> int: ...
-    def replace(
-        self,
-        *,
-        channel: int | None = ...,
-        parameter: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> NrpnIncrement: ...
-
-class NrpnDecrement(Message):
-    def __init__(self, parameter: int, channel: int | None = None) -> None: ...
-    @property
-    def channel(self) -> int | None: ...
-    @property
-    def parameter(self) -> int: ...
-    def replace(
-        self,
-        *,
-        channel: int | None = ...,
-        parameter: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> NrpnDecrement: ...
+    ) -> ParameterStep: ...

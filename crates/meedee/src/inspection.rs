@@ -444,10 +444,7 @@ fn command_kind(value: &messages::AnyCommand) -> &'static str {
         ControlChange14(_) => "ControlChange14",
         RpnSet(_) => "RpnSet",
         NrpnSet(_) => "NrpnSet",
-        RpnIncrement(_) => "RpnIncrement",
-        RpnDecrement(_) => "RpnDecrement",
-        NrpnIncrement(_) => "NrpnIncrement",
-        NrpnDecrement(_) => "NrpnDecrement",
+        ParameterStep(_) => "ParameterStep",
         BankProgramSelect(_) => "BankProgramSelect",
         ZoneConfiguration(_) => "ZoneConfiguration",
     }

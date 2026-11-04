@@ -352,22 +352,38 @@ macro_rules! command_messages {
         message_classes! { $($name $signature { $($field),* };)* }
 
         fn register_commands(module: &Bound<'_, PyModule>) -> PyResult<()> {
+            module.add_class::<ParameterStep>()?;
             $(module.add_class::<$name>()?;)*
             Ok(())
         }
         pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
+            if let Ok(command) = command.extract::<PyRef<'_, ParameterStep>>() {
+                if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
+                return Ok(messages::AnyCommand::ParameterStep(command.value.clone()));
+            }
             $(if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
                 return Ok(messages::AnyCommand::$name(command.resolved()?.clone()));
             })*
             crate::profiles::extract_command(command)?
                 .ok_or_else(|| PyTypeError::new_err("command must be a supported compound command"))
         }
-        pub fn command_wire(command: &messages::AnyCommand) -> (String, std::collections::HashMap<String, i64>) {
-            match command {
+        pub fn command_wire(py: Python<'_>, command: &messages::AnyCommand) -> PyResult<(String, Py<PyDict>)> {
+            let kwargs = PyDict::new(py);
+            if let messages::AnyCommand::ParameterStep(value) = command {
+                let value = ParameterStep { value: value.clone() };
+                kwargs.set_item("parameter", value.parameter())?;
+                kwargs.set_item("direction", value.direction())?;
+                kwargs.set_item("channel", value.channel())?;
+                kwargs.set_item("family", value.family())?;
+                return Ok(("ParameterStep".into(), kwargs.unbind()));
+            }
+            let (name, fields): (String, std::collections::HashMap<String, i64>) = match command {
                 $(messages::AnyCommand::$name(value) => (stringify!($name).into(),
                     [$( (stringify!($field).into(), wire_field!(value, $field)) ),*].into_iter().collect()),)*
                 _ => crate::profiles::command_wire(command),
-            }
+            };
+            for (key, value) in fields { kwargs.set_item(key, value)?; }
+            Ok((name, kwargs.unbind()))
         }
     };
 }
@@ -376,10 +392,115 @@ command_messages! {
     ControlChange14 (controller, value, channel=None) { channel, controller, value };
     RpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
     NrpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
-    RpnIncrement (parameter, channel=None) { channel, parameter };
-    RpnDecrement (parameter, channel=None) { channel, parameter };
-    NrpnIncrement (parameter, channel=None) { channel, parameter };
-    NrpnDecrement (parameter, channel=None) { channel, parameter };
+}
+
+#[pyclass(frozen, extends = Message, module = "meedee.messages")]
+struct ParameterStep {
+    value: messages::ParameterStep,
+}
+#[pymethods]
+impl ParameterStep {
+    #[new]
+    #[pyo3(signature=(parameter, direction=1, channel=None, *, family="rpn"))]
+    fn new(
+        #[pyo3(from_py_with=strict_integer)] parameter: i64,
+        #[pyo3(from_py_with=strict_integer)] direction: i64,
+        channel: Option<&Bound<'_, PyAny>>,
+        family: &str,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        use meedee::controls::{ParameterFamily, StepDirection};
+        let family = match family {
+            "rpn" => ParameterFamily::Rpn,
+            "nrpn" => ParameterFamily::Nrpn,
+            _ => return Err(PyValueError::new_err("family must be rpn or nrpn")),
+        };
+        let direction = match direction {
+            1 => StepDirection::Increment,
+            -1 => StepDirection::Decrement,
+            _ => return Err(PyValueError::new_err("direction must be 1 or -1")),
+        };
+        let mut value = messages::ParameterStep::new(0)
+            .and_then(|v| v.with_family(family))
+            .and_then(|v| v.with_parameter(parameter))
+            .map_err(value_error)?
+            .with_direction(direction);
+        if let Some(channel) = channel {
+            value = value
+                .with_channel(integer(channel, "channel")?)
+                .map_err(value_error)?;
+        }
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+    }
+    #[getter]
+    fn parameter(&self) -> u16 {
+        self.value.parameter()
+    }
+    #[getter]
+    fn direction(&self) -> i8 {
+        match self.value.direction() {
+            meedee::controls::StepDirection::Increment => 1,
+            meedee::controls::StepDirection::Decrement => -1,
+        }
+    }
+    #[getter]
+    fn family(&self) -> &'static str {
+        match self.value.family() {
+            meedee::controls::ParameterFamily::Rpn => "rpn",
+            meedee::controls::ParameterFamily::Nrpn => "nrpn",
+        }
+    }
+    #[getter]
+    fn channel(&self) -> Option<u8> {
+        self.value.channel()
+    }
+    fn __repr__(&self) -> String {
+        format!(
+            "ParameterStep(parameter={}, direction={}, channel={}, family={:?})",
+            self.parameter(),
+            self.direction(),
+            self.channel()
+                .map_or_else(|| "None".into(), |v| v.to_string()),
+            self.family()
+        )
+    }
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, Self>>()
+            .is_ok_and(|v| self.value == v.value)
+    }
+    fn __hash__(&self) -> u64 {
+        value_hash(&self.value)
+    }
+    #[pyo3(signature=(**changes))]
+    fn replace<'py>(
+        slf: PyRef<'py, Self>,
+        changes: Option<&Bound<'py, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let py = slf.py();
+        crate::tuning::replacement(
+            slf.into_pyobject(py)?.as_any(),
+            &["parameter", "direction", "channel", "family"],
+            changes,
+        )
+    }
+    #[classattr]
+    fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+        let annotations = PyDict::new(py);
+        annotations.set_item("parameter", py.get_type::<PyInt>())?;
+        annotations.set_item("direction", py.get_type::<PyInt>())?;
+        annotations.set_item(
+            "channel",
+            py.import("typing")?
+                .getattr("Optional")?
+                .get_item(py.get_type::<PyInt>())?,
+        )?;
+        annotations.set_item("family", py.get_type::<pyo3::types::PyString>())?;
+        Ok(annotations)
+    }
+    #[classattr]
+    fn __match_args__() -> (&'static str, &'static str, &'static str) {
+        ("parameter", "direction", "channel")
+    }
 }
 
 pub(crate) fn rpn_to_python(py: Python<'_>, value: messages::RpnSet) -> PyResult<Py<PyAny>> {

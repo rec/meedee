@@ -135,7 +135,8 @@ fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>
 pub fn prepare_command(
     protocol: crate::packets::Protocol,
     command: &Bound<'_, PyAny>,
-) -> PyResult<(String, std::collections::HashMap<String, i64>, usize)> {
+) -> PyResult<(String, Py<pyo3::types::PyDict>, usize)> {
+    let py = command.py();
     let command = messages::extract_command(command)?;
     if protocol != crate::packets::Protocol::Midi1 {
         return Err(crate::errors::CapabilityError::new_err(
@@ -145,7 +146,7 @@ pub fn prepare_command(
     let total = codecs::expand(&command)
         .map_err(|e| PyValueError::new_err(e.to_string()))?
         .len();
-    let (name, fields) = messages::command_wire(&command);
+    let (name, fields) = messages::command_wire(py, &command)?;
     Ok((name, fields, total))
 }
 

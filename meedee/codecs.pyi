@@ -10,10 +10,7 @@ def expand(
     command: messages.ControlChange14
     | messages.RpnSet
     | messages.NrpnSet
-    | messages.RpnIncrement
-    | messages.RpnDecrement
-    | messages.NrpnIncrement
-    | messages.NrpnDecrement
+    | messages.ParameterStep
     | gm.BankProgramSelect
     | mpe.ZoneConfiguration,
 ) -> list[Message]: ...

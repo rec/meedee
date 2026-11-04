@@ -68,10 +68,10 @@ A long-running capture that exhausts these bounds must start another archive.
 | 1 | ControlChange14 | channel, controller, value |
 | 2 | RpnSet | channel, parameter, value, resolution |
 | 3 | NrpnSet | channel, parameter, value, resolution |
-| 4 | RpnIncrement | channel, parameter |
-| 5 | RpnDecrement | channel, parameter |
-| 6 | NrpnIncrement | channel, parameter |
-| 7 | NrpnDecrement | channel, parameter |
+| 4 | ParameterStep (rpn, +1) | channel, parameter |
+| 5 | ParameterStep (rpn, -1) | channel, parameter |
+| 6 | ParameterStep (nrpn, +1) | channel, parameter |
+| 7 | ParameterStep (nrpn, -1) | channel, parameter |
 | 8 | BankProgramSelect | channel, bank_msb, bank_lsb, program |
 | 9 | ZoneConfiguration | manager_channel, members |
 

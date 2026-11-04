@@ -196,10 +196,79 @@ channel_messages! {
     ControlChange14(controller, value) { controller: u8 => with_controller = 0..=31 => controller, value: u16 => with_value = 0..=16383 => value };
     RpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16382 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
     NrpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16383 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
-    RpnIncrement(parameter) { parameter: u16 => with_parameter = 0..=16382 => parameter };
-    RpnDecrement(parameter) { parameter: u16 => with_parameter = 0..=16382 => parameter };
-    NrpnIncrement(parameter) { parameter: u16 => with_parameter = 0..=16383 => parameter };
-    NrpnDecrement(parameter) { parameter: u16 => with_parameter = 0..=16383 => parameter };
+}
+
+/// A single relative step of a registered or non-registered parameter.
+#[derive(Clone, Debug)]
+pub struct ParameterStep {
+    metadata: Option<Box<Metadata>>,
+    channel: Option<u8>,
+    parameter: u16,
+    family: crate::controls::ParameterFamily,
+    direction: crate::controls::StepDirection,
+}
+value_metadata!(ParameterStep {
+    channel,
+    parameter,
+    family,
+    direction
+});
+impl ParameterStep {
+    pub fn new(parameter: i64) -> Result<Self, ValueError> {
+        Self {
+            metadata: None,
+            channel: None,
+            parameter: 0,
+            family: crate::controls::ParameterFamily::Rpn,
+            direction: crate::controls::StepDirection::Increment,
+        }
+        .with_parameter(parameter)
+    }
+    pub fn parameter(&self) -> u16 {
+        self.parameter
+    }
+    pub fn channel(&self) -> Option<u8> {
+        self.channel
+    }
+    pub fn family(&self) -> crate::controls::ParameterFamily {
+        self.family
+    }
+    pub fn direction(&self) -> crate::controls::StepDirection {
+        self.direction
+    }
+    pub fn with_parameter(mut self, parameter: i64) -> Result<Self, ValueError> {
+        let maximum = if self.family == crate::controls::ParameterFamily::Rpn {
+            16382
+        } else {
+            16383
+        };
+        self.parameter = bounded(parameter, "parameter", 0, maximum)? as u16;
+        Ok(self)
+    }
+    pub fn with_family(
+        mut self,
+        family: crate::controls::ParameterFamily,
+    ) -> Result<Self, ValueError> {
+        self.family = family;
+        let parameter = self.parameter;
+        self.with_parameter(parameter.into())
+    }
+    pub fn with_direction(mut self, direction: crate::controls::StepDirection) -> Self {
+        self.direction = direction;
+        self
+    }
+    pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
+        self.channel = Some(bounded(channel, "channel", 1, 16)? as u8);
+        Ok(self)
+    }
+    pub fn without_channel(mut self) -> Self {
+        self.channel = None;
+        self
+    }
+    pub(crate) fn resolved_channel(&self) -> Result<u8, ValueError> {
+        self.channel
+            .ok_or_else(|| ValueError("message channel is unassigned".into()))
+    }
 }
 
 macro_rules! transpose_note {
@@ -306,10 +375,7 @@ pub enum AnyCommand {
     ControlChange14(ControlChange14),
     RpnSet(RpnSet),
     NrpnSet(NrpnSet),
-    RpnIncrement(RpnIncrement),
-    RpnDecrement(RpnDecrement),
-    NrpnIncrement(NrpnIncrement),
-    NrpnDecrement(NrpnDecrement),
+    ParameterStep(ParameterStep),
     BankProgramSelect(crate::gm::BankProgramSelect),
     ZoneConfiguration(crate::mpe::ZoneConfiguration),
 }
@@ -317,10 +383,7 @@ enum_metadata!(AnyCommand {
     ControlChange14,
     RpnSet,
     NrpnSet,
-    RpnIncrement,
-    RpnDecrement,
-    NrpnIncrement,
-    NrpnDecrement,
+    ParameterStep,
     BankProgramSelect,
     ZoneConfiguration
 });

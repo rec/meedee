@@ -825,10 +825,7 @@ class _OutputState:
                         messages.ControlChange14,
                         messages.RpnSet,
                         messages.NrpnSet,
-                        messages.RpnIncrement,
-                        messages.RpnDecrement,
-                        messages.NrpnIncrement,
-                        messages.NrpnDecrement,
+                        messages.ParameterStep,
                     ),
                 ) and (self._channel is not None or v.channel is None):
                     v = v.replace(channel=self._channel or 1)

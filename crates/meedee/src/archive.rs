@@ -322,35 +322,25 @@ fn command(out: &mut Vec<u8>, c: &m::AnyCommand) -> io::Result<()> {
                 v.resolution().into(),
             ],
         ),
-        RpnIncrement(v) => (
-            4,
-            vec![
-                v.channel()
-                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
-                    .into(),
-                v.parameter().into(),
-            ],
-        ),
-        RpnDecrement(v) => (
-            5,
-            vec![
-                v.channel()
-                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
-                    .into(),
-                v.parameter().into(),
-            ],
-        ),
-        NrpnIncrement(v) => (
-            6,
-            vec![
-                v.channel()
-                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
-                    .into(),
-                v.parameter().into(),
-            ],
-        ),
-        NrpnDecrement(v) => (
-            7,
+        ParameterStep(v) => (
+            match (v.family(), v.direction()) {
+                (
+                    crate::controls::ParameterFamily::Rpn,
+                    crate::controls::StepDirection::Increment,
+                ) => 4,
+                (
+                    crate::controls::ParameterFamily::Rpn,
+                    crate::controls::StepDirection::Decrement,
+                ) => 5,
+                (
+                    crate::controls::ParameterFamily::Nrpn,
+                    crate::controls::StepDirection::Increment,
+                ) => 6,
+                (
+                    crate::controls::ParameterFamily::Nrpn,
+                    crate::controls::StepDirection::Decrement,
+                ) => 7,
+            },
             vec![
                 v.channel()
                     .ok_or_else(|| invalid(0, "message channel is unassigned"))?
@@ -725,38 +715,27 @@ fn decode_command(b: &[u8]) -> io::Result<m::AnyCommand> {
                     .map_err(|e| invalid(0, e))?,
             )
         }
-        4 => {
+        4..=7 => {
             let channel = f.i64()?;
             let parameter = f.i64()?;
-            RpnIncrement(
-                m::RpnIncrement::new(parameter)
-                    .and_then(|m| m.with_channel(channel))
-                    .map_err(|e| invalid(0, e))?,
-            )
-        }
-        5 => {
-            let channel = f.i64()?;
-            let parameter = f.i64()?;
-            RpnDecrement(
-                m::RpnDecrement::new(parameter)
-                    .and_then(|m| m.with_channel(channel))
-                    .map_err(|e| invalid(0, e))?,
-            )
-        }
-        6 => {
-            let channel = f.i64()?;
-            let parameter = f.i64()?;
-            NrpnIncrement(
-                m::NrpnIncrement::new(parameter)
-                    .and_then(|m| m.with_channel(channel))
-                    .map_err(|e| invalid(0, e))?,
-            )
-        }
-        7 => {
-            let channel = f.i64()?;
-            let parameter = f.i64()?;
-            NrpnDecrement(
-                m::NrpnDecrement::new(parameter)
+            use crate::controls::{ParameterFamily, StepDirection};
+            ParameterStep(
+                m::ParameterStep::new(0)
+                    .and_then(|m| {
+                        m.with_family(if id < 6 {
+                            ParameterFamily::Rpn
+                        } else {
+                            ParameterFamily::Nrpn
+                        })
+                    })
+                    .and_then(|m| m.with_parameter(parameter))
+                    .map(|m| {
+                        m.with_direction(if id % 2 == 0 {
+                            StepDirection::Increment
+                        } else {
+                            StepDirection::Decrement
+                        })
+                    })
                     .and_then(|m| m.with_channel(channel))
                     .map_err(|e| invalid(0, e))?,
             )

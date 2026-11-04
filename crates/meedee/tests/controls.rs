@@ -13,7 +13,16 @@ fn commands_expand_to_independent_wire_vectors() {
         let (fields, wire) = line.split_once('|').unwrap();
         let mut fields = fields.split_whitespace();
         let name = fields.next().unwrap();
-        let v: Vec<i64> = fields.map(|v| v.parse().unwrap()).collect();
+        let fields: Vec<_> = fields.collect();
+        let v: Vec<i64> = fields
+            .iter()
+            .take(if name == "ParameterStep" {
+                3
+            } else {
+                fields.len()
+            })
+            .map(|v| v.parse().unwrap())
+            .collect();
         let command = match name {
             "ControlChange14" => AnyCommand::ControlChange14(
                 ControlChange14::new(v[1], v[2])
@@ -32,23 +41,23 @@ fn commands_expand_to_independent_wire_vectors() {
                     .and_then(|m| m.with_channel(v[0]))
                     .unwrap(),
             ),
-            "RpnIncrement" => AnyCommand::RpnIncrement(
-                RpnIncrement::new(v[1])
-                    .and_then(|m| m.with_channel(v[0]))
-                    .unwrap(),
-            ),
-            "RpnDecrement" => AnyCommand::RpnDecrement(
-                RpnDecrement::new(v[1])
-                    .and_then(|m| m.with_channel(v[0]))
-                    .unwrap(),
-            ),
-            "NrpnIncrement" => AnyCommand::NrpnIncrement(
-                NrpnIncrement::new(v[1])
-                    .and_then(|m| m.with_channel(v[0]))
-                    .unwrap(),
-            ),
-            "NrpnDecrement" => AnyCommand::NrpnDecrement(
-                NrpnDecrement::new(v[1])
+            "ParameterStep" => AnyCommand::ParameterStep(
+                ParameterStep::new(0)
+                    .and_then(|m| {
+                        m.with_family(if fields[3] == "rpn" {
+                            ParameterFamily::Rpn
+                        } else {
+                            ParameterFamily::Nrpn
+                        })
+                    })
+                    .and_then(|m| m.with_parameter(v[1]))
+                    .map(|m| {
+                        m.with_direction(if v[2] == 1 {
+                            StepDirection::Increment
+                        } else {
+                            StepDirection::Decrement
+                        })
+                    })
                     .and_then(|m| m.with_channel(v[0]))
                     .unwrap(),
             ),
@@ -229,4 +238,27 @@ fn cc(
             .and_then(|m| m.with_channel(channel))
             .unwrap(),
     ))
+}
+
+#[test]
+fn parameter_step_builders_validate_family_and_preserve_defaults() {
+    let step = ParameterStep::new(7).unwrap();
+    assert_eq!(step.family(), ParameterFamily::Rpn);
+    assert_eq!(step.direction(), StepDirection::Increment);
+    assert_eq!(step.channel(), None);
+    assert!(step.expand().is_err());
+    assert!(ParameterStep::new(16383).is_err());
+    let step = step
+        .with_family(ParameterFamily::Nrpn)
+        .unwrap()
+        .with_parameter(16383)
+        .unwrap()
+        .with_direction(StepDirection::Decrement)
+        .with_channel(16)
+        .unwrap();
+    assert!(step.clone().with_family(ParameterFamily::Rpn).is_err());
+    assert!(step.clone().with_parameter(-1).is_err());
+    assert!(step.clone().with_parameter(16384).is_err());
+    assert!(step.clone().with_channel(17).is_err());
+    assert_eq!(step.expand().unwrap().len(), 5);
 }

@@ -233,10 +233,15 @@ provided by slice 4 below and tuning by slice 5; GM profiles and files retain la
 
 ### Slice 4 compound commands and observations, approved 2026-10-14
 
-Seven frozen Message subclasses are added in `meedee.messages`:
-ControlChange14(channel, controller, value), RpnSet/NrpnSet(channel, parameter,
-value, resolution), and RpnIncrement/RpnDecrement/NrpnIncrement/NrpnDecrement
-(channel, parameter). Payload fields are positional strict integers, with an optional trailing channel and checked
+Four frozen command subclasses are provided in `meedee.messages`:
+ControlChange14(controller, value, channel=None), RpnSet/NrpnSet(parameter,
+value, resolution=14, channel=None), and ParameterStep(parameter, direction=1,
+channel=None, *, family="rpn"). Direction is exactly -1 or 1; family is "rpn"
+or "nrpn". Rust uses `ParameterStep::new(parameter)` with `with_family` and
+`with_direction` builders taking the existing controls enums. The default is an
+RPN increment. Builders validate each result: select NRPN before setting parameter
+16383. The separate `controls.ParameterStep` represents incoming observations.
+Payload integer fields are positional strict integers, with an optional trailing channel and checked
 replacement, annotations and class patterns as for primitive messages.
 ControlChange14 uses controller 0–31 and value 0–16383. Parameter identifiers
 are 0–16383 except RPN 16383, which is null selection and cannot be set/stepped;

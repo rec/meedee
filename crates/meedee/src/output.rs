@@ -650,10 +650,7 @@ fn resolve_command(command: AnyCommand, channel: Option<u8>) -> io::Result<AnyCo
         ControlChange14,
         RpnSet,
         NrpnSet,
-        RpnIncrement,
-        RpnDecrement,
-        NrpnIncrement,
-        NrpnDecrement,
+        ParameterStep,
         BankProgramSelect
     )
 }
@@ -841,15 +838,7 @@ midi1_values!(
     SysEx
 );
 macro_rules! command_values {($($name:ident),*)=>{$(impl From<messages::$name> for OutputValue {fn from(v:messages::$name)->Self {AnyCommand::$name(v).into()}})*};}
-command_values!(
-    ControlChange14,
-    RpnSet,
-    NrpnSet,
-    RpnIncrement,
-    RpnDecrement,
-    NrpnIncrement,
-    NrpnDecrement
-);
+command_values!(ControlChange14, RpnSet, NrpnSet, ParameterStep);
 impl From<crate::gm::BankProgramSelect> for OutputValue {
     fn from(v: crate::gm::BankProgramSelect) -> Self {
         AnyCommand::BankProgramSelect(v).into()

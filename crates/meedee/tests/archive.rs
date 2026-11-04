@@ -192,3 +192,36 @@ fn independent_v1_vectors_validate_future_headers_and_preserve_exact_bytes() {
         }
     }
 }
+
+#[test]
+fn parameter_steps_keep_the_existing_archive_ids_and_fields() {
+    use meedee::{
+        controls::{ParameterFamily, StepDirection},
+        messages::{AnyCommand, ParameterStep},
+    };
+    for (id, family, direction) in [
+        (4u16, ParameterFamily::Rpn, StepDirection::Increment),
+        (5, ParameterFamily::Rpn, StepDirection::Decrement),
+        (6, ParameterFamily::Nrpn, StepDirection::Increment),
+        (7, ParameterFamily::Nrpn, StepDirection::Decrement),
+    ] {
+        let step = ParameterStep::new(7)
+            .unwrap()
+            .with_family(family)
+            .unwrap()
+            .with_direction(direction)
+            .with_channel(2)
+            .unwrap();
+        let event = Payload::Command(AnyCommand::ParameterStep(step))
+            .with_stream("s")
+            .unwrap();
+        let mut expected = vec![0, 3, 0, 0, 0, 1, b's', 0, 0, 3];
+        expected.extend(id.to_be_bytes());
+        expected.extend(2i64.to_be_bytes());
+        expected.extend(7i64.to_be_bytes());
+        assert_eq!(
+            archive::encode(&Record::Event(Box::new(event))).unwrap(),
+            expected
+        );
+    }
+}

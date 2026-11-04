@@ -395,7 +395,7 @@ impl Command for ControlChange14 {
 }
 
 macro_rules! parameter_commands {
-    (sets: $($set:ident => $selector:literal),*; steps: $($step:ident => ($family:literal, $controller:literal)),* $(;)?) => {
+    ($($set:ident => $selector:literal),* $(,)?) => {
         $(impl Command for $set {
             fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
                 let data = if self.resolution() == 7 {
@@ -406,11 +406,6 @@ macro_rules! parameter_commands {
                 inherit_metadata(self, parameter_command(self.resolved_channel()?, self.parameter(), $selector, &data))
             }
         })*
-        $(impl Command for $step {
-            fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-                inherit_metadata(self, parameter_command(self.resolved_channel()?, self.parameter(), $family, &[($controller, 0)]))
-            }
-        })*
         impl Command for AnyCommand {
             fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
                 match self {
@@ -418,7 +413,7 @@ macro_rules! parameter_commands {
                     Self::BankProgramSelect(command) => command.expand(),
                     Self::ZoneConfiguration(command) => command.expand(),
                     $(Self::$set(command) => command.expand(),)*
-                    $(Self::$step(command) => command.expand(),)*
+                    Self::ParameterStep(command) => command.expand(),
                 }
             }
         }
@@ -426,9 +421,30 @@ macro_rules! parameter_commands {
 }
 
 parameter_commands! {
-    sets: RpnSet => 101, NrpnSet => 99;
-    steps: RpnIncrement => (101, 96), RpnDecrement => (101, 97),
-           NrpnIncrement => (99, 96), NrpnDecrement => (99, 97);
+    RpnSet => 101, NrpnSet => 99,
+}
+
+impl Command for ParameterStep {
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        use crate::controls::{ParameterFamily, StepDirection};
+        let selector = match self.family() {
+            ParameterFamily::Rpn => 101,
+            ParameterFamily::Nrpn => 99,
+        };
+        let controller = match self.direction() {
+            StepDirection::Increment => 96,
+            StepDirection::Decrement => 97,
+        };
+        inherit_metadata(
+            self,
+            parameter_command(
+                self.resolved_channel()?,
+                self.parameter(),
+                selector,
+                &[(controller, 0)],
+            ),
+        )
+    }
 }
 
 encode_short! {

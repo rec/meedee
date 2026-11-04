@@ -448,3 +448,20 @@ The driver requires a fresh monitor and leaves the input open. Omit `callback`
 for a summary alone. Callbacks must not reenter the same monitor. No payload
 history is retained by the library; the CLI owns bounded previews and display
 history. Metrics use host delivery times, independently of source timestamps.
+
+## Step an RPN or NRPN parameter
+
+Increment registered parameter 7 once, then decrement non-registered parameter 7
+once. Choose parameter numbers supported by your instrument.
+
+```python
+from meedee import messages, midi
+
+with midi.Output() as out:
+    out(messages.ParameterStep(7))
+    out(messages.ParameterStep(7, -1, family="nrpn"))
+```
+
+`direction` is `1` or `-1`; it is not a step count. Family defaults to `"rpn"`.
+The output supplies the channel when it is unassigned. `controls.ParameterStep`
+is a separate observation returned when interpreting incoming controller messages.

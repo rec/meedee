@@ -94,8 +94,9 @@ fn expanded_commands_retain_the_original_provenance() {
                 .with_channel(2)
                 .unwrap(),
         ),
-        AnyCommand::NrpnIncrement(
-            meedee::messages::NrpnIncrement::new(1)
+        AnyCommand::ParameterStep(
+            meedee::messages::ParameterStep::new(1)
+                .and_then(|m| m.with_family(meedee::controls::ParameterFamily::Nrpn))
                 .unwrap()
                 .with_channel(2)
                 .unwrap(),

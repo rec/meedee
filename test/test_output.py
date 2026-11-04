@@ -25,7 +25,9 @@ class NativeConnection:
             raise midi.SendError("release failed")
         self.sink(packet)
 
-    def send_command(self, command: messages.ControlChange14) -> None:
+    def send_command(
+        self, command: messages.ControlChange14 | messages.ParameterStep
+    ) -> None:
         for i, message in enumerate(codecs.expand(command)):
             if self.partial == i:
                 raise midi.CompoundSendError("partial", i, 2)
@@ -83,6 +85,22 @@ def test_output_channel_overrides_messages_and_tracks_cleanup(
         b"\x81\x3f\x00",
     ]
     assert transport.closed
+
+
+def test_parameter_step_uses_output_channel_and_preserves_nrpn_family(
+    transport: NativeConnection,
+) -> None:
+    step = messages.ParameterStep(16383, -1, family="nrpn")
+    with midi.Output(channel=2) as out:
+        out(step)
+    assert step.channel is None
+    assert transport.packets() == [
+        b"\xb1\x63\x7f",
+        b"\xb1\x62\x7f",
+        b"\xb1\x61\x00",
+        b"\xb1\x65\x7f",
+        b"\xb1\x64\x7f",
+    ]
 
 
 def test_call_schedules_cumulative_delays_including_trailing_time(

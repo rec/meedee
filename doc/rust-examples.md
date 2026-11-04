@@ -510,3 +510,24 @@ continues; terminal failures return an error with progress retained in
 `monitor.snapshot()`. The driver requires a fresh monitor and leaves the input
 open. Use `|_| Ok(())` when only the report is needed. The final boolean enables
 host delivery metrics. The library retains no payload history or formatted text.
+
+## Step an RPN or NRPN parameter
+
+Use the same single-step command with typed family and direction builders:
+
+```rust
+use meedee::{controls::{ParameterFamily, StepDirection}, messages::ParameterStep, midi::Output};
+
+let mut out = Output::new();
+out.send(ParameterStep::new(7)?)?;
+out.send(ParameterStep::new(7)?
+    .with_family(ParameterFamily::Nrpn)?
+    .with_direction(StepDirection::Decrement))?;
+out.close()?;
+```
+
+Choose parameter numbers supported by your instrument. The defaults are RPN,
+increment, and an unassigned channel. To use NRPN parameter 16383, select the
+family before that parameter: `ParameterStep::new(0)?.with_family(ParameterFamily::Nrpn)?.with_parameter(16383)?`.
+Each builder preserves a valid command. `controls::ParameterStep` remains the
+separate incoming observation type.

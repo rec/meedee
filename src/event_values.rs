@@ -56,19 +56,15 @@ pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
         model::Payload::Midi1(v) => crate::messages::to_python(py, v),
         model::Payload::Ump(v) => crate::ump::to_python(py, v),
         model::Payload::Command(v) => {
-            let (name, fields) = crate::messages::command_wire(&v);
+            let (name, kwargs) = crate::messages::command_wire(py, &v)?;
             let module = match name.as_str() {
                 "BankProgramSelect" => "meedee.gm",
                 "ZoneConfiguration" => "meedee.mpe",
                 _ => "meedee.messages",
             };
-            let kwargs = PyDict::new(py);
-            for (k, v) in fields {
-                kwargs.set_item(k, v)?;
-            }
             Ok(PyModule::import(py, module)?
                 .getattr(name)?
-                .call((), Some(&kwargs))?
+                .call((), Some(kwargs.bind(py)))?
                 .unbind())
         }
     }?;
