@@ -89,8 +89,8 @@ impl Step {
     }
 }
 #[pyclass(frozen, module = "meedee.transfer")]
-struct Report {
-    value: transfer::Report,
+pub(crate) struct Report {
+    pub(crate) value: transfer::Report,
 }
 #[pymethods]
 impl Report {
@@ -136,8 +136,8 @@ impl Report {
     }
 }
 #[pyclass(module = "meedee.transfer")]
-struct Session {
-    value: transfer::Session,
+pub(crate) struct Session {
+    pub(crate) value: transfer::Session,
 }
 #[pymethods]
 impl Session {
@@ -196,8 +196,8 @@ fn position(value: &Bound<'_, PyAny>) -> PyResult<usize> {
 }
 
 #[pyclass(frozen, module = "meedee.transfer")]
-struct CaptureReport {
-    value: transfer::CaptureReport,
+pub(crate) struct CaptureReport {
+    pub(crate) value: transfer::CaptureReport,
 }
 #[pymethods]
 impl CaptureReport {
@@ -231,8 +231,8 @@ impl CaptureReport {
     }
 }
 #[pyclass(module = "meedee.transfer")]
-struct Capture {
-    value: transfer::Capture,
+pub(crate) struct Capture {
+    pub(crate) value: transfer::Capture,
 }
 #[pymethods]
 impl Capture {

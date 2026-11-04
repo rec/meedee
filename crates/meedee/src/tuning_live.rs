@@ -24,7 +24,8 @@ pub fn run(
         cancel.unwrap_or(&Cancellation::default()),
     )
 }
-fn run_with(
+#[doc(hidden)]
+pub fn run_with(
     query: &mut Query,
     receiver: &mut impl Receiver,
     output: &mut impl Sender,
@@ -40,7 +41,11 @@ fn run_with(
             break;
         }
         if let Err(error) = receiver.check() {
-            query.fail(&error.to_string());
+            if drivers::interrupted(&error) {
+                query.cancel("interrupted");
+            } else {
+                query.fail(&error.to_string());
+            }
             break;
         }
         if query.snapshot().status == "ready" {
@@ -49,6 +54,7 @@ fn run_with(
                 crate::messages::AnyMessage::SysEx(request),
             )) {
                 Ok(()) => query.confirm(clock.now_ns())?,
+                Err(error) if drivers::interrupted(&error) => query.cancel("interrupted"),
                 Err(error) => query.fail(&error.to_string()),
             }
             continue;
@@ -62,7 +68,11 @@ fn run_with(
         match receiver.receive(wait) {
             Ok(item) => {
                 if let Err(error) = receiver.check() {
-                    query.fail(&error.to_string());
+                    if drivers::interrupted(&error) {
+                        query.cancel("interrupted");
+                    } else {
+                        query.fail(&error.to_string());
+                    }
                     break;
                 }
                 if cancel.cancelled() {
@@ -73,6 +83,7 @@ fn run_with(
                     query.feed(&item, clock.now_ns())?;
                 }
             }
+            Err(error) if drivers::interrupted(&error) => query.cancel("interrupted"),
             Err(error) => query.fail(&error.to_string()),
         }
     }

@@ -22,7 +22,8 @@ pub fn run(
         cancel.unwrap_or(&Cancellation::default()),
     )
 }
-fn run_with(
+#[doc(hidden)]
+pub fn run_with(
     capture: &mut Capture,
     receiver: &mut impl Receiver,
     clock: &mut impl PlaybackClock,
@@ -35,7 +36,11 @@ fn run_with(
             break;
         }
         if let Err(error) = receiver.check() {
-            capture.fail(&error.to_string());
+            if drivers::interrupted(&error) {
+                capture.cancel("interrupted");
+            } else {
+                capture.fail(&error.to_string());
+            }
             break;
         }
         capture.poll(clock.now_ns())?;
@@ -47,7 +52,11 @@ fn run_with(
         match receiver.receive(wait) {
             Ok(item) => {
                 if let Err(error) = receiver.check() {
-                    capture.fail(&error.to_string());
+                    if drivers::interrupted(&error) {
+                        capture.cancel("interrupted");
+                    } else {
+                        capture.fail(&error.to_string());
+                    }
                     break;
                 }
                 if cancel.cancelled() {
@@ -58,6 +67,7 @@ fn run_with(
                     capture.feed(&item, clock.now_ns())?;
                 }
             }
+            Err(error) if drivers::interrupted(&error) => capture.cancel("interrupted"),
             Err(error) => capture.fail(&error.to_string()),
         }
     }

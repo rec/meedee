@@ -50,7 +50,8 @@ pub fn run(
         options,
     )
 }
-fn run_with(
+#[doc(hidden)]
+pub fn run_with(
     browser: &mut Browser,
     receiver: &mut impl Receiver,
     output: &mut impl Sender,
@@ -63,7 +64,7 @@ fn run_with(
     let mut queue = VecDeque::from(browser.start(clock.now_ns())?);
     let mut sending = None;
     let result = (|| -> midi::Result<()> {
-        while matches!(
+        'scan: while matches!(
             browser.snapshot().status,
             "discovering" | "inquiring" | "stopping"
         ) {
@@ -71,7 +72,13 @@ fn run_with(
                 browser.stop("cancelled by caller");
                 break;
             }
-            receiver.check()?;
+            if let Err(error) = receiver.check() {
+                if drivers::input_loss(&error) {
+                    browser.stop(&error.to_string());
+                    break;
+                }
+                return Err(error);
+            }
             queue.extend(browser.poll(clock.now_ns())?);
             let pending = browser.snapshot().pending_tokens;
             queue.retain(|a| pending.contains(&a.token));
@@ -89,10 +96,15 @@ fn run_with(
                 for packet in packets {
                     receiver.check()?;
                     if cancel.cancelled() {
-                        return Err(drivers::invalid("scan cancelled during management send"));
+                        browser.stop("cancelled by caller");
+                        break 'scan;
                     }
                     sending = Some(action.token);
-                    output.send(packet)?;
+                    if route.group().is_none() {
+                        output.send_management(action.message.clone())?;
+                    } else {
+                        output.send(packet)?;
+                    }
                 }
                 queue.extend(browser.report_send(action.token, true, clock.now_ns())?);
                 sending = None;
@@ -157,6 +169,9 @@ fn run_with(
     assembler.reset();
     if let Err(error) = result {
         browser.stop(&error.to_string());
+        if drivers::interrupted(&error) {
+            return Ok(browser.snapshot());
+        }
         return Err(error);
     }
     Ok(browser.snapshot())

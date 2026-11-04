@@ -18,7 +18,8 @@ pub fn run(
         cancel.unwrap_or(&Cancellation::default()),
     )
 }
-fn run_with(
+#[doc(hidden)]
+pub fn run_with(
     session: &mut Session,
     output: &mut impl Sender,
     clock: &mut impl PlaybackClock,
@@ -39,7 +40,13 @@ fn run_with(
                 .snapshot()
                 .next_ready_ns
                 .expect("paced session deadline");
-            clock.wait_until(deadline, cancel)?;
+            if let Err(error) = clock.wait_until(deadline, cancel) {
+                if error.kind() == std::io::ErrorKind::Interrupted {
+                    session.cancel("interrupted");
+                    break;
+                }
+                return Err(error.into());
+            }
             continue;
         };
         match output.send(crate::events::Payload::Midi1(
@@ -50,6 +57,10 @@ fn run_with(
                     session.fail(step.index, "send confirmation failed")?;
                     return Err(error.into());
                 }
+            }
+            Err(error) if drivers::interrupted(&error) => {
+                session.cancel("interrupted");
+                break;
             }
             Err(error) => session.fail(step.index, &error.to_string())?,
         }

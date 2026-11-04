@@ -5,8 +5,8 @@ use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 
 #[pyclass(frozen, module = "meedee.tuning")]
-struct QueryReport {
-    value: tuning_query::QueryReport,
+pub(crate) struct QueryReport {
+    pub(crate) value: tuning_query::QueryReport,
 }
 #[pymethods]
 impl QueryReport {
@@ -52,8 +52,8 @@ impl QueryReport {
     }
 }
 #[pyclass(module = "meedee.tuning")]
-struct Query {
-    value: tuning_query::Query,
+pub(crate) struct Query {
+    pub(crate) value: tuning_query::Query,
 }
 #[pymethods]
 impl Query {

@@ -66,8 +66,8 @@ impl PlaybackPlan {
     }
 }
 #[pyclass(frozen, module = "meedee.events")]
-struct Cancellation {
-    value: model::Cancellation,
+pub(crate) struct Cancellation {
+    pub(crate) value: model::Cancellation,
 }
 #[pymethods]
 impl Cancellation {

@@ -2,7 +2,7 @@
 use crate::{events::Payload, live::Item, midi, playback::PlaybackClock};
 use std::time::Duration;
 
-pub(crate) trait Receiver {
+pub trait Receiver {
     fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>>;
     fn check(&self) -> midi::Result<()>;
 }
@@ -20,8 +20,13 @@ impl Receiver for midi::Input {
         Ok(())
     }
 }
-pub(crate) trait Sender {
+pub trait Sender {
     fn send(&mut self, message: Payload) -> midi::Result<()>;
+    fn send_management(&mut self, message: crate::ci::Management) -> midi::Result<()> {
+        self.send(Payload::Midi1(crate::messages::AnyMessage::SysEx(
+            message.sysex(),
+        )))
+    }
 }
 impl Sender for midi::Output {
     fn send(&mut self, message: Payload) -> midi::Result<()> {
@@ -33,6 +38,17 @@ pub(crate) fn remaining(clock: &mut impl PlaybackClock, deadline: u64) -> Durati
 }
 pub(crate) fn invalid(reason: &str) -> midi::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidInput, reason).into()
+}
+pub(crate) fn interrupted(error: &midi::Error) -> bool {
+    matches!(error, midi::Error::Io(e) if e.kind() == std::io::ErrorKind::Interrupted)
+}
+pub(crate) fn input_loss(error: &midi::Error) -> bool {
+    matches!(
+        error,
+        midi::Error::Transport(crate::transport::Error::Resource(
+            "input packet loss reported by transport counter"
+        ))
+    )
 }
 
 #[cfg(test)]

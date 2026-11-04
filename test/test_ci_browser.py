@@ -382,20 +382,19 @@ def test_stream_diagnostic_stops_without_interpreting_later_input(
 def test_cancel_before_first_packet_does_not_claim_uncertain_delivery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class Cancellation:
-        def __init__(self) -> None:
-            self.checks = 0
-
-        @property
-        def cancelled(self) -> bool:
-            self.checks += 1
-            return self.checks >= 2
-
     monkeypatch.setattr(ci_live, "monotonic_ns", lambda: 0)
     receiver = Receiver([0])
+    token = events.Cancellation()
+    checks = 0
+
+    def health(self: Receiver) -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            token.cancel()
+
+    monkeypatch.setattr(Receiver, "failure", property(health), raising=False)
     output = Output(receiver, 1)
-    report = run(
-        browser(1), receiver, output, cast(events.Cancellation, Cancellation())
-    )
+    report = run(browser(1), receiver, output, token)
     assert report.status == "stopped" and report.uncertain_token is None
     assert report.confirmed_actions == 0 and output.sent == []

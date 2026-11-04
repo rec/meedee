@@ -43,7 +43,8 @@ mod input;
 pub mod midi;
 mod output;
 
-mod drivers;
+#[doc(hidden)]
+pub mod drivers;
 pub mod transfer_input;
 pub mod transfer_output;
 pub mod tuning_live;

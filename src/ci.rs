@@ -465,7 +465,7 @@ fn extract(message: &Bound<'_, PyAny>) -> PyResult<model::Management> {
         "expected a supported MIDI-CI management message",
     ))
 }
-fn to_python(py: Python<'_>, value: model::Management) -> PyResult<Py<PyAny>> {
+pub(crate) fn to_python(py: Python<'_>, value: model::Management) -> PyResult<Py<PyAny>> {
     macro_rules! object {
         ($name:ident) => {
             Ok(Py::new(
@@ -526,8 +526,8 @@ fn error(e: meedee::messages::ValueError) -> PyErr {
 }
 
 #[pyclass(module = "meedee.ci")]
-struct Browser {
-    value: meedee::ci::Browser,
+pub(crate) struct Browser {
+    pub(crate) value: meedee::ci::Browser,
 }
 #[pymethods]
 impl Browser {
@@ -649,8 +649,8 @@ impl Browser {
     }
 }
 #[pyclass(frozen, module = "meedee.ci")]
-struct BrowseReport {
-    value: meedee::ci::BrowseReport,
+pub(crate) struct BrowseReport {
+    pub(crate) value: meedee::ci::BrowseReport,
 }
 #[pymethods]
 impl BrowseReport {

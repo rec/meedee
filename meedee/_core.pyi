@@ -1,5 +1,36 @@
+from collections.abc import Callable
 from types import ModuleType
 
+from . import ci, events, transfer, tuning
+
+def run_ci(
+    browser: ci.Browser,
+    receiver: object,
+    output: object,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+    message_limit: int,
+    byte_limit: int,
+) -> ci.BrowseReport: ...
+def run_transfer_input(
+    capture: transfer.Capture,
+    receiver: object,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+) -> transfer.CaptureReport: ...
+def run_tuning(
+    query: tuning.Query,
+    receiver: object,
+    output: object,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+) -> tuning.QueryReport: ...
+def run_transfer_output(
+    session: transfer.Session,
+    output: object,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+) -> transfer.Report: ...
 def populate_metrics(module: ModuleType) -> None: ...
 def populate_testing(module: ModuleType) -> None: ...
 def populate_transfer(module: ModuleType) -> None: ...
