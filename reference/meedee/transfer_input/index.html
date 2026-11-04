@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.72">
+      <meta name="generator" content="zensical-0.0.73">
     
     
       
@@ -211,7 +211,33 @@
   <span class="md-ellipsis">
     
   
-  Ten practical Python MIDI projects
+  Practical Python MIDI examples
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rust-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Practical Rust MIDI examples
 
     
   </span>
@@ -244,10 +270,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
@@ -265,8 +291,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_3">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -348,8 +374,6 @@
       
         
       
-        
-      
     
     
     
@@ -358,7 +382,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -379,15 +403,15 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
         
-          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_3_1">
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4_1">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1192,33 +1216,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../ufor_tuning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  ufor_tuning
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../ump/" class="md-nav__link">
         
   
@@ -1389,7 +1386,7 @@
 
 
 <h2 id="meedee.transfer_input.run" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">capture</span><span class="p">:</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Capture</span><span class="p">,</span> <span class="n">receiver</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">TypedInputConnection</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">transfer</span><span class="o">.</span><span class="n">CaptureReport</span></code>
+            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">capture</span><span class="p">:</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Capture</span><span class="p">,</span> <span class="n">receiver</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">Input</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">transfer</span><span class="o">.</span><span class="n">CaptureReport</span></code>
 
 <a href="#meedee.transfer_input.run" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -1467,7 +1464,7 @@ Receive waits are at most 50 ms; an in-process driver stall remains unbounded.</
 <span class="normal"><a href="#meedee.transfer_input.run--source--__codelineno-0-74">74</a></span>
 <span class="normal"><a href="#meedee.transfer_input.run--source--__codelineno-0-75">75</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.transfer_input.run--source--__span-0-14"><a id="meedee.transfer_input.run--source--__codelineno-0-14" name="meedee.transfer_input.run--source--__codelineno-0-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
 </span><span id="meedee.transfer_input.run--source--__span-0-15"><a id="meedee.transfer_input.run--source--__codelineno-0-15" name="meedee.transfer_input.run--source--__codelineno-0-15"></a>    <span class="n">capture</span><span class="p">:</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Capture</span><span class="p">,</span>
-</span><span id="meedee.transfer_input.run--source--__span-0-16"><a id="meedee.transfer_input.run--source--__codelineno-0-16" name="meedee.transfer_input.run--source--__codelineno-0-16"></a>    <span class="n">receiver</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">TypedInputConnection</span><span class="p">,</span>
+</span><span id="meedee.transfer_input.run--source--__span-0-16"><a id="meedee.transfer_input.run--source--__codelineno-0-16" name="meedee.transfer_input.run--source--__codelineno-0-16"></a>    <span class="n">receiver</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">Input</span><span class="p">,</span>
 </span><span id="meedee.transfer_input.run--source--__span-0-17"><a id="meedee.transfer_input.run--source--__codelineno-0-17" name="meedee.transfer_input.run--source--__codelineno-0-17"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="meedee.transfer_input.run--source--__span-0-18"><a id="meedee.transfer_input.run--source--__codelineno-0-18" name="meedee.transfer_input.run--source--__codelineno-0-18"></a>    <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="meedee.transfer_input.run--source--__span-0-19"><a id="meedee.transfer_input.run--source--__codelineno-0-19" name="meedee.transfer_input.run--source--__codelineno-0-19"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">transfer</span><span class="o">.</span><span class="n">CaptureReport</span><span class="p">:</span>
@@ -1601,7 +1598,7 @@ Receive waits are at most 50 ms; an in-process driver stall remains unbounded.</
       <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.77dd0ce9.min.js"></script>
       
     
   </body>

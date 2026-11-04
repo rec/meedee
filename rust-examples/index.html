@@ -1,0 +1,2051 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Python bindings for the meedee Rust MIDI toolkit">
+      
+      
+      
+        <link rel="canonical" href="https://rec.github.io/meedee/rust-examples/">
+      
+      
+      
+        <link rel="prev" href="../examples/">
+      
+      
+        <link rel="next" href="../reference/meedee/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.73">
+    
+    
+      
+        <title>Practical Rust MIDI examples - meedee</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.4ab2de0c.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-hidden="true"></label>
+    <div data-md-component="skip">
+      <a href="#__skip" class="md-skip">
+        Skip to content
+      </a>
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="meedee" class="md-header__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+      <span class="md-visually-hidden">Navigation</span>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            meedee
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Practical Rust MIDI examples
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+          <span class="md-visually-hidden">Search</span>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="meedee" class="md-nav__button md-logo" aria-label="meedee" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 5v16M20.001 19A2 2 0 0 0 22 17V5a2 2 0 0 0-1.999-2L16 3.002A5 5 0 0 0 12 5a5 5 0 0 0-4-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 1.999 2H8a5 5 0 0 1 4 2 5 5 0 0 1 4-2z"/></svg>
+
+    </a>
+    meedee
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  meedee
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Practical Python MIDI examples
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Practical Rust MIDI examples
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Practical Rust MIDI examples
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-play-one-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Play one note
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-play-a-tune-in-beats" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Play a tune in beats
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-print-incoming-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Print incoming messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-transpose-a-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Transpose a keyboard
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-split-a-keyboard-between-two-sounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Split a keyboard between two sounds
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-record-and-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Record and replay
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-handle-input-diagnostics-explicitly" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        7. Handle input diagnostics explicitly
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-overlap-notes-and-send-a-compound-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        8. Overlap notes and send a compound command
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-preserve-provenance-while-editing-a-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        9. Preserve provenance while editing a message
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-send-native-midi-2-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        10. Send native MIDI 2 messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-inspect-and-compare-saved-captures" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        11. Inspect and compare saved captures
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-capture-and-restore-a-sysex-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        12. Capture and restore a SysEx dump
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-query-a-tuning-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        13. Query a tuning dump
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-observe-endpoint-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        14. Observe endpoint changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-discover-midi-ci-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        15. Discover MIDI-CI devices
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  API Reference
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../reference/meedee/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_4_1">
+              <span class="md-nav__icon md-icon"></span>
+              
+  
+  <code class="doc-symbol doc-symbol-nav doc-symbol-module"></code>meedee
+
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  archive
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/ci/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/ci_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ci_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  cli
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  clip
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/codecs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  codecs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/controls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  controls
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  discovery
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  events
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/gm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  gm
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/inspection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  inspection
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/messages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  messages
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  metrics
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/midi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  midi
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/mpe/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  mpe
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  notes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/routing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  routing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/smf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  smf
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/syx/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  syx
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  testing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/timecode/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  timecode
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/topology/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  topology
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/transfer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/transfer_input/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_input
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/transfer_output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  transfer_output
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/tuning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/tuning_live/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  tuning_live
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/ump/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ump
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/meedee/universal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  universal
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+                
+              
+            </ul>
+          </nav>
+        
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-play-one-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Play one note
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-play-a-tune-in-beats" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Play a tune in beats
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-print-incoming-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Print incoming messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-transpose-a-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Transpose a keyboard
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-split-a-keyboard-between-two-sounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Split a keyboard between two sounds
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-record-and-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Record and replay
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-handle-input-diagnostics-explicitly" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        7. Handle input diagnostics explicitly
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-overlap-notes-and-send-a-compound-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        8. Overlap notes and send a compound command
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-preserve-provenance-while-editing-a-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        9. Preserve provenance while editing a message
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-send-native-midi-2-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        10. Send native MIDI 2 messages
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-inspect-and-compare-saved-captures" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        11. Inspect and compare saved captures
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-capture-and-restore-a-sysex-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        12. Capture and restore a SysEx dump
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-query-a-tuning-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        13. Query a tuning dump
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-observe-endpoint-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        14. Observe endpoint changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-discover-midi-ci-devices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        15. Discover MIDI-CI devices
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                <a id="__skip" tabindex="-1"></a>
+                
+                  
+
+
+<h1 id="practical-rust-midi-examples">Practical Rust MIDI examples<a class="headerlink" href="#practical-rust-midi-examples" title="Permanent link">&para;</a></h1>
+<p>These examples use the <code>meedee</code> Rust crate. Each block is an independent function
+body; put it inside a function returning <code>Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;</code>
+and finish with <code>Ok(())</code>. The <code>?</code> operator propagates a checked error.</p>
+<p>Live examples select the first available MIDI port. Connect a keyboard or synth
+before running them. MIDI carries messages, not audio. Channels are 1..16, notes
+and velocities are 0..127, and program numbers are 1..128.</p>
+<h2 id="1-play-one-note">1. Play one note<a class="headerlink" href="#1-play-one-note" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">messages</span><span class="p">::</span><span class="n">Note</span><span class="p">;</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Output</span><span class="p">;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">send</span><span class="p">(</span><span class="n">Note</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">500</span><span class="p">),</span><span class="w"> </span><span class="mi">60</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>This plays middle C for half a second, with velocity 90 on channel 1. <code>Note</code>
+sends the attack and release. The temporary output closes when the statement ends.</p>
+<h2 id="2-play-a-tune-in-beats">2. Play a tune in beats<a class="headerlink" href="#2-play-a-tune-in-beats" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">messages</span><span class="p">::{</span><span class="n">Beats</span><span class="p">,</span><span class="w"> </span><span class="n">Note</span><span class="p">,</span><span class="w"> </span><span class="n">Rest</span><span class="p">};</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Output</span><span class="p">;</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">with_bpm</span><span class="p">(</span><span class="mi">120</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">out</span><span class="p">.</span><span class="n">send_all</span><span class="p">([</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">Note</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Beats</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="mi">60</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">Note</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Beats</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="o">?</span><span class="p">,</span><span class="w"> </span><span class="mi">62</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">with_velocity</span><span class="p">(</span><span class="mi">70</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="n">Note</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Beats</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="o">?</span><span class="p">,</span><span class="w"> </span><span class="mi">64</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">with_velocity</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="n">Rest</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Beats</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="mi">1</span><span class="p">)).</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="n">Note</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Beats</span><span class="p">::</span><span class="n">from</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span><span class="w"> </span><span class="mi">64</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>One beat is a quarter note; <code>Beats::new(1, 2)</code> is half a beat. Each note or rest
+advances the sequence. <code>Duration</code> always means elapsed time, even with a tempo;
+<code>Beats</code> requires a tempo. Clocks and scheduling are automatic. <code>.into()</code> lets
+notes, rests, messages and delays share one sequence.</p>
+<p><code>Output::new().with_port("FLOW 8")?</code> selects a unique name substring; <code>*</code> and <code>?</code>
+also work as wildcards. To choose from discovery, use:</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Output</span><span class="p">;</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="kd">let</span><span class="w"> </span><span class="n">ports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">output</span><span class="p">.</span><span class="n">ports</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{ports:?}"</span><span class="p">);</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">output</span><span class="p">.</span><span class="n">connect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ports</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>This discovery example assumes there is at least one output. <code>Input</code> supports
+the same selection methods. The low-level <code>transport</code> module remains available
+for virtual ports, callbacks and backend-specific settings. Closing is terminal;
+create a new object to reconnect. Python <code>connect()</code> returns the same object; Rust
+<code>connect()</code> consumes and returns the resource to express ownership.</p>
+<h2 id="3-print-incoming-messages">3. Print incoming messages<a class="headerlink" href="#3-print-incoming-messages" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Input</span><span class="p">;</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">for</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{message:?}"</span><span class="p">);</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Input yields messages, never full <code>Note</code> values. Malformed traffic and loss are
+reported on stderr; decoding continues. Terminal connection errors stop the
+iterator. <code>with_channel(1)?</code> or <code>with_channels([1, 3])?</code> filters channel messages;
+system messages and diagnostics still pass through.</p>
+<h2 id="4-transpose-a-keyboard">4. Transpose a keyboard<a class="headerlink" href="#4-transpose-a-keyboard" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">};</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">events</span><span class="p">::</span><span class="n">Payload</span><span class="p">;</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">messages</span><span class="p">::</span><span class="n">AnyMessage</span><span class="p">;</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="k">for</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="k">match</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="n">Payload</span><span class="p">::</span><span class="n">Midi1</span><span class="p">(</span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">NoteOn</span><span class="p">(</span><span class="n">note</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">out</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">note</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">12</span><span class="p">))</span><span class="o">?</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="n">Payload</span><span class="p">::</span><span class="n">Midi1</span><span class="p">(</span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">NoteOff</span><span class="p">(</span><span class="n">note</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">out</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">note</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">12</span><span class="p">))</span><span class="o">?</span><span class="p">,</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="n">other</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">out</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">?</span><span class="p">,</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="p">}</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p><code>transpose</code> clamps to MIDI's note range and preserves timing/source metadata.
+<code>Payload</code> distinguishes MIDI 1, UMP and compound commands; <code>AnyMessage</code> identifies
+the MIDI 1 message kind. These are enums holding the messages themselves, not
+separate timing wrappers.</p>
+<h2 id="5-split-a-keyboard-between-two-sounds">5. Split a keyboard between two sounds<a class="headerlink" href="#5-split-a-keyboard-between-two-sounds" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">};</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">events</span><span class="p">::</span><span class="n">Payload</span><span class="p">;</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">messages</span><span class="p">::{</span><span class="n">AnyMessage</span><span class="p">,</span><span class="w"> </span><span class="n">ProgramChange</span><span class="p">};</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">low</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">with_channel</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">high</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">with_channel</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="n">low</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">ProgramChange</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">34</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">high</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">ProgramChange</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">81</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="k">for</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">with_channel</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">match</span><span class="w"> </span><span class="o">&amp;</span><span class="n">message</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">        </span><span class="n">Payload</span><span class="p">::</span><span class="n">Midi1</span><span class="p">(</span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">NoteOn</span><span class="p">(</span><span class="n">note</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">note</span><span class="p">.</span><span class="n">note</span><span class="p">()),</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">        </span><span class="n">Payload</span><span class="p">::</span><span class="n">Midi1</span><span class="p">(</span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">NoteOff</span><span class="p">(</span><span class="n">note</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">Some</span><span class="p">(</span><span class="n">note</span><span class="p">.</span><span class="n">note</span><span class="p">()),</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="n">_</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">    </span><span class="p">};</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="k">match</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">        </span><span class="nb">Some</span><span class="p">(</span><span class="n">note</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">note</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">60</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">low</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">message</span><span class="p">)</span><span class="o">?</span><span class="p">,</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="w">        </span><span class="nb">Some</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">high</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">message</span><span class="p">)</span><span class="o">?</span><span class="p">,</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">        </span><span class="nb">None</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="fm">matches!</span><span class="p">(</span><span class="o">&amp;</span><span class="n">message</span><span class="p">,</span><span class="w"> </span><span class="n">Payload</span><span class="p">::</span><span class="n">Midi1</span><span class="p">(</span>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">            </span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">ControlChange</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">PolyPressure</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">            </span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">ChannelPressure</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">ProgramChange</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="w">            </span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">PitchBend</span><span class="p">(</span><span class="n">_</span><span class="p">)</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="w">        </span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="w">            </span><span class="n">low</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">message</span><span class="p">.</span><span class="n">clone</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="w">            </span><span class="n">high</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">message</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a><span class="w">        </span><span class="nb">None</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">low</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">message</span><span class="p">)</span><span class="o">?</span><span class="p">,</span>
+</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a><span class="p">}</span>
+</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="n">low</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="n">high</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>System messages pass through the input filter and are forwarded once.
+An explicitly configured output channel overrides a MIDI 1 message's channel.
+Without that setting, an output preserves assigned channels and supplies channel
+1 only for unassigned messages. To send several channels through one output,
+leave its channel unset and use message builders such as <code>.with_channel(2)?</code>.</p>
+<h2 id="6-record-and-replay">6. Record and replay<a class="headerlink" href="#6-record-and-replay" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">};</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">play</span><span class="p">(</span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">record</span><span class="p">(</span><span class="n">Duration</span><span class="p">::</span><span class="n">from_secs</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>Recording closes the input and returns a <code>Recording</code> containing declarations,
+messages and any receive problems. Replay infers its origin from the first message.
+To retain the result, bind it to a variable and print the whole recording.</p>
+<p>To save and read the capture:</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">};</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">archive</span><span class="p">::</span><span class="n">Reader</span><span class="p">;</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">record_to</span><span class="p">(</span><span class="n">Duration</span><span class="p">::</span><span class="n">from_secs</span><span class="p">(</span><span class="mi">10</span><span class="p">),</span><span class="w"> </span><span class="s">"rec.meedee"</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="kd">let</span><span class="w"> </span><span class="n">report</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">play</span><span class="p">(</span><span class="n">Reader</span><span class="p">::</span><span class="n">open</span><span class="p">(</span><span class="s">"rec.meedee"</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{report:?}"</span><span class="p">);</span>
+</span></code></pre></div>
+<p>The final <code>true</code> allows overwriting; use <code>false</code> to preserve existing files.
+Recording retains the capture in memory before writing, so memory use grows with
+traffic. A disk-write failure can leave a partial file, rejected by the strict
+reader. Receive errors remain visible as gap/discontinuity records; a structurally
+complete file does not imply a loss-free performance.</p>
+<p>Replay stops at a gap, discontinuity, malformed record, timestamp regression or
+unmapped clock. Its error includes confirmed progress. Explicit clock mappings,
+rounding permission, cancellation and metrics are configured with <code>Output::with_playback</code>.</p>
+<h2 id="7-handle-input-diagnostics-explicitly">7. Handle input diagnostics explicitly<a class="headerlink" href="#7-handle-input-diagnostics-explicitly" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Input</span><span class="p">;</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">events</span><span class="p">::</span><span class="n">InputItem</span><span class="p">;</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">for</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">input</span><span class="p">.</span><span class="n">with_errors</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="k">match</span><span class="w"> </span><span class="n">item</span><span class="o">?</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">        </span><span class="n">InputItem</span><span class="p">::</span><span class="n">Message</span><span class="p">(</span><span class="n">message</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{message:?}"</span><span class="p">),</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">        </span><span class="n">InputItem</span><span class="p">::</span><span class="n">Diagnostic</span><span class="p">(</span><span class="n">diagnostic</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="fm">eprintln!</span><span class="p">(</span><span class="s">"{diagnostic:?}"</span><span class="p">),</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>The native callback feeds a bounded raw-packet queue. Decoding happens on the
+calling thread and resets partial state after loss. Queue overflow is reported
+after the accepted prefix, even if the sender goes silent. Closing also reports
+remaining native loss and unfinished messages. <code>with_receive_limits</code> configures
+queue and SysEx limits; <code>with_transport</code> configures backend admission separately.</p>
+<h2 id="8-overlap-notes-and-send-a-compound-command">8. Overlap notes and send a compound command<a class="headerlink" href="#8-overlap-notes-and-send-a-compound-command" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Output</span><span class="p">;</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">messages</span><span class="p">::{</span><span class="n">NoteOn</span><span class="p">,</span><span class="w"> </span><span class="n">RpnSet</span><span class="p">};</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">out</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">RpnSet</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">7</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span><span class="w"> </span><span class="c1">// Pitch-bend sensitivity: two semitones.</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">out</span><span class="p">.</span><span class="n">send_all</span><span class="p">([</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="n">NoteOn</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">60</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">    </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">300</span><span class="p">).</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">    </span><span class="n">NoteOn</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">    </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">300</span><span class="p">).</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span><span class="n">NoteOn</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">67</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">    </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_secs</span><span class="p">(</span><span class="mi">1</span><span class="p">).</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>These <code>NoteOn</code> messages overlap until close releases them. Compound commands
+expand internally. The complete sequence is validated before its first send.</p>
+<p>Close releases tracked MIDI 1 note counts and resets changed pitch bend,
+modulation, sustain, sostenuto, soft pedal and channel/polyphonic pressure.
+Volume, pan, expression, programs, tuning and other parameters are left alone.
+The pitch-bend sensitivity set above therefore remains in effect. <code>Drop</code> performs
+best-effort cleanup; explicit <code>close()</code> returns cleanup errors. Use channels owned
+by this connection: cleanup can affect another writer sharing a channel, and a
+failed transport can prevent cleanup.</p>
+<h2 id="9-preserve-provenance-while-editing-a-message">9. Preserve provenance while editing a message<a class="headerlink" href="#9-preserve-provenance-while-editing-a-message" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">};</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">events</span><span class="p">::</span><span class="n">Payload</span><span class="p">;</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">messages</span><span class="p">::{</span><span class="n">AnyMessage</span><span class="p">,</span><span class="w"> </span><span class="n">Message</span><span class="p">};</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="k">for</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="n">Payload</span><span class="p">::</span><span class="n">Midi1</span><span class="p">(</span><span class="n">AnyMessage</span><span class="p">::</span><span class="n">NoteOn</span><span class="p">(</span><span class="n">note</span><span class="p">))</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">message</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">edited</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">note</span><span class="p">.</span><span class="n">with_velocity</span><span class="p">(</span><span class="mi">70</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">12</span><span class="p">);</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">        </span><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">edited</span><span class="p">.</span><span class="n">metadata</span><span class="p">());</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">        </span><span class="n">out</span><span class="p">.</span><span class="n">send</span><span class="p">(</span><span class="n">edited</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">        </span><span class="k">break</span><span class="p">;</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="p">}</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>The <code>Message</code> trait exposes optional timestamp, source and packet-span metadata.
+Builders and transposition preserve it. Equality and hashing compare musical
+content, ignoring provenance; archive records compare recorded occurrences.
+Encoding a channel message directly requires an assigned channel. <code>Output</code>
+resolves an unassigned channel for you.</p>
+<h2 id="10-send-native-midi-2-messages">10. Send native MIDI 2 messages<a class="headerlink" href="#10-send-native-midi-2-messages" title="Permanent link">&para;</a></h2>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::</span><span class="n">Output</span><span class="p">;</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">transport</span><span class="p">::{</span><span class="n">OutputOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Protocol</span><span class="p">};</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">ump</span><span class="p">::{</span><span class="n">Midi2NoteOff</span><span class="p">,</span><span class="w"> </span><span class="n">Midi2NoteOn</span><span class="p">};</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">with_transport</span><span class="p">(</span><span class="n">OutputOptions</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">    </span><span class="n">protocol</span><span class="p">:</span><span class="w"> </span><span class="nc">Protocol</span><span class="p">::</span><span class="n">Ump</span><span class="p">,</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">    </span><span class="o">..</span><span class="n">OutputOptions</span><span class="p">::</span><span class="n">default</span><span class="p">()</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="p">})</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="n">out</span><span class="p">.</span><span class="n">send_all</span><span class="p">([</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="n">Midi2NoteOn</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">40_000</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">    </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">500</span><span class="p">).</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">    </span><span class="n">Midi2NoteOff</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>This needs a native UMP backend and endpoint. Group and channel are explicit;
+MIDI 2 velocity uses its native 16-bit range. There is no automatic protocol
+translation, full-note scheduling or cleanup for UMP. Raw packets likewise retain
+their own addressing. The <code>ump</code> module provides explicit translation when needed.</p>
+<h2 id="11-inspect-and-compare-saved-captures">11. Inspect and compare saved captures<a class="headerlink" href="#11-inspect-and-compare-saved-captures" title="Permanent link">&para;</a></h2>
+<p>These operations open files, not MIDI ports. Reports keep capture quality separate
+from structural completeness.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">inspection</span><span class="p">::{</span><span class="bp">self</span><span class="p">,</span><span class="w"> </span><span class="n">ComparisonOptions</span><span class="p">,</span><span class="w"> </span><span class="n">Format</span><span class="p">,</span><span class="w"> </span><span class="n">Options</span><span class="p">};</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">inspection</span><span class="p">::</span><span class="n">inspect_file</span><span class="p">(</span><span class="s">"rec.meedee"</span><span class="p">,</span><span class="w"> </span><span class="n">Format</span><span class="p">::</span><span class="n">Archive</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">);</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">inspection</span><span class="p">::</span><span class="n">compare_files</span><span class="p">(</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="s">"rec.meedee"</span><span class="p">,</span><span class="w"> </span><span class="s">"other.meedee"</span><span class="p">,</span><span class="w"> </span><span class="n">Format</span><span class="p">::</span><span class="n">Archive</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ComparisonOptions</span><span class="p">::</span><span class="n">default</span><span class="p">(),</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+</span></code></pre></div>
+<p>For playback diagnostics, configure the output once. The options apply to each
+subsequent <code>play()</code> call; ordinary playback needs no options.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">archive</span><span class="p">::</span><span class="n">Reader</span><span class="p">;</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::</span><span class="n">midi</span><span class="p">::{</span><span class="n">Output</span><span class="p">,</span><span class="w"> </span><span class="n">PlaybackOptions</span><span class="p">};</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">with_playback</span><span class="p">(</span><span class="n">PlaybackOptions</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="n">metrics</span><span class="p">:</span><span class="w"> </span><span class="nc">true</span><span class="p">,</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="o">..</span><span class="nb">Default</span><span class="p">::</span><span class="n">default</span><span class="p">()</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="p">});</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="p">.</span><span class="n">play</span><span class="p">(</span><span class="n">Reader</span><span class="p">::</span><span class="n">open</span><span class="p">(</span><span class="s">"rec.meedee"</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p><code>PlaybackOptions</code> also accepts an origin timestamp, clock mappings, rounding
+permission and a shared <code>events::Cancellation</code>. Inspection and metrics snapshots
+expose read-only getters with the same names as Python properties.</p>
+<h2 id="12-capture-and-restore-a-sysex-dump">12. Capture and restore a SysEx dump<a class="headerlink" href="#12-capture-and-restore-a-sysex-dump" title="Permanent link">&para;</a></h2>
+<p>Initiate a one-message dump on the instrument within ten seconds. The capture
+retains complete messages, then creates a new backup file only after success.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::{</span><span class="n">midi</span><span class="p">::</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">transfer</span><span class="p">,</span><span class="w"> </span><span class="n">transfer_input</span><span class="p">};</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">OpenOptions</span><span class="p">;</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">capture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transfer</span><span class="p">::</span><span class="n">Capture</span><span class="p">::</span><span class="n">new</span><span class="p">(</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">    </span><span class="n">input</span><span class="p">.</span><span class="n">stream</span><span class="p">()</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">10_000_000_000</span><span class="p">,</span><span class="w"> </span><span class="mi">8_388_608</span><span class="p">,</span><span class="w"> </span><span class="mi">1_048_576</span><span class="p">,</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="kd">let</span><span class="w"> </span><span class="n">report</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transfer_input</span><span class="p">::</span><span class="n">run</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">capture</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="n">input</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{report:?}"</span><span class="p">);</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a><span class="k">if</span><span class="w"> </span><span class="n">report</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s">"completed"</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="w">    </span><span class="n">capture</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">OpenOptions</span><span class="p">::</span><span class="n">new</span><span class="p">().</span><span class="n">write</span><span class="p">(</span><span class="kc">true</span><span class="p">).</span><span class="n">create_new</span><span class="p">(</span><span class="kc">true</span><span class="p">).</span><span class="n">open</span><span class="p">(</span><span class="s">"backup.syx"</span><span class="p">)</span><span class="o">?</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Run this separately to restore the backup. The first output must be the intended
+instrument, ready to receive it. Sending a dump can replace sounds or settings;
+choose the gap from the device's documentation.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::{</span><span class="n">midi</span><span class="p">::</span><span class="n">Output</span><span class="p">,</span><span class="w"> </span><span class="n">transfer</span><span class="p">,</span><span class="w"> </span><span class="n">transfer_output</span><span class="p">};</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">use</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">time</span><span class="p">::</span><span class="n">Duration</span><span class="p">;</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="kd">let</span><span class="w"> </span><span class="n">plan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transfer</span><span class="p">::</span><span class="n">read_file</span><span class="p">(</span><span class="s">"backup.syx"</span><span class="p">,</span><span class="w"> </span><span class="n">Duration</span><span class="p">::</span><span class="n">from_millis</span><span class="p">(</span><span class="mi">100</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="nb">Default</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">transfer</span><span class="p">::</span><span class="n">Session</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">plan</span><span class="p">);</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">transfer_output</span><span class="p">::</span><span class="n">run</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="n">output</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<h2 id="13-query-a-tuning-dump">13. Query a tuning dump<a class="headerlink" href="#13-query-a-tuning-dump" title="Permanent link">&para;</a></h2>
+<p>This asks device 0 for tuning program 2 through the first input/output pair.
+The final report includes a matching reply, timeout or failure with known progress.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::{</span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">},</span><span class="w"> </span><span class="n">tuning</span><span class="p">,</span><span class="w"> </span><span class="n">tuning_live</span><span class="p">};</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">tuning</span><span class="p">::</span><span class="n">Query</span><span class="p">::</span><span class="n">new</span><span class="p">(</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">    </span><span class="n">tuning</span><span class="p">::</span><span class="n">BulkDumpRequest</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span><span class="w"> </span><span class="n">input</span><span class="p">.</span><span class="n">stream</span><span class="p">()</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span><span class="w"> </span><span class="mi">5_000_000_000</span><span class="p">,</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">tuning_live</span><span class="p">::</span><span class="n">run</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">query</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">);</span>
+</span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="n">input</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="n">output</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p>Live drivers require fresh sessions and own their monotonic clocks. They borrow
+connections; the caller owns closing them. Failures never trigger automatic retries.
+High-level I/O errors use <code>midi::Error</code>; native categories and error causes remain
+available for inspection instead of being flattened into strings.</p>
+<h2 id="14-observe-endpoint-changes">14. Observe endpoint changes<a class="headerlink" href="#14-observe-endpoint-changes" title="Permanent link">&para;</a></h2>
+<p>Each call performs one complete discovery scan. A failed or oversized scan stops
+the poller and retains its last complete snapshot.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::{</span><span class="n">discovery</span><span class="p">::</span><span class="n">Poller</span><span class="p">,</span><span class="w"> </span><span class="n">midi</span><span class="p">::</span><span class="n">Protocol</span><span class="p">};</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">poller</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Poller</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">Protocol</span><span class="p">::</span><span class="n">Midi1</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">poller</span><span class="p">.</span><span class="n">poll</span><span class="p">()</span><span class="o">?</span><span class="p">);</span>
+</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="c1">// Call poll() again when the application wants another observation.</span>
+</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">poller</span><span class="p">.</span><span class="n">close</span><span class="p">();</span>
+</span></code></pre></div>
+<p>Python additionally provides process isolation, CLI commands, unit strings and
+uFor integration. Rust uses typed durations, builders, enums and <code>Result</code> values;
+its <code>transport</code> and <code>file_io</code> modules expose lower-level native and streaming
+primitives. Corresponding workflows otherwise use the same public module names.</p>
+<h2 id="15-discover-midi-ci-devices">15. Discover MIDI-CI devices<a class="headerlink" href="#15-discover-midi-ci-devices" title="Permanent link">&para;</a></h2>
+<p>This uses the experimental manufacturer identity 0x7D and a caller-selected local
+MUID. Choose a fresh unused MUID for a real scan. Python's example generates one
+with <code>secrets</code>; Rust leaves that choice to the application's random-number source.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">use</span><span class="w"> </span><span class="n">meedee</span><span class="p">::{</span><span class="n">ci</span><span class="p">,</span><span class="w"> </span><span class="n">ci_live</span><span class="p">,</span><span class="w"> </span><span class="n">midi</span><span class="p">::{</span><span class="n">Input</span><span class="p">,</span><span class="w"> </span><span class="n">Output</span><span class="p">}};</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Input</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Output</span><span class="p">::</span><span class="n">new</span><span class="p">();</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="kd">let</span><span class="w"> </span><span class="n">identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ci</span><span class="p">::</span><span class="n">Identity</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="fm">vec!</span><span class="p">[</span><span class="mh">0x7d</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="mi">4</span><span class="p">])</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="kd">let</span><span class="w"> </span><span class="n">route</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ci</span><span class="p">::</span><span class="n">Route</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">stream</span><span class="p">()</span><span class="o">?</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span><span class="w"> </span><span class="s">"device"</span><span class="p">.</span><span class="n">into</span><span class="p">(),</span><span class="w"> </span><span class="nb">None</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="kd">let</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ci</span><span class="p">::</span><span class="n">Session</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">12345</span><span class="p">,</span><span class="w"> </span><span class="n">identity</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nb">None</span><span class="p">,</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="mi">8_388_608</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">browser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ci</span><span class="p">::</span><span class="n">Browser</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="mi">3_000_000_000</span><span class="p">,</span><span class="w"> </span><span class="mi">1_000_000_000</span><span class="p">,</span><span class="w"> </span><span class="mi">30_000_000_000</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="fm">println!</span><span class="p">(</span><span class="s">"{:?}"</span><span class="p">,</span><span class="w"> </span><span class="n">ci_live</span><span class="p">::</span><span class="n">run</span><span class="p">(</span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">browser</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="k">mut</span><span class="w"> </span><span class="n">output</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ci_live</span><span class="p">::</span><span class="n">Options</span><span class="p">::</span><span class="n">default</span><span class="p">())</span><span class="o">?</span><span class="p">);</span>
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="n">input</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="n">output</span><span class="p">.</span><span class="n">close</span><span class="p">()</span><span class="o">?</span><span class="p">;</span>
+</span></code></pre></div>
+<p><code>ci_live::Options</code> sets cancellation and SysEx assembly limits, matching Python's
+keyword options. Set both transports to UMP and give the route an explicit group
+for SysEx7. This scan sends Discovery and endpoint inquiries only; it performs no
+Profiles, Property Exchange or instrument configuration writes.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog" role="status" aria-atomic="true">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      
+      
+        
+        
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.77dd0ce9.min.js"></script>
+      
+    
+  </body>
+</html>

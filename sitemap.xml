@@ -91,12 +91,12 @@
         <loc>https://rec.github.io/meedee/reference/meedee/tuning_live/</loc>
       </url>
       <url>
-        <loc>https://rec.github.io/meedee/reference/meedee/ufor_tuning/</loc>
-      </url>
-      <url>
         <loc>https://rec.github.io/meedee/reference/meedee/ump/</loc>
       </url>
       <url>
         <loc>https://rec.github.io/meedee/reference/meedee/universal/</loc>
+      </url>
+      <url>
+        <loc>https://rec.github.io/meedee/rust-examples/</loc>
       </url>
 </urlset>

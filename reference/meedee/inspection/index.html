@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.72">
+      <meta name="generator" content="zensical-0.0.73">
     
     
       
@@ -211,7 +211,33 @@
   <span class="md-ellipsis">
     
   
-  Ten practical Python MIDI projects
+  Practical Python MIDI examples
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rust-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Practical Rust MIDI examples
 
     
   </span>
@@ -244,10 +270,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
@@ -265,8 +291,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_3">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -348,8 +374,6 @@
       
         
       
-        
-      
     
     
     
@@ -358,7 +382,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -379,15 +403,15 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
         
-          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_3_1">
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4_1">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1814,33 +1838,6 @@
     
   
   tuning_live
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ufor_tuning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  ufor_tuning
 
     
   </span>
@@ -3822,7 +3819,7 @@
 
 
 <h3 id="meedee.inspection.Observer.feed" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">feed</span><span class="p">(</span><span class="n">item</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Event</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
+            <code class="highlight language-python"><span class="n">feed</span><span class="p">(</span><span class="n">item</span><span class="p">:</span> <span class="n">messages</span><span class="o">.</span><span class="n">Message</span> <span class="o">|</span> <span class="n">events</span><span class="o">.</span><span class="n">StreamDiagnostic</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span></code>
 
 <a href="#meedee.inspection.Observer.feed" class="headerlink" title="Permanent link">&para;</a></h3>
 
@@ -3879,7 +3876,7 @@
 
 
 <h2 id="meedee.inspection.inspect_file" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">inspect_file</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'archive'</span><span class="p">,</span> <span class="s1">'smf'</span><span class="p">,</span> <span class="s1">'syx'</span><span class="p">,</span> <span class="s1">'clip'</span><span class="p">],</span> <span class="n">payload_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span> <span class="n">preserve_unknown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">detail_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Report</span></code>
+            <code class="highlight language-python"><span class="n">inspect_file</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'archive'</span><span class="p">,</span> <span class="s1">'smf'</span><span class="p">,</span> <span class="s1">'syx'</span><span class="p">,</span> <span class="s1">'clip'</span><span class="p">],</span> <span class="n">payload_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span> <span class="n">preserve_unknown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">detail_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Report</span></code>
 
 <a href="#meedee.inspection.inspect_file" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -3900,7 +3897,7 @@
 
 
 <h2 id="meedee.inspection.compare_files" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">compare_files</span><span class="p">(</span><span class="n">left</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="n">right</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'archive'</span><span class="p">,</span> <span class="s1">'smf'</span><span class="p">,</span> <span class="s1">'syx'</span><span class="p">,</span> <span class="s1">'clip'</span><span class="p">],</span> <span class="n">source_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">clock_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ignore_timestamps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">tick_tolerance</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">payload_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span> <span class="n">detail_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span> <span class="n">preserve_unknown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComparisonReport</span></code>
+            <code class="highlight language-python"><span class="n">compare_files</span><span class="p">(</span><span class="n">left</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="n">right</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="nb">format</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'archive'</span><span class="p">,</span> <span class="s1">'smf'</span><span class="p">,</span> <span class="s1">'syx'</span><span class="p">,</span> <span class="s1">'clip'</span><span class="p">],</span> <span class="n">source_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">clock_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ignore_timestamps</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">tick_tolerance</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">payload_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="mi">1048576</span><span class="p">,</span> <span class="n">detail_limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">128</span><span class="p">,</span> <span class="n">preserve_unknown</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ComparisonReport</span></code>
 
 <a href="#meedee.inspection.compare_files" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -3980,7 +3977,7 @@
       <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.77dd0ce9.min.js"></script>
       
     
   </body>

@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../../../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.72">
+      <meta name="generator" content="zensical-0.0.73">
     
     
       
@@ -211,7 +211,33 @@
   <span class="md-ellipsis">
     
   
-  Ten practical Python MIDI projects
+  Practical Python MIDI examples
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../rust-examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Practical Rust MIDI examples
 
     
   </span>
@@ -244,10 +270,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
@@ -265,8 +291,8 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_3">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -348,8 +374,6 @@
       
         
       
-        
-      
     
     
     
@@ -358,7 +382,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_1" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -379,15 +403,15 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
         
-          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="true">
-            <label class="md-nav__title" for="__nav_3_1">
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="true">
+            <label class="md-nav__title" for="__nav_4_1">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1192,33 +1216,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../ufor_tuning/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  ufor_tuning
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../ump/" class="md-nav__link">
         
   
@@ -1389,7 +1386,7 @@
 
 
 <h2 id="meedee.transfer_output.run" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">session</span><span class="p">:</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Session</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">OutputConnection</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Report</span></code>
+            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">session</span><span class="p">:</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Session</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">Output</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Report</span></code>
 
 <a href="#meedee.transfer_output.run" class="headerlink" title="Permanent link">&para;</a></h2>
 
@@ -1451,9 +1448,17 @@ exceptions propagate; the caller can inspect the supplied session afterward.</p>
 <span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-58">58</a></span>
 <span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-59">59</a></span>
 <span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-60">60</a></span>
-<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-61">61</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.transfer_output.run--source--__span-0-14"><a id="meedee.transfer_output.run--source--__codelineno-0-14" name="meedee.transfer_output.run--source--__codelineno-0-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-68">68</a></span>
+<span class="normal"><a href="#meedee.transfer_output.run--source--__codelineno-0-69">69</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="meedee.transfer_output.run--source--__span-0-14"><a id="meedee.transfer_output.run--source--__codelineno-0-14" name="meedee.transfer_output.run--source--__codelineno-0-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
 </span><span id="meedee.transfer_output.run--source--__span-0-15"><a id="meedee.transfer_output.run--source--__codelineno-0-15" name="meedee.transfer_output.run--source--__codelineno-0-15"></a>    <span class="n">session</span><span class="p">:</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Session</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-16"><a id="meedee.transfer_output.run--source--__codelineno-0-16" name="meedee.transfer_output.run--source--__codelineno-0-16"></a>    <span class="n">output</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">OutputConnection</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-16"><a id="meedee.transfer_output.run--source--__codelineno-0-16" name="meedee.transfer_output.run--source--__codelineno-0-16"></a>    <span class="n">output</span><span class="p">:</span> <span class="n">midi</span><span class="o">.</span><span class="n">Output</span><span class="p">,</span>
 </span><span id="meedee.transfer_output.run--source--__span-0-17"><a id="meedee.transfer_output.run--source--__codelineno-0-17" name="meedee.transfer_output.run--source--__codelineno-0-17"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="meedee.transfer_output.run--source--__span-0-18"><a id="meedee.transfer_output.run--source--__codelineno-0-18" name="meedee.transfer_output.run--source--__codelineno-0-18"></a>    <span class="n">cancel</span><span class="p">:</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="meedee.transfer_output.run--source--__span-0-19"><a id="meedee.transfer_output.run--source--__codelineno-0-19" name="meedee.transfer_output.run--source--__codelineno-0-19"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">transfer</span><span class="o">.</span><span class="n">Report</span><span class="p">:</span>
@@ -1465,40 +1470,48 @@ exceptions propagate; the caller can inspect the supplied session afterward.</p>
 </span><span id="meedee.transfer_output.run--source--__span-0-25"><a id="meedee.transfer_output.run--source--__codelineno-0-25" name="meedee.transfer_output.run--source--__codelineno-0-25"></a><span class="sd">    """</span>
 </span><span id="meedee.transfer_output.run--source--__span-0-26"><a id="meedee.transfer_output.run--source--__codelineno-0-26" name="meedee.transfer_output.run--source--__codelineno-0-26"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">midi</span>
 </span><span id="meedee.transfer_output.run--source--__span-0-27"><a id="meedee.transfer_output.run--source--__codelineno-0-27" name="meedee.transfer_output.run--source--__codelineno-0-27"></a>
-</span><span id="meedee.transfer_output.run--source--__span-0-28"><a id="meedee.transfer_output.run--source--__codelineno-0-28" name="meedee.transfer_output.run--source--__codelineno-0-28"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-29"><a id="meedee.transfer_output.run--source--__codelineno-0-29" name="meedee.transfer_output.run--source--__codelineno-0-29"></a>        <span class="k">while</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"active"</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-30"><a id="meedee.transfer_output.run--source--__codelineno-0-30" name="meedee.transfer_output.run--source--__codelineno-0-30"></a>            <span class="k">if</span> <span class="n">cancel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cancel</span><span class="o">.</span><span class="n">cancelled</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-31"><a id="meedee.transfer_output.run--source--__codelineno-0-31" name="meedee.transfer_output.run--source--__codelineno-0-31"></a>                <span class="n">session</span><span class="o">.</span><span class="n">cancel</span><span class="p">(</span><span class="s2">"cancelled by caller"</span><span class="p">)</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-32"><a id="meedee.transfer_output.run--source--__codelineno-0-32" name="meedee.transfer_output.run--source--__codelineno-0-32"></a>                <span class="k">break</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-33"><a id="meedee.transfer_output.run--source--__codelineno-0-33" name="meedee.transfer_output.run--source--__codelineno-0-33"></a>            <span class="n">now</span> <span class="o">=</span> <span class="n">monotonic_ns</span><span class="p">()</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-34"><a id="meedee.transfer_output.run--source--__codelineno-0-34" name="meedee.transfer_output.run--source--__codelineno-0-34"></a>            <span class="n">step</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">now</span><span class="p">)</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-35"><a id="meedee.transfer_output.run--source--__codelineno-0-35" name="meedee.transfer_output.run--source--__codelineno-0-35"></a>            <span class="k">if</span> <span class="n">step</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-36"><a id="meedee.transfer_output.run--source--__codelineno-0-36" name="meedee.transfer_output.run--source--__codelineno-0-36"></a>                <span class="n">deadline</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">next_ready_ns</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-37"><a id="meedee.transfer_output.run--source--__codelineno-0-37" name="meedee.transfer_output.run--source--__codelineno-0-37"></a>                <span class="k">assert</span> <span class="n">deadline</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-38"><a id="meedee.transfer_output.run--source--__codelineno-0-38" name="meedee.transfer_output.run--source--__codelineno-0-38"></a>                <span class="n">sleep</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">deadline</span> <span class="o">-</span> <span class="n">now</span><span class="p">)</span> <span class="o">/</span> <span class="mi">1_000_000_000</span><span class="p">))</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-39"><a id="meedee.transfer_output.run--source--__codelineno-0-39" name="meedee.transfer_output.run--source--__codelineno-0-39"></a>                <span class="k">continue</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-40"><a id="meedee.transfer_output.run--source--__codelineno-0-40" name="meedee.transfer_output.run--source--__codelineno-0-40"></a>            <span class="k">try</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-41"><a id="meedee.transfer_output.run--source--__codelineno-0-41" name="meedee.transfer_output.run--source--__codelineno-0-41"></a>                <span class="n">output</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-42"><a id="meedee.transfer_output.run--source--__codelineno-0-42" name="meedee.transfer_output.run--source--__codelineno-0-42"></a>            <span class="k">except</span> <span class="p">(</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-43"><a id="meedee.transfer_output.run--source--__codelineno-0-43" name="meedee.transfer_output.run--source--__codelineno-0-43"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">MidiError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-44"><a id="meedee.transfer_output.run--source--__codelineno-0-44" name="meedee.transfer_output.run--source--__codelineno-0-44"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">StateError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-45"><a id="meedee.transfer_output.run--source--__codelineno-0-45" name="meedee.transfer_output.run--source--__codelineno-0-45"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">CallbackThreadError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-46"><a id="meedee.transfer_output.run--source--__codelineno-0-46" name="meedee.transfer_output.run--source--__codelineno-0-46"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">NativePanicError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-47"><a id="meedee.transfer_output.run--source--__codelineno-0-47" name="meedee.transfer_output.run--source--__codelineno-0-47"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">ResourceError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-48"><a id="meedee.transfer_output.run--source--__codelineno-0-48" name="meedee.transfer_output.run--source--__codelineno-0-48"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-49"><a id="meedee.transfer_output.run--source--__codelineno-0-49" name="meedee.transfer_output.run--source--__codelineno-0-49"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">WorkerTimeoutError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-50"><a id="meedee.transfer_output.run--source--__codelineno-0-50" name="meedee.transfer_output.run--source--__codelineno-0-50"></a>                <span class="ne">OSError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-51"><a id="meedee.transfer_output.run--source--__codelineno-0-51" name="meedee.transfer_output.run--source--__codelineno-0-51"></a>                <span class="ne">ValueError</span><span class="p">,</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-52"><a id="meedee.transfer_output.run--source--__codelineno-0-52" name="meedee.transfer_output.run--source--__codelineno-0-52"></a>            <span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-53"><a id="meedee.transfer_output.run--source--__codelineno-0-53" name="meedee.transfer_output.run--source--__codelineno-0-53"></a>                <span class="n">session</span><span class="o">.</span><span class="n">fail</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-54"><a id="meedee.transfer_output.run--source--__codelineno-0-54" name="meedee.transfer_output.run--source--__codelineno-0-54"></a>                <span class="k">break</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-55"><a id="meedee.transfer_output.run--source--__codelineno-0-55" name="meedee.transfer_output.run--source--__codelineno-0-55"></a>            <span class="n">session</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">monotonic_ns</span><span class="p">())</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-56"><a id="meedee.transfer_output.run--source--__codelineno-0-56" name="meedee.transfer_output.run--source--__codelineno-0-56"></a>    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-57"><a id="meedee.transfer_output.run--source--__codelineno-0-57" name="meedee.transfer_output.run--source--__codelineno-0-57"></a>        <span class="n">session</span><span class="o">.</span><span class="n">cancel</span><span class="p">(</span><span class="s2">"interrupted"</span><span class="p">)</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-58"><a id="meedee.transfer_output.run--source--__codelineno-0-58" name="meedee.transfer_output.run--source--__codelineno-0-58"></a>    <span class="k">finally</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-59"><a id="meedee.transfer_output.run--source--__codelineno-0-59" name="meedee.transfer_output.run--source--__codelineno-0-59"></a>        <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="o">:=</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">in_flight</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-60"><a id="meedee.transfer_output.run--source--__codelineno-0-60" name="meedee.transfer_output.run--source--__codelineno-0-60"></a>            <span class="n">session</span><span class="o">.</span><span class="n">fail</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="s2">"send or confirmation did not complete"</span><span class="p">)</span>
-</span><span id="meedee.transfer_output.run--source--__span-0-61"><a id="meedee.transfer_output.run--source--__codelineno-0-61" name="meedee.transfer_output.run--source--__codelineno-0-61"></a>    <span class="k">return</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-28"><a id="meedee.transfer_output.run--source--__codelineno-0-28" name="meedee.transfer_output.run--source--__codelineno-0-28"></a>    <span class="n">initial</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-29"><a id="meedee.transfer_output.run--source--__codelineno-0-29" name="meedee.transfer_output.run--source--__codelineno-0-29"></a>    <span class="k">if</span> <span class="p">(</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-30"><a id="meedee.transfer_output.run--source--__codelineno-0-30" name="meedee.transfer_output.run--source--__codelineno-0-30"></a>        <span class="n">initial</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="s2">"active"</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-31"><a id="meedee.transfer_output.run--source--__codelineno-0-31" name="meedee.transfer_output.run--source--__codelineno-0-31"></a>        <span class="ow">or</span> <span class="n">initial</span><span class="o">.</span><span class="n">confirmed_messages</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-32"><a id="meedee.transfer_output.run--source--__codelineno-0-32" name="meedee.transfer_output.run--source--__codelineno-0-32"></a>        <span class="ow">or</span> <span class="n">initial</span><span class="o">.</span><span class="n">in_flight</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-33"><a id="meedee.transfer_output.run--source--__codelineno-0-33" name="meedee.transfer_output.run--source--__codelineno-0-33"></a>    <span class="p">):</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-34"><a id="meedee.transfer_output.run--source--__codelineno-0-34" name="meedee.transfer_output.run--source--__codelineno-0-34"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"transfer session must be fresh"</span><span class="p">)</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-35"><a id="meedee.transfer_output.run--source--__codelineno-0-35" name="meedee.transfer_output.run--source--__codelineno-0-35"></a>    <span class="n">cancel</span> <span class="o">=</span> <span class="n">events</span><span class="o">.</span><span class="n">Cancellation</span><span class="p">()</span> <span class="k">if</span> <span class="n">cancel</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">cancel</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-36"><a id="meedee.transfer_output.run--source--__codelineno-0-36" name="meedee.transfer_output.run--source--__codelineno-0-36"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-37"><a id="meedee.transfer_output.run--source--__codelineno-0-37" name="meedee.transfer_output.run--source--__codelineno-0-37"></a>        <span class="k">while</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="s2">"active"</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-38"><a id="meedee.transfer_output.run--source--__codelineno-0-38" name="meedee.transfer_output.run--source--__codelineno-0-38"></a>            <span class="k">if</span> <span class="n">cancel</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cancel</span><span class="o">.</span><span class="n">cancelled</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-39"><a id="meedee.transfer_output.run--source--__codelineno-0-39" name="meedee.transfer_output.run--source--__codelineno-0-39"></a>                <span class="n">session</span><span class="o">.</span><span class="n">cancel</span><span class="p">(</span><span class="s2">"cancelled by caller"</span><span class="p">)</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-40"><a id="meedee.transfer_output.run--source--__codelineno-0-40" name="meedee.transfer_output.run--source--__codelineno-0-40"></a>                <span class="k">break</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-41"><a id="meedee.transfer_output.run--source--__codelineno-0-41" name="meedee.transfer_output.run--source--__codelineno-0-41"></a>            <span class="n">now</span> <span class="o">=</span> <span class="n">monotonic_ns</span><span class="p">()</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-42"><a id="meedee.transfer_output.run--source--__codelineno-0-42" name="meedee.transfer_output.run--source--__codelineno-0-42"></a>            <span class="n">step</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">now</span><span class="p">)</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-43"><a id="meedee.transfer_output.run--source--__codelineno-0-43" name="meedee.transfer_output.run--source--__codelineno-0-43"></a>            <span class="k">if</span> <span class="n">step</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-44"><a id="meedee.transfer_output.run--source--__codelineno-0-44" name="meedee.transfer_output.run--source--__codelineno-0-44"></a>                <span class="n">deadline</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">next_ready_ns</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-45"><a id="meedee.transfer_output.run--source--__codelineno-0-45" name="meedee.transfer_output.run--source--__codelineno-0-45"></a>                <span class="k">assert</span> <span class="n">deadline</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-46"><a id="meedee.transfer_output.run--source--__codelineno-0-46" name="meedee.transfer_output.run--source--__codelineno-0-46"></a>                <span class="n">cancel</span><span class="o">.</span><span class="n">wait_for</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">deadline</span> <span class="o">-</span> <span class="n">now</span><span class="p">)</span> <span class="o">/</span> <span class="mi">1_000_000_000</span><span class="p">))</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-47"><a id="meedee.transfer_output.run--source--__codelineno-0-47" name="meedee.transfer_output.run--source--__codelineno-0-47"></a>                <span class="k">continue</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-48"><a id="meedee.transfer_output.run--source--__codelineno-0-48" name="meedee.transfer_output.run--source--__codelineno-0-48"></a>            <span class="k">try</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-49"><a id="meedee.transfer_output.run--source--__codelineno-0-49" name="meedee.transfer_output.run--source--__codelineno-0-49"></a>                <span class="n">output</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">message</span><span class="p">)</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-50"><a id="meedee.transfer_output.run--source--__codelineno-0-50" name="meedee.transfer_output.run--source--__codelineno-0-50"></a>            <span class="k">except</span> <span class="p">(</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-51"><a id="meedee.transfer_output.run--source--__codelineno-0-51" name="meedee.transfer_output.run--source--__codelineno-0-51"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">MidiError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-52"><a id="meedee.transfer_output.run--source--__codelineno-0-52" name="meedee.transfer_output.run--source--__codelineno-0-52"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">StateError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-53"><a id="meedee.transfer_output.run--source--__codelineno-0-53" name="meedee.transfer_output.run--source--__codelineno-0-53"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">CallbackThreadError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-54"><a id="meedee.transfer_output.run--source--__codelineno-0-54" name="meedee.transfer_output.run--source--__codelineno-0-54"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">NativePanicError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-55"><a id="meedee.transfer_output.run--source--__codelineno-0-55" name="meedee.transfer_output.run--source--__codelineno-0-55"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">ResourceError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-56"><a id="meedee.transfer_output.run--source--__codelineno-0-56" name="meedee.transfer_output.run--source--__codelineno-0-56"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">WorkerError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-57"><a id="meedee.transfer_output.run--source--__codelineno-0-57" name="meedee.transfer_output.run--source--__codelineno-0-57"></a>                <span class="n">midi</span><span class="o">.</span><span class="n">WorkerTimeoutError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-58"><a id="meedee.transfer_output.run--source--__codelineno-0-58" name="meedee.transfer_output.run--source--__codelineno-0-58"></a>                <span class="ne">OSError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-59"><a id="meedee.transfer_output.run--source--__codelineno-0-59" name="meedee.transfer_output.run--source--__codelineno-0-59"></a>                <span class="ne">ValueError</span><span class="p">,</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-60"><a id="meedee.transfer_output.run--source--__codelineno-0-60" name="meedee.transfer_output.run--source--__codelineno-0-60"></a>            <span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-61"><a id="meedee.transfer_output.run--source--__codelineno-0-61" name="meedee.transfer_output.run--source--__codelineno-0-61"></a>                <span class="n">session</span><span class="o">.</span><span class="n">fail</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-62"><a id="meedee.transfer_output.run--source--__codelineno-0-62" name="meedee.transfer_output.run--source--__codelineno-0-62"></a>                <span class="k">break</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-63"><a id="meedee.transfer_output.run--source--__codelineno-0-63" name="meedee.transfer_output.run--source--__codelineno-0-63"></a>            <span class="n">session</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">monotonic_ns</span><span class="p">())</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-64"><a id="meedee.transfer_output.run--source--__codelineno-0-64" name="meedee.transfer_output.run--source--__codelineno-0-64"></a>    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-65"><a id="meedee.transfer_output.run--source--__codelineno-0-65" name="meedee.transfer_output.run--source--__codelineno-0-65"></a>        <span class="n">session</span><span class="o">.</span><span class="n">cancel</span><span class="p">(</span><span class="s2">"interrupted"</span><span class="p">)</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-66"><a id="meedee.transfer_output.run--source--__codelineno-0-66" name="meedee.transfer_output.run--source--__codelineno-0-66"></a>    <span class="k">finally</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-67"><a id="meedee.transfer_output.run--source--__codelineno-0-67" name="meedee.transfer_output.run--source--__codelineno-0-67"></a>        <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="o">:=</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span><span class="o">.</span><span class="n">in_flight</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-68"><a id="meedee.transfer_output.run--source--__codelineno-0-68" name="meedee.transfer_output.run--source--__codelineno-0-68"></a>            <span class="n">session</span><span class="o">.</span><span class="n">fail</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="s2">"send or confirmation did not complete"</span><span class="p">)</span>
+</span><span id="meedee.transfer_output.run--source--__span-0-69"><a id="meedee.transfer_output.run--source--__codelineno-0-69" name="meedee.transfer_output.run--source--__codelineno-0-69"></a>    <span class="k">return</span> <span class="n">session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1573,7 +1586,7 @@ exceptions propagate; the caller can inspect the supplied session afterward.</p>
       <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.indexes","content.code.copy"],"redirect":null,"search":"../../../assets/javascripts/workers/search.c47bb847.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","clipboard.error":"Could not copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.10ee5ab6.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.77dd0ce9.min.js"></script>
       
     
   </body>
