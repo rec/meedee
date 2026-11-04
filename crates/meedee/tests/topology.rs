@@ -1,4 +1,57 @@
+use meedee::discovery::PollState;
 use meedee::topology::{Endpoint, Tracker};
+
+#[test]
+fn discovery_commits_only_complete_scans_and_keeps_the_baseline_on_failure() {
+    let mut poller = PollState::new(2, 8, 8).unwrap();
+    let baseline = poller
+        .scan(|direction| Ok(vec![endpoint(direction)]))
+        .unwrap();
+    assert_eq!(baseline.generation, 1);
+    let error = poller
+        .scan(|direction| {
+            if direction == "input" {
+                Ok(vec![endpoint("changed")])
+            } else {
+                Err(std::io::Error::other("output discovery failed").into())
+            }
+        })
+        .unwrap_err();
+    let report = poller.fail(&error.to_string());
+    assert_eq!(report.generation, baseline.generation);
+    assert_eq!(
+        report
+            .ports
+            .iter()
+            .map(|p| (&p.endpoint, p.count))
+            .collect::<Vec<_>>(),
+        baseline
+            .ports
+            .iter()
+            .map(|p| (&p.endpoint, p.count))
+            .collect::<Vec<_>>(),
+    );
+    assert!(report.stopped && poller.closed());
+    assert!(poller
+        .scan(|_| panic!("closed discovery must not scan"))
+        .is_err());
+}
+
+#[test]
+fn oversized_input_scan_stops_before_discovering_outputs() {
+    let mut poller = PollState::new(1, 8, 8).unwrap();
+    let mut directions = Vec::new();
+    let error = poller
+        .scan(|direction| {
+            directions.push(direction.to_owned());
+            Ok(vec![endpoint("first"), endpoint("second")])
+        })
+        .unwrap_err();
+    let report = poller.fail(&error.to_string());
+    assert_eq!(directions, ["input"]);
+    assert_eq!(report.generation, 0);
+    assert_eq!(report.port_count, 0);
+}
 
 fn endpoint(name: &str) -> Endpoint {
     Endpoint::new(

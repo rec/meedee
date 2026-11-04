@@ -122,8 +122,8 @@ impl Delta {
     }
 }
 #[pyclass(frozen, module = "meedee.topology")]
-struct Report {
-    value: topology::Report,
+pub(crate) struct Report {
+    pub(crate) value: topology::Report,
 }
 #[pymethods]
 impl Report {

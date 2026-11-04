@@ -1,7 +1,17 @@
 from collections.abc import Callable
 from types import ModuleType
 
-from . import ci, events, transfer, tuning
+from . import ci, events, topology, transfer, tuning
+
+class DiscoveryPollState:
+    def __init__(
+        self, protocol: str, port_limit: int, detail_limit: int, history_limit: int
+    ) -> None: ...
+    def poll(self, ports: Callable[[str], object]) -> topology.Report: ...
+    def snapshot(self) -> topology.Report: ...
+    @property
+    def closed(self) -> bool: ...
+    def close(self) -> None: ...
 
 def run_ci(
     browser: ci.Browser,

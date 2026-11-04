@@ -43,6 +43,7 @@ mod transport_tests;
 /// One private binary. Public loaders select which definitions to register.
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<drivers::DiscoveryPollState>()?;
     module.add_function(wrap_pyfunction!(drivers::run_transfer_output, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_transfer_input, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;

@@ -27,7 +27,11 @@ impl<'py> Calls<'py> {
             } else {
                 io::ErrorKind::Other
             };
-            let message = error.to_string();
+            let message = error
+                .value(self.py)
+                .str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|_| error.to_string());
             if self.failure.borrow().is_none() {
                 *self.failure.borrow_mut() = Some(error);
             }
@@ -328,4 +332,80 @@ pub(crate) fn run_ci(
     calls
         .finish(result, true)
         .map(|value| crate::ci::BrowseReport { value })
+}
+
+#[pyclass(module = "meedee._core")]
+pub(crate) struct DiscoveryPollState {
+    value: meedee::discovery::PollState,
+    protocol: String,
+}
+#[pymethods]
+impl DiscoveryPollState {
+    #[new]
+    fn new(
+        protocol: String,
+        #[pyo3(from_py_with=crate::files::limit)] port_limit: usize,
+        #[pyo3(from_py_with=crate::files::limit)] detail_limit: usize,
+        #[pyo3(from_py_with=crate::files::limit)] history_limit: usize,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            value: meedee::discovery::PollState::new(port_limit, detail_limit, history_limit)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+            protocol,
+        })
+    }
+    fn poll(
+        &mut self,
+        py: Python<'_>,
+        ports: Bound<'_, PyAny>,
+    ) -> PyResult<crate::topology::Report> {
+        if self.value.closed() {
+            return Err(PyValueError::new_err("discovery poller is closed"));
+        }
+        let calls = Calls::new(py);
+        let result = self.value.scan(|direction| {
+            let values = calls.convert(ports.call1((direction,)))?;
+            let mut endpoints = Vec::new();
+            for value in calls.convert(values.try_iter())? {
+                let port = calls.convert(value)?;
+                let backend: crate::packets::Backend = calls.convert(
+                    port.getattr("backend")
+                        .and_then(|v| v.extract().map_err(Into::into)),
+                )?;
+                let id: u64 =
+                    calls.convert(port.getattr("backend_id").and_then(|v| v.extract()))?;
+                let name: String = calls.convert(port.getattr("name").and_then(|v| v.extract()))?;
+                endpoints.push(meedee::topology::Endpoint::new(
+                    format!("{:?}", backend.native()),
+                    self.protocol.clone(),
+                    direction.into(),
+                    id,
+                    name,
+                )?);
+            }
+            Ok(endpoints)
+        });
+        if let Some(error) = calls.failure.borrow_mut().take() {
+            if !expected(py, &error) {
+                return Err(error);
+            }
+        }
+        let value = match result {
+            Ok(report) => report,
+            Err(error) => self.value.fail(&error.to_string()),
+        };
+        Ok(crate::topology::Report { value })
+    }
+    fn snapshot(&self) -> crate::topology::Report {
+        crate::topology::Report {
+            value: self.value.snapshot(),
+        }
+    }
+    #[getter]
+    fn closed(&self) -> bool {
+        self.value.closed()
+    }
+    fn close(&mut self) {
+        self.value.close();
+    }
 }
