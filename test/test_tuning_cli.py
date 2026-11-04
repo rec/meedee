@@ -60,7 +60,7 @@ def install(
             if fault == "race":
                 path.write_bytes(b"another writer")
 
-        def __call__(self, message: messages.Message) -> None:
+        def send(self, message: messages.Message) -> None:
             sent.append(codecs.encode(message))
             if fault == "send":
                 raise midi.SendError("uncertain request")

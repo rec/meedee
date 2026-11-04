@@ -265,8 +265,8 @@ reject an unassigned channel. MIDI 1 constructors leave channels unassigned;
 expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
-`out(command)` accepts these commands on MIDI 1.0
-outputs, rejecting UMP before sending. Encoded packets also use `out(packet)`. One native
+`out.send(command)` accepts these commands on MIDI 1.0
+outputs, rejecting UMP before sending. Encoded packets also use `out.send(packet)`. One native
 owner-thread operation and the existing connection serialization cover the whole
 sequence, including release; raw sends, other commands and close cannot run
 between its steps on that connection. This is not atomicity against other
@@ -487,7 +487,7 @@ Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
 
 All these messages implement Rust PrimitiveMessage and Python Message, and work
-with `codecs.encode`. Raw output uses `connection(codecs.encode(message))`;
+with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
 there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
 ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
 containing `message` and `checksum`, or None for unrelated/unsupported forms;
@@ -1581,7 +1581,7 @@ is not a saved backup. No physical instrument interoperability is qualified by
 this workflow's device-free tests.
 
 
-## Callable MIDI 1 output
+## MIDI 1 output sequencing
 
 Python `Output(channel=None, port=None, bpm=None, isolated=False)` remains a discovery client
 with `ports()` and `connect(port)`. As a context manager it opens the first port,
@@ -1589,8 +1589,8 @@ or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
 No or ambiguous matches raise before connecting. `isolated=True` remains supported
 and launches a separate worker module, without importing the calling script.
 
-The connection is callable; the former public `send()` method is removed.
-`out(*values)` accepts full notes, rests, messages, raw packets and nonnegative
+The connection exposes `send()` for output and is not callable.
+`out.send(*values)` accepts full notes, rests, messages, raw packets and nonnegative
 finite delays. Numeric values and dimensionless numeric strings mean quarter-note
 beats with `bpm` set, seconds otherwise. Explicit time quantities retain their
 meaning; explicit beats require a tempo. Other dimensions are rejected. Arguments

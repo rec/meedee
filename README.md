@@ -17,7 +17,7 @@ UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
 tracked in [the plan](plan/meedee.md).
-`out(...)` accepts message objects, compound control/bank/MPE
+`out.send(...)` accepts message objects, compound control/bank/MPE
 commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
 
@@ -26,7 +26,7 @@ from meedee.messages import Note, Rest
 from meedee.midi import Output
 
 with Output(bpm=120) as out:
-    out(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
+    out.send(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
 ```
 
 `Note(duration, note, velocity=90, channel=None)` plays an attack and release;
@@ -96,7 +96,7 @@ compatibility guarantees still owner decisions.
 
 `midi.Input()` decodes received packets into events; `midi.Input(raw=True)`
 returns unchanged transport packets. `midi.Output` opens one
-`OutputConnection` supporting `out(...)` for messages, compound operations and
+`OutputConnection` supporting `out.send(...)` for messages, compound operations and
 encoded bytes/UMP packets, and `play()` for timestamped events. Both use the same
 native transport. Inputs default to process isolation; outputs default to in-process
 transport, with `isolated=True` available. Typed input connections
@@ -461,7 +461,7 @@ selection = gm.BankProgramSelect(
 packets = [codecs.encode(p) for p in codecs.expand(selection)]
 volume = controls.Controller.ChannelVolume.message(channel=1, value=100)
 zone = mpe.ZoneConfiguration(manager_channel=1, members=7)
-# An open MIDI 1.0 output can explicitly send selection or zone with out(...).
+# An open MIDI 1.0 output can explicitly send selection or zone with out.send(...).
 ```
 
 Rust owns the GM1 instrument/family and percussion maps, all 256 GM2 melodic
@@ -518,14 +518,14 @@ primitives = expand(command)
 interpreter = Interpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
 # An open MIDI 1.0 output can send the whole command:
-# connection(command)
+# connection.send(command)
 ```
 
 `ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
-identifier. Use `out(...)` for messages, compound commands or encoded packets.
+identifier. Use `out.send(...)` for messages, compound commands or encoded packets.
 Use primitive `encode()` for byte encoding and `expand()` to inspect commands.
 UMP outputs reject these MIDI 1.0 commands rather than translating silently.
 
@@ -587,7 +587,7 @@ sequences require source context and are not guessed. Returned primitive lists
 are not atomic live sends; output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
-negotiation runs automatically. `OutputConnection.__call__()` takes `midi.UmpPacket`;
+negotiation runs automatically. `OutputConnection.send()` takes `midi.UmpPacket`;
 construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
 has passed between test-owned virtual peers. Other native backends and physical
 MIDI 2.0 device compatibility remain unqualified.
@@ -601,8 +601,8 @@ output = Output()
 ports = output.ports()
 # Select an endpoint deliberately from this snapshot, for example ports[index].
 # with output.connect(ports[index]) as connection:
-#     connection(bytes([0x90, 60, 100]))
-#     connection(bytes([0x80, 60, 0]))
+#     connection.send(bytes([0x90, 60, 100]))
+#     connection.send(bytes([0x80, 60, 0]))
 ```
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
@@ -640,7 +640,7 @@ In raw mode, received packets are transport chunks, including partial SysEx or
 multiple UMPs. Raw mode does not assemble messages or apply `Ignore` filters.
 Use `Input()` for decoded events or `Input(raw=True)` for unchanged transport
 packets. Both modes support callbacks or bounded `receive()` queues.
-`OutputConnection.__call__()` accepts unsigned-byte buffers,
+`OutputConnection.send()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.
@@ -992,7 +992,7 @@ event = receiver.receive()  # Decoded by the production packet decoder.
 
 sink = testing.Output(protocol="midi1")
 if isinstance(event, messages.Message):
-    sink(event)
+    sink.send(event)
 assert sink.take_packet() == b"\x90\x3c\x64"
 ```
 

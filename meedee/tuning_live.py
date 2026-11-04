@@ -40,7 +40,7 @@ def run(
             now = monotonic_ns()
             if query.snapshot().status == "ready":
                 request = query.prepare(now)
-                output(request)
+                output.send(request)
                 query.confirm(monotonic_ns())
                 continue
             query.poll(now)

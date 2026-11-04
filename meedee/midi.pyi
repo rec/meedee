@@ -1,4 +1,4 @@
-"""Decoded or raw MIDI input and callable output over the shared Rust transport."""
+"""Decoded or raw MIDI input and message output over the shared Rust transport."""
 
 from collections.abc import Callable, Generator, Iterable, Iterator
 from os import PathLike
@@ -213,7 +213,7 @@ class OutputConnection:
         allow_rounding: bool = False,
         metrics: bool = False,
     ) -> events.PlaybackReport: ...
-    def __call__(
+    def send(
         self,
         *values: messages.Note
         | messages.Rest

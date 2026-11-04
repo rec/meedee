@@ -26,7 +26,7 @@ from meedee.messages import Note
 from meedee.midi import Output
 
 with Output() as out:
-    out(Note("500 ms", 60))
+    out.send(Note("500 ms", 60))
 ```
 
 `Note` sends both the attack and release. Velocity defaults to 90; the channel
@@ -41,7 +41,7 @@ from meedee.messages import Note, Rest
 from meedee.midi import Output
 
 with Output(bpm=120) as out:  # Numeric durations are beats.
-    out(
+    out.send(
         Note(duration=1, note=60, velocity=90),
         Note(0.5, 62, 70),
         Note(0.5, 64, 100),
@@ -95,9 +95,9 @@ from meedee.midi import Input, Output
 with Input() as input, Output() as output:
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
-            output(m.transpose(12))
+            output.send(m.transpose(12))
         else:
-            output(m)
+            output.send(m)
 ```
 
 `transpose()` returns a new message and clamps the note to 0..127. To handle
@@ -112,9 +112,9 @@ from meedee.midi import Input, Output
 with Input() as input, Output() as output:
     for m in input.with_errors():
         if isinstance(m, (NoteOn, NoteOff)):
-            output(m.transpose(12))
+            output.send(m.transpose(12))
         elif isinstance(m, Message):
-            output(m)
+            output.send(m)
         else:
             print("ERROR", m, file=sys.stderr)
 ```
@@ -129,18 +129,18 @@ from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
 with Input(channel=1) as input, Output() as out:
-    out(ProgramChange(34, channel=2))
-    out(ProgramChange(81, channel=3))
+    out.send(ProgramChange(34, channel=2))
+    out.send(ProgramChange(81, channel=3))
 
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out(m.replace(channel=2))
+                out.send(m.replace(channel=2))
             else:
-                out(m.replace(channel=3))
+                out.send(m.replace(channel=3))
         else:
-            out(m.replace(channel=2))
-            out(m.replace(channel=3))
+            out.send(m.replace(channel=2))
+            out.send(m.replace(channel=3))
 ```
 
 `Input(channel=1)` accepts only channel-1 messages. A container such as
@@ -155,18 +155,18 @@ from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
 with Input() as input, Output(channel=2) as out2, Output(channel=3) as out3:
-    out2(ProgramChange(34))
-    out3(ProgramChange(81))
+    out2.send(ProgramChange(34))
+    out3.send(ProgramChange(81))
 
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out2(m)
+                out2.send(m)
             else:
-                out3(m)
+                out3.send(m)
         else:
-            out2(m)
-            out3(m)
+            out2.send(m)
+            out3.send(m)
 ```
 
 Use `Output()` for multiple channels: it preserves assigned message channels
@@ -301,7 +301,7 @@ with Path("just-three.syx").open("xb") as stream:
 ```
 
 After the instrument has loaded it, select the tuning with
-`output(controls.tuning_program(channel=1, program=2))`, importing `controls`
+`output.send(controls.tuning_program(channel=1, program=2))`, importing `controls`
 from `meedee`. Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
@@ -334,14 +334,14 @@ sequence = [
 ]
 client = midi.Output()
 with client.connect(client.ports()[0]) as output:
-    output(zone)
+    output.send(zone)
     for voice in [root, moving]:
-        output(
+        output.send(
             controls.pitch_bend_sensitivity(
                 channel=voice.channel, semitones=48, cents=0
             )
         )
-        output(messages.PitchBend(channel=voice.channel, value=0))
+        output.send(messages.PitchBend(channel=voice.channel, value=0))
     print(output.play(sequence, origin=origin))
 ```
 

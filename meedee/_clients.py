@@ -557,7 +557,7 @@ class OutputConnection:
             metrics=metrics,
         )
 
-    def __call__(
+    def send(
         self,
         *values: messages.Note
         | messages.Rest

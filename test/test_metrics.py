@@ -60,7 +60,7 @@ class Sink:
         self.sent = 0
         self.fail = fail
 
-    def __call__(self, message: messages.Message) -> None:
+    def send(self, message: messages.Message) -> None:
         if self.fail and self.sent == 1:
             raise midi.SendError("simulated send failure")
         self.sent += 1
