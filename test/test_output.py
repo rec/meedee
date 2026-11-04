@@ -210,6 +210,25 @@ def test_port_patterns_require_one_match(
     assert transport.packets() == []
 
 
+@pytest.mark.parametrize(
+    "pattern", ["FLOW [0-9] MIDI", "[FO]LOW ? MIDI", "[!A-E]LOW*", "FLOW [!9] MIDI"]
+)
+def test_port_selection_supports_shell_character_classes(
+    transport: NativeConnection,
+    pattern: str,
+) -> None:
+    with midi.Output(port=pattern) as out:
+        out(messages.ProgramChange(1))
+    assert transport.packets() == [b"\xc0\x00"]
+
+
+def test_empty_port_patterns_are_rejected_before_discovery() -> None:
+    with pytest.raises(ValueError, match="empty"):
+        midi.Input(port="")
+    with pytest.raises(ValueError, match="empty"):
+        midi.Output(port="")
+
+
 def test_two_stage_connection_and_close_are_idempotent(
     transport: NativeConnection,
 ) -> None:

@@ -55,8 +55,9 @@ One beat is a quarter note. Without `bpm`, numeric durations mean seconds.
 Explicit time units keep their meaning at any tempo; explicit beats require
 `bpm`. The clock and scheduling are automatic, without explicit clocks or sleeps.
 
-`Output(port="FLOW 8")` selects a unique name substring; `*` and `?` support
-wildcard matching. Input supports the same selection. Two-stage `client.connect(client.ports()[0])`
+`Output(port="FLOW 8")` selects a unique name substring; shell patterns support
+`*`, `?`, `[abc]`, `[a-z]` and `[!abc]`. Empty patterns are rejected.
+Input supports the same selection. Two-stage `client.connect(client.ports()[0])`
 returns the same object. Closing is terminal; create a new object to reconnect.
 For overlapping attacks, use `NoteOn` with delays and explicit `NoteOff` releases;
 `Note` instead releases before the next item starts. Numeric delays follow the

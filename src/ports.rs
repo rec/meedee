@@ -3,6 +3,26 @@ use pyo3::prelude::*;
 
 use crate::packets::Backend;
 
+#[pyfunction]
+#[pyo3(signature=(ports, pattern, direction))]
+pub(crate) fn select_port(
+    py: Python<'_>,
+    ports: Vec<Py<Port>>,
+    pattern: Option<&str>,
+    direction: &str,
+) -> PyResult<Py<Port>> {
+    let names: Vec<_> = ports.iter().map(|p| p.borrow(py).name.clone()).collect();
+    let index = meedee::midi::select_port_index(names.iter().map(String::as_str), pattern)
+        .map_err(|e| {
+            if pattern.is_none() {
+                crate::errors::ConnectError::new_err(format!("No MIDI {direction} ports available"))
+            } else {
+                pyo3::exceptions::PyValueError::new_err(format!("{e}; expected one {direction}"))
+            }
+        })?;
+    Ok(ports.into_iter().nth(index).expect("selected port index"))
+}
+
 #[pyclass(frozen, module = "meedee.midi")]
 pub struct Port {
     pub native: Option<transport::Port>,

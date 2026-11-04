@@ -168,6 +168,7 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native.add_class::<output::Output>()?;
     native.add_class::<output::OutputConnection>()?;
     native.add_class::<output::OutputState>()?;
+    native.add_function(wrap_pyfunction!(ports::select_port, &native)?)?;
     module.add_class::<ports::Port>()?;
     native.add_class::<callback::CallbackBridge>()?;
     native.add_function(wrap_pyfunction!(callback::check_thread, &native)?)?;

@@ -46,8 +46,9 @@ advances the sequence. `Duration` always means elapsed time, even with a tempo;
 `Beats` requires a tempo. Clocks and scheduling are automatic. `.into()` lets
 notes, rests, messages and delays share one sequence.
 
-`Output::new().with_port("FLOW 8")?` selects a unique name substring; `*` and `?`
-also work as wildcards. To choose from discovery, use:
+`Output::new().with_port("FLOW 8")?` selects a unique name substring; shell patterns
+support `*`, `?`, `[abc]`, `[a-z]` and `[!abc]`, just as in Python. Empty patterns
+are rejected. To choose from discovery, use:
 
 ```rust
 use meedee::midi::Output;

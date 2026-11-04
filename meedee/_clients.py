@@ -7,7 +7,6 @@ import math
 import sys
 from _thread import LockType
 from collections.abc import Callable, Generator, Iterable, Iterator
-from fnmatch import fnmatchcase
 from fractions import Fraction
 from functools import partial
 from itertools import chain
@@ -92,6 +91,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             raise ValueError("channel filtering requires decoded input (raw=False)")
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
+        if port == "":
+            raise ValueError("port pattern must not be empty")
         self._port = port
         self._initialization = Lock()
         self._context: Context | None = None
@@ -256,7 +257,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         if self._closed:
             raise midi.StateError("input is closed")
         if self._connection is None:
-            self.connect(select_port(self.ports(), self._port, "input"))
+            self.connect(_native.select_port(self.ports(), self._port, "input"))
         return self
 
     def __exit__(
@@ -438,6 +439,8 @@ class Output:
         messages.NoteOn(0, channel=channel)
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
+        if port == "":
+            raise ValueError("port pattern must not be empty")
         if bpm is not None:
             if type(bpm) not in (int, float):
                 raise TypeError("bpm must be a number")
@@ -573,7 +576,7 @@ class Output:
         if self._closed:
             raise midi.StateError("output is closed")
         if self._connection is None:
-            self.connect(select_port(self.ports(), self._port, "output"))
+            self.connect(_native.select_port(self.ports(), self._port, "output"))
         return self
 
     def __exit__(
@@ -1425,21 +1428,6 @@ def input_size(item: object) -> int:
             else len(item.packet)
         )
     return _native.live_size(cast(messages.Message | events.StreamDiagnostic, item))
-
-
-def select_port(
-    ports: list[midi.Port], pattern: str | None, direction: str
-) -> midi.Port:
-    if pattern is not None:
-        ports = [p for p in ports if fnmatchcase(p.name, pattern) or pattern in p.name]
-        if len(ports) != 1:
-            raise ValueError(
-                f"Port pattern {pattern!r} matched {len(ports)} {direction}s; "
-                "expected one"
-            )
-    if not ports:
-        raise midi.ConnectError(f"No MIDI {direction} ports available")
-    return ports[0]
 
 
 INPUT_ERRORS = (

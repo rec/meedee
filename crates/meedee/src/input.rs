@@ -85,7 +85,7 @@ impl Input {
         self.channels = Some(mask);
         Ok(self)
     }
-    /// Select a unique case-sensitive substring or `*`/`?` name pattern.
+    /// Select a unique case-sensitive substring or shell name pattern, including brackets.
     pub fn with_port(mut self, pattern: impl Into<String>) -> crate::midi::Result<Self> {
         if self.connection.is_some() || self.closed {
             return Err(invalid("input is connected or closed").into());
