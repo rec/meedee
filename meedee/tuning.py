@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ufor.tuning import Tuning
 
-from . import _core, codecs, messages, transfer, tuning
+from . import _core, tuning
 
 _core.populate_tuning(sys.modules[__name__])
 
@@ -39,101 +39,6 @@ def convert(source: Tuning, note: int) -> tuning.NoteTuning:
     return tuning.NoteTuning(note=note, pitch=pitch)
 
 
-def bulk_dump(
-    result: list[tuning.NoteTuning],
-    *,
-    device_id: int,
-    program: int,
-    name: str,
-    bank: int | None = None,
-    preserve_unmapped: bool = False,
-) -> tuning.BulkDump | tuning.KeyBasedDump:
-    """Build an ordinary or banked 128-key dump. Never open a port or send."""
-    changes = _changes(result, preserve_unmapped)
-    if len(changes) != 128 and not preserve_unmapped:
-        raise ValueError("bulk dumps require all 128 keys or explicit preservation")
-    values: list[tuning.Pitch | tuning.NoChange] = [
-        tuning.NoChange() for _ in range(128)
-    ]
-    for change in changes:
-        values[change.note] = change.pitch
-    table = tuning.TuningTable(values=values)
-    if bank is None:
-        return tuning.BulkDump(
-            device_id=device_id, program=program, name=name, table=table
-        )
-    return tuning.KeyBasedDump(
-        device_id=device_id, bank=bank, program=program, name=name, table=table
-    )
-
-
-def bulk_plan(
-    result: list[tuning.NoteTuning],
-    *,
-    device_id: int,
-    program: int,
-    name: str,
-    gap: float | str,
-    bank: int | None = None,
-    preserve_unmapped: bool = False,
-) -> transfer.Plan:
-    """Prepare one bulk dump for the existing transfer executor, without I/O."""
-    message = bulk_dump(
-        result,
-        device_id=device_id,
-        program=program,
-        name=name,
-        bank=bank,
-        preserve_unmapped=preserve_unmapped,
-    )
-    wire = codecs.encode(message)
-    return transfer.Plan(
-        [messages.SysEx(data=wire[1:-1])],
-        gap=gap,
-        message_limit=1,
-        byte_limit=len(wire),
-    )
-
-
-def note_changes(
-    result: list[tuning.NoteTuning],
-    *,
-    device_id: int,
-    program: int,
-    realtime: bool,
-    bank: int | None = None,
-    preserve_unmapped: bool = False,
-) -> list[tuning.SingleNoteChange | tuning.BankedNoteChange]:
-    """Build ordered batches of at most 127 keys, with explicit real-time intent."""
-    if type(realtime) is not bool:
-        raise TypeError("realtime must be a boolean")
-    if bank is None and not realtime:
-        raise ValueError(
-            "unbanked note changes are real-time; use a bank for non-real-time"
-        )
-    changes = _changes(result, preserve_unmapped)
-    outgoing: list[tuning.SingleNoteChange | tuning.BankedNoteChange] = []
-    for start in range(0, len(changes), 127):
-        part = changes[start : start + 127]
-        if bank is None:
-            outgoing.append(
-                tuning.SingleNoteChange(
-                    device_id=device_id, program=program, changes=part
-                )
-            )
-        else:
-            outgoing.append(
-                tuning.BankedNoteChange(
-                    device_id=device_id,
-                    bank=bank,
-                    program=program,
-                    realtime=realtime,
-                    changes=part,
-                )
-            )
-    return outgoing
-
-
 def _check_notes(notes: list[int]) -> list[int]:
     if type(notes) is not list:
         raise TypeError("notes must be a list of MIDI key integers")
@@ -161,17 +66,3 @@ def _covered(definition: Tuning, note: int) -> bool:
     if isinstance(source, IntervalPattern):
         return source.repeat or 0 <= degree <= len(source.intervals)
     return True
-
-
-def _changes(
-    result: list[tuning.NoteTuning], preserve_unmapped: bool
-) -> list[tuning.NoteTuning]:
-    if type(preserve_unmapped) is not bool:
-        raise TypeError("preserve_unmapped must be a boolean")
-    changes = result.copy()
-    _check_notes([k.note for k in changes])
-    if not preserve_unmapped and any(
-        isinstance(k.pitch, tuning.NoChange) for k in changes
-    ):
-        raise ValueError("NoChange requires explicit preservation")
-    return changes

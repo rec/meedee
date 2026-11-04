@@ -7,6 +7,79 @@ pub use crate::tuning_query::{Query, QueryReport};
 const STEPS: f64 = 16384.0;
 const MAX_PITCH: u32 = 2_097_150; // 7F 7F 7F is not a frequency.
 
+/// Build an ordinary or banked 128-key dump. Partial coverage and NoChange
+/// entries require explicit preservation. Does not send anything.
+pub fn bulk_dump(
+    result: &[NoteTuning],
+    device_id: i64,
+    program: i64,
+    name: String,
+    bank: Option<i64>,
+    preserve_unmapped: bool,
+) -> Result<TuningMessage, ValueError> {
+    check_selection(result, preserve_unmapped)?;
+    if result.len() != 128 && !preserve_unmapped {
+        return Err(error(
+            "bulk dumps require all 128 keys or explicit preservation",
+        ));
+    }
+    let mut values = [TuningValue::NoChange; 128];
+    for change in result {
+        values[change.note as usize] = change.pitch;
+    }
+    let table = TuningTable(values);
+    match bank {
+        None => Ok(BulkDump::new(device_id, program, name, table)?.into()),
+        Some(bank) => Ok(KeyBasedDump::new(device_id, bank, program, name, table)?.into()),
+    }
+}
+
+/// Prepare one bulk dump for transfer, with a minimum gap in nanoseconds.
+/// The resulting plan permits exactly its single message and encoded size.
+pub fn bulk_plan(
+    result: &[NoteTuning],
+    device_id: i64,
+    program: i64,
+    name: String,
+    gap_ns: u64,
+    bank: Option<i64>,
+    preserve_unmapped: bool,
+) -> std::io::Result<crate::transfer::Plan> {
+    let wire = bulk_dump(result, device_id, program, name, bank, preserve_unmapped)?.encode()?;
+    let message = SysEx::new(wire[1..wire.len() - 1].to_vec())?;
+    crate::transfer::Plan::new([Ok(message)], gap_ns, 1, wire.len())
+}
+
+/// Build ordered messages of at most 127 keys each. Unbanked changes must
+/// be real-time. NoChange entries require explicit preservation.
+pub fn note_changes(
+    result: &[NoteTuning],
+    device_id: i64,
+    program: i64,
+    realtime: bool,
+    bank: Option<i64>,
+    preserve_unmapped: bool,
+) -> Result<Vec<TuningMessage>, ValueError> {
+    if bank.is_none() && !realtime {
+        return Err(error(
+            "unbanked note changes are real-time; use a bank for non-real-time",
+        ));
+    }
+    check_selection(result, preserve_unmapped)?;
+    result
+        .chunks(127)
+        .map(|part| match bank {
+            None => Ok(SingleNoteChange::new(device_id, program, part.to_vec())?.into()),
+            Some(bank) => {
+                Ok(
+                    BankedNoteChange::new(device_id, bank, program, realtime, part.to_vec())?
+                        .into(),
+                )
+            }
+        })
+        .collect()
+}
+
 /// Exact absolute pitch in 1/16384-semitone units above MIDI note zero.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Pitch(u32);
@@ -718,6 +791,21 @@ fn check_changes(changes: &[NoteTuning]) -> Result<(), ValueError> {
     } else {
         Ok(())
     }
+}
+fn check_selection(changes: &[NoteTuning], preserve_unmapped: bool) -> Result<(), ValueError> {
+    if !(1..=128).contains(&changes.len()) {
+        return Err(error("select between one and 128 MIDI keys"));
+    }
+    let mut seen = [false; 128];
+    for change in changes {
+        if std::mem::replace(&mut seen[change.note as usize], true) {
+            return Err(error("selected MIDI keys must be distinct"));
+        }
+    }
+    if !preserve_unmapped && changes.iter().any(|c| c.pitch == TuningValue::NoChange) {
+        return Err(error("NoChange requires explicit preservation"));
+    }
+    Ok(())
 }
 fn push_table(out: &mut Vec<u8>, table: &TuningTable) {
     for pitch in table.0 {

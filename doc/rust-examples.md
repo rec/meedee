@@ -417,3 +417,35 @@ output.close()?;
 keyword options. Set both transports to UMP and give the route an explicit group
 for SysEx7. This scan sends Discovery and endpoint inquiries only; it performs no
 Profiles, Property Exchange or instrument configuration writes.
+
+## 16. Export a just-intonation tuning
+
+Create `just-three.syx` with keys 69, 70 and 71 tuned to 440, 660 and 880 Hz.
+Unselected keys are preserved. This uses the same `bulk_dump` builder as Python;
+Rust supplies frequencies directly instead of using Python's optional uFor adapter.
+
+```rust
+use meedee::{messages::PrimitiveMessage, tuning};
+use std::{fs::OpenOptions, io::Write};
+
+let pitches = [(69, 440.0), (70, 660.0), (71, 880.0)]
+    .into_iter()
+    .map(|(note, hz)| {
+        tuning::NoteTuning::new(
+            note, tuning::TuningValue::Pitch(tuning::Pitch::from_frequency(hz)?.pitch),
+        )
+    })
+    .collect::<Result<Vec<_>, _>>()?;
+let dump = tuning::bulk_dump(&pitches, 0, 2, "Just three".into(), None, true)?;
+OpenOptions::new().write(true).create_new(true).open("just-three.syx")?
+    .write_all(&dump.encode()?)?;
+println!("{dump:?}");
+```
+
+For a transfer plan with a 20 ms gap, use
+`tuning::bulk_plan(&pitches, 0, 2, "Just three".into(), 20_000_000, None, true)?`.
+For individual real-time changes, use
+`tuning::note_changes(&pitches, 0, 2, true, None, false)?`.
+These builders do not open ports or send messages. `None` selects the unbanked
+format; `Some(bank)` selects the banked format. The final boolean permits
+preserving unmapped keys and explicit `NoChange` entries.

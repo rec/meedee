@@ -31,6 +31,17 @@ def check_without_ufor() -> None:
     assert tuning.bulk_dump(
         result, device_id=1, program=0, name="test", preserve_unmapped=True
     ).table.values[69] == tuning.Pitch(semitone=69, fraction=0)
+    plan = tuning.bulk_plan(
+        result,
+        device_id=1,
+        program=0,
+        name="test",
+        gap=0.02,
+        preserve_unmapped=True,
+    )
+    assert plan.message_count == 1 and plan.gap == 0.02
+    outgoing = tuning.note_changes(result, device_id=1, program=0, realtime=True)
+    assert outgoing[0].changes == tuple(result)
     assert not any(n == "ufor" or n.startswith("ufor.") for n in sys.modules)
 
 

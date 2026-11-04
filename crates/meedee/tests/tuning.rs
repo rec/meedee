@@ -11,6 +11,101 @@ fn scale(resolution: i64) -> ScaleOffsets {
 fn changes() -> Vec<NoteTuning> {
     vec![NoteTuning::new(69, TuningValue::Pitch(Pitch::new(69, 0).unwrap())).unwrap()]
 }
+
+#[test]
+fn bulk_builders_preserve_unmapped_keys_and_exact_transfer_bytes() {
+    let notes = changes();
+    assert!(bulk_dump(&notes, 1, 2, "partial".into(), None, false).is_err());
+    for bank in [None, Some(3)] {
+        let dump = bulk_dump(&notes, 127, 2, "partial".into(), bank, true).unwrap();
+        let table = match &dump {
+            TuningMessage::BulkDump(d) => {
+                assert!(bank.is_none());
+                d.table()
+            }
+            TuningMessage::KeyBasedDump(d) => {
+                assert_eq!(Some(i64::from(d.bank())), bank);
+                d.table()
+            }
+            _ => panic!("expected bulk dump"),
+        };
+        for (note, pitch) in table.values().iter().enumerate() {
+            assert_eq!(
+                *pitch,
+                if note == 69 {
+                    notes[0].pitch()
+                } else {
+                    TuningValue::NoChange
+                }
+            );
+        }
+        let wire = dump.encode().unwrap();
+        let plan = bulk_plan(&notes, 127, 2, "partial".into(), 20_000_000, bank, true).unwrap();
+        assert_eq!(plan.message_count(), 1);
+        assert_eq!(plan.gap_ns(), 20_000_000);
+        assert_eq!(plan.wire_bytes(), wire.len());
+        assert_eq!(plan.message(0).unwrap().encode().unwrap(), wire);
+    }
+}
+
+#[test]
+fn full_keyboard_builders_preserve_order_and_split_at_127_keys() {
+    let notes: Vec<_> = (0..128)
+        .rev()
+        .map(|n| NoteTuning::new(n, TuningValue::Pitch(Pitch::new(n, 0).unwrap())).unwrap())
+        .collect();
+    for bank in [None, Some(0)] {
+        assert!(bulk_dump(&notes, 1, 2, "equal".into(), bank, false).is_ok());
+        for realtime in [true, false] {
+            if bank.is_none() && !realtime {
+                continue;
+            }
+            let messages = note_changes(&notes, 1, 2, realtime, bank, false).unwrap();
+            let batches: Vec<_> = messages
+                .iter()
+                .map(|m| match m {
+                    TuningMessage::SingleNoteChange(m) => {
+                        assert!(bank.is_none());
+                        m.changes()
+                    }
+                    TuningMessage::BankedNoteChange(m) => {
+                        assert_eq!(m.realtime(), realtime);
+                        m.changes()
+                    }
+                    _ => panic!("expected note changes"),
+                })
+                .collect();
+            assert_eq!(
+                batches.iter().map(|b| b.len()).collect::<Vec<_>>(),
+                [127, 1]
+            );
+            assert_eq!(batches.concat(), notes);
+        }
+    }
+}
+
+#[test]
+fn builders_reject_invalid_selections_and_require_explicit_preservation() {
+    let notes = changes();
+    for invalid in [
+        vec![],
+        vec![notes[0].clone(); 2],
+        vec![notes[0].clone(); 129],
+    ] {
+        assert!(bulk_dump(&invalid, 1, 0, "test".into(), None, true).is_err());
+        assert!(bulk_plan(&invalid, 1, 0, "test".into(), 0, None, true).is_err());
+        assert!(note_changes(&invalid, 1, 0, true, None, true).is_err());
+    }
+    let unchanged = [NoteTuning::new(69, TuningValue::NoChange).unwrap()];
+    assert!(bulk_dump(&unchanged, 1, 0, "test".into(), None, false).is_err());
+    assert!(note_changes(&unchanged, 1, 0, true, None, false).is_err());
+    assert!(note_changes(&unchanged, 1, 0, true, None, true).is_ok());
+    assert!(note_changes(&notes, 1, 0, false, None, false).is_err());
+    assert!(note_changes(&notes, 128, 0, true, None, false).is_err());
+    assert!(bulk_dump(&notes, 1, 128, "test".into(), None, true).is_err());
+    assert!(bulk_dump(&notes, 1, 0, "test".into(), Some(128), true).is_err());
+    assert!(bulk_dump(&notes, 1, 0, "x".repeat(17), None, true).is_err());
+}
 fn message(name: &str) -> TuningMessage {
     match name {
         "BulkDumpRequest" => BulkDumpRequest::new(1, 2).unwrap().into(),

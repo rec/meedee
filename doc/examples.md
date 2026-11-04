@@ -312,6 +312,11 @@ After the instrument has loaded it, select the tuning with
 from `meedee`. Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
+Only `convert()` needs uFor. The shared Rust builders `bulk_dump()`, `bulk_plan()`
+and `note_changes()` also accept `NoteTuning` values constructed directly.
+`bulk_plan()` prepares a dump for paced transfer; `note_changes()` produces
+ordered messages of at most 127 keys each.
+
 ## 10. Bend one note of an MPE chord
 
 Hold C and E for two beats, bending only E up two semitones after the first beat.

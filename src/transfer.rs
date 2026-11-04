@@ -6,8 +6,8 @@ use pyo3::exceptions::{PyIndexError, PyValueError};
 use pyo3::prelude::*;
 
 #[pyclass(frozen, module = "meedee.transfer")]
-struct Plan {
-    value: transfer::Plan,
+pub(crate) struct Plan {
+    pub(crate) value: transfer::Plan,
 }
 #[pymethods]
 impl Plan {

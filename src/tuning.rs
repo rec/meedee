@@ -6,7 +6,7 @@ use meedee::messages::PrimitiveMessage;
 use meedee::tuning as model;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyString, PyTuple};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::IntoPyObjectExt;
 
 use crate::messages::{integer, Message};
@@ -412,10 +412,101 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<ReplyTracker>()?;
     crate::tuning_query::register(module)?;
     module.add_function(wrap_pyfunction!(decode, module)?)?;
+    module.add_function(wrap_pyfunction!(bulk_dump, module)?)?;
+    module.add_function(wrap_pyfunction!(bulk_plan, module)?)?;
+    module.add_function(wrap_pyfunction!(note_changes, module)?)?;
     Ok(())
+}
+
+/// Build an ordinary or banked 128-key dump. Never open a port or send.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature=(result, *, device_id, program, name, bank=None, preserve_unmapped=false))]
+fn bulk_dump(
+    py: Python<'_>,
+    #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
+    #[pyo3(from_py_with=int)] device_id: i64,
+    #[pyo3(from_py_with=int)] program: i64,
+    name: String,
+    bank: Option<&Bound<'_, PyAny>>,
+    #[pyo3(from_py_with=flag)] preserve_unmapped: bool,
+) -> PyResult<Py<PyAny>> {
+    message_object(
+        py,
+        model::bulk_dump(
+            &result,
+            device_id,
+            program,
+            name,
+            bank.map(int).transpose()?,
+            preserve_unmapped,
+        )
+        .map_err(value_error)?,
+    )
+}
+
+/// Prepare one bulk dump for the existing transfer executor, without I/O.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature=(result, *, device_id, program, name, gap, bank=None, preserve_unmapped=false))]
+fn bulk_plan(
+    #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
+    #[pyo3(from_py_with=int)] device_id: i64,
+    #[pyo3(from_py_with=int)] program: i64,
+    name: String,
+    #[pyo3(from_py_with=crate::units::duration)] gap: u64,
+    bank: Option<&Bound<'_, PyAny>>,
+    #[pyo3(from_py_with=flag)] preserve_unmapped: bool,
+) -> PyResult<crate::transfer::Plan> {
+    Ok(crate::transfer::Plan {
+        value: model::bulk_plan(
+            &result,
+            device_id,
+            program,
+            name,
+            gap,
+            bank.map(int).transpose()?,
+            preserve_unmapped,
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?,
+    })
+}
+
+/// Build ordered batches of at most 127 keys, with explicit real-time intent.
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature=(result, *, device_id, program, realtime, bank=None, preserve_unmapped=false))]
+fn note_changes(
+    py: Python<'_>,
+    #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
+    #[pyo3(from_py_with=int)] device_id: i64,
+    #[pyo3(from_py_with=int)] program: i64,
+    #[pyo3(from_py_with=flag)] realtime: bool,
+    bank: Option<&Bound<'_, PyAny>>,
+    #[pyo3(from_py_with=flag)] preserve_unmapped: bool,
+) -> PyResult<Vec<Py<PyAny>>> {
+    model::note_changes(
+        &result,
+        device_id,
+        program,
+        realtime,
+        bank.map(int).transpose()?,
+        preserve_unmapped,
+    )
+    .map_err(value_error)?
+    .into_iter()
+    .map(|m| message_object(py, m))
+    .collect()
 }
 fn value_error(error: meedee::messages::ValueError) -> PyErr {
     PyValueError::new_err(error.to_string())
+}
+fn selection(value: &Bound<'_, PyAny>) -> PyResult<Vec<model::NoteTuning>> {
+    value
+        .cast::<PyList>()?
+        .iter()
+        .map(|n| Ok(n.extract::<PyRef<'_, NoteTuning>>()?.value.clone()))
+        .collect()
 }
 pub(crate) fn hash(value: &impl Hash) -> u64 {
     let mut hasher = DefaultHasher::new();
