@@ -12,7 +12,9 @@ Connect a suitable keyboard or synth before running them. MIDI carries messages,
 not audio; configure the synth's sound and audio output separately. Channels are
 1..16, notes and velocities are 0..127, and program numbers are 1..128.
 
-Inputs and outputs run in-process by default. Use `isolated=True` for worker failure
+Input and Output construction opens nothing. Discovery, connection or actual I/O
+initializes the resource; empty playback opens no ports. Inputs and outputs run
+in-process by default. Use `isolated=True` for worker failure
 containment; neither mode requires a main guard. Native MIDI 1 output tracks notes and selected controls for cleanup
 when explicitly closed or when leaving its context.
 

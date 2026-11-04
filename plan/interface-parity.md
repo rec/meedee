@@ -76,3 +76,23 @@ Native qualification scripts were migrated to callable output and new resources
 per open/close cycle, but were not executed. No macOS, Windows or Linux hardware
 qualification is claimed by these device-free checks. public-symbols.txt remains
 untracked and excluded from the commit.
+
+
+## Follow-up: lazy opening boundary
+
+The side-by-side symbol audit found remaining differences despite the completed
+module migration above. The user approved lazy construction and device-free empty
+playback in both languages. Python now delays native clients and isolated workers
+until discovery/connect or actual I/O. Initialization errors and worker admission
+limits apply at first use; closing an unused object creates nothing. Playback
+examines the source before opening, matching Rust's existing boundary.
+
+The remaining pattern, high-level input/raw-mode, snapshot and CI-constructor
+design choices are still pending. This follow-up does not claim full parity.
+Additional work beyond the prompt: None.
+
+Verification for the lazy-opening follow-up: 534 Python tests passed; the Rust
+workspace passed 201 tests with five opt-in tests ignored, including its existing
+empty-replay/no-port regression. Python lint, format, type and 3.13 pyupgrade checks
+passed. The strict documentation build reported no issues. No native device flows
+were run. public-symbols.txt marks G5 resolved and remains uncommitted.

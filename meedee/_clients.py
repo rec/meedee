@@ -31,6 +31,10 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
     __slots__ = (
         "_native",
         "_context",
+        "_settings",
+        "_initialization",
+        "_isolated",
+        "_timeout",
         "_protocol",
         "_raw_mode",
         "_event_limit",
@@ -90,6 +94,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
         self._port = port
+        self._initialization = Lock()
         self._context: Context | None = None
         self._closed = False
         self._channels = channels
@@ -106,14 +111,28 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             "timestamps": timestamps,
             "receive_byte_limit": receive_byte_limit,
         }
-        self._native = None if isolated else _native.Input(**settings)
-        self._context = Context(timeout, receive_byte_limit) if isolated else None
-        if self._context is not None:
-            self._context.request("init", [True, wire_settings(settings)])
+        self._settings = settings
+        self._isolated = isolated
+        self._timeout = timeout
+        self._native = None
+
+    def _initialize(self) -> None:
+        _native.check_thread()
+        with self._initialization:
+            if self._closed:
+                raise midi.StateError("client is closed")
+            if self._native is not None or self._context is not None:
+                return
+            if self._isolated:
+                self._context = Context(self._timeout, self._byte_limit)
+                self._context.request("init", [True, wire_settings(self._settings)])
+            else:
+                self._native = _native.Input(**self._settings)
 
     def ports(self) -> list[midi.Port]:
         if self._closed or self._connection is not None:
             raise midi.StateError("client is connected or closed")
+        self._initialize()
         if self._native is not None:
             return self._native.ports()
         assert self._context is not None
@@ -150,6 +169,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         validate_open(callback=callback)
         if name is None and not isinstance(port, midi.Port):
             raise TypeError("port must be a discovery snapshot")
+        self._initialize()
         identity = uuid4().hex
         connection = _InputState[T]._create(self, callback)
         transport = _InputTransport[T]._create(self)
@@ -280,16 +300,17 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
 
     def close(self) -> None:
         _native.check_thread()
-        if self._closed:
-            return
-        self._closed = True
-        try:
-            if self._connection is not None:
-                self._connection.close()
-        finally:
-            self._native = None
-            if self._context is not None:
-                self._context.dispose()
+        with self._initialization:
+            if self._closed:
+                return
+            self._closed = True
+            try:
+                if self._connection is not None:
+                    self._connection.close()
+            finally:
+                self._native = None
+                if self._context is not None:
+                    self._context.dispose()
 
     def receive(
         self,
@@ -389,6 +410,10 @@ class Output:
     __slots__ = (
         "_native",
         "_context",
+        "_settings",
+        "_initialization",
+        "_isolated",
+        "_timeout",
         "_protocol",
         "_channel",
         "_port",
@@ -420,6 +445,7 @@ class Output:
             if not math.isfinite(bpm) or bpm <= 0:
                 raise ValueError("bpm must be positive and finite")
         self._beat_period = None if bpm is None else Fraction(60) / Fraction(str(bpm))
+        self._initialization = Lock()
         self._context: Context | None = None
         self._closed = False
         self._channel = channel
@@ -431,14 +457,28 @@ class Output:
             "protocol": protocol,
             "backend": backend,
         }
-        self._native = None if isolated else _native.Output(**settings)
-        self._context = Context(timeout) if isolated else None
-        if self._context is not None:
-            self._context.request("init", [False, wire_settings(settings)])
+        self._settings = settings
+        self._isolated = isolated
+        self._timeout = timeout
+        self._native = None
+
+    def _initialize(self) -> None:
+        _native.check_thread()
+        with self._initialization:
+            if self._closed:
+                raise midi.StateError("client is closed")
+            if self._native is not None or self._context is not None:
+                return
+            if self._isolated:
+                self._context = Context(self._timeout)
+                self._context.request("init", [False, wire_settings(self._settings)])
+            else:
+                self._native = _native.Output(**self._settings)
 
     def ports(self) -> list[midi.Port]:
         if self._closed or self._connection is not None:
             raise midi.StateError("client is connected or closed")
+        self._initialize()
         if self._native is not None:
             return self._native.ports()
         assert self._context is not None
@@ -457,6 +497,7 @@ class Output:
             raise midi.StateError("output is closed or already connected")
         if not isinstance(port, midi.Port):
             raise TypeError("port must be a discovery snapshot")
+        self._initialize()
         connection = _OutputState._create(self)
         if self._native is not None:
             connection._native = self._native.connect(port)
@@ -472,6 +513,7 @@ class Output:
         if self._closed or self._connection is not None:
             raise midi.StateError("output is closed or already connected")
         validate_open(name)
+        self._initialize()
         connection = _OutputState._create(self)
         if self._native is not None:
             connection._native = self._native.create_virtual(name)
@@ -495,11 +537,29 @@ class Output:
         allow_rounding: bool = False,
         metrics: bool = False,
     ) -> events.PlaybackReport:
-        self.__enter__()
-        assert self._connection is not None
+        if self._closed:
+            raise midi.StateError("output is closed")
         try:
-            return self._connection.play(
-                source,
+            iterator = iter(source)
+            prefix: list[object] = []
+            for item in iterator:
+                prefix.append(item)
+                if isinstance(item, messages.Message):
+                    if origin is None:
+                        if item.timestamp is None:
+                            raise ValueError("playback requires timestamped events")
+                        origin = item.timestamp
+                    self.__enter__()
+                    break
+                if not isinstance(
+                    item, (events.Clock, archive.Stream, archive.Metadata)
+                ):
+                    break
+            if origin is None:
+                origin = events.Timestamp(ticks=0, clock=events.Clock(identity="empty"))
+            return _native.play(
+                self,
+                chain(prefix, iterator),
                 origin=origin,
                 mappings=mappings,
                 cancel=cancel,
@@ -533,16 +593,17 @@ class Output:
 
     def close(self) -> None:
         _native.check_thread()
-        if self._closed:
-            return
-        self._closed = True
-        try:
-            if self._connection is not None:
-                self._connection.close()
-        finally:
-            self._native = None
-            if self._context is not None:
-                self._context.dispose()
+        with self._initialization:
+            if self._closed:
+                return
+            self._closed = True
+            try:
+                if self._connection is not None:
+                    self._connection.close()
+            finally:
+                self._native = None
+                if self._context is not None:
+                    self._context.dispose()
 
     def __call__(
         self,
@@ -704,42 +765,6 @@ class _OutputState:
             0 if client._context is None else client._context.generation
         )
         return connection
-
-    def play(
-        self,
-        source: Iterable[object],
-        *,
-        origin: events.Timestamp | None = None,
-        mappings: list[events.ClockMapping]
-        | tuple[events.ClockMapping, ...]
-        | None = None,
-        cancel: events.Cancellation | None = None,
-        allow_rounding: bool = False,
-        metrics: bool = False,
-    ) -> events.PlaybackReport:
-        """Play timestamped events on the caller's thread, stopping on failure."""
-        if origin is None:
-            iterator = iter(source)
-            prefix: list[object] = []
-            for item in iterator:
-                prefix.append(item)
-                if isinstance(item, messages.Message):
-                    if item.timestamp is None:
-                        raise ValueError("playback requires timestamped events")
-                    origin = item.timestamp
-                    break
-            source = chain(prefix, iterator)
-            if origin is None:
-                origin = events.Timestamp(ticks=0, clock=events.Clock(identity="empty"))
-        return _native.play(
-            self,
-            source,
-            origin=origin,
-            mappings=mappings,
-            cancel=cancel,
-            allow_rounding=allow_rounding,
-            metrics=metrics,
-        )
 
     def send(
         self,

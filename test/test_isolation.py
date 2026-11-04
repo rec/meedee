@@ -865,17 +865,23 @@ def test_invalid_deadlines_are_rejected_before_starting_a_worker(
 
 
 def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPacket]:
+    """Discover while the child fixture's selected mode is in the environment."""
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
-        return cast(Callable[..., midi.Input[events.ReceivedPacket]], midi.Input)(
+        client = cast(Callable[..., midi.Input[events.ReceivedPacket]], midi.Input)(
             **({"raw": True, "isolated": True} | settings)
         )
+        client.ports()
+        return client
 
 
 def output_client(mode: str, **settings: object) -> midi.Output:
+    """Discover while the child fixture's selected mode is in the environment."""
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
-        return cast(Callable[..., midi.Output], midi.Output)(
+        client = cast(Callable[..., midi.Output], midi.Output)(
             **({"isolated": True} | settings)
         )
+        client.ports()
+        return client
 
 
 def local_port() -> midi.Port:
@@ -912,13 +918,14 @@ def test_isolated_snapshots_disambiguate_duplicate_ids_and_do_not_rediscover_on_
 def test_discovery_metadata_failure_preserves_coremidi_worker_for_explicit_retry(
     workers: list[Popen[bytes]], direction: str
 ) -> None:
-    client = (
-        input_client("discovery_error_once")
-        if direction == "input"
-        else output_client("discovery_error_once")
-    )
-    with pytest.raises(midi.PortInfoError, match="endpoint disappeared"):
-        client.ports()
+    with patch.dict(os.environ, {"MEEDEE_TEST_MODE": "discovery_error_once"}):
+        client = (
+            midi.Input(isolated=True)
+            if direction == "input"
+            else midi.Output(isolated=True)
+        )
+        with pytest.raises(midi.PortInfoError, match="endpoint disappeared"):
+            client.ports()
     if sys.platform == "darwin":
         assert client.ports()
         assert client.worker_failure is None
@@ -1362,4 +1369,7 @@ def test_clients_leaving_scope_are_collectible_and_workers_exit(
     reference = open_client()
     gc.collect()
     assert reference() is None
-    workers[0].wait(timeout=3)
+    if connected:
+        workers[0].wait(timeout=3)
+    else:
+        assert not workers

@@ -71,3 +71,30 @@ def test_client_rejects_positional_arguments_before_native_initialization(
 ) -> None:
     with pytest.raises(TypeError):
         client(37)  # ty: ignore[too-many-positional-arguments, no-matching-overload]
+
+
+@pytest.mark.parametrize("client_type", [midi.Input, midi.Output])
+@pytest.mark.parametrize("isolated", [False, True])
+def test_client_initialization_is_deferred_until_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+    client_type: type[midi.Input] | type[midi.Output],
+    isolated: bool,
+) -> None:
+    def fail_initialization(*args: object, **kwargs: object) -> None:
+        raise midi.InitError("initialization attempted")
+
+    from meedee import _clients, _native
+
+    target = _clients if isolated else _native
+    monkeypatch.setattr(
+        target, "Context" if isolated else client_type.__name__, fail_initialization
+    )
+    unopened = client_type(isolated=isolated)
+    assert unopened.worker_failure is None
+    unopened.close()
+    assert unopened.closed
+    with pytest.raises(midi.StateError):
+        unopened.ports()
+    client = client_type(isolated=isolated)
+    with pytest.raises(midi.InitError, match="initialization attempted"):
+        client.ports()

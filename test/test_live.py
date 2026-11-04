@@ -108,7 +108,7 @@ class Sink:
         self.sent: list[messages.Message] = []
         self.fail_at = fail_at
 
-    def send(self, message: messages.Message) -> None:
+    def __call__(self, message: messages.Message) -> None:
         if len(self.sent) == self.fail_at:
             raise midi.SendError("device failed")
         self.sent.append(message)

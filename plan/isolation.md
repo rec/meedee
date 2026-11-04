@@ -4,7 +4,8 @@
 
 `Input(*, isolated=False, timeout=5.0)` and the corresponding `Output`
 constructor default to in-process operation. Explicit `isolated=True` uses one
-child process per resource; closing is terminal and retires its worker. The ownership
+child process per initialized resource. Construction is lazy; discovery/connect or
+actual I/O starts the worker. Closing is terminal and retires any worker. The ownership
 model allows one live connection per client; input and output ports of the same
 physical device therefore use separate processes. `isolated=False` keeps native
 MIDI in the caller's process. No automatic physical-device grouping is inferred.

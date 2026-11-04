@@ -177,11 +177,9 @@ fn play(
     let source = Source {
         iterator: source.try_iter()?.into_any().unbind(),
     };
-    let send = output.getattr("send")?.unbind();
+    let send = output.clone().unbind();
     if !send.bind(py).is_callable() {
-        return Err(PyTypeError::new_err(
-            "MIDI output send method must be callable",
-        ));
+        return Err(PyTypeError::new_err("MIDI output must be callable"));
     }
     let result = py.detach(move || {
         model::play(

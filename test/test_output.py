@@ -387,7 +387,7 @@ def test_client_play_infers_origin_and_closes_reader_and_output(
 def test_client_play_accepts_empty_capture(transport: NativeConnection) -> None:
     report = midi.Output().play([])
     assert report.sent_events == 0
-    assert transport.closed
+    assert not transport.closed
 
 
 @pytest.mark.parametrize("connected", [False, True])
@@ -424,3 +424,27 @@ def test_playback_accepts_timing_without_source_metadata(
     assert midi.Output().play([note]).sent_events == 1
     assert note.stream is None
     assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
+
+
+@pytest.mark.parametrize("isolated", [False, True])
+@pytest.mark.parametrize("declarations", [False, True])
+def test_empty_playback_does_not_initialize_transport(
+    monkeypatch: pytest.MonkeyPatch, isolated: bool, declarations: bool
+) -> None:
+    from meedee import _clients, _native, archive, events
+
+    def fail_initialization(*args: object, **kwargs: object) -> None:
+        raise AssertionError("empty playback opened a MIDI client")
+
+    monkeypatch.setattr(_native, "Output", fail_initialization)
+    monkeypatch.setattr(_clients, "Context", fail_initialization)
+    source = (
+        [events.Clock(identity="empty"), archive.Stream(id="s", label="")]
+        if declarations
+        else []
+    )
+    output = midi.Output(isolated=isolated)
+    report = output.play(iter(source))
+    assert report.sent_events == 0
+    assert not output.closed
+    output.close()

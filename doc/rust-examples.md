@@ -4,6 +4,9 @@ These examples use the `meedee` Rust crate. Each block is an independent functio
 body; put it inside a function returning `Result<(), Box<dyn std::error::Error>>`
 and finish with `Ok(())`. The `?` operator propagates a checked error.
 
+Both Rust and Python construct Input/Output lazily; first discovery or I/O
+initializes the resource. Empty playback opens no ports.
+
 Live examples select the first available MIDI port. Connect a keyboard or synth
 before running them. MIDI carries messages, not audio. Channels are 1..16, notes
 and velocities are 0..127, and program numbers are 1..128.

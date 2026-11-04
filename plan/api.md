@@ -53,8 +53,8 @@ Slice 2 transport choices, approved 2026-10-14:
 
 Resource follow-up approved 2026-10-15: each parent Python process admits at most
 32 live isolated workers, separately from native-client and connection counts.
-Each isolated Input/Output constructor consumes one slot, including discovery-only
-clients. Starts in progress and retiring processes count until exit is confirmed;
+Each isolated Input/Output consumes one slot on first native use, including
+discovery-only clients. Construction validates settings without starting a worker. Starts in progress and retiring processes count until exit is confirmed;
 admission raises ResourceError before spawning at capacity. Failed starts release
 their reservations. This is a count limit, not a machine-wide memory budget.
 Input and Output each own their connection state. Closing releases the native
@@ -1708,7 +1708,9 @@ final partial-message and loss diagnostics retained. Raw mode is rejected.
 When output is specified, the in-memory result is written to an archive after
 capture, using exclusive creation unless overwrite=True. File errors raise.
 
-`Output.play(source)` opens the selected output and leaves it open for later sends
+`Output.play(source)` examines the source first; an empty or declaration-only
+source creates no native client. Playback with messages opens the selected output
+and leaves it open for later sends
 until explicit close, context exit or finalization. A passed archive Reader is
 consumed and closed. Origin is optional, inferred from the first Message timestamp. Initial
 silence is trimmed; inter-event timing is retained. Empty captures send no events.

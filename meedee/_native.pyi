@@ -80,7 +80,7 @@ def prepare_output(
 ) -> bytes | midi.UmpPacket | tuple[str, dict[str, int], int]: ...
 def live_size(item: messages.Message | events.StreamDiagnostic) -> int: ...
 def play(
-    output: object,
+    output: Callable[[messages.Message], None],
     source: object,
     *,
     origin: events.Timestamp,

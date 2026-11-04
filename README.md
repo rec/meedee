@@ -604,7 +604,11 @@ ports = output.ports()
 #     connection(bytes([0x80, 60, 0]))
 ```
 
-`Input` and `Output` constructors accept keyword-only settings. Defaults are
+`Input` and `Output` constructors validate settings without creating native clients
+or isolated workers. Discovery, explicit connection or actual I/O initializes the
+resource on first use. Empty or declaration-only playback opens no MIDI ports.
+Initialization errors therefore occur at first use. Constructors accept
+keyword-only settings. Defaults are
 `protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
 `isolated=False` and `raw=False`; outputs default to `isolated=False`, `channel=None`, `port=None`,
 and `bpm=None`.
@@ -675,9 +679,9 @@ Both modes use a dedicated native owner thread per client for creation,
 operations and teardown; Windows COM initialization stays on that thread.
 
 A parent Python process admits at most 32 live isolated workers. Each Input or
-Output client uses one slot, even when used only for discovery; an input/output
-pair uses two. Starts in progress and retiring children count until process exit
-is confirmed. At the limit construction raises ResourceError before starting
+Output resource uses one slot once initialized, including discovery-only use;
+an input/output pair uses two. Starts in progress and retiring children count until process exit
+is confirmed. At the limit first use raises ResourceError before starting
 another child. Startup failures release their reservation. These counts are
 separate from native-client/connection limits and are not a machine-wide memory
 budget or a guarantee that 32 workers fit on any particular host.
