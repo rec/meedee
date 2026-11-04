@@ -485,3 +485,31 @@ An explicitly supplied velocity is a raw 16-bit value. The same version selectio
 applies to NoteOff, PolyPressure, ControlChange, ProgramChange, ChannelPressure
 and PitchBend. Use `ump.to_midi1()` or `ump.to_midi2()` for conversion;
 `replace(version=...)` cannot change the protocol.
+
+## Interpret controller gestures
+
+Move a high-resolution controller or send RPN/NRPN changes from the first input.
+The interpreter combines the contributing MIDI 1 messages and reports what was
+observed. It also accepts plain messages without source or timing metadata.
+
+```python
+from meedee.controls import ControlInterpreter
+from meedee.midi import Input
+
+interpreter = ControlInterpreter()
+with Input() as source:
+    for message in source.with_errors():
+        if isinstance(message, Exception):
+            raise message
+        for observation in interpreter.feed(message):
+            print(observation)
+```
+
+Use `VelocityInterpreter` instead to interpret MIDI 1 high-resolution velocity
+prefixes. Both return a list of observations; `observation.value` holds the
+interpreted result or diagnostic. Source and contributor timestamps are optional.
+Known-loss diagnostics clear pending fragments and are retained in the result.
+Clock changes report `StateReset`. Call `reset()` before switching sources,
+including switching between anonymous and named messages. `reset()` returns nothing.
+For MIDI 1 inside UMP, select an explicit `group`; native MIDI 2 interpretation
+is not performed by these interpreters.

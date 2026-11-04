@@ -26,10 +26,16 @@ if let(Some(a),Some(b))=(&value.first_timestamp,&value.last_timestamp){if a.cloc
 #[getter]fn first_packet(&self)->u64{self.value.first_packet}#[getter]fn last_packet(&self)->u64{self.value.last_packet}#[getter]fn first_timestamp(&self)->Option<Timestamp>{self.value.first_timestamp.clone().map(|value|Timestamp{value})}#[getter]fn last_timestamp(&self)->Option<Timestamp>{self.value.last_timestamp.clone().map(|value|Timestamp{value})}
 });
 pub fn extract(object: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
+    with_metadata(object, payload(object)?)
+}
+pub(crate) fn with_metadata(
+    object: &Bound<'_, PyAny>,
+    payload: model::Payload,
+) -> PyResult<model::Payload> {
     let metadata = object
         .extract::<PyRef<'_, crate::messages::Message>>()?
         .metadata();
-    let value = payload(object)?
+    let value = payload
         .with_metadata(meedee::messages::Metadata {
             stream: metadata.stream,
             timestamp: metadata.timestamp,

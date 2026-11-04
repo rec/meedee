@@ -15,19 +15,16 @@ struct Prefix {
     index: usize,
 }
 #[derive(Clone, Debug, Default)]
-pub struct VelocityInterpreter {
+pub(crate) struct VelocityState {
     prefix: [Option<Prefix>; 16],
     next_index: usize,
 }
-impl VelocityInterpreter {
+impl VelocityState {
     pub fn new() -> Self {
         Self::default()
     }
     pub fn reset(&mut self) {
         self.prefix.fill(None);
-    }
-    pub fn feed(&mut self, message: &AnyMessage) -> Option<VelocityObservation> {
-        self.feed_spanned(message).map(|(v, _, _)| v)
     }
     pub fn feed_spanned(
         &mut self,

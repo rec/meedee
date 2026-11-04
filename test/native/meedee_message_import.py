@@ -93,7 +93,7 @@ def main() -> None:
             )
             == 6
         )
-        assert controls.Interpreter().feed(messages.TimingClock()) == []
+        assert controls.ControlInterpreter().feed(messages.TimingClock()) == []
         assert gm.program(program=1).name == "Acoustic Grand Piano"
         assert (
             len(codecs.expand(mpe.ZoneConfiguration(manager_channel=1, members=1))) == 5
@@ -130,7 +130,7 @@ def main() -> None:
             == 2
         )
         assert not timecode.Assembler(timeout="100 ns").locked
-        assert controls.VelocityInterpreter().feed(messages.TimingClock()) is None
+        assert controls.VelocityInterpreter().feed(messages.TimingClock()) == []
 
         assert ump.encode(ump.JrClock(ticks=65535)) == (0x0010FFFF,)
         assert ump.Assembler().active_streams == 0
@@ -181,7 +181,7 @@ def main() -> None:
         assert poller.snapshot().generation == 0
         poller.close()
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"
-        view = controls.EventInterpreter()
+        view = controls.ControlInterpreter()
         assert view.feed((messages.TimingClock()).replace(stream="s")) == []
 
         assert "meedee.midi" not in sys.modules

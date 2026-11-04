@@ -547,3 +547,32 @@ println!("{words:?}");
 Implementations of `ump::UmpValue` likewise return `Result<Vec<u32>, ValueError>`
 from `encode_words()`. Python's `ump.encode()` continues to return a tuple of
 words and raises an exception on failure.
+
+## Interpret controller gestures
+
+The same interpreter accepts plain `events::Payload` messages and messages with
+source/timing metadata. Keep one instance per source.
+
+```rust
+use meedee::controls::ControlInterpreter;
+use meedee::events::InputItem;
+use meedee::midi::Input;
+
+let mut interpreter = ControlInterpreter::new(None)?;
+let mut input = Input::new();
+for item in input.with_errors() {
+    let observations = match item? {
+        InputItem::Message(message) => interpreter.feed(&message)?,
+        InputItem::Diagnostic(diagnostic) => interpreter.feed_diagnostic(&diagnostic)?,
+    };
+    println!("{observations:?}");
+}
+```
+
+`VelocityInterpreter` uses the same interface for MIDI 1 velocity prefixes.
+Both return observation vectors with optional source and contributor timestamps;
+`value` contains the interpreted result or diagnostic. Known loss clears pending
+fragments and retains the original diagnostic. Clock changes report `StateReset`.
+Call `reset()` before changing source identity, including between anonymous and
+named messages. Use `new(Some(group))` for MIDI 1 inside UMP. These interpreters
+do not interpret native MIDI 2 channel messages.

@@ -297,13 +297,18 @@ even though the failed connection already rejects sends. Release cannot be
 guaranteed after failure. Python error construction occurs after dropping the
 connection mutex, so import hooks/exception constructors cannot run under it.
 
-`meedee.controls.Interpreter()` is pure and optional. Use one instance per source;
+`meedee.controls.ControlInterpreter()` is pure and optional. Use one instance per source;
 it has fixed state for 16 channels and no parameter cache or source registry.
-`feed(primitive_message)` returns frozen ControlObservation, ParameterObservation,
-ParameterStep and Diagnostic values; it does not return, mutate or replace raw
-messages. Non-control primitives still advance its zero-based input index.
-No SysEx payload is copied merely to ignore that input. Keep the raw stream
-separately. Feeding a compound command is an error; expand or decode it first.
+`feed(message_or_diagnostic)` returns a list of `events.Observation` values.
+Their `value` contains ControlObservation, ParameterObservation, ParameterStep
+or Diagnostic; known-loss input retains its original StreamDiagnostic.
+The interpreter does not return, mutate or replace raw messages.
+Observations have optional source and contributor timestamps; plain messages
+need no metadata. Anonymous input is one source: switching between anonymous
+and named input, or between named sources, requires `reset()`. Rejected source
+changes do not consume input or alter parser state. MIDI 1 in UMP requires
+an explicit group. Native MIDI 2 interpretation is not added by this merger. Non-control primitives still advance its zero-based input index.
+Keep the raw stream separately. Feeding a compound command is an error; expand or decode it first.
 
 ControlObservation contains channel/controller/value/resolution and first_index/
 last_index. A new coarse CC reports its exact seven-bit value and forgets the
@@ -329,15 +334,17 @@ partner; the incomplete diagnostic is emitted if parameter data arrives too soon
 This intentionally declines compliant devices that change only one selector
 half, rather than guessing inherited context. RPN-null clears both families.
 
-`reset()` clears all source state and emits StateReset at the next input index
-without advancing it, a boundary-position diagnostic. SystemReset does the same
-at its input position; Reset All Controllers clears only its channel. No physical
+`reset()` clears source binding, clock and interpretation state, returning nothing.
+Clock changes emit a StateReset diagnostic on an enclosing observation carrying
+available metadata, then interpret the new message with fresh state.
+SystemReset emits StateReset at its input position; Reset All Controllers clears
+only its channel. No physical
 default values are invented or sent. All Notes Off is not a controller reset.
 Diagnostics expose kind, optional channel/controller, and first/last indexes.
-Indexes count fed primitives, retain their position across reset, and saturate
-at usize::MAX. No timeout or silent-loss detector invents stream boundaries.
-Call reset after known loss/reconnect; also reset the byte decoder when needed.
-Timestamped observations and device/profile-specific semantics remain later work.
+Indexes count fed primitives and retain their position across reset; index
+exhaustion is reported as an error. No timeout or silent-loss detector invents stream boundaries.
+Feed known-loss diagnostics to clear state while preserving their details, or
+call reset after loss/reconnect; also reset the byte decoder when needed.
 
 The prototype does not interpret manufacturer IDs, enforce a complete vendor
 message schema, assemble packets or implement SysEx8. Do not use its generic
@@ -714,6 +721,11 @@ seven-bit coarse values when no prefix was received and fourteen-bit values
 when paired. Zero-velocity NoteOn remains a note-off observation, ignores its
 prefix and records its original form. Explicit reset, SystemReset and channel
 Reset All Controllers invalidate pending context. Raw messages remain caller-owned.
+Its feed method has the same observation-list, optional metadata and source-boundary
+contract as ControlInterpreter. `VelocityObservation` remains the velocity result
+in `Observation.value`; no observation is represented by an empty list.
+Rust uses `new(None)` or `new(Some(group))`, `feed(&Payload)`,
+`feed_diagnostic(&StreamDiagnostic)` and `reset()` for both interpreters.
 
 `timecode.Position` validates SMPTE labels, including skipped drop-frame labels;
 `advance(frames=...)` wraps at 24 hours in either direction. FullFrame remains a

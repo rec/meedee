@@ -402,15 +402,9 @@ pub fn register_timecode(module: &Bound<'_, PyModule>) -> PyResult<()> {
     engines::register_timecode(module)
 }
 
-pub fn changes_mode(message: &Bound<'_, PyAny>) -> bool {
-    message.is_instance_of::<gm::Gm1On>()
-        || message.is_instance_of::<gm::Gm2On>()
-        || message.is_instance_of::<gm::GmOff>()
-}
 macro_rules! primitives {
     ($($module:ident :: $name:ident),*)=>{
         pub fn encode_message(message:&Bound<'_,PyAny>)->Option<Vec<u8>> {$(if let Ok(value)=message.extract::<PyRef<'_,$module::$name>>() {return Some(value.value.encode().expect("validated system message"));})*engines::encode_message(message)}
-        pub fn is_message(message:&Bound<'_,PyAny>)->bool {engines::is_message(message) $(||message.is_instance_of::<$module::$name>())*}
     };
 }
 primitives!(

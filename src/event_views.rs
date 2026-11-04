@@ -12,8 +12,8 @@ pub struct Observation {
 #[pymethods]
 impl Observation {
     #[getter]
-    fn stream(&self) -> &str {
-        &self.value.stream
+    fn stream(&self) -> Option<&str> {
+        self.value.stream.as_deref()
     }
     #[getter]
     fn group(&self) -> Option<u8> {
@@ -95,8 +95,24 @@ fn feed(
     view: &mut impl View,
     value: &Bound<'_, PyAny>,
     now: Option<u64>,
+    profiles: bool,
 ) -> PyResult<Vec<Observation>> {
-    let values = if let Ok(e) = crate::event_values::extract(&value) {
+    let message = crate::event_values::extract(value).or_else(|error| {
+        if !profiles || !value.is_instance_of::<crate::messages::Message>() {
+            return Err(error);
+        }
+        let wire = crate::messages::encode_message(value)?;
+        if wire.first() != Some(&240) || wire.last() != Some(&247) {
+            return Err(error);
+        }
+        let sysex = meedee::messages::SysEx::new(wire[1..wire.len() - 1].to_vec())
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        crate::event_values::with_metadata(
+            value,
+            meedee::events::Payload::Midi1(meedee::messages::AnyMessage::SysEx(sysex)),
+        )
+    });
+    let values = if let Ok(e) = message {
         view.feed(&e, now)
     } else if let Ok(d) = value.extract::<PyRef<'_, StreamDiagnostic>>() {
         view.boundary(&d.value)
@@ -105,24 +121,24 @@ fn feed(
     };
     Ok(output(values.map_err(error)?))
 }
-macro_rules! view_methods{($name:ident;{$($ctor:item)*})=>{
-#[pymethods]impl $name{$($ctor)* fn feed(&mut self,value:&Bound<'_,PyAny>)->PyResult<Vec<Observation>>{feed(&mut self.value,value,None)}fn reset(&mut self){self.value.reset();}}
+macro_rules! view_methods{($name:ident, $profiles:expr;{$($ctor:item)*})=>{
+#[pymethods]impl $name{$($ctor)* fn feed(&mut self,value:&Bound<'_,PyAny>)->PyResult<Vec<Observation>>{feed(&mut self.value,value,None,$profiles)}fn reset(&mut self){self.value.reset();}}
 };}
-#[pyclass(name = "EventInterpreter", module = "meedee.controls")]
+#[pyclass(name = "ControlInterpreter", module = "meedee.controls")]
 struct Controls {
-    value: meedee::controls::EventInterpreter,
+    value: meedee::controls::ControlInterpreter,
 }
-view_methods!(Controls;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::EventInterpreter::new(selected(group)?).map_err(error)?})}});
-#[pyclass(name = "EventVelocityInterpreter", module = "meedee.controls")]
+view_methods!(Controls, true;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::ControlInterpreter::new(selected(group)?).map_err(error)?})}});
+#[pyclass(name = "VelocityInterpreter", module = "meedee.controls")]
 struct Velocity {
-    value: meedee::controls::EventVelocityInterpreter,
+    value: meedee::controls::VelocityInterpreter,
 }
-view_methods!(Velocity;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::EventVelocityInterpreter::new(selected(group)?).map_err(error)?})}});
+view_methods!(Velocity, true;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::VelocityInterpreter::new(selected(group)?).map_err(error)?})}});
 #[pyclass(name = "EventTracker", module = "meedee.mpe")]
 struct Mpe {
     value: meedee::mpe::EventTracker,
 }
-view_methods!(Mpe;{
+view_methods!(Mpe, false;{
 #[new]#[pyo3(signature=(*,zone,group=None))]fn new(zone:&Bound<'_,PyAny>,group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{let meedee::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)?else{return Err(PyTypeError::new_err("ZoneConfiguration required"));};Ok(Self{value:meedee::mpe::EventTracker::new(zone,selected(group)?).map_err(error)?})}
 #[pyo3(signature=(*,channel))]fn snapshot(&self,py:Python<'_>,channel:&Bound<'_,PyAny>)->PyResult<Py<PyAny>>{value_object(py,Value::Mpe(self.value.snapshot(crate::messages::integer(channel,"channel")?).map_err(|e|PyValueError::new_err(e.to_string()))?))}
 });
@@ -130,12 +146,12 @@ view_methods!(Mpe;{
 struct Ump {
     value: meedee::ump::EventAssembler,
 }
-view_methods!(Ump;{#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:meedee::ump::EventAssembler::new(message_limit,total_limit,max_streams).map_err(error)?})}});
+view_methods!(Ump, false;{#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:meedee::ump::EventAssembler::new(message_limit,total_limit,max_streams).map_err(error)?})}});
 #[pyclass(name = "EventDecoder", module = "meedee.tuning")]
 struct Tuning {
     value: meedee::tuning::EventDecoder,
 }
-view_methods!(Tuning;{
+view_methods!(Tuning, false;{
 #[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::tuning::EventDecoder::new(selected(group)?).map_err(error)?})}
 fn feed_assembled(&mut self,observation:PyRef<'_,Observation>)->PyResult<Vec<Observation>>{Ok(output(self.value.assembled(&observation.value).map_err(error)?))}
 });
@@ -166,6 +182,7 @@ impl Timecode {
             &mut self.value,
             value,
             Some(crate::units::nanoseconds(now_ns)?),
+            false,
         )
     }
     #[pyo3(signature=(*,now_ns))]

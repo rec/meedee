@@ -62,7 +62,7 @@ def test_shared_vectors_and_explicit_interpretation_preserve_raw_messages() -> N
             assert codecs.Decoder().feed(b) == [raw]
             assert v in (gm.decode(raw), universal.decode(raw), timecode.decode(raw))
             if not isinstance(v, (gm.Gm1On, gm.GmOff, gm.Gm2On)):
-                assert controls.Interpreter().feed(v) == []
+                assert controls.ControlInterpreter().feed(v) == []
             for i in range(3, len(raw.data)):
                 truncated = messages.SysEx(data=raw.data[:i])
                 with pytest.raises(ValueError):
@@ -211,22 +211,22 @@ def test_named_controls_keep_distinct_units_and_reset_on_explicit_input() -> Non
         controls.local_control(channel=1, enabled=1)  # ty: ignore[invalid-argument-type]
     with pytest.raises(ValueError):
         controls.mono_mode(channel=1, channels=17)
-    interpreter = controls.Interpreter()
+    interpreter = controls.ControlInterpreter()
     assert interpreter.feed(messages.ControlChange(channel=1, controller=7, value=1))
     reset = controls.reset_all_controllers(channel=1)
     # Constructing a value does not reset interpretation state.
     assert interpreter.feed(messages.ControlChange(channel=1, controller=39, value=2))
-    diagnostic = interpreter.feed(reset)[0]
+    diagnostic = interpreter.feed(reset)[0].value
     assert isinstance(diagnostic, controls.Diagnostic)
     assert diagnostic.kind == controls.DiagnosticKind.StateReset
     for mode in (gm.Gm1On(device_id=1), gm.Gm2On(device_id=1), gm.GmOff(device_id=1)):
         interpreter.feed(messages.ControlChange(channel=1, controller=7, value=1))
-        diagnostic = interpreter.feed(mode)[0]
+        diagnostic = interpreter.feed(mode)[0].value
         assert isinstance(diagnostic, controls.Diagnostic)
         assert diagnostic.kind == controls.DiagnosticKind.StateReset
         diagnostic = interpreter.feed(
             messages.ControlChange(channel=1, controller=39, value=2)
-        )[0]
+        )[0].value
         assert isinstance(diagnostic, controls.Diagnostic)
         assert diagnostic.kind == controls.DiagnosticKind.MissingCoarse
 

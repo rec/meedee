@@ -90,7 +90,7 @@ def test_shared_vectors_encode_and_decode_only_when_explicitly_requested() -> No
     for m, b in tuning_vectors():
         assert isinstance(m, messages.Message)
         assert codecs.encode(m) == b
-        assert controls.Interpreter().feed(m) == []
+        assert controls.ControlInterpreter().feed(m) == []
         decoder = codecs.Decoder()
         raw = decoder.feed(b)
         assert raw == [messages.SysEx(data=b[1:-1])]

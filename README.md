@@ -103,8 +103,8 @@ provide either a callback or `receive(timeout=..., cancel=...)`, returning an
 immutable `messages.Message` or `events.StreamDiagnostic`. Messages carry optional
 `timestamp`, `stream` and `span` fields directly. `replace()` and `transpose()`
 preserve this metadata; equality and hashing compare MIDI content only.
-Optional `EventInterpreter`,
-`EventVelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
+Optional `ControlInterpreter`,
+`VelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
 
@@ -509,12 +509,12 @@ allocation, sustain, entry limits and sequence-lock behavior.
 
 ```python
 from meedee.codecs import expand
-from meedee.controls import Interpreter
+from meedee.controls import ControlInterpreter
 from meedee.messages import NrpnSet
 
 command = NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
 primitives = expand(command)
-interpreter = Interpreter()  # One per independent input source.
+interpreter = ControlInterpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
 # An open MIDI 1.0 output can send the whole command:
 # connection(command)
@@ -543,7 +543,10 @@ NRPN selection requires both halves afresh, a deliberate conservative policy
 that declines single-half selector edits. Bank Select and Data Entry are not
 presented as generic knobs. Reset after known loss/reconnect; SystemReset and
 Reset All Controllers invalidate the applicable local state automatically.
-There are no timers, guessed device defaults, timestamps or source registry.
+Observations preserve available source and timing metadata. Plain messages need
+no metadata. Source identity changes require reset; clock changes and reported
+loss clear interpretation state. There are no timers, guessed device defaults
+or source registry.
 Rust exposes the same values and state machine; its common Message marker has
 PrimitiveMessage and Command subtraits for encoding and expansion.
 

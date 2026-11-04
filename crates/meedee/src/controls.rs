@@ -1,9 +1,9 @@
 //! Optional observations of one source's primitive stream. Never replaces raw
 //! messages or infers physical units, lost messages, or unknown absolute values.
 
-pub use crate::event_views::{Controls as EventInterpreter, Velocity as EventVelocityInterpreter};
+pub use crate::event_views::{ControlInterpreter, VelocityInterpreter};
 use crate::messages::{AnyMessage, ControlChange};
-pub use crate::velocity::{VelocityInterpreter, VelocityObservation};
+pub use crate::velocity::VelocityObservation;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ParameterFamily {
@@ -77,7 +77,7 @@ pub enum Observation {
 /// Minimal primitive-stream input. Other advances the index without copying an
 /// unrelated payload, including a potentially large SysEx. From<&AnyMessage>
 /// preserves the normal Rust stream interface.
-pub enum InputMessage {
+pub(crate) enum InputMessage {
     ControlChange(ControlChange),
     SystemReset,
     Other,
@@ -96,12 +96,12 @@ impl From<&AnyMessage> for InputMessage {
 /// Fixed bounded state for 16 channels of one source. No timers, source registry
 /// or parameter-value cache. Input indexes saturate at usize::MAX.
 #[derive(Default)]
-pub struct Interpreter {
+pub(crate) struct ControlState {
     channels: [Channel; 16],
     next_index: usize,
 }
 
-impl Interpreter {
+impl ControlState {
     pub fn new() -> Self {
         Self::default()
     }
@@ -527,15 +527,3 @@ pub fn poly_mode(
 ) -> Result<crate::messages::ControlChange, crate::messages::ValueError> {
     Controller::PolyMode.message(channel, 0)
 }
-
-impl From<&crate::gm::ModeMessage> for InputMessage {
-    fn from(_: &crate::gm::ModeMessage) -> Self {
-        Self::SystemReset
-    }
-}
-macro_rules! mode_boundaries {
-    ($($name:ident),*)=>{$(impl From<&crate::gm::$name> for InputMessage {
-        fn from(_: &crate::gm::$name)->Self {Self::SystemReset}
-    })*};
-}
-mode_boundaries!(Gm1On, Gm2On, GmOff);

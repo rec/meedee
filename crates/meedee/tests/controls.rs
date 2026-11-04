@@ -1,6 +1,6 @@
 use meedee::codecs::{encode, expand};
 use meedee::controls::{
-    DiagnosticKind, InputMessage, Interpreter, Observation, ParameterFamily, StepDirection,
+    ControlInterpreter, DiagnosticKind, Observation, ParameterFamily, StepDirection,
 };
 use meedee::messages::*;
 
@@ -108,7 +108,7 @@ fn commands_expand_to_independent_wire_vectors() {
 
 #[test]
 fn fine_controls_follow_wire_order_and_keep_only_the_known_coarse_component() {
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = ControlInterpreter::new(None).unwrap();
     assert!(
         matches!(&cc(&mut interpreter, 1, 39, 7)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
     );
@@ -116,7 +116,11 @@ fn fine_controls_follow_wire_order_and_keep_only_the_known_coarse_component() {
         matches!(&cc(&mut interpreter, 1, 7, 2)[0], Observation::Control(v) if v.value == 2 && v.resolution == 7 && v.first_index == 1)
     );
     cc(&mut interpreter, 2, 7, 9);
-    interpreter.feed(&AnyMessage::TimingClock(TimingClock::new().unwrap()));
+    interpreter
+        .feed(&meedee::events::Payload::Midi1(AnyMessage::TimingClock(
+            TimingClock::new().unwrap(),
+        )))
+        .unwrap();
     assert!(
         matches!(&cc(&mut interpreter, 1, 39, 1)[0], Observation::Control(v) if v.value == 257 && v.resolution == 14 && v.first_index == 1 && v.last_index == 4)
     );
@@ -131,7 +135,7 @@ fn fine_controls_follow_wire_order_and_keep_only_the_known_coarse_component() {
 
 #[test]
 fn edited_and_switched_selectors_require_fresh_halves_and_never_donate_data() {
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = ControlInterpreter::new(None).unwrap();
     cc(&mut interpreter, 1, 99, 1);
     assert!(
         matches!(&cc(&mut interpreter, 1, 6, 2)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::IncompleteSelection)
@@ -166,7 +170,7 @@ fn edited_and_switched_selectors_require_fresh_halves_and_never_donate_data() {
 
 #[test]
 fn relative_updates_are_direction_only_and_invalidate_absolute_context() {
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = ControlInterpreter::new(None).unwrap();
     cc(&mut interpreter, 1, 101, 0);
     cc(&mut interpreter, 1, 100, 1);
     assert!(
@@ -183,7 +187,7 @@ fn relative_updates_are_direction_only_and_invalidate_absolute_context() {
 
 #[test]
 fn rpn_null_deselects_both_families_without_reserving_nrpn_16383() {
-    let mut interpreter = Interpreter::new();
+    let mut interpreter = ControlInterpreter::new(None).unwrap();
     cc(&mut interpreter, 1, 99, 127);
     cc(&mut interpreter, 1, 98, 127);
     assert!(
@@ -198,8 +202,8 @@ fn rpn_null_deselects_both_families_without_reserving_nrpn_16383() {
 
 #[test]
 fn resets_and_source_boundaries_invalidate_only_the_applicable_state() {
-    let mut one = Interpreter::new();
-    let mut two = Interpreter::new();
+    let mut one = ControlInterpreter::new(None).unwrap();
+    let mut two = ControlInterpreter::new(None).unwrap();
     cc(&mut one, 1, 7, 2);
     cc(&mut one, 2, 7, 3);
     assert!(
@@ -212,14 +216,15 @@ fn resets_and_source_boundaries_invalidate_only_the_applicable_state() {
         matches!(&cc(&mut one, 1, 39, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
     );
     assert!(matches!(&cc(&mut one, 2, 39, 1)[0], Observation::Control(v) if v.value == 385));
-    one.feed(InputMessage::SystemReset);
+    one.feed(&meedee::events::Payload::Midi1(AnyMessage::SystemReset(
+        SystemReset::new().unwrap(),
+    )))
+    .unwrap();
     assert!(
         matches!(&cc(&mut one, 2, 39, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
     );
     cc(&mut one, 1, 7, 2);
-    assert!(
-        matches!(&one.reset()[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::StateReset && d.first_index == 8)
-    );
+    one.reset();
     assert!(
         matches!(&cc(&mut one, 1, 39, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
     );
@@ -228,16 +233,24 @@ fn resets_and_source_boundaries_invalidate_only_the_applicable_state() {
 }
 
 fn cc(
-    interpreter: &mut Interpreter,
+    interpreter: &mut ControlInterpreter,
     channel: i64,
     controller: i64,
     value: i64,
 ) -> Vec<Observation> {
-    interpreter.feed(&AnyMessage::ControlChange(
-        ControlChange::new(controller, value)
-            .and_then(|m| m.with_channel(channel))
-            .unwrap(),
-    ))
+    interpreter
+        .feed(&meedee::events::Payload::Midi1(AnyMessage::ControlChange(
+            ControlChange::new(controller, value)
+                .and_then(|m| m.with_channel(channel))
+                .unwrap(),
+        )))
+        .unwrap()
+        .into_iter()
+        .map(|v| match v.value {
+            meedee::events::ObservationValue::Control(v) => v,
+            _ => panic!("expected control observation"),
+        })
+        .collect()
 }
 
 #[test]

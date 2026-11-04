@@ -383,22 +383,7 @@ macro_rules! short_messages {
             }
         }
 
-        pub fn control_input(message: &Bound<'_, PyAny>) -> PyResult<meedee::controls::InputMessage> {
-            use meedee::controls::InputMessage;
-            if let Ok(message) = message.extract::<PyRef<'_, ControlChange>>() {
-                return Ok(InputMessage::ControlChange(message.resolved()?.clone()));
-            }
-            if message.is_instance_of::<SystemReset>() || crate::profiles::changes_mode(message) {
-                return Ok(InputMessage::SystemReset);
-            }
-            if message.is_instance_of::<NoteOn>() || message.is_instance_of::<SysEx>()
-                || crate::tuning::is_message(message)
-                || crate::profiles::is_message(message)
-                $(|| message.is_instance_of::<$name>())* {
-                return Ok(InputMessage::Other);
-            }
-            Err(PyTypeError::new_err("interpreter input must be a primitive MIDI 1.0 message"))
-        }
+
     };
 }
 

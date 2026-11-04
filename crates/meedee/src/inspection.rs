@@ -538,8 +538,8 @@ pub struct MonitorReport {
 pub struct Monitor {
     observer: Observer,
     options: MonitorOptions,
-    controls: Option<crate::controls::EventInterpreter>,
-    velocity: Option<crate::controls::EventVelocityInterpreter>,
+    controls: Option<crate::controls::ControlInterpreter>,
+    velocity: Option<crate::controls::VelocityInterpreter>,
     filtered: u64,
     diagnostics: u64,
     transport_drops: u64,
@@ -565,10 +565,10 @@ impl Monitor {
         Ok(Self {
             observer: Observer::new(stream, clock, options.detail_limit)?,
             controls: interpret
-                .then(|| crate::controls::EventInterpreter::new(options.group))
+                .then(|| crate::controls::ControlInterpreter::new(options.group))
                 .transpose()?,
             velocity: interpret
-                .then(|| crate::controls::EventVelocityInterpreter::new(options.group))
+                .then(|| crate::controls::VelocityInterpreter::new(options.group))
                 .transpose()?,
             options,
             filtered: 0,
@@ -590,7 +590,6 @@ impl Monitor {
         }
     }
     pub fn feed(&mut self, item: &events::InputItem) -> io::Result<Option<MonitorEntry>> {
-        use events::View;
         self.observer.feed(item)?;
         match item {
             events::InputItem::Diagnostic(d) => {
@@ -601,10 +600,10 @@ impl Monitor {
             events::InputItem::Message(message) => {
                 let mut observations = Vec::new();
                 if let Some(view) = &mut self.controls {
-                    observations.extend(view.feed(message, None)?);
+                    observations.extend(view.feed(message)?);
                 }
                 if let Some(view) = &mut self.velocity {
-                    observations.extend(view.feed(message, None)?);
+                    observations.extend(view.feed(message)?);
                 }
                 let kind = match message.as_ref() {
                     events::Payload::Midi1(v) => midi1_kind(v),
@@ -657,7 +656,6 @@ impl Monitor {
         Some(MonitorEntry::LossCounter(total))
     }
     fn reset_views(&mut self) {
-        use events::View;
         if let Some(view) = &mut self.controls {
             view.reset();
         }

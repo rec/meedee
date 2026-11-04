@@ -71,28 +71,6 @@ observations! {
     Diagnostic { kind: DiagnosticKind, channel: Option<u8>, controller: Option<u8>, first_index: usize, last_index: usize };
 }
 
-#[pyclass(module = "meedee.controls")]
-struct Interpreter {
-    value: controls::Interpreter,
-}
-
-#[pymethods]
-impl Interpreter {
-    #[new]
-    fn new() -> Self {
-        Self {
-            value: controls::Interpreter::new(),
-        }
-    }
-    fn feed(&mut self, py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
-        let message = crate::messages::control_input(message)?;
-        to_python(py, self.value.feed(message))
-    }
-    fn reset(&mut self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
-        to_python(py, self.value.reset())
-    }
-}
-
 pub(crate) fn to_python(
     py: Python<'_>,
     observations: Vec<controls::Observation>,
@@ -120,7 +98,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     register_helpers(module)?;
     register_enums(module)?;
     register_observations(module)?;
-    module.add_class::<Interpreter>()?;
     Ok(())
 }
 

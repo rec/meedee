@@ -237,19 +237,23 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
         assert!(timecode::FullFrame::new(127, rate, 0, 0, 0, max + 1).is_err());
     }
     assert!(timecode::FullFrame::new(1, timecode::FrameRate::Fps30, 0, 0, 0, 0).is_err());
-    let mut interpreter = controls::Interpreter::new();
-    interpreter.feed(&AnyMessage::ControlChange(
-        meedee::messages::ControlChange::new(7, 1)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
+    let mut interpreter = controls::ControlInterpreter::new(None).unwrap();
+    let cc = |controller, value| {
+        meedee::events::Payload::Midi1(AnyMessage::ControlChange(
+            meedee::messages::ControlChange::new(controller, value)
+                .unwrap()
+                .with_channel(1)
+                .unwrap(),
+        ))
+    };
+    interpreter.feed(&cc(7, 1)).unwrap();
+    let wire = gm::Gm2On::new(127).unwrap().encode().unwrap();
+    let mode = meedee::events::Payload::Midi1(AnyMessage::SysEx(
+        SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap(),
     ));
-    interpreter.feed(&gm::Gm2On::new(127).unwrap());
-    let result = interpreter.feed(&AnyMessage::ControlChange(
-        meedee::messages::ControlChange::new(39, 2)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
-    ));
+    interpreter.feed(&mode).unwrap();
+    let result = interpreter.feed(&cc(39, 2)).unwrap();
     assert!(
-        matches!(&result[0],controls::Observation::Diagnostic(value) if value.kind==controls::DiagnosticKind::MissingCoarse)
+        matches!(&result[0].value, meedee::events::ObservationValue::Control(controls::Observation::Diagnostic(v)) if v.kind==controls::DiagnosticKind::MissingCoarse)
     );
 }

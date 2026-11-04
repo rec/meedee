@@ -93,24 +93,33 @@ def test_velocity_prefix_is_one_shot_per_channel_and_zero_note_on_ignores_it() -
     decoder = controls.VelocityInterpreter()
     decoder.feed(messages.ControlChange(channel=1, controller=88, value=127))
     decoder.feed(messages.TimingClock())
-    other = decoder.feed(messages.NoteOn(channel=2, note=60, velocity=1))
-    assert other is not None and (other.velocity, other.resolution) == (1, 7)
-    fine = decoder.feed(messages.NoteOn(channel=1, note=60, velocity=1))
-    assert fine is not None and (fine.velocity, fine.resolution) == (255, 14)
-    coarse = decoder.feed(messages.NoteOff(channel=1, note=60, velocity=64))
-    assert coarse is not None and (coarse.velocity, coarse.resolution) == (64, 7)
+    other = decoder.feed(messages.NoteOn(channel=2, note=60, velocity=1))[0].value
+    assert isinstance(other, controls.VelocityObservation) and (
+        other.velocity,
+        other.resolution,
+    ) == (1, 7)
+    fine = decoder.feed(messages.NoteOn(channel=1, note=60, velocity=1))[0].value
+    assert isinstance(fine, controls.VelocityObservation) and (
+        fine.velocity,
+        fine.resolution,
+    ) == (255, 14)
+    coarse = decoder.feed(messages.NoteOff(channel=1, note=60, velocity=64))[0].value
+    assert isinstance(coarse, controls.VelocityObservation) and (
+        coarse.velocity,
+        coarse.resolution,
+    ) == (64, 7)
     decoder.feed(messages.ControlChange(channel=1, controller=88, value=127))
-    off = decoder.feed(messages.NoteOn(channel=1, note=60, velocity=0))
+    off = decoder.feed(messages.NoteOn(channel=1, note=60, velocity=0))[0].value
     assert (
-        off is not None
+        isinstance(off, controls.VelocityObservation)
         and not off.note_on
         and off.zero_velocity_note_on
         and off.velocity == 0
     )
     decoder.feed(messages.ControlChange(channel=1, controller=88, value=127))
     decoder.reset()
-    coarse = decoder.feed(messages.NoteOn(channel=1, note=60, velocity=1))
-    assert coarse is not None and coarse.resolution == 7
+    coarse = decoder.feed(messages.NoteOn(channel=1, note=60, velocity=1))[0].value
+    assert isinstance(coarse, controls.VelocityObservation) and coarse.resolution == 7
 
 
 def test_mpe_allocator_never_steals_and_retains_released_sustained_voices() -> None:

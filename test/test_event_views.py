@@ -12,8 +12,89 @@ def event(message: messages.Message, ticks: int) -> messages.Message:
     )
 
 
+@pytest.mark.parametrize("velocity", [False, True])
+def test_interpreters_require_reset_between_anonymous_and_named_sources(
+    velocity: bool,
+) -> None:
+    interpreter = (
+        controls.VelocityInterpreter() if velocity else controls.ControlInterpreter()
+    )
+    prefix = messages.ControlChange(88 if velocity else 7, 1, channel=1)
+    following = (
+        messages.NoteOn(60, 1, 1) if velocity else messages.ControlChange(39, 1, 1)
+    )
+    interpreter.feed(prefix)
+    with pytest.raises(ValueError, match="source"):
+        interpreter.feed(following.replace(stream="keyboard"))
+    result = interpreter.feed(following)[0]
+    assert result.stream is None and result.first_timestamp is None
+    assert isinstance(
+        result.value, (controls.ControlObservation, controls.VelocityObservation)
+    )
+    assert result.value.resolution == 14
+
+    interpreter.reset()
+    interpreter.feed(prefix.replace(stream="keyboard"))
+    for m in [following, following.replace(stream="other")]:
+        with pytest.raises(ValueError, match="source"):
+            interpreter.feed(m)
+    result = interpreter.feed(following.replace(stream="keyboard"))[0]
+    assert result.stream == "keyboard"
+    assert isinstance(
+        result.value, (controls.ControlObservation, controls.VelocityObservation)
+    )
+    assert result.value.resolution == 14
+
+    decoder = events.PacketDecoder(stream="keyboard", protocol=midi.Protocol.Midi1)
+    loss = decoder.loss(lost=3, reason="known loss")
+    interpreter.feed(prefix.replace(stream="keyboard"))
+    reported = interpreter.feed(loss)[0].value
+    assert isinstance(reported, events.StreamDiagnostic)
+    assert all(
+        getattr(reported, n) == getattr(loss, n)
+        for n in ("stream", "packet", "kind", "lost", "reason")
+    )
+    result = interpreter.feed(following.replace(stream="keyboard"))[0].value
+    if velocity:
+        assert (
+            isinstance(result, controls.VelocityObservation) and result.resolution == 7
+        )
+    else:
+        assert (
+            isinstance(result, controls.Diagnostic)
+            and result.kind == controls.DiagnosticKind.MissingCoarse
+        )
+
+
+@pytest.mark.parametrize("velocity", [False, True])
+def test_anonymous_clock_changes_report_reset_without_inventing_a_source(
+    velocity: bool,
+) -> None:
+    interpreter = (
+        controls.VelocityInterpreter() if velocity else controls.ControlInterpreter()
+    )
+    first = events.Timestamp(ticks=10, clock=events.Clock(identity="first"))
+    second = events.Timestamp(ticks=20, clock=events.Clock(identity="second"))
+    prefix = messages.ControlChange(88 if velocity else 7, 1, channel=1)
+    following = (
+        messages.NoteOn(60, 1, 1) if velocity else messages.ControlChange(39, 1, 1)
+    )
+    interpreter.feed(prefix.replace(timestamp=first))
+    reset, result = interpreter.feed(following.replace(timestamp=second))
+    assert reset.stream is None and result.stream is None
+    assert isinstance(reset.value, controls.Diagnostic)
+    assert reset.value.kind == controls.DiagnosticKind.StateReset
+    assert reset.first_timestamp is None and reset.last_timestamp == second
+    if velocity:
+        assert isinstance(result.value, controls.VelocityObservation)
+        assert result.value.resolution == 7
+    else:
+        assert isinstance(result.value, controls.Diagnostic)
+        assert result.value.kind == controls.DiagnosticKind.MissingCoarse
+
+
 def test_control_and_velocity_views_keep_contributor_times_after_long_gaps() -> None:
-    view = controls.EventInterpreter()
+    view = controls.ControlInterpreter()
     view.feed(event(messages.ControlChange(channel=1, controller=7, value=64), 10))
     for i in range(1500):
         view.feed(event(messages.NoteOn(channel=1, note=60, velocity=100), i + 11))
@@ -33,7 +114,7 @@ def test_control_and_velocity_views_keep_contributor_times_after_long_gaps() -> 
     )
     with pytest.raises(ValueError, match="source"):
         view.feed(event(messages.TimingClock(), 3000).replace(stream="other"))
-    velocity = controls.EventVelocityInterpreter()
+    velocity = controls.VelocityInterpreter()
     velocity.feed(event(messages.ControlChange(channel=1, controller=88, value=127), 1))
     observation = velocity.feed(
         event(messages.NoteOn(channel=1, note=60, velocity=127), 2)
@@ -50,7 +131,7 @@ def test_control_and_velocity_views_keep_contributor_times_after_long_gaps() -> 
 
 
 def test_group_selection_and_reported_loss_cannot_mix_control_state() -> None:
-    view = controls.EventInterpreter(group=2)
+    view = controls.ControlInterpreter(group=2)
     view.feed(
         event(
             ump.Midi1Packet(
@@ -90,7 +171,7 @@ def test_group_selection_and_reported_loss_cannot_mix_control_state() -> None:
         and observation.first_timestamp.ticks == 3
     )
     with pytest.raises(ValueError, match="group"):
-        controls.EventInterpreter().feed(
+        controls.ControlInterpreter().feed(
             event(ump.Midi1Packet(group=2, message=messages.TimingClock()), 4)
         )
 

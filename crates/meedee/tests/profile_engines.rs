@@ -99,63 +99,56 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
 }
 #[test]
 fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
-    let mut d = velocity::VelocityInterpreter::new();
-    d.feed(&AnyMessage::ControlChange(
+    use meedee::events::{ObservationValue, Payload};
+    let mut d = velocity::VelocityInterpreter::new(None).unwrap();
+    let prefix = Payload::Midi1(AnyMessage::ControlChange(
         ControlChange::new(88, 127)
-            .and_then(|m| m.with_channel(1))
+            .unwrap()
+            .with_channel(1)
             .unwrap(),
     ));
+    let note = NoteOn::new(60).unwrap().with_velocity(1).unwrap();
+    d.feed(&prefix).unwrap();
     let coarse = d
-        .feed(&AnyMessage::NoteOn(
-            NoteOn::new(60)
-                .and_then(|m| m.with_velocity(1))
-                .and_then(|m| m.with_channel(2))
-                .unwrap(),
-        ))
+        .feed(&Payload::Midi1(AnyMessage::NoteOn(
+            note.clone().with_channel(2).unwrap(),
+        )))
         .unwrap();
-    assert_eq!((coarse.velocity, coarse.resolution), (1, 7));
+    assert!(
+        matches!(&coarse[0].value, ObservationValue::Velocity(v) if v.velocity==1 && v.resolution==7)
+    );
     let fine = d
-        .feed(&AnyMessage::NoteOn(
-            NoteOn::new(60)
-                .and_then(|m| m.with_velocity(1))
-                .and_then(|m| m.with_channel(1))
-                .unwrap(),
-        ))
+        .feed(&Payload::Midi1(AnyMessage::NoteOn(
+            note.clone().with_channel(1).unwrap(),
+        )))
         .unwrap();
-    assert_eq!((fine.velocity, fine.resolution), (255, 14));
-    d.feed(&AnyMessage::ControlChange(
-        ControlChange::new(88, 127)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
-    ));
+    assert!(
+        matches!(&fine[0].value, ObservationValue::Velocity(v) if v.velocity==255 && v.resolution==14)
+    );
+    d.feed(&prefix).unwrap();
     let off = d
-        .feed(&AnyMessage::NoteOn(
-            NoteOn::new(60)
-                .and_then(|m| m.with_velocity(0))
-                .and_then(|m| m.with_channel(1))
-                .unwrap(),
-        ))
+        .feed(&Payload::Midi1(AnyMessage::NoteOn(
+            note.with_channel(1).unwrap().with_velocity(0).unwrap(),
+        )))
         .unwrap();
-    assert!(!off.note_on);
-    assert_eq!(off.velocity, 0);
-    d.feed(&AnyMessage::ControlChange(
-        ControlChange::new(88, 127)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
-    ));
+    assert!(matches!(&off[0].value, ObservationValue::Velocity(v) if !v.note_on && v.velocity==0));
+    d.feed(&prefix).unwrap();
     d.reset();
-    assert_eq!(
-        d.feed(&AnyMessage::NoteOff(
+    let coarse = d
+        .feed(&Payload::Midi1(AnyMessage::NoteOff(
             NoteOff::new(60)
-                .and_then(|m| m.with_velocity(64))
-                .and_then(|m| m.with_channel(1))
                 .unwrap()
-        ))
-        .unwrap()
-        .resolution,
-        7
+                .with_velocity(64)
+                .unwrap()
+                .with_channel(1)
+                .unwrap(),
+        )))
+        .unwrap();
+    assert!(
+        matches!(&coarse[0].value, ObservationValue::Velocity(v) if v.velocity==64 && v.resolution==7)
     );
 }
+
 #[test]
 fn timecode_sequence_lock_requires_continuity_and_expires_without_extrapolation() {
     use timecode::*;

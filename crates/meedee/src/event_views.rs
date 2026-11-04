@@ -23,7 +23,7 @@ pub enum Value {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Observation {
-    pub stream: String,
+    pub stream: Option<String>,
     pub group: Option<u8>,
     pub first_index: Option<usize>,
     pub last_index: Option<usize>,
@@ -38,26 +38,24 @@ struct Marker {
 #[derive(Default)]
 struct Context {
     stream: Option<String>,
+    bound: bool,
     clock: Option<Clock>,
     index: usize,
     markers: BTreeMap<usize, Marker>,
 }
 impl Context {
-    fn event(&mut self, event: &Payload) -> io::Result<(usize, bool)> {
-        if event.stream().is_none() {
+    fn event(&mut self, event: &Payload, anonymous: bool) -> io::Result<(usize, bool)> {
+        if !anonymous && event.stream().is_none() {
             return Err(invalid(0, "observation requires a source identity"));
         }
-        if self
-            .stream
-            .as_ref()
-            .is_some_and(|s| s != event.stream().unwrap_or_default())
-        {
+        if self.bound && self.stream.as_deref() != event.stream() {
             return Err(invalid(
                 0,
-                "one event view belongs to one source; reset before rebinding",
+                "source identity changed; reset before rebinding",
             ));
         }
-        self.stream = Some(event.stream().unwrap_or_default().to_owned());
+        self.stream = event.stream().map(str::to_owned);
+        self.bound = true;
         let index = self.index;
         self.index = self
             .index
@@ -85,16 +83,18 @@ impl Context {
         Ok((index, changed))
     }
     fn boundary(&mut self, d: &Diagnostic) -> io::Result<()> {
-        if self.stream.as_ref().is_some_and(|s| s != &d.stream) {
+        if self.bound && self.stream.as_deref() != Some(d.stream.as_str()) {
             return Err(invalid(0, "boundary belongs to another source"));
         }
         self.stream = Some(d.stream.clone());
+        self.bound = true;
         self.clock = None;
         self.markers.clear();
         Ok(())
     }
     fn reset(&mut self) {
         self.stream = None;
+        self.bound = false;
         self.clock = None;
         self.markers.clear();
     }
@@ -106,7 +106,7 @@ impl Context {
         last: Option<usize>,
     ) -> Observation {
         Observation {
-            stream: self.stream.clone().unwrap_or_default(),
+            stream: self.stream.clone(),
             group,
             first_index: first,
             last_index: last,
@@ -183,28 +183,49 @@ pub trait View {
     fn boundary(&mut self, d: &Diagnostic) -> io::Result<Vec<Observation>>;
     fn reset(&mut self);
 }
-pub struct Controls {
+pub struct ControlInterpreter {
     context: Context,
-    state: controls::Interpreter,
+    state: controls::ControlState,
     group: Option<u8>,
 }
-impl Controls {
+impl ControlInterpreter {
+    pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
+        View::feed(self, message, None)
+    }
+    pub fn feed_diagnostic(&mut self, diagnostic: &Diagnostic) -> io::Result<Vec<Observation>> {
+        View::boundary(self, diagnostic)
+    }
+    pub fn reset(&mut self) {
+        View::reset(self);
+    }
+
     pub fn new(selected: Option<u8>) -> io::Result<Self> {
         Ok(Self {
             context: Context::default(),
-            state: controls::Interpreter::new(),
+            state: controls::ControlState::new(),
             group: group(selected)?,
         })
     }
 }
-impl View for Controls {
+impl View for ControlInterpreter {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event)?;
+        let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
-            out.push(self.context.clock_change(event, index, self.group));
+            out.push(self.context.observation(
+                Value::Control(controls::Observation::Diagnostic(controls::Diagnostic {
+                    kind: controls::DiagnosticKind::StateReset,
+                    channel: None,
+                    controller: None,
+                    first_index: index,
+                    last_index: index,
+                })),
+                self.group,
+                None,
+                Some(index),
+            ));
         }
         let input = match message.as_deref() {
             Some(v) if resets(v) => controls::InputMessage::SystemReset,
@@ -230,44 +251,63 @@ impl View for Controls {
     }
     fn boundary(&mut self, d: &Diagnostic) -> io::Result<Vec<Observation>> {
         self.context.boundary(d)?;
-        let out = self
-            .state
-            .reset()
-            .into_iter()
-            .map(|v| {
-                self.context
-                    .observation(Value::Control(v), self.group, None, None)
-            })
-            .collect();
-        Ok(out)
+        self.state.reset();
+        Ok(vec![self.context.observation(
+            Value::Boundary(d.clone()),
+            self.group,
+            None,
+            None,
+        )])
     }
+
     fn reset(&mut self) {
         self.state.reset();
         self.context.reset();
     }
 }
-pub struct Velocity {
+pub struct VelocityInterpreter {
     context: Context,
-    state: velocity::VelocityInterpreter,
+    state: velocity::VelocityState,
     group: Option<u8>,
 }
-impl Velocity {
+impl VelocityInterpreter {
+    pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
+        View::feed(self, message, None)
+    }
+    pub fn feed_diagnostic(&mut self, diagnostic: &Diagnostic) -> io::Result<Vec<Observation>> {
+        View::boundary(self, diagnostic)
+    }
+    pub fn reset(&mut self) {
+        View::reset(self);
+    }
+
     pub fn new(selected: Option<u8>) -> io::Result<Self> {
         Ok(Self {
             context: Context::default(),
-            state: velocity::VelocityInterpreter::new(),
+            state: velocity::VelocityState::new(),
             group: group(selected)?,
         })
     }
 }
-impl View for Velocity {
+impl View for VelocityInterpreter {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event)?;
+        let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
-            out.push(self.context.clock_change(event, index, self.group));
+            out.push(self.context.observation(
+                Value::Control(controls::Observation::Diagnostic(controls::Diagnostic {
+                    kind: controls::DiagnosticKind::StateReset,
+                    channel: None,
+                    controller: None,
+                    first_index: index,
+                    last_index: index,
+                })),
+                self.group,
+                None,
+                Some(index),
+            ));
         }
         if let Some(message) = message.as_deref() {
             if resets(message) {
@@ -322,7 +362,7 @@ impl Mpe {
 impl View for Mpe {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event)?;
+        let (index, changed) = self.context.event(event, false)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
@@ -377,7 +417,7 @@ impl View for Ump {
         let Payload::Ump(message) = &event else {
             return Err(invalid(0, "UMP events required"));
         };
-        let (index, changed) = self.context.event(event)?;
+        let (index, changed) = self.context.event(event, false)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
@@ -438,11 +478,12 @@ impl Tuning {
             .context
             .stream
             .as_ref()
-            .is_some_and(|s| s != &observation.stream)
+            .is_some_and(|s| Some(s) != observation.stream.as_ref())
         {
             return Err(invalid(0, "another source requires reset"));
         }
-        self.context.stream = Some(observation.stream.clone());
+        self.context.stream = observation.stream.clone();
+        self.context.bound = true;
         let mut out = observation.clone();
         out.value = Value::Tuning(Box::new(value));
         Ok(vec![out])
@@ -451,7 +492,7 @@ impl Tuning {
 impl View for Tuning {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event)?;
+        let (index, changed) = self.context.event(event, false)?;
         let mut out = vec![];
         if changed {
             out.push(self.context.clock_change(event, index, self.group));
@@ -532,7 +573,7 @@ impl View for Timecode {
     fn feed(&mut self, event: &Payload, now: Option<u64>) -> io::Result<Vec<Observation>> {
         let now = now.ok_or_else(|| invalid(0, "MTC view needs explicit monotonic now_ns"))?;
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event)?;
+        let (index, changed) = self.context.event(event, false)?;
         let mut out = vec![];
         if changed {
             self.state.reset();

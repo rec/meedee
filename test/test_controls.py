@@ -138,12 +138,12 @@ def test_command_ranges_and_null_parameter_are_explicit() -> None:
 
 
 def test_fine_control_observations_preserve_wire_order_and_source_ranges() -> None:
-    interpreter = controls.Interpreter()
+    interpreter = controls.ControlInterpreter()
 
     def cc(channel: int, controller: int, value: int) -> object:
         return interpreter.feed(
             messages.ControlChange(channel=channel, controller=controller, value=value)
-        )[0]
+        )[0].value
 
     early = cc(1, 39, 7)
     assert isinstance(early, controls.Diagnostic)
@@ -177,14 +177,15 @@ def test_fine_control_observations_preserve_wire_order_and_source_ranges() -> No
 
 
 def test_selection_changes_cannot_reuse_selector_or_data_halves() -> None:
-    interpreter = controls.Interpreter()
+    interpreter = controls.ControlInterpreter()
 
     def cc(controller: int, value: int) -> list[object]:
-        return list(
-            interpreter.feed(
+        return [
+            i.value
+            for i in interpreter.feed(
                 messages.ControlChange(channel=1, controller=controller, value=value)
             )
-        )
+        ]
 
     assert cc(99, 1) == []
     partial = cc(6, 2)[0]
@@ -241,7 +242,7 @@ def test_selection_changes_cannot_reuse_selector_or_data_halves() -> None:
 
 
 def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() -> None:
-    interpreter = controls.Interpreter()
+    interpreter = controls.ControlInterpreter()
     for controller, value in ((101, 0), (100, 1), (6, 2)):
         interpreter.feed(
             messages.ControlChange(channel=1, controller=controller, value=value)
@@ -252,7 +253,7 @@ def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() 
     ):
         step = interpreter.feed(
             messages.ControlChange(channel=1, controller=controller, value=value)
-        )[0]
+        )[0].value
         assert isinstance(step, controls.ParameterStep)
         assert (step.family, step.parameter, step.direction, step.first_index) == (
             controls.ParameterFamily.Rpn,
@@ -263,7 +264,7 @@ def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() 
         assert not hasattr(step, "value")
     missing = interpreter.feed(
         messages.ControlChange(channel=1, controller=38, value=3)
-    )[0]
+    )[0].value
     assert (
         isinstance(missing, controls.Diagnostic)
         and missing.kind == controls.DiagnosticKind.MissingCoarse
@@ -271,14 +272,14 @@ def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() 
 
 
 def test_rpn_null_deselects_nrpn_without_reserving_its_maximum_identifier() -> None:
-    interpreter = controls.Interpreter()
+    interpreter = controls.ControlInterpreter()
     for controller in (99, 98):
         interpreter.feed(
             messages.ControlChange(channel=1, controller=controller, value=127)
         )
     observed = interpreter.feed(
         messages.ControlChange(channel=1, controller=6, value=127)
-    )[0]
+    )[0].value
     assert isinstance(observed, controls.ParameterObservation)
     assert (observed.family, observed.parameter) == (
         controls.ParameterFamily.Nrpn,
@@ -290,7 +291,7 @@ def test_rpn_null_deselects_nrpn_without_reserving_its_maximum_identifier() -> N
         )
     missing = interpreter.feed(
         messages.ControlChange(channel=1, controller=6, value=1)
-    )[0]
+    )[0].value
     assert (
         isinstance(missing, controls.Diagnostic)
         and missing.kind == controls.DiagnosticKind.MissingSelection
@@ -298,33 +299,34 @@ def test_rpn_null_deselects_nrpn_without_reserving_its_maximum_identifier() -> N
 
 
 def test_resets_invalidate_channel_source_and_parameter_state() -> None:
-    one = controls.Interpreter()
-    two = controls.Interpreter()
+    one = controls.ControlInterpreter()
+    two = controls.ControlInterpreter()
     for channel in (1, 2):
         one.feed(messages.ControlChange(channel=channel, controller=7, value=2))
     fine = messages.ControlChange(channel=1, controller=39, value=1)
-    assert isinstance(two.feed(fine)[0], controls.Diagnostic)
-    reset = one.feed(messages.ControlChange(channel=1, controller=121, value=0))[0]
+    assert isinstance(two.feed(fine)[0].value, controls.Diagnostic)
+    reset = one.feed(messages.ControlChange(channel=1, controller=121, value=0))[
+        0
+    ].value
     assert isinstance(reset, controls.Diagnostic) and reset.channel == 1
-    assert isinstance(one.feed(fine)[0], controls.Diagnostic)
-    assert isinstance(one.feed(fine.replace(channel=2))[0], controls.ControlObservation)
-    reset = one.feed(messages.SystemReset())[0]
-    assert isinstance(reset, controls.Diagnostic) and reset.channel is None
-    assert isinstance(one.feed(fine.replace(channel=2))[0], controls.Diagnostic)
-    one.feed(messages.ControlChange(channel=1, controller=7, value=2))
-    reset = one.reset()[0]
-    assert (
-        isinstance(reset, controls.Diagnostic)
-        and reset.kind == controls.DiagnosticKind.StateReset
+    assert isinstance(one.feed(fine)[0].value, controls.Diagnostic)
+    assert isinstance(
+        one.feed(fine.replace(channel=2))[0].value, controls.ControlObservation
     )
-    assert (reset.first_index, reset.last_index) == (8, 8)
-    assert isinstance(one.feed(fine)[0], controls.Diagnostic)
+    reset = one.feed(messages.SystemReset())[0].value
+    assert isinstance(reset, controls.Diagnostic) and reset.channel is None
+    assert isinstance(one.feed(fine.replace(channel=2))[0].value, controls.Diagnostic)
+    one.feed(messages.ControlChange(channel=1, controller=7, value=2))
+    assert one.reset() is None
+    assert isinstance(one.feed(fine)[0].value, controls.Diagnostic)
     for command in codecs.expand(
         messages.NrpnSet(channel=1, parameter=0, value=1, resolution=14)
     )[:2]:
         one.feed(command)
     one.reset()
-    missing = one.feed(messages.ControlChange(channel=1, controller=6, value=1))[0]
+    missing = one.feed(messages.ControlChange(channel=1, controller=6, value=1))[
+        0
+    ].value
     assert (
         isinstance(missing, controls.Diagnostic)
         and missing.kind == controls.DiagnosticKind.MissingSelection
@@ -332,10 +334,11 @@ def test_resets_invalidate_channel_source_and_parameter_state() -> None:
 
 
 def test_observations_are_frozen_owned_values_and_raw_input_is_unchanged() -> None:
-    interpreter = controls.Interpreter()
+    interpreter = controls.ControlInterpreter()
     raw = messages.ControlChange(channel=1, controller=7, value=2)
-    first = interpreter.feed(raw)[0]
-    same = controls.Interpreter().feed(raw)[0]
+    first = interpreter.feed(raw)[0].value
+    same = controls.ControlInterpreter().feed(raw)[0].value
+    assert isinstance(first, controls.ControlObservation)
     assert first == same and hash(first) == hash(same)
     assert first != object()
     assert (
@@ -352,11 +355,11 @@ def test_observations_are_frozen_owned_values_and_raw_input_is_unchanged() -> No
         b"\xb0\x07\x01",
         messages.ControlChange14(channel=1, controller=7, value=2),
     ):
-        with pytest.raises(TypeError):
+        with pytest.raises((TypeError, ValueError)):
             interpreter.feed(value)  # ty: ignore[invalid-argument-type]
     fine = interpreter.feed(messages.ControlChange(channel=1, controller=39, value=1))[
         0
-    ]
+    ].value
     assert isinstance(fine, controls.ControlObservation) and fine.last_index == 1
     for controller in (0, 32):
         assert (

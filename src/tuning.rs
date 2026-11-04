@@ -252,9 +252,6 @@ macro_rules! message_classes {
             })*
             Err(PyTypeError::new_err("message must be a supported MIDI 1.0 Message"))
         }
-        pub fn is_message(message: &Bound<'_, PyAny>) -> bool {
-            false $(|| message.is_instance_of::<$name>())*
-        }
         pub(crate) fn extract_message(message: &Bound<'_, PyAny>) -> PyResult<model::TuningMessage> {
             $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {
                 return Ok(value.value.clone().into());

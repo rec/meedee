@@ -293,12 +293,6 @@ pub(super) fn encode_message(value: &Bound<'_, PyAny>) -> Option<Vec<u8>> {
     }
     None
 }
-pub(super) fn is_message(value: &Bound<'_, PyAny>) -> bool {
-    value.is_instance_of::<ControllerDestination>()
-        || value.is_instance_of::<KeyBasedControl>()
-        || value.is_instance_of::<GlobalParameterControl>()
-}
-
 #[pyclass(frozen, module = "meedee.mpe")]
 struct Voice {
     value: mpe_model::Voice,
@@ -514,31 +508,8 @@ frozen!(VelocityObservation;channel,note,velocity,resolution,note_on,zero_veloci
         self.value.zero_velocity_note_on
     }
 });
-#[pyclass(module = "meedee.controls")]
-struct VelocityInterpreter {
-    value: velocity::VelocityInterpreter,
-}
-#[pymethods]
-impl VelocityInterpreter {
-    #[new]
-    fn new() -> Self {
-        Self {
-            value: velocity::VelocityInterpreter::new(),
-        }
-    }
-    fn reset(&mut self) {
-        self.value.reset();
-    }
-    fn feed(&mut self, message: &Bound<'_, PyAny>) -> PyResult<Option<VelocityObservation>> {
-        Ok(self
-            .value
-            .feed(&messages::extract_primitive(message)?)
-            .map(|value| VelocityObservation { value }))
-    }
-}
 pub(super) fn register_controls(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<VelocityObservation>()?;
-    module.add_class::<VelocityInterpreter>()?;
     Ok(())
 }
 

@@ -1,22 +1,8 @@
-"""Per-source, indexed control observations without transport or timestamps."""
+"""Per-source control and velocity interpretation with optional timing metadata."""
 
 from enum import Enum
 
 from . import events, messages
-from .messages import Message
-
-class Interpreter:
-    def __init__(self) -> None: ...
-    def feed(
-        self, message: Message
-    ) -> list[
-        ControlObservation | ParameterObservation | ParameterStep | Diagnostic
-    ]: ...
-    def reset(
-        self,
-    ) -> list[
-        ControlObservation | ParameterObservation | ParameterStep | Diagnostic
-    ]: ...
 
 class ControlObservation:
     @property
@@ -171,19 +157,14 @@ class VelocityObservation:
     @property
     def zero_velocity_note_on(self) -> bool: ...
 
-class VelocityInterpreter:
-    def __init__(self) -> None: ...
-    def reset(self) -> None: ...
-    def feed(self, message: messages.Message) -> VelocityObservation | None: ...
-
-class EventInterpreter:
+class ControlInterpreter:
     def __init__(self, *, group: int | None = None) -> None: ...
     def feed(
         self, value: messages.Message | events.StreamDiagnostic
     ) -> list[events.Observation]: ...
     def reset(self) -> None: ...
 
-class EventVelocityInterpreter:
+class VelocityInterpreter:
     def __init__(self, *, group: int | None = None) -> None: ...
     def feed(
         self, value: messages.Message | events.StreamDiagnostic
