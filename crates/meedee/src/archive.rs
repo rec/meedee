@@ -1,8 +1,9 @@
 //! meedee archive v1. Big endian, CRC-32/ISO-HDLC frames, explicit completion.
-use crate::events::{Clock, Payload, Span, Timestamp};
+use crate::events::{Clock, Payload, SourceSpan, Timestamp};
 use crate::file_io::{invalid, Source};
 use crate::messages::Message;
 use crate::messages::{self as m, PrimitiveMessage};
+pub use crate::recording::{Recorder, RecordingReport};
 use crate::ump::{self, UmpValue};
 use std::collections::BTreeMap;
 use std::io::{self, Cursor, Read, Write};
@@ -137,7 +138,7 @@ impl Registry {
         &self,
         stream: &str,
         timestamp: Option<&Timestamp>,
-        span: Option<&Span>,
+        span: Option<&SourceSpan>,
     ) -> io::Result<()> {
         if !self.streams.contains_key(stream) {
             return Err(invalid(0, "event stream is undeclared"));
@@ -212,7 +213,7 @@ impl Registry {
                     .insert(id.clone(), (label.clone(), clock_identity.clone()));
             }
             Record::Event(e) => {
-                self.check_event_header(e.source().unwrap_or_default(), e.timestamp(), e.span())?;
+                self.check_event_header(e.stream().unwrap_or_default(), e.timestamp(), e.span())?;
             }
             Record::Metadata {
                 stream, timestamp, ..
@@ -413,10 +414,10 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
             2
         }
         Record::Event(e) => {
-            if e.source().is_none() {
+            if e.stream().is_none() {
                 return Err(invalid(0, "empty stream identity"));
             }
-            string(&mut out, e.source().unwrap_or_default())?;
+            string(&mut out, e.stream().unwrap_or_default())?;
             timestamp(&mut out, e.timestamp())?;
             out.push(u8::from(e.span().is_some()));
             if let Some(s) = &e.span() {
@@ -593,7 +594,7 @@ fn decode(body: &[u8], registry: &Registry, preserve: bool) -> io::Result<Record
             let stream = f.string()?;
             let timestamp = f.timestamp(&registry.clocks)?;
             let span = if f.flag()? {
-                Some(Span {
+                Some(SourceSpan {
                     first_packet: f.u64()?,
                     last_packet: f.u64()?,
                     first_timestamp: f.timestamp(&registry.clocks)?,
@@ -647,7 +648,7 @@ fn decode(body: &[u8], registry: &Registry, preserve: bool) -> io::Result<Record
             };
             Record::Event(Box::new((message).with_metadata(
                 crate::messages::Metadata {
-                    source: Some(stream),
+                    stream: Some(stream),
                     timestamp,
                     span,
                 },
@@ -815,7 +816,7 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
                 Payload::Ump(v) => v.encode_words().len() * 4,
                 Payload::Command(_) => 34,
             };
-            7 + e.source().unwrap_or_default().len()
+            7 + e.stream().unwrap_or_default().len()
                 + timestamp_size(e.timestamp())
                 + 1
                 + e.span().map_or(0, |s| {

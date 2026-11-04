@@ -10,11 +10,12 @@
 //! use meedee::messages::{Message, NoteOn, PrimitiveMessage, ValueError};
 //!
 //! let note = NoteOn::new(60)?.with_velocity(70)?.with_channel(2)?
-//!     .with_source("keyboard")?;
+//!     .with_stream("keyboard")?;
 //! println!("{:?}", note.transpose(12).encode()?);
 //! # Ok::<(), ValueError>(())
 //! ```
 
+pub use crate::sequence::{Beats, Note, NoteDuration, Rest};
 use std::error::Error;
 use std::fmt;
 
@@ -22,12 +23,12 @@ use std::fmt;
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Metadata {
     pub timestamp: Option<crate::events::Timestamp>,
-    pub source: Option<String>,
-    pub span: Option<crate::events::Span>,
+    pub stream: Option<String>,
+    pub span: Option<crate::events::SourceSpan>,
 }
 impl Metadata {
     pub fn validate(&self) -> Result<(), ValueError> {
-        if self.source.as_ref().is_some_and(|s| s.is_empty()) {
+        if self.stream.as_ref().is_some_and(|s| s.is_empty()) {
             return Err(ValueError("empty source identity".into()));
         }
         if self
@@ -59,10 +60,10 @@ pub trait Message: fmt::Debug {
     fn timestamp(&self) -> Option<&crate::events::Timestamp> {
         self.metadata().and_then(|m| m.timestamp.as_ref())
     }
-    fn source(&self) -> Option<&str> {
-        self.metadata().and_then(|m| m.source.as_deref())
+    fn stream(&self) -> Option<&str> {
+        self.metadata().and_then(|m| m.stream.as_deref())
     }
-    fn span(&self) -> Option<&crate::events::Span> {
+    fn span(&self) -> Option<&crate::events::SourceSpan> {
         self.metadata().and_then(|m| m.span.as_ref())
     }
     fn with_timestamp(self, timestamp: crate::events::Timestamp) -> Result<Self, ValueError>
@@ -73,15 +74,15 @@ pub trait Message: fmt::Debug {
         metadata.timestamp = Some(timestamp);
         self.with_metadata(metadata)
     }
-    fn with_source(self, source: impl Into<String>) -> Result<Self, ValueError>
+    fn with_stream(self, source: impl Into<String>) -> Result<Self, ValueError>
     where
         Self: Sized,
     {
         let mut metadata = self.metadata().cloned().unwrap_or_default();
-        metadata.source = Some(source.into());
+        metadata.stream = Some(source.into());
         self.with_metadata(metadata)
     }
-    fn with_span(self, span: crate::events::Span) -> Result<Self, ValueError>
+    fn with_span(self, span: crate::events::SourceSpan) -> Result<Self, ValueError>
     where
         Self: Sized,
     {

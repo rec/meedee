@@ -1,5 +1,6 @@
 //! M2-116-U 1.0 MIDI Clip framing. All UMPs, including clock/configuration, are retained.
 use crate::file_io::{invalid, Source};
+pub use crate::file_timing::{ClipReader as TimedReader, ClipTimeline as Timeline};
 use crate::ump::{self, UmpMessage, UmpValue};
 use std::io::{self, Read, Write};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -204,5 +205,11 @@ impl<W: Write> Writer<W> {
         }
         self.state.finish(self.offset)?;
         self.inner.flush()
+    }
+}
+
+impl Reader<std::io::BufReader<std::fs::File>> {
+    pub fn open(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Self::new(std::io::BufReader::new(std::fs::File::open(path)?), false)
     }
 }

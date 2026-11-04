@@ -37,7 +37,10 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         "_sysex_limit",
         "_byte_limit",
         "_channels",
+        "_port",
         "_connection",
+        "_closed",
+        "__weakref__",
     )
 
     def __init__(
@@ -45,12 +48,13 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         *,
         raw: bool = False,
         channel: int | Iterable[int] | None = None,
+        port: str | None = None,
         event_limit: int = 128,
         sysex_limit: int | str = 1_048_576,
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
         timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
-        isolated: bool = True,
+        isolated: bool = False,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = DEFAULT_RECEIVE_BYTE_LIMIT,
     ) -> None:
@@ -83,8 +87,13 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             channels = frozenset(values)
         if raw and channels is not None:
             raise ValueError("channel filtering requires decoded input (raw=False)")
+        if port is not None and not isinstance(port, str):
+            raise TypeError("port must be a name pattern or None")
+        self._port = port
+        self._context: Context | None = None
+        self._closed = False
         self._channels = channels
-        self._connection: InputConnection[T] | None = None
+        self._connection: _InputState[T] | None = None
         self._protocol = protocol
         self._raw_mode = raw
         self._event_limit = event_limit
@@ -103,6 +112,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             self._context.request("init", [True, wire_settings(settings)])
 
     def ports(self) -> list[midi.Port]:
+        if self._closed or self._connection is not None:
+            raise midi.StateError("client is connected or closed")
         if self._native is not None:
             return self._native.ports()
         assert self._context is not None
@@ -117,26 +128,30 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
 
     def connect(
         self, port: midi.Port, callback: Callable[[T], object] | None = None
-    ) -> InputConnection[T]:
-        return self._open(port, None, callback)
+    ) -> Input[T]:
+        self._open(port, None, callback)
+        return self
 
     def create_virtual(
         self, name: str, callback: Callable[[T], object] | None = None
-    ) -> InputConnection[T]:
+    ) -> Input[T]:
         validate_open(name, callback)
-        return self._open(None, name, callback)
+        self._open(None, name, callback)
+        return self
 
     def _open(
         self,
         port: midi.Port | None,
         name: str | None,
         callback: Callable[[T], object] | None,
-    ) -> InputConnection[T]:
+    ) -> _InputState[T]:
+        if self._closed or self._connection is not None:
+            raise midi.StateError("input is closed or already connected")
         validate_open(callback=callback)
         if name is None and not isinstance(port, midi.Port):
             raise TypeError("port must be a discovery snapshot")
         identity = uuid4().hex
-        connection = InputConnection[T]._create(self, callback)
+        connection = _InputState[T]._create(self, callback)
         transport = _InputTransport[T]._create(self)
         if self._native is not None:
             transport._native = (
@@ -158,6 +173,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             transport._generation = self._context.generation
         transport._closed = False
         connection._raw = transport
+        self._connection = connection
         return connection
 
     def record(
@@ -217,14 +233,12 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
                 writer.finish()
         return records
 
-    def __enter__(self) -> InputConnection[T]:
-        if self._connection is not None:
-            raise midi.StateError("input context is already open")
-        ports = self.ports()
-        if not ports:
-            raise midi.ConnectError("No MIDI input ports available")
-        self._connection = self.connect(ports[0])
-        return self._connection
+    def __enter__(self) -> Input[T]:
+        if self._closed:
+            raise midi.StateError("input is closed")
+        if self._connection is None:
+            self.connect(select_port(self.ports(), self._port, "input"))
+        return self
 
     def __exit__(
         self,
@@ -232,10 +246,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        connection = self._connection
-        self._connection = None
-        if connection is not None:
-            close_context(connection.close, exc_value)
+        close_context(self.close, exc_value)
 
     def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]:
         for item in self.with_errors():
@@ -249,25 +260,124 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
     ) -> Generator[
         messages.Message | events.ReceivedPacket | events.StreamDiagnostic | Exception,
     ]:
-        if self._connection is not None:
-            yield from self._connection.with_errors()
-            return
-        connection = None
+        owned = self._connection is None
         try:
-            connection = self.__enter__()
-            yield from connection.with_errors()
+            if owned:
+                self.__enter__()
+            assert self._connection is not None
+            yield from self._connection.with_errors()
         except INPUT_ERRORS as error:
             yield error
         finally:
-            self._connection = None
-            if connection is not None:
-                connection.close()
+            if owned:
+                self.close()
+
+    @property
+    def closed(self) -> bool:
+        return self._closed or (
+            self._connection is not None and self._connection.closed
+        )
+
+    def close(self) -> None:
+        _native.check_thread()
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            if self._connection is not None:
+                self._connection.close()
+        finally:
+            self._native = None
+            if self._context is not None:
+                self._context.dispose()
+
+    def receive(
+        self,
+        *,
+        timeout: float | str | None = None,
+        cancel: events.Cancellation | None = None,
+    ) -> T | None:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.receive(timeout=timeout, cancel=cancel)
+
+    def start_recording(
+        self,
+        destination: str | PathLike[str],
+        *,
+        label: str = "",
+        best_effort: bool = False,
+        payload_limit: int | str = 1_048_576,
+        record_limit: int = 128,
+        byte_limit: int | str = 8_388_608,
+        metrics: bool = False,
+    ) -> archive.Recorder:
+        self.__enter__()
+        assert self._connection is not None
+        return self._connection.start_recording(
+            destination,
+            label=label,
+            best_effort=best_effort,
+            payload_limit=payload_limit,
+            record_limit=record_limit,
+            byte_limit=byte_limit,
+            metrics=metrics,
+        )
+
+    def stop_recording(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
+        if self._connection is None:
+            raise midi.StateError("no recording is attached")
+        return self._connection.stop_recording(timeout=timeout)
+
+    @property
+    def stream(self) -> str:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.stream
+
+    @property
+    def clock(self) -> events.Clock:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.clock
+
+    @property
+    def dropped_packets(self) -> int:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.dropped_packets
+
+    @property
+    def last_message_time(self) -> float | None:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.last_message_time
+
+    @property
+    def failure(self) -> Exception | None:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.failure
+
+    @property
+    def recording_report(self) -> archive.RecordingReport | None:
+        if self._connection is None:
+            self.__enter__()
+        assert self._connection is not None
+        return self._connection.recording_report
 
     def __del__(self) -> None:
         try:
-            if (connection := getattr(self, "_connection", None)) is not None:
-                self._connection = None
-                connection.close()
+            if hasattr(self, "_closed"):
+                self.close()
+        except INPUT_ERRORS as error:
+            print(error, file=sys.stderr)
         finally:
             if (context := getattr(self, "_context", None)) is not None:
                 context.dispose()
@@ -283,6 +393,8 @@ class Output:
         "_channel",
         "_port",
         "_connection",
+        "_closed",
+        "__weakref__",
         "_beat_period",
     )
 
@@ -308,9 +420,11 @@ class Output:
             if not math.isfinite(bpm) or bpm <= 0:
                 raise ValueError("bpm must be positive and finite")
         self._beat_period = None if bpm is None else Fraction(60) / Fraction(str(bpm))
+        self._context: Context | None = None
+        self._closed = False
         self._channel = channel
         self._port = port
-        self._connection: OutputConnection | None = None
+        self._connection: _OutputState | None = None
         self._protocol = protocol
         settings: dict[str, object] = {
             "identity": uuid4().hex,
@@ -323,6 +437,8 @@ class Output:
             self._context.request("init", [False, wire_settings(settings)])
 
     def ports(self) -> list[midi.Port]:
+        if self._closed or self._connection is not None:
+            raise midi.StateError("client is connected or closed")
         if self._native is not None:
             return self._native.ports()
         assert self._context is not None
@@ -335,11 +451,13 @@ class Output:
     def worker_failure(self) -> Exception | None:
         return None if self._context is None else self._context.failure_exception
 
-    def connect(self, port: midi.Port) -> OutputConnection:
+    def connect(self, port: midi.Port) -> Output:
         _native.check_thread()
+        if self._closed or self._connection is not None:
+            raise midi.StateError("output is closed or already connected")
         if not isinstance(port, midi.Port):
             raise TypeError("port must be a discovery snapshot")
-        connection = OutputConnection._create(self)
+        connection = _OutputState._create(self)
         if self._native is not None:
             connection._native = self._native.connect(port)
         else:
@@ -347,11 +465,14 @@ class Output:
             self._context.open("connect", port._wire, "", None, "")
             connection._generation = self._context.generation
         connection._closed = False
-        return connection
+        self._connection = connection
+        return self
 
-    def create_virtual(self, name: str) -> OutputConnection:
+    def create_virtual(self, name: str) -> Output:
+        if self._closed or self._connection is not None:
+            raise midi.StateError("output is closed or already connected")
         validate_open(name)
-        connection = OutputConnection._create(self)
+        connection = _OutputState._create(self)
         if self._native is not None:
             connection._native = self._native.create_virtual(name)
         else:
@@ -359,37 +480,42 @@ class Output:
             self._context.open("virtual", None, name, None, "")
             connection._generation = self._context.generation
         connection._closed = False
-        return connection
+        self._connection = connection
+        return self
 
-    def play(self, source: Iterable[object]) -> events.PlaybackReport:
-        """Play a capture on the selected output, inferring its timing origin."""
+    def play(
+        self,
+        source: Iterable[object],
+        *,
+        origin: events.Timestamp | None = None,
+        mappings: list[events.ClockMapping]
+        | tuple[events.ClockMapping, ...]
+        | None = None,
+        cancel: events.Cancellation | None = None,
+        allow_rounding: bool = False,
+        metrics: bool = False,
+    ) -> events.PlaybackReport:
+        self.__enter__()
+        assert self._connection is not None
         try:
-            if self._connection is not None:
-                return self._connection.play(source)
-            with self as connection:
-                return connection.play(source)
+            return self._connection.play(
+                source,
+                origin=origin,
+                mappings=mappings,
+                cancel=cancel,
+                allow_rounding=allow_rounding,
+                metrics=metrics,
+            )
         finally:
             if isinstance(source, archive.Reader):
                 source.close()
 
-    def __enter__(self) -> OutputConnection:
-        if self._connection is not None:
-            raise _native.StateError("output context is already open")
-        ports = self.ports()
-        if self._port is not None:
-            pattern = self._port
-            ports = [
-                p for p in ports if fnmatchcase(p.name, pattern) or pattern in p.name
-            ]
-            if len(ports) != 1:
-                raise ValueError(
-                    f"Port pattern {pattern!r} matched {len(ports)} outputs; "
-                    "expected one"
-                )
-        if not ports:
-            raise ValueError("No MIDI output ports available")
-        self._connection = self.connect(ports[0])
-        return self._connection
+    def __enter__(self) -> Output:
+        if self._closed:
+            raise midi.StateError("output is closed")
+        if self._connection is None:
+            self.connect(select_port(self.ports(), self._port, "output"))
+        return self
 
     def __exit__(
         self,
@@ -397,28 +523,65 @@ class Output:
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        connection = self._connection
-        self._connection = None
-        if connection is not None:
-            close_context(connection.close, exc_value)
+        close_context(self.close, exc_value)
+
+    @property
+    def closed(self) -> bool:
+        return self._closed or (
+            self._connection is not None and self._connection.closed
+        )
+
+    def close(self) -> None:
+        _native.check_thread()
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            if self._connection is not None:
+                self._connection.close()
+        finally:
+            self._native = None
+            if self._context is not None:
+                self._context.dispose()
+
+    def __call__(
+        self,
+        *values: messages.Note
+        | messages.Rest
+        | messages.Message
+        | bytes
+        | bytearray
+        | memoryview
+        | midi.UmpPacket
+        | int
+        | float
+        | str,
+    ) -> None:
+        self.__enter__()
+        assert self._connection is not None
+        self._connection.send(*values)
 
     def __del__(self) -> None:
         try:
-            if (connection := getattr(self, "_connection", None)) is not None:
-                self._connection = None
-                connection.close()
+            if hasattr(self, "_closed"):
+                self.close()
+        except INPUT_ERRORS as error:
+            print(error, file=sys.stderr)
         finally:
             if (context := getattr(self, "_context", None)) is not None:
                 context.dispose()
 
 
 class _InputTransport[T]:
+    _snapshot: tuple[Clock, int, float | None] | None
+
     __slots__ = (
-        "_client",
+        "_context",
         "_native",
         "_delivery",
         "_closed",
         "_generation",
+        "_snapshot",
         "__weakref__",
     )
 
@@ -428,9 +591,10 @@ class _InputTransport[T]:
     @classmethod
     def _create(cls, client: Input[T]) -> _InputTransport[T]:
         connection = object.__new__(cls)
-        connection._client = client
+        connection._context = client._context
         connection._native = cast(_native.InputConnection | None, None)
         connection._delivery = cast(Delivery | None, None)
+        connection._snapshot = None
         connection._closed = True
         connection._generation = (
             0 if client._context is None else client._context.generation
@@ -441,11 +605,12 @@ class _InputTransport[T]:
     def closed(self) -> bool:
         if self._native is not None:
             return self._native.closed
-        assert self._client._context is not None
-        return self._closed or bool(self._client._context.failure)
+        return self._closed or bool(self._context and self._context.failure)
 
     @property
     def clock(self) -> Clock:
+        if self._snapshot is not None:
+            return self._snapshot[0]
         if self._native is not None:
             return self._native.clock
         assert self._delivery is not None and self._delivery.clock is not None
@@ -453,6 +618,8 @@ class _InputTransport[T]:
 
     @property
     def dropped_packets(self) -> int:
+        if self._snapshot is not None:
+            return self._snapshot[1]
         if self._native is not None:
             return self._native.dropped_packets
         assert self._delivery is not None
@@ -464,10 +631,12 @@ class _InputTransport[T]:
 
     @property
     def worker_failure(self) -> Exception | None:
-        return self._client.worker_failure
+        return None if self._context is None else self._context.failure_exception
 
     @property
     def last_message_time(self) -> float | None:
+        if self._snapshot is not None:
+            return self._snapshot[2]
         if self._native is not None:
             return self._native.last_message_time
         return (
@@ -477,12 +646,21 @@ class _InputTransport[T]:
     def close(self) -> None:
         _native.check_thread()
         if self._native is not None:
-            self._native.close()
+            try:
+                self._native.close()
+            finally:
+                self._snapshot = (
+                    self._native.clock,
+                    self._native.dropped_packets,
+                    self._native.last_message_time,
+                )
+                self._closed = True
+                self._native = None
         elif not self._closed:
-            assert self._client._context is not None and self._delivery is not None
+            assert self._context is not None and self._delivery is not None
             self._delivery.retire()
             try:
-                self._client._context.close(self._generation)
+                self._context.close(self._generation)
                 self._closed = True
             finally:
                 self._delivery.drain()
@@ -490,19 +668,22 @@ class _InputTransport[T]:
     def __del__(self) -> None:
         if (delivery := getattr(self, "_delivery", None)) is not None:
             delivery.retire()
-            if not self._closed and self._client._context is not None:
-                self._client._context.defer_close(self._generation)
+            if not self._closed and self._context is not None:
+                self._context.defer_close(self._generation)
 
 
-class OutputConnection:
+class _OutputState:
     """An open destination for messages, encoded packets and timed playback."""
 
     __slots__ = (
-        "_client",
+        "_context",
         "_native",
         "_closed",
         "_generation",
         "_state",
+        "_protocol",
+        "_channel",
+        "_beat_period",
         "__weakref__",
     )
 
@@ -510,10 +691,13 @@ class OutputConnection:
         raise TypeError("MIDI connection handles cannot be constructed directly")
 
     @classmethod
-    def _create(cls, client: Output) -> OutputConnection:
+    def _create(cls, client: Output) -> _OutputState:
         connection = object.__new__(cls)
-        connection._client = client
+        connection._context = client._context
         connection._state = OutputState()
+        connection._protocol = client._protocol
+        connection._channel = client._channel
+        connection._beat_period = client._beat_period
         connection._native = cast(_native.OutputConnection | None, None)
         connection._closed = True
         connection._generation = (
@@ -582,22 +766,22 @@ class OutputConnection:
                 duration = (
                     v.duration if isinstance(v, (messages.Note, messages.Rest)) else v
                 )
-                elapsed += _units.sequence_duration(duration, self._client._beat_period)
+                elapsed += _units.sequence_duration(duration, self._beat_period)
                 end = round(elapsed * 1_000_000_000)
                 if end > 2**64 - 1:
                     raise ValueError("delay exceeds scheduler range")
                 if isinstance(v, messages.Note):
-                    channel = self._client._channel or v.channel or 1
+                    channel = self._channel or v.channel or 1
                     attack = messages.NoteOn(v.note, v.velocity, channel)
                     release = messages.NoteOff(v.note, channel=channel)
                     timeline.append(
                         (
                             deadline,
-                            _native.prepare_output(self._client._protocol, attack),
+                            _native.prepare_output(self._protocol, attack),
                         )
                     )
                     timeline.append(
-                        (end, _native.prepare_output(self._client._protocol, release))
+                        (end, _native.prepare_output(self._protocol, release))
                     )
             else:
                 if isinstance(
@@ -619,9 +803,9 @@ class OutputConnection:
                         messages.NrpnIncrement,
                         messages.NrpnDecrement,
                     ),
-                ) and (self._client._channel is not None or v.channel is None):
-                    v = v.replace(channel=self._client._channel or 1)
-                prepared = _native.prepare_output(self._client._protocol, v)
+                ) and (self._channel is not None or v.channel is None):
+                    v = v.replace(channel=self._channel or 1)
+                prepared = _native.prepare_output(self._protocol, v)
                 timeline.append(
                     (deadline, v if isinstance(prepared, tuple) else prepared)
                 )
@@ -636,7 +820,7 @@ class OutputConnection:
         Protocol conversion is never implicit.
         """
         _native.check_thread()
-        prepared = _native.prepare_output(self._client._protocol, value)
+        prepared = _native.prepare_output(self._protocol, value)
         if isinstance(prepared, tuple):
             total = prepared[2]
             packets = [
@@ -651,8 +835,8 @@ class OutputConnection:
                 else:
                     if self.closed:
                         raise _native.StateError("MIDI connection is closed or failed")
-                    assert self._client._context is not None
-                    self._client._context.request(
+                    assert self._context is not None
+                    self._context.request(
                         "send_command", [prepared, self._generation], serial=True
                     )
             except CompoundSendError as error:
@@ -672,8 +856,8 @@ class OutputConnection:
         else:
             if self.closed:
                 raise _native.StateError("MIDI connection is closed or failed")
-            assert self._client._context is not None
-            self._client._context.request(
+            assert self._context is not None
+            self._context.request(
                 "send",
                 [
                     prepared.words
@@ -691,12 +875,11 @@ class OutputConnection:
     def closed(self) -> bool:
         if self._native is not None:
             return self._native.closed
-        assert self._client._context is not None
-        return self._closed or bool(self._client._context.failure)
+        return self._closed or bool(self._context and self._context.failure)
 
     @property
     def worker_failure(self) -> Exception | None:
-        return self._client.worker_failure
+        return None if self._context is None else self._context.failure_exception
 
     def close(self) -> None:
         _native.check_thread()
@@ -713,13 +896,17 @@ class OutputConnection:
 
     def _close_transport(self) -> None:
         if self._native is not None:
-            self._native.close()
+            try:
+                self._native.close()
+            finally:
+                self._closed = True
+                self._native = None
         elif not self._closed:
-            assert self._client._context is not None
-            self._client._context.close(self._generation)
+            assert self._context is not None
+            self._context.close(self._generation)
             self._closed = True
 
-    def __enter__(self) -> OutputConnection:
+    def __enter__(self) -> _OutputState:
         if self._native is not None:
             self._native.__enter__()
         elif self.closed:
@@ -735,12 +922,12 @@ class OutputConnection:
         close_context(self.close, exc_value)
 
     def __del__(self) -> None:
-        if hasattr(self, "_client") and self._native is None and not self._closed:
-            assert self._client._context is not None
-            self._client._context.defer_close(self._generation)
+        if hasattr(self, "_context") and self._native is None and not self._closed:
+            assert self._context is not None
+            self._context.defer_close(self._generation)
 
 
-class InputConnection[T = messages.Message | events.StreamDiagnostic]:
+class _InputState[T = messages.Message | events.StreamDiagnostic]:
     _raw: _InputTransport[T] | None
     _channels: frozenset[int] | None
     _stream: str
@@ -764,7 +951,7 @@ class InputConnection[T = messages.Message | events.StreamDiagnostic]:
         cls,
         client: Input[T],
         callback: Callable[[T], object] | None,
-    ) -> InputConnection[T]:
+    ) -> _InputState[T]:
         connection = object.__new__(cls)
         connection._raw = None
         connection._channels = client._channels
@@ -866,6 +1053,7 @@ class InputConnection[T = messages.Message | events.StreamDiagnostic]:
                     i
                     for i in items
                     if not isinstance(i, messages.Message)
+                    or getattr(i, "channel", None) is None
                     or getattr(i, "channel", None) in self._channels
                 ]
             self._accept(items)
@@ -1065,7 +1253,7 @@ class InputConnection[T = messages.Message | events.StreamDiagnostic]:
         if failure is not None:
             raise failure
 
-    def __enter__(self) -> InputConnection[T]:
+    def __enter__(self) -> _InputState[T]:
         if self.closed:
             raise midi.StateError("input is closed")
         return self
@@ -1213,6 +1401,21 @@ def input_size(item: object) -> int:
             else len(item.packet)
         )
     return _native.live_size(cast(messages.Message | events.StreamDiagnostic, item))
+
+
+def select_port(
+    ports: list[midi.Port], pattern: str | None, direction: str
+) -> midi.Port:
+    if pattern is not None:
+        ports = [p for p in ports if fnmatchcase(p.name, pattern) or pattern in p.name]
+        if len(ports) != 1:
+            raise ValueError(
+                f"Port pattern {pattern!r} matched {len(ports)} {direction}s; "
+                "expected one"
+            )
+    if not ports:
+        raise midi.ConnectError(f"No MIDI {direction} ports available")
+    return ports[0]
 
 
 INPUT_ERRORS = (

@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 def run(
     browser: ci.Browser,
-    receiver: midi.InputConnection,
-    output: midi.OutputConnection,
+    receiver: midi.Input,
+    output: midi.Output,
     *,
     cancel: events.Cancellation | None = None,
     message_limit: int = 1_048_576,
@@ -67,7 +67,7 @@ def run(
                     if cancel is not None and cancel.cancelled:
                         raise KeyboardInterrupt
                     sending = action.token
-                    output.send(packet)
+                    output(packet)
                 queue.extend(
                     browser.report_send(
                         token=action.token, sent=True, now_ns=monotonic_ns()

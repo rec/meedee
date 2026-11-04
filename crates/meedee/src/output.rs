@@ -2,9 +2,9 @@
 use crate::codecs::{DecodeItem, Decoder};
 use crate::events::{Payload, Rational};
 use crate::messages::{self, AnyCommand, AnyMessage, Command, Message, PrimitiveMessage};
+use crate::messages::{Beats, Note, NoteDuration, Rest};
 use crate::playback::{Cancellation, MonotonicClock, PlaybackClock};
 use crate::transport::{self, Packet, Port, Protocol};
-use crate::{Beats, Note, NoteDuration, Rest};
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::time::Duration;
@@ -16,7 +16,8 @@ use std::time::Duration;
 /// state best-effort; call `close` to receive cleanup errors.
 ///
 /// ```no_run
-/// use meedee::{Beats, Note, Output, Rest};
+/// use meedee::messages::{Beats, Note, Rest};
+/// use meedee::midi::{Output};
 /// use std::time::Duration;
 /// # fn main() -> std::io::Result<()> {
 /// Output::new().send(Note::new(Duration::from_millis(500), 60)?)?;
@@ -35,6 +36,7 @@ pub struct Output {
     port: Option<String>,
     channel: Option<u8>,
     bpm: Option<Rational>,
+    playback: PlaybackOptions,
     client: Option<transport::Output>,
     connection: Option<Connection>,
     clock: Box<dyn PlaybackClock>,
@@ -53,6 +55,16 @@ pub enum OutputValue {
     Wait(NoteDuration),
 }
 
+/// Persistent options for subsequent Output::play calls.
+#[derive(Clone, Default)]
+pub struct PlaybackOptions {
+    pub origin: Option<crate::events::Timestamp>,
+    pub mappings: Vec<crate::playback::Mapping>,
+    pub cancel: Cancellation,
+    pub allow_rounding: bool,
+    pub metrics: bool,
+}
+
 impl Default for Output {
     fn default() -> Self {
         Self::new()
@@ -66,6 +78,7 @@ impl Output {
             port: None,
             channel: None,
             bpm: None,
+            playback: PlaybackOptions::default(),
             client: None,
             connection: None,
             clock: Box::new(MonotonicClock::default()),
@@ -73,76 +86,88 @@ impl Output {
             closed: false,
         }
     }
-    pub fn with_channel(mut self, channel: i64) -> io::Result<Self> {
+    pub fn with_playback(mut self, options: PlaybackOptions) -> Self {
+        self.playback = options;
+        self
+    }
+    pub fn with_channel(mut self, channel: i64) -> crate::midi::Result<Self> {
         if !(1..=16).contains(&channel) {
-            return Err(invalid("channel must be in 1..=16"));
+            return Err(invalid("channel must be in 1..=16").into());
         }
         self.channel = Some(channel as u8);
         Ok(self)
     }
-    pub fn with_bpm(mut self, bpm: impl Into<Rational>) -> io::Result<Self> {
+    pub fn with_bpm(mut self, bpm: impl Into<Rational>) -> crate::midi::Result<Self> {
         let bpm = bpm.into();
         if bpm.numerator() <= 0 {
-            return Err(invalid("tempo must be positive"));
+            return Err(invalid("tempo must be positive").into());
         }
         self.bpm = Some(bpm);
         Ok(self)
     }
     /// Case-sensitive substring or wildcard (`*`, `?`) matching. Multiple
     /// matching ports are an error, including duplicate names.
-    pub fn with_port(mut self, pattern: impl Into<String>) -> io::Result<Self> {
+    pub fn with_port(mut self, pattern: impl Into<String>) -> crate::midi::Result<Self> {
         if self.connection.is_some() || self.closed {
-            return Err(invalid("output is already connected or closed"));
+            return Err(invalid("output is already connected or closed").into());
         }
         let pattern = pattern.into();
         if pattern.is_empty() {
-            return Err(invalid("port pattern must not be empty"));
+            return Err(invalid("port pattern must not be empty").into());
         }
         self.port = Some(pattern);
         Ok(self)
     }
     /// Select advanced backend/protocol options before discovery or connection.
-    pub fn with_transport(mut self, options: transport::OutputOptions) -> io::Result<Self> {
+    pub fn with_transport(
+        mut self,
+        options: transport::OutputOptions,
+    ) -> crate::midi::Result<Self> {
         if self.client.is_some() || self.connection.is_some() || self.closed {
-            return Err(invalid(
-                "configure transport before discovery or connection",
-            ));
+            return Err(invalid("configure transport before discovery or connection").into());
         }
         self.options = options;
         Ok(self)
     }
-    pub fn ports(&mut self) -> io::Result<Vec<Port>> {
-        self.client()?.ports().map_err(transport_error)
+    pub fn ports(&mut self) -> crate::midi::Result<Vec<Port>> {
+        self.client()?
+            .ports()
+            .map_err(crate::midi::Error::Transport)
     }
     /// Connect a port from this output's most recent discovery snapshot.
-    pub fn connect(mut self, port: &Port) -> io::Result<Self> {
+    pub fn connect(mut self, port: &Port) -> crate::midi::Result<Self> {
         self.client()?;
         let client = self.client.take().expect("initialized output client");
-        self.connection = Some(Connection::Native(
-            client.connect(port).map_err(transport_error)?,
-        ));
+        self.connection =
+            Some(Connection::Native(client.connect(port).map_err(|e| {
+                io::Error::from(crate::midi::Error::Connect(e))
+            })?));
         Ok(self)
     }
-    pub fn send(&mut self, value: impl Into<OutputValue>) -> io::Result<()> {
+    pub fn send(&mut self, value: impl Into<OutputValue>) -> crate::midi::Result<()> {
         let plan = self.prepare(std::iter::once(value.into()))?;
-        self.execute(plan)
+        self.execute(plan).map_err(crate::midi::Error::from)
     }
     /// Validate the complete sequence before opening a port or sending anything.
     /// Durations accumulate exactly; only cumulative deadlines are rounded.
-    pub fn send_all(&mut self, values: impl IntoIterator<Item = OutputValue>) -> io::Result<()> {
+    pub fn send_all(
+        &mut self,
+        values: impl IntoIterator<Item = OutputValue>,
+    ) -> crate::midi::Result<()> {
         let plan = self.prepare(values)?;
-        self.execute(plan)
+        self.execute(plan).map_err(crate::midi::Error::from)
     }
     /// Replay a recording or archive reader using the first message as time zero.
     /// Clock/stream declarations and metadata do not send traffic. Loss markers,
     /// unknown records, timestamp regressions and unrelated clocks stop replay.
     /// The failure report counts successfully sent messages before the failure.
     /// This output stays open; its normal close/Drop cleanup policy applies.
-    /// Fractional nanosecond deadlines require the lower-level playback API's
-    /// explicit rounding option, as do clock mappings and cancellation.
+    /// Configure origin, clock mappings, rounding, cancellation and metrics with
+    /// `with_playback` before calling this method.
     ///
     /// ```no_run
-    /// use meedee::{Output, Reader};
+    /// use meedee::midi::{Output};
+    /// use meedee::archive::Reader;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let report = Output::new().play(Reader::open("rec.meedee")?)?;
     /// println!("{report:?}");
@@ -152,7 +177,7 @@ impl Output {
     pub fn play(
         &mut self,
         source: impl IntoIterator<Item = io::Result<crate::archive::Record>>,
-    ) -> Result<crate::playback::Report, crate::playback::Failure<io::Error>> {
+    ) -> Result<crate::playback::Report, crate::playback::Failure<crate::midi::Error>> {
         use crate::playback::{Cause, Failure, Planner, Report};
         let input_error = |error| Failure {
             report: Report::default(),
@@ -169,20 +194,28 @@ impl Output {
             return Ok(Report::default());
         };
         let first = first.map_err(input_error)?;
-        let origin = first
-            .timestamp()
-            .cloned()
+        let origin = self
+            .playback
+            .origin
+            .clone()
+            .or_else(|| first.timestamp().cloned())
             .ok_or_else(|| input_error(invalid("playback requires a timestamp")))?;
-        let planner = Planner::new(origin, Vec::new(), false).map_err(input_error)?;
+        let planner = Planner::new(
+            origin,
+            self.playback.mappings.clone(),
+            self.playback.allow_rounding,
+        )
+        .map_err(input_error)?;
         self.prepare_message(first.clone()).map_err(input_error)?;
         self.open().map_err(|error| Failure {
             report: Report::default(),
-            cause: Cause::Send(error),
+            cause: Cause::Send(error.into()),
         })?;
         // The scheduler uses deadlines relative to replay start, independent of
         // earlier sends on this output and time spent opening the native port.
         let mut clock = std::mem::replace(&mut self.clock, Box::new(MonotonicClock::default()));
         let origin = clock.now_ns();
+        let options = self.playback.clone();
         let result = crate::playback::play(
             std::iter::once(Ok(first)).chain(messages),
             planner,
@@ -190,9 +223,12 @@ impl Output {
                 clock: clock.as_mut(),
                 origin,
             },
-            &Cancellation::default(),
-            |message| self.transmit(self.prepare_message(message.clone())?),
-            false,
+            &options.cancel,
+            |message| {
+                self.transmit(self.prepare_message(message.clone())?)
+                    .map_err(crate::midi::Error::from)
+            },
+            options.metrics,
         );
         self.clock = clock;
         result
@@ -200,7 +236,7 @@ impl Output {
     /// Cleanup covers held note counts, pitch bend, CC1/64/66/67 and channel/poly
     /// pressure changed by confirmed sends. Other controller/program state is
     /// left alone. The transport closes even if a cleanup send fails.
-    pub fn close(&mut self) -> io::Result<()> {
+    pub fn close(&mut self) -> crate::midi::Result<()> {
         if self.closed {
             return Ok(());
         }
@@ -225,14 +261,17 @@ impl Output {
                 report(&error);
             }
         }
-        result
+        result.map_err(crate::midi::Error::from)
     }
     fn client(&mut self) -> io::Result<&transport::Output> {
         if self.closed || self.connection.is_some() {
             return Err(invalid("output is connected or closed"));
         }
         if self.client.is_none() {
-            self.client = Some(transport::Output::new(self.options).map_err(transport_error)?);
+            self.client = Some(
+                transport::Output::new(self.options)
+                    .map_err(|e| io::Error::from(crate::midi::Error::Init(e)))?,
+            );
         }
         Ok(self.client.as_ref().expect("initialized output client"))
     }
@@ -247,9 +286,10 @@ impl Output {
             let ports = self.ports()?;
             let selected = select_port(&ports, self.port.as_deref())?;
             let client = self.client.take().expect("discovery initialized client");
-            self.connection = Some(Connection::Native(
-                client.connect(selected).map_err(transport_error)?,
-            ));
+            self.connection =
+                Some(Connection::Native(client.connect(selected).map_err(
+                    |e| io::Error::from(crate::midi::Error::Connect(e)),
+                )?));
         }
         Ok(())
     }
@@ -371,7 +411,9 @@ impl Output {
         let connection = self.connection.as_mut().expect("connected output");
         match prepared {
             Prepared::Packet(packet) => {
-                connection.send(&packet).map_err(transport_error)?;
+                connection
+                    .send(&packet)
+                    .map_err(|e| io::Error::from(crate::midi::Error::Send(e)))?;
                 if let Packet::Bytes(bytes) = packet {
                     self.state.feed(&bytes)?;
                 }
@@ -389,7 +431,7 @@ impl Output {
                 for bytes in packets.iter().take(completed) {
                     self.state.feed(bytes)?;
                 }
-                result.map_err(transport_error)
+                result.map_err(|e| io::Error::from(crate::midi::Error::Send(e)))
             }
         }
     }
@@ -675,7 +717,7 @@ pub(crate) fn transport_error(error: transport::Error) -> io::Error {
 fn invalid(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, reason)
 }
-fn report(error: &io::Error) {
+fn report(error: &impl std::fmt::Display) {
     let _ = writeln!(io::stderr().lock(), "meedee: {error}");
 }
 
@@ -834,7 +876,7 @@ mod tests {
             .unwrap()
             .with_timestamp(crate::events::Timestamp { ticks, clock })
             .unwrap()
-            .with_source("input")
+            .with_stream("input")
             .unwrap();
         crate::archive::Record::Event(Box::new(Payload::Midi1(AnyMessage::NoteOn(message))))
     }
@@ -859,6 +901,32 @@ mod tests {
         assert_eq!(f.packets(), bytes(&[&[0x90, 60, 90], &[0x90, 62, 90]]));
         f.output.close().unwrap();
         assert_eq!(f.packets(), bytes(&[&[0x80, 60, 0], &[0x80, 62, 0]]));
+    }
+
+    #[test]
+    fn replay_options_persist_and_control_origin_metrics_and_cancellation() {
+        let mut f = Fixture::new();
+        let origin = recorded(100, 60);
+        let crate::archive::Record::Event(message) = origin else {
+            unreachable!()
+        };
+        let cancel = Cancellation::default();
+        f.output = f.output.with_playback(PlaybackOptions {
+            origin: message.timestamp().cloned(),
+            metrics: true,
+            cancel: cancel.clone(),
+            ..Default::default()
+        });
+        for _ in 0..2 {
+            let report = f.output.play([Ok(recorded(200, 60))]).unwrap();
+            assert_eq!(report.lateness.unwrap().count(), 1);
+        }
+        assert_eq!(*f.deadlines.borrow(), [100, 200]);
+        cancel.cancel();
+        let report = f.output.play([Ok(recorded(300, 60))]).unwrap();
+        assert!(report.cancelled);
+        assert_eq!(report.sent_events, 0);
+        assert_eq!(f.packets().len(), 2);
     }
 
     #[test]
@@ -1107,8 +1175,8 @@ mod tests {
             .send(messages::ControlChange14::new(1, 128).unwrap())
             .unwrap_err();
         assert!(matches!(
-            error.get_ref().unwrap().downcast_ref::<transport::Error>(),
-            Some(transport::Error::CompoundSend {
+            error,
+            crate::midi::Error::Send(transport::Error::CompoundSend {
                 completed_messages: Some(1),
                 ..
             })

@@ -16,7 +16,7 @@ pub use recording::Recording;
 /// Use `with_errors` to receive diagnostics and terminal errors explicitly.
 ///
 /// ```no_run
-/// use meedee::Input;
+/// use meedee::midi::Input;
 /// for message in Input::new() {
 ///     println!("{message:?}");
 /// }
@@ -66,16 +66,19 @@ impl Input {
             closed: false,
         }
     }
-    pub fn with_channel(self, channel: i64) -> io::Result<Self> {
+    pub fn with_channel(self, channel: i64) -> crate::midi::Result<Self> {
         self.with_channels([channel])
     }
     /// An empty selection excludes all channel messages. System messages and
     /// diagnostics always pass through, including on UMP input.
-    pub fn with_channels(mut self, channels: impl IntoIterator<Item = i64>) -> io::Result<Self> {
+    pub fn with_channels(
+        mut self,
+        channels: impl IntoIterator<Item = i64>,
+    ) -> crate::midi::Result<Self> {
         let mut mask = 0;
         for channel in channels {
             if !(1..=16).contains(&channel) {
-                return Err(invalid("channel must be in 1..=16"));
+                return Err(invalid("channel must be in 1..=16").into());
             }
             mask |= 1 << (channel - 1);
         }
@@ -83,22 +86,20 @@ impl Input {
         Ok(self)
     }
     /// Select a unique case-sensitive substring or `*`/`?` name pattern.
-    pub fn with_port(mut self, pattern: impl Into<String>) -> io::Result<Self> {
+    pub fn with_port(mut self, pattern: impl Into<String>) -> crate::midi::Result<Self> {
         if self.connection.is_some() || self.closed {
-            return Err(invalid("input is connected or closed"));
+            return Err(invalid("input is connected or closed").into());
         }
         let pattern = pattern.into();
         if pattern.is_empty() {
-            return Err(invalid("port pattern must not be empty"));
+            return Err(invalid("port pattern must not be empty").into());
         }
         self.port = Some(pattern);
         Ok(self)
     }
-    pub fn with_transport(mut self, options: transport::InputOptions) -> io::Result<Self> {
+    pub fn with_transport(mut self, options: transport::InputOptions) -> crate::midi::Result<Self> {
         if self.client.is_some() || self.connection.is_some() || self.closed {
-            return Err(invalid(
-                "configure transport before discovery or connection",
-            ));
+            return Err(invalid("configure transport before discovery or connection").into());
         }
         self.options = options;
         Ok(self)
@@ -110,30 +111,76 @@ impl Input {
         packets: usize,
         bytes: usize,
         sysex: usize,
-    ) -> io::Result<Self> {
+    ) -> crate::midi::Result<Self> {
         if self.connection.is_some() || self.closed {
-            return Err(invalid("configure limits before connection"));
+            return Err(invalid("configure limits before connection").into());
         }
         if packets == 0 || bytes == 0 || sysex == 0 {
-            return Err(invalid("receive limits must be positive"));
+            return Err(invalid("receive limits must be positive").into());
         }
         self.queue = Arc::new(Queue::new(packets, bytes));
         self.sysex_limit = sysex;
         Ok(self)
     }
-    pub fn ports(&mut self) -> io::Result<Vec<Port>> {
-        self.client()?.ports().map_err(transport_error)
+    pub fn ports(&mut self) -> crate::midi::Result<Vec<Port>> {
+        self.client()?
+            .ports()
+            .map_err(crate::midi::Error::Transport)
     }
-    pub fn connect(mut self, port: &Port) -> io::Result<Self> {
+    pub fn connect(mut self, port: &Port) -> crate::midi::Result<Self> {
         self.connect_port(port)?;
         Ok(self)
+    }
+    /// Receive one decoded message or diagnostic; None means the timeout elapsed.
+    pub fn receive(&mut self, timeout: Option<Duration>) -> crate::midi::Result<Option<Item>> {
+        let deadline = timeout
+            .map(|t| {
+                Instant::now()
+                    .checked_add(t)
+                    .ok_or_else(|| invalid("receive timeout exceeds clock range"))
+            })
+            .transpose()?;
+        self.next_item(deadline)
+            .transpose()
+            .map_err(crate::midi::Error::from)
+    }
+    pub fn stream(&mut self) -> crate::midi::Result<&str> {
+        if self.closed {
+            return Err(invalid("input is closed").into());
+        }
+        self.open()?;
+        Ok(self.stream.as_deref().expect("opened input stream"))
+    }
+    pub fn dropped_packets(&self) -> u64 {
+        let queued = self
+            .queue
+            .state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .lost;
+        queued.saturating_add(
+            self.connection
+                .as_ref()
+                .map_or(0, |c| c.diagnostics().dropped_packets()),
+        )
+    }
+    pub fn check_health(&self) -> crate::midi::Result<()> {
+        if self.closed {
+            return Err(invalid("input is closed").into());
+        }
+        if let Some(connection) = &self.connection {
+            connection
+                .check_health()
+                .map_err(crate::midi::Error::Transport)?;
+        }
+        Ok(())
     }
     pub fn with_errors(&mut self) -> InputErrors<'_> {
         InputErrors { input: self }
     }
     /// Stop native delivery, drain accepted packets and finish partial decoding.
     /// Remaining messages/diagnostics can still be drained by either iterator.
-    pub fn close(&mut self) -> io::Result<()> {
+    pub fn close(&mut self) -> crate::midi::Result<()> {
         if self.closed {
             return Ok(());
         }
@@ -168,14 +215,17 @@ impl Input {
             }
             self.pending.extend(decoder.finish().into_iter().map(Ok));
         }
-        result
+        result.map_err(crate::midi::Error::from)
     }
     fn client(&mut self) -> io::Result<&transport::Input> {
         if self.closed || self.connection.is_some() {
             return Err(invalid("input is connected or closed"));
         }
         if self.client.is_none() {
-            self.client = Some(transport::Input::new(self.options).map_err(transport_error)?);
+            self.client = Some(
+                transport::Input::new(self.options)
+                    .map_err(|e| io::Error::from(crate::midi::Error::Init(e)))?,
+            );
         }
         Ok(self.client.as_ref().expect("initialized input"))
     }
@@ -193,7 +243,7 @@ impl Input {
                     timestamp: packet.timestamp_ns,
                 })
             })
-            .map_err(transport_error)?;
+            .map_err(|e| io::Error::from(crate::midi::Error::Connect(e)))?;
         let native_clock = connection.clock();
         let enabled = native_clock.mode == transport::TimestampMode::Absolute;
         self.clock = Some(
@@ -348,9 +398,11 @@ impl Iterator for Input {
     }
 }
 impl Iterator for InputErrors<'_> {
-    type Item = io::Result<Item>;
+    type Item = crate::midi::Result<Item>;
     fn next(&mut self) -> Option<Self::Item> {
-        self.input.next_item(None)
+        self.input
+            .next_item(None)
+            .map(|r| r.map_err(crate::midi::Error::from))
     }
 }
 impl Drop for Input {
@@ -424,7 +476,7 @@ impl Queue {
 fn invalid(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, reason)
 }
-fn report(error: &io::Error) {
+fn report(error: &impl std::fmt::Display) {
     let _ = writeln!(io::stderr().lock(), "meedee: {error}");
 }
 
@@ -467,7 +519,7 @@ mod tests {
             Payload::Midi1(AnyMessage::TimingClock(_))
         ));
         for message in messages {
-            assert_eq!(message.source(), Some("keyboard"));
+            assert_eq!(message.stream(), Some("keyboard"));
             assert_eq!(message.timestamp().unwrap().ticks, 0);
             assert_eq!(message.span().unwrap().first_packet, 0);
         }
@@ -523,7 +575,10 @@ mod tests {
         input.queue.push(packet(0, &[0x90, 60, 90]));
         input.queue.push(packet(1, &[0x90, 62, 90]));
         input.close().unwrap();
-        let items: Vec<_> = input.with_errors().collect::<io::Result<_>>().unwrap();
+        let items: Vec<_> = input
+            .with_errors()
+            .collect::<crate::midi::Result<_>>()
+            .unwrap();
         assert_eq!(items.len(), 2);
         assert!(matches!(&items[0], Item::Message(_)));
         assert!(
@@ -538,7 +593,10 @@ mod tests {
         input.queue.push(packet(2, &[90, 0x91, 64, 70]));
         input.queue.state.lock().unwrap().lost = 1;
         input.close().unwrap();
-        let items: Vec<_> = input.with_errors().collect::<io::Result<_>>().unwrap();
+        let items: Vec<_> = input
+            .with_errors()
+            .collect::<crate::midi::Result<_>>()
+            .unwrap();
         assert_eq!(
             items
                 .iter()
@@ -563,7 +621,10 @@ mod tests {
         let mut input = input(transport::Protocol::Midi1).with_channels([]).unwrap();
         input.queue.push(packet(0, &[1, 0x90, 60]));
         input.close().unwrap();
-        let items: Vec<_> = input.with_errors().collect::<io::Result<_>>().unwrap();
+        let items: Vec<_> = input
+            .with_errors()
+            .collect::<crate::midi::Result<_>>()
+            .unwrap();
         assert!(items
             .iter()
             .any(|i| matches!(i,Item::Diagnostic(d) if d.kind==DiagnosticKind::Malformed)));
@@ -659,25 +720,21 @@ mod tests {
         let recording = first.record_to(Duration::ZERO, &path, false).unwrap();
         let original = std::fs::read(&path).unwrap();
         assert_eq!(
-            crate::Reader::open(&path)
+            crate::archive::Reader::open(&path)
                 .unwrap()
                 .collect::<io::Result<Vec<_>>>()
                 .unwrap(),
             recording.records
         );
-        assert_eq!(
-            input(transport::Protocol::Midi1)
-                .record_to(Duration::ZERO, &path, false)
-                .unwrap_err()
-                .kind(),
-            io::ErrorKind::AlreadyExists
+        assert!(
+            matches!(input(transport::Protocol::Midi1).record_to(Duration::ZERO, &path, false).unwrap_err(), crate::midi::Error::Io(e) if e.kind() == io::ErrorKind::AlreadyExists)
         );
         assert_eq!(std::fs::read(&path).unwrap(), original);
         let second = input(transport::Protocol::Midi1)
             .record_to(Duration::ZERO, &path, true)
             .unwrap();
         assert_eq!(
-            crate::Reader::open(&path)
+            crate::archive::Reader::open(&path)
                 .unwrap()
                 .collect::<io::Result<Vec<_>>>()
                 .unwrap(),

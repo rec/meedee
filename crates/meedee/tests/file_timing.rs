@@ -1,8 +1,7 @@
 use meedee::messages::Message;
 use meedee::{
+    events::InputItem as Item,
     events::{Payload, Rational, Timestamp},
-    file_timing,
-    live::Item,
     messages::{AnyMessage, NoteOn},
     smf::{self, Event, Header, Record},
     ump,
@@ -83,7 +82,7 @@ fn merged_tracks_apply_tempo_in_stable_order_and_preserve_leading_silence() {
         [(0, 0), (240, 0), (240, 1), (480, 0), (480, 1), (480, 1)]
     );
     let merge = smf::MergedReader::new(Cursor::new(&bytes), 1024, 128, 8192, None).unwrap();
-    let mut timed = file_timing::SmfReader::new(merge, "song".into(), None, 1024).unwrap();
+    let mut timed = smf::TimedReader::new(merge, "song".into(), None, 1024).unwrap();
     let origin = timed.origin();
     assert_eq!(origin.ticks, 0);
     let result = timed.by_ref().collect::<io::Result<Vec<_>>>().unwrap();
@@ -111,16 +110,15 @@ fn merged_tracks_apply_tempo_in_stable_order_and_preserve_leading_silence() {
         meedee::events::timestamp_seconds(events[1].timestamp().unwrap()).unwrap(),
         Rational::new(3, 8).unwrap()
     );
-    let mut plan = meedee::playback::Planner::new(origin, vec![], false).unwrap();
+    let mut plan = meedee::events::PlaybackPlan::new(origin, vec![], false).unwrap();
     assert_eq!(plan.deadline(&events[0]).unwrap().delay_ns, 250_000_000);
     assert!(smf::MergedReader::new(Cursor::new(&bytes), 1024, 1, 8192, None).is_err());
 }
 #[test]
 fn independent_sequences_smpte_and_export_rounding_are_explicit() {
     let header = Header::new(2, 2, 0xe328, vec![]).unwrap();
-    let mut timeline =
-        file_timing::SmfTimeline::new(header.clone(), "frames".into(), Some(1), 1024).unwrap();
-    assert!(file_timing::SmfTimeline::new(header, "bad".into(), None, 1024).is_err());
+    let mut timeline = smf::Timeline::new(header.clone(), "frames".into(), Some(1), 1024).unwrap();
+    assert!(smf::Timeline::new(header, "bad".into(), None, 1024).is_err());
     let result = timeline
         .feed(&Event {
             track: 1,
@@ -141,12 +139,10 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
         Rational::new(1001, 1000).unwrap()
     );
     let target = Header::new(0, 1, 480, vec![]).unwrap();
-    let report =
-        file_timing::export_smf(e, &target, &timeline.origin(), 0, 500000, None, false).unwrap();
+    let report = smf::export_event(e, &target, &timeline.origin(), 0, 500000, None, false).unwrap();
     assert_eq!(report.status, ump::TranslationStatus::Quantized);
     assert!(report.events.is_empty());
-    let report =
-        file_timing::export_smf(e, &target, &timeline.origin(), 0, 500000, None, true).unwrap();
+    let report = smf::export_event(e, &target, &timeline.origin(), 0, 500000, None, true).unwrap();
     assert_eq!(report.events[0].tick, 961);
     assert_eq!(report.rounding_error_ticks, Rational::new(1, 25).unwrap());
     let mut missing = (**e).clone();
@@ -154,7 +150,7 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
     metadata.timestamp = None;
     missing = missing.with_metadata(metadata).unwrap();
     assert_eq!(
-        file_timing::export_smf(
+        smf::export_event(
             &missing,
             &target,
             &timeline.origin(),
@@ -196,7 +192,7 @@ fn large_escape_records_stream_and_group_routing_is_not_silently_discarded() {
     }
     let merged =
         smf::MergedReader::new(Cursor::new(b.into_inner()), 1_048_576, 128, 8192, None).unwrap();
-    let mut reader = file_timing::SmfReader::new(merged, "s".into(), None, 1_048_576).unwrap();
+    let mut reader = smf::TimedReader::new(merged, "s".into(), None, 1_048_576).unwrap();
     assert_eq!(reader.by_ref().count(), 4096);
     let clock = reader.clock().clone();
     let origin = Timestamp {
@@ -207,12 +203,12 @@ fn large_escape_records_stream_and_group_routing_is_not_silently_discarded() {
         ump::Midi2NoteOn::new(2, 1, 60, 65535, 0, 0).unwrap(),
     )))
     .with_metadata(meedee::messages::Metadata {
-        source: Some("s".into()),
+        stream: Some("s".into()),
         timestamp: Some(origin.clone()),
         span: None,
     })
     .unwrap();
-    let report = file_timing::export_smf(
+    let report = smf::export_event(
         &event,
         &Header::new(0, 1, 480, vec![]).unwrap(),
         &origin,

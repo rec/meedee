@@ -1,6 +1,7 @@
 //! M2-104-UM 1.1.2 values and pure codecs. Word order is explicit; byte order
 //! belongs to the selected transport/file format and must be specified by callers.
 use crate::codecs::{DecodeItem, Decoder as ByteDecoder};
+pub use crate::event_views::Ump as EventAssembler;
 use crate::messages::{AnyMessage, Message, PrimitiveMessage, SysEx, ValueError};
 #[path = "ump_stream.rs"]
 mod streams;

@@ -29,7 +29,7 @@ fn records() -> Vec<Record> {
                     .unwrap(),
             )))
             .with_metadata(meedee::messages::Metadata {
-                source: Some("source".into()),
+                stream: Some("source".into()),
                 timestamp: Some(Timestamp {
                     ticks: i64::MIN,
                     clock: c,

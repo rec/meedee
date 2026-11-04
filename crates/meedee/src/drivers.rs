@@ -1,0 +1,109 @@
+//! Shared caller-thread workflow I/O; no separate scheduler or transport backend.
+use crate::{events::Payload, live::Item, midi, playback::PlaybackClock};
+use std::time::Duration;
+
+pub(crate) trait Receiver {
+    fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>>;
+    fn check(&self) -> midi::Result<()>;
+}
+impl Receiver for midi::Input {
+    fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>> {
+        self.receive(Some(timeout))
+    }
+    fn check(&self) -> midi::Result<()> {
+        self.check_health()?;
+        if self.dropped_packets() != 0 {
+            return Err(midi::Error::Transport(crate::transport::Error::Resource(
+                "input packet loss reported by transport counter",
+            )));
+        }
+        Ok(())
+    }
+}
+pub(crate) trait Sender {
+    fn send(&mut self, message: Payload) -> midi::Result<()>;
+}
+impl Sender for midi::Output {
+    fn send(&mut self, message: Payload) -> midi::Result<()> {
+        self.send(message)
+    }
+}
+pub(crate) fn remaining(clock: &mut impl PlaybackClock, deadline: u64) -> Duration {
+    Duration::from_nanos(deadline.saturating_sub(clock.now_ns())).min(Duration::from_millis(50))
+}
+pub(crate) fn invalid(reason: &str) -> midi::Error {
+    std::io::Error::new(std::io::ErrorKind::InvalidInput, reason).into()
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::{
+        messages::{AnyMessage, Message, SysEx},
+        playback::Cancellation,
+    };
+    use std::{cell::Cell, collections::VecDeque, io, rc::Rc};
+    #[derive(Clone, Default)]
+    pub struct Clock(pub Rc<Cell<u64>>);
+    impl PlaybackClock for Clock {
+        fn now_ns(&mut self) -> u64 {
+            self.0.get()
+        }
+        fn wait_until(&mut self, deadline: u64, cancel: &Cancellation) -> io::Result<bool> {
+            if cancel.cancelled() {
+                return Ok(false);
+            }
+            self.0.set(deadline.max(self.0.get()));
+            Ok(true)
+        }
+    }
+    pub struct Input {
+        pub clock: Clock,
+        pub items: VecDeque<Item>,
+        pub lost: bool,
+    }
+    impl Receiver for Input {
+        fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>> {
+            if let Some(item) = self.items.pop_front() {
+                return Ok(Some(item));
+            }
+            self.clock
+                .0
+                .set(self.clock.0.get() + timeout.as_nanos() as u64);
+            Ok(None)
+        }
+        fn check(&self) -> midi::Result<()> {
+            if self.lost {
+                Err(midi::Error::Transport(crate::transport::Error::Resource(
+                    "known loss",
+                )))
+            } else {
+                Ok(())
+            }
+        }
+    }
+    pub struct Output {
+        pub clock: Clock,
+        pub sent: Vec<(u64, Payload)>,
+        pub fail_at: Option<usize>,
+    }
+    impl Sender for Output {
+        fn send(&mut self, message: Payload) -> midi::Result<()> {
+            if self.fail_at == Some(self.sent.len()) {
+                return Err(midi::Error::Send(crate::transport::Error::Native(
+                    "send failed".into(),
+                )));
+            }
+            self.sent.push((self.clock.0.get(), message));
+            self.clock.0.set(self.clock.0.get() + 100);
+            Ok(())
+        }
+    }
+    pub fn sysex(data: &[u8]) -> Item {
+        Item::Message(Box::new(
+            Payload::Midi1(AnyMessage::SysEx(SysEx::new(data.to_vec()).unwrap()))
+                .with_stream("s")
+                .unwrap(),
+        ))
+    }
+}

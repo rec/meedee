@@ -44,20 +44,20 @@ struct Context {
 }
 impl Context {
     fn event(&mut self, event: &Payload) -> io::Result<(usize, bool)> {
-        if event.source().is_none() {
+        if event.stream().is_none() {
             return Err(invalid(0, "observation requires a source identity"));
         }
         if self
             .stream
             .as_ref()
-            .is_some_and(|s| s != event.source().unwrap_or_default())
+            .is_some_and(|s| s != event.stream().unwrap_or_default())
         {
             return Err(invalid(
                 0,
                 "one event view belongs to one source; reset before rebinding",
             ));
         }
-        self.stream = Some(event.source().unwrap_or_default().to_owned());
+        self.stream = Some(event.stream().unwrap_or_default().to_owned());
         let index = self.index;
         self.index = self
             .index
@@ -126,7 +126,7 @@ impl Context {
     fn clock_change(&self, event: &Payload, index: usize, group: Option<u8>) -> Observation {
         self.observation(
             Value::Boundary(Diagnostic {
-                stream: event.source().unwrap_or_default().to_owned(),
+                stream: event.stream().unwrap_or_default().to_owned(),
                 packet: event.span().map_or(index as u64, |s| s.last_packet),
                 kind: DiagnosticKind::ClockChange,
                 lost: 0,
@@ -467,7 +467,7 @@ impl View for Tuning {
                 Ok(None) => {}
                 Err(e) => out.push(self.context.observation(
                     Value::Boundary(Diagnostic {
-                        stream: event.source().unwrap_or_default().to_owned(),
+                        stream: event.stream().unwrap_or_default().to_owned(),
                         packet: event.span().map_or(index as u64, |s| s.last_packet),
                         kind: DiagnosticKind::Malformed,
                         lost: 0,

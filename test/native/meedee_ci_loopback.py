@@ -7,23 +7,19 @@ from uuid import uuid4
 from meedee import ci, codecs, messages, midi, ump
 
 
-def dispatch(
-    session: ci.Session, action: ci.Action, output: midi.OutputConnection
-) -> None:
+def dispatch(session: ci.Session, action: ci.Action, output: midi.Output) -> None:
     assert action.route.group is not None
     wire = codecs.encode(action.message)
     try:
         for p in ump.packetize_sysex7(group=action.route.group, data=wire[1:-1]):
-            output.send(p)
+            output(p)
     except midi.MidiError:
         session.report_send(token=action.token, sent=False, now_ns=monotonic_ns())
         raise
     session.report_send(token=action.token, sent=True, now_ns=monotonic_ns())
 
 
-def receive(
-    receiver: midi.InputConnection, assembler: ump.EventAssembler
-) -> messages.SysEx:
+def receive(receiver: midi.Input, assembler: ump.EventAssembler) -> messages.SysEx:
     while True:
         value = receiver.receive(timeout=3)
         assert isinstance(value, messages.Message), value
@@ -34,7 +30,7 @@ def receive(
                 return messages.SysEx(data=data.data)
 
 
-def connect(name: str) -> midi.OutputConnection:
+def connect(name: str) -> midi.Output:
     client = midi.Output(protocol=midi.Protocol.Ump)
     matches = [p for p in client.ports() if p.name == name]
     assert len(matches) == 1, "test-owned destination was not discovered uniquely"

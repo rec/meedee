@@ -1,6 +1,9 @@
 //! RP-001 v1.0 streaming Standard MIDI Files. File records are never sent implicitly.
 use crate::codecs::{DecodeItem, Decoder};
 use crate::file_io::{invalid, Source};
+pub use crate::file_timing::{
+    export_smf as export_event, ExportReport, SmfReader as TimedReader, SmfTimeline as Timeline,
+};
 use crate::messages::{AnyMessage, PrimitiveMessage};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
@@ -599,5 +602,14 @@ fn record_size(r: &Record) -> usize {
         Record::Meta { data, .. } | Record::SysEx { data, .. } | Record::Chunk { data, .. } => {
             data.len()
         }
+    }
+}
+
+impl Reader<std::io::BufReader<std::fs::File>> {
+    pub fn open(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Self::new(
+            std::io::BufReader::new(std::fs::File::open(path)?),
+            1_048_576,
+        )
     }
 }

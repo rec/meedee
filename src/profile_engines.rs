@@ -2,7 +2,7 @@
 use super::{hash, int, mpe, object, timecode, value_error};
 use crate::messages::{self, Message};
 use meedee::messages::PrimitiveMessage;
-use meedee::{gm as gm_model, mpe as mpe_model, timecode as tc, velocity};
+use meedee::{controls as velocity, gm as gm_model, mpe as mpe_model, timecode as tc};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList, PyTuple};
@@ -780,15 +780,18 @@ fn pairs(value: &Bound<'_, PyAny>, max: usize) -> PyResult<Vec<(i64, i64)>> {
         .collect()
 }
 
-pub(crate) fn view_value(py: Python<'_>, value: meedee::event_views::Value) -> PyResult<Py<PyAny>> {
+pub(crate) fn view_value(
+    py: Python<'_>,
+    value: meedee::events::ObservationValue,
+) -> PyResult<Py<PyAny>> {
     match value {
-        meedee::event_views::Value::Velocity(value) => {
+        meedee::events::ObservationValue::Velocity(value) => {
             Ok(Py::new(py, VelocityObservation { value })?.into_any())
         }
-        meedee::event_views::Value::Mpe(value) => {
+        meedee::events::ObservationValue::Mpe(value) => {
             Ok(Py::new(py, ChannelState { value })?.into_any())
         }
-        meedee::event_views::Value::Timecode(value) => {
+        meedee::events::ObservationValue::Timecode(value) => {
             Ok(Py::new(py, AssemblyResult { value })?.into_any())
         }
         _ => Err(PyTypeError::new_err("profile view value expected")),

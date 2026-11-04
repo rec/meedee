@@ -1,4 +1,6 @@
 //! MIDI-CI 1.2.1 management messages. Profile/property rules are deliberately deferred.
+pub use crate::ci_browser::{BrowseDiagnostic, BrowseReport, Browser};
+pub use crate::ci_session::{Action, Observation, Peer, Route, Session, Update};
 use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 
 pub const BROADCAST_MUID: u32 = 0x0fff_ffff;

@@ -1,6 +1,6 @@
+use meedee::ci::Browser;
 use meedee::ci::{Address, Body, DiscoveryInfo, Header, Identity, Management};
-use meedee::ci_browser::Browser;
-use meedee::ci_session::{Route, Session};
+use meedee::ci::{Route, Session};
 
 fn identity() -> Identity {
     Identity::new(vec![125, 0, 0], 1, 2, vec![0; 4]).unwrap()

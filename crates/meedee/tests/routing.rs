@@ -9,7 +9,7 @@ fn event(source: &str, note: i64) -> events::Payload {
             .unwrap(),
     )))
     .with_metadata(meedee::messages::Metadata {
-        source: Some(source.into()),
+        stream: Some(source.into()),
         timestamp: None,
         span: None,
     })
@@ -98,7 +98,7 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
     .unwrap();
     router.feed(&e).unwrap();
     let d = router.peek().unwrap();
-    assert_eq!(d.event.source().unwrap(), "s");
+    assert_eq!(d.event.stream().unwrap(), "s");
     assert_eq!(d.event.timestamp(), e.timestamp());
     let events::Payload::Ump(v) = &d.event else {
         panic!("expected UMP")

@@ -1,11 +1,11 @@
 use meedee::messages::Message;
 use meedee::{
+    archive as recording,
     archive::{self, Record},
+    events::{self as playback, Cancellation, PlaybackClock},
     events::{Clock, Payload, Rational, Timestamp},
-    live::{Decoder, DiagnosticKind, Item},
+    events::{InputItem as Item, PacketDecoder as Decoder, StreamDiagnosticKind as DiagnosticKind},
     messages::{AnyMessage, NoteOn},
-    playback::{self, Cancellation, PlaybackClock},
-    recording,
     transport::{Packet, Protocol},
 };
 use std::io::{self, Write};
@@ -30,7 +30,7 @@ fn event(ticks: i64) -> Payload {
             .unwrap(),
     )))
     .with_metadata(meedee::messages::Metadata {
-        source: Some("s".into()),
+        stream: Some("s".into()),
         timestamp: Some(Timestamp {
             ticks,
             clock: clock(),
@@ -128,7 +128,7 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
     let mut sent = 0;
     let report = playback::play(
         vec![Ok(event(100)), Ok(event(100)), Ok(event(120))].into_iter(),
-        playback::Planner::new(
+        playback::PlaybackPlan::new(
             Timestamp {
                 ticks: 100,
                 clock: self::clock(),
@@ -157,7 +157,7 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
     let mut sent = 0;
     let failure = playback::play(
         vec![Ok(event(0)), Ok(event(1)), Ok(event(2))].into_iter(),
-        playback::Planner::new(
+        playback::PlaybackPlan::new(
             Timestamp {
                 ticks: 0,
                 clock: self::clock(),
@@ -187,7 +187,7 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
     assert!(
         playback::play(
             std::iter::once(Ok(event(0))),
-            playback::Planner::new(
+            playback::PlaybackPlan::new(
                 Timestamp {
                     ticks: 0,
                     clock: self::clock()
@@ -208,7 +208,7 @@ fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
 #[test]
 fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
     let c = Clock::new("fraction".into(), 1, 3, "test".into(), None).unwrap();
-    let mapping = playback::Mapping::new(
+    let mapping = playback::ClockMapping::new(
         c.clone(),
         clock(),
         Rational::new(1, 1).unwrap(),
@@ -216,7 +216,7 @@ fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
         None,
     )
     .unwrap();
-    let mut p = playback::Planner::new(
+    let mut p = playback::PlaybackPlan::new(
         Timestamp {
             ticks: 0,
             clock: clock(),
@@ -241,7 +241,7 @@ fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
         })
         .unwrap();
     assert!(p.deadline(&a).is_err());
-    let mut p = playback::Planner::new(
+    let mut p = playback::PlaybackPlan::new(
         Timestamp {
             ticks: 0,
             clock: c.clone(),
@@ -268,7 +268,7 @@ fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
     let planned = p.deadline(&a).unwrap();
     assert_eq!(planned.delay_ns, 333_333_333);
     assert_eq!(planned.rounding_error_ns, Rational::new(-1, 3).unwrap());
-    assert!(playback::Planner::new(
+    assert!(playback::PlaybackPlan::new(
         Timestamp {
             ticks: 0,
             clock: clock()
@@ -407,11 +407,11 @@ fn a_blocked_file_cannot_block_record_admission_or_exceed_stop_deadline() {
     assert!(r.record(Record::Event(Box::new(event(1)))));
     assert!(!r.record(Record::Event(Box::new(event(2)))));
     let pressure = r.pressure().unwrap();
-    assert_eq!(pressure.accepted_records, 2);
-    assert_eq!(pressure.capacity_rejections, 1);
-    assert_eq!(pressure.peak_reserved_records, 2);
+    assert_eq!(pressure.accepted_records(), 2);
+    assert_eq!(pressure.capacity_rejections(), 1);
+    assert_eq!(pressure.peak_reserved_records(), 2);
     assert_eq!(
-        pressure.peak_reserved_bytes,
+        pressure.peak_reserved_bytes(),
         2 * archive::payload_size(&Record::Event(Box::new(event(0)))).unwrap()
     );
     assert_eq!(
@@ -435,7 +435,7 @@ fn playback_timing_does_not_require_a_source_identity() {
         })
         .unwrap();
     let mut planner =
-        playback::Planner::new(message.timestamp().unwrap().clone(), vec![], false).unwrap();
+        playback::PlaybackPlan::new(message.timestamp().unwrap().clone(), vec![], false).unwrap();
     assert_eq!(planner.deadline(&message).unwrap().delay_ns, 0);
-    assert_eq!(message.source(), None);
+    assert_eq!(message.stream(), None);
 }

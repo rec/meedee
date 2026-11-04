@@ -41,7 +41,7 @@ Slice 2 transport choices, approved 2026-10-14:
   snapshots. `backend_id` is metadata, not a unique persistent identity.
 - Remove native naming parameters except the virtual endpoint name, and remove
   ID lookup. The pinned C API cannot honor the former and IDs cannot guarantee
-  the latter. Retain per-client process isolation as an option; input defaults to isolated
+  the latter. Retain per-client process isolation as an option; input defaults to in-process
   and output defaults to in-process transport.
 - Raw-mode callbacks take an immutable `meedee.events.ReceivedPacket`: exact optional
   signed `timestamp_ns`, connection `clock`, and raw `packet`. Bytes remain
@@ -49,7 +49,7 @@ Slice 2 transport choices, approved 2026-10-14:
 - Raw mode exposes chunks/batches without assembly. Decoded mode, now the
   default, assembles messages and reports stream diagnostics.
 - Failed opens entering Rust invalidate the client in both modes. Ordinary
-  Python validation happens first. Successful explicit close restores it.
+  Python validation happens first. Public Input/Output closure is terminal.
 
 Resource follow-up approved 2026-10-15: each parent Python process admits at most
 32 live isolated workers, separately from native-client and connection counts.
@@ -57,9 +57,9 @@ Each isolated Input/Output constructor consumes one slot, including discovery-on
 clients. Starts in progress and retiring processes count until exit is confirmed;
 admission raises ResourceError before spawning at capacity. Failed starts release
 their reservations. This is a count limit, not a machine-wide memory budget.
-Closing a connection restores its reusable client and does not terminate that
-client's worker. Connections retain their clients; drop those references when
-the client is no longer needed, and allow asynchronous retirement to complete.
+Input and Output each own their connection state. Closing releases the native
+client and retires an isolated worker; create a new resource to reconnect.
+Allow asynchronous retirement to complete.
 CoreMIDI retains one additional keeper client and notification-loop thread per
 MIDI-using process until exit; ordinary ports/clients still close. Per-client
 operation ownership is preserved. The private notification callback stores no
@@ -265,8 +265,8 @@ reject an unassigned channel. MIDI 1 constructors leave channels unassigned;
 expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
-`out.send(command)` accepts these commands on MIDI 1.0
-outputs, rejecting UMP before sending. Encoded packets also use `out.send(packet)`. One native
+`out(command)` accepts these commands on MIDI 1.0
+outputs, rejecting UMP before sending. Encoded packets also use `out(packet)`. One native
 owner-thread operation and the existing connection serialization cover the whole
 sequence, including release; raw sends, other commands and close cannot run
 between its steps on that connection. This is not atomicity against other
@@ -357,11 +357,14 @@ from their PyO3 wrappers; both use the interpreter-independent core validation.
 
 ### Ergonomic Rust I/O
 
-The crate root exports Input, Output, Note, Rest, Beats, Recording and Reader.
+The midi module exports Input, Output and Recording; messages exports Note, Rest
+and Beats; archive exports Reader. High-level failures use midi::Error, preserving
+transport categories and underlying causes. Output::with_playback configures
+origin, clock mappings, cancellation, rounding and metrics for later play calls.
 MIDI 1 channel constructors use payload-first defaults and optional channels;
 validated `with_*` builders replace payload fields and preserve metadata.
 Input defaults to lazy first-port selection and message iteration. Its borrowed
-`with_errors()` iterator yields live Items in io::Result, retaining diagnostics;
+`with_errors()` iterator yields events::InputItem values in midi::Result, retaining diagnostics;
 default iteration prints diagnostics and stops on terminal errors. Channel filters
 accept a single channel or an iterator of channels and retain system messages.
 
@@ -384,7 +387,7 @@ capture memory grows with traffic; native and application receive queues remain
 bounded. Reader::open uses strict archive validation and a 1 MiB payload limit.
 Output::play accepts recordings/readers and infers its origin from the first
 message. It stops on loss, discontinuity, malformed records, timestamp regression
-or unmapped clocks, retaining confirmed send progress. The lower-level playback
+or unmapped clocks, retaining confirmed send progress. The events playback
 API supplies explicit mappings, rounding, cancellation and metrics.
 
 ## Evidence and measurements
@@ -487,7 +490,7 @@ Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
 
 All these messages implement Rust PrimitiveMessage and Python Message, and work
-with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
+with `codecs.encode`. Raw output uses `connection(codecs.encode(message))`;
 there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
 ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
 containing `message` and `checksum`, or None for unrelated/unsupported forms;
@@ -858,8 +861,7 @@ completion; recovery is explicit and returns only verified complete records.
 Native clock values and absent timestamps remain exact, with rational units and
 stable record IDs. Unknown records may be retained opaquely without execution.
 
-Input combines decoded and raw reception over the existing input transport. Python Output opens one
-OutputConnection with send for message objects, compound operations and encoded
+Input combines decoded and raw reception over the existing input transport. Python Output owns discovery and one connection, with callable sending for message objects, compound operations and encoded
 packets, and play for timestamped events.
 Message and packet operations share connection ownership and process isolation;
 protocol conversion remains explicit. Input selects callbacks or a bounded
@@ -1253,7 +1255,7 @@ handoff does not establish that bytes reached the wire or that an instrument
 accepted, applied or persisted the dump.
 
 `transfer_output.run(session, output, cancel=None)` is a synchronous Python
-adapter for an existing MIDI 1 `OutputConnection`. It uses monotonic time,
+adapter for an existing MIDI 1 `Output`. It uses monotonic time,
 checks the existing `events.Cancellation` between sends and at most every 50 ms
 while waiting, and does not own/close the output. Native calls cannot be forcibly
 interrupted. Operational send failures return a failed report; Ctrl-C returns a
@@ -1583,14 +1585,15 @@ this workflow's device-free tests.
 
 ## MIDI 1 output sequencing
 
-Python `Output(channel=None, port=None, bpm=None, isolated=False)` remains a discovery client
-with `ports()` and `connect(port)`. As a context manager it opens the first port,
+Python `Output(channel=None, port=None, bpm=None, isolated=False)` owns discovery and its connection
+with `ports()` and `connect(port)`. Connecting returns the same object. A second
+connection is rejected, and close is terminal, including for discovery-only objects. As a context manager it opens the first port,
 or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
 No or ambiguous matches raise before connecting. `isolated=True` remains supported
 and launches a separate worker module, without importing the calling script.
 
-The connection exposes `send()` for output and is not callable.
-`out.send(*values)` accepts full notes, rests, messages, raw packets and nonnegative
+The output is callable; there is no separate public connection class.
+`out(*values)` accepts full notes, rests, messages, raw packets and nonnegative
 finite delays. Numeric values and dimensionless numeric strings mean quarter-note
 beats with `bpm` set, seconds otherwise. Explicit time quantities retain their
 meaning; explicit beats require a tempo. Other dimensions are rejected. Arguments
@@ -1654,8 +1657,10 @@ and advanced playback workflows.
 default, yielding `messages.Message` and `events.StreamDiagnostic`; `raw=True` yields
 unchanged `events.ReceivedPacket` values, including partial SysEx and UMP chunks.
 The former TypedInput and TypedInputConnection classes are removed without aliases.
-Both modes return InputConnection and share discovery, isolation, port lifetime,
-callback guards and close behavior. Input continues to default to isolation.
+Both modes connect and return the same Input object, sharing discovery, isolation,
+port lifetime, callback guards and terminal close behavior. Input defaults to
+in-process operation, with explicit isolated=True available. Input(port=pattern)
+uses the same unique substring/glob selection as Output.
 
 Both modes accept an optional callback at connect/create_virtual, or support
 `receive(timeout=..., cancel=...)` when no callback is supplied. Queue admission
@@ -1666,7 +1671,7 @@ Decoded mode retains assembly diagnostics, stream identity and archive recording
 Raw recording is rejected explicitly because archive recording requires decoded
 events. The worker_failure and last_message_time properties remain available.
 
-Type hints infer InputConnection[ReceivedPacket] for raw=True and decoded message
+Type hints infer Input[ReceivedPacket] for raw=True and decoded message
 unions by default; a dynamic boolean yields the union of both modes.
 
 
@@ -1682,13 +1687,14 @@ and stops after a terminal failure. Setup errors in explicit contexts, invalid
 arguments, close failures and output sends retain their exception behavior. `receive()` returns the same messages and retains its checked error interface.
 
 `Input(channel=1)` selects one channel; an iterable of integers selects several.
-Only channels 1..16 are valid. With a channel selection, channel-less messages
-are excluded and diagnostics are retained. Filtering applies to polling,
+Only channels 1..16 are valid. With a channel selection, channel-less system messages
+and diagnostics are preserved. Channel filters select channel-voice traffic only. Filtering applies to polling,
 callbacks, iteration and attached recordings. Raw mode rejects channel selection.
 Output(channel=None), the default, preserves assigned channels and supplies
 channel 1 when unassigned. An explicit Output(channel=N) overrides MIDI 1 message,
 full-note and compound-command channels without modifying the original values.
-Encoded packets and timestamped play() retain their explicit addressing.
+The override also applies to messages replayed by play(). Encoded packets retain
+their explicit addressing.
 
 
 ### Short capture and replay
@@ -1702,20 +1708,21 @@ final partial-message and loss diagnostics retained. Raw mode is rejected.
 When output is specified, the in-memory result is written to an archive after
 capture, using exclusive creation unless overwrite=True. File errors raise.
 
-`Output.play(source)` opens the selected output and closes it on completion or
-failure. A passed archive Reader is consumed and closed. Connection-level play
-also allows omission of origin, inferred from the first Message timestamp. Initial
+`Output.play(source)` opens the selected output and leaves it open for later sends
+until explicit close, context exit or finalization. A passed archive Reader is
+consumed and closed. Origin is optional, inferred from the first Message timestamp. Initial
 silence is trimmed; inter-event timing is retained. Empty captures send no events.
 Existing checked replay rejects gaps and discontinuities rather than silently
-skipping them. Explicit origin/mapping options remain on the connection method.
+skipping them. Explicit origin/mapping, cancellation, rounding and metrics options are available
+on Python play() and the Rust Output::with_playback builder.
 
 Input and Output destructors close an active convenience context and dispose an
 isolated worker when Python finalizes the client. Native callback references are
 visible to cyclic GC, and worker delivery references are weak, so internal
 ownership cycles do not prevent collection after application references are
-released. A live connection intentionally retains its client. Python finalization
-is not guaranteed.
-The record/play convenience methods use deterministic context cleanup, not GC.
+released. Private connection state retains transport resources, not the public
+owner. Python finalization is not guaranteed. record() closes deterministically;
+keep an Output in a context when deterministic playback cleanup is required.
 
 
 ### Message timing and source metadata

@@ -128,3 +128,7 @@ impl Timing {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "inspection_timing_tests.rs"]
+mod tests;

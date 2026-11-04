@@ -190,7 +190,7 @@ pub struct Report {
     pub cancelled: bool,
     pub max_lateness_ns: u64,
     pub rounded_events: u64,
-    pub lateness: Option<Box<crate::metrics::Histogram>>,
+    pub lateness: Option<Box<crate::metrics::Distribution>>,
 }
 #[derive(Debug)]
 pub enum Cause<E> {
@@ -231,8 +231,9 @@ pub fn play<E>(
     mut send: impl FnMut(&Payload) -> Result<(), E>,
     collect_metrics: bool,
 ) -> Result<Report, Failure<E>> {
+    let mut histogram = collect_metrics.then(crate::metrics::Histogram::default);
     let mut report = Report {
-        lateness: collect_metrics.then(|| Box::new(crate::metrics::Histogram::default())),
+        lateness: histogram.as_ref().map(|h| Box::new(h.snapshot())),
         ..Report::default()
     };
     loop {
@@ -272,11 +273,12 @@ pub fn play<E>(
             cause: Cause::Input(invalid(0, "playback event count exhausted")),
         })?;
         report.max_lateness_ns = report.max_lateness_ns.max(lateness);
-        if let Some(histogram) = &mut report.lateness {
+        if let Some(histogram) = &mut histogram {
             histogram.observe(lateness).map_err(|e| Failure {
                 report: report.clone(),
                 cause: Cause::Input(e),
             })?;
+            report.lateness = Some(Box::new(histogram.snapshot()));
         }
         report.rounded_events += u64::from(planned.rounding_error_ns.numerator() != 0);
     }

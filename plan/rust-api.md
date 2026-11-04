@@ -1,5 +1,9 @@
 # Rust API alignment
 
+This records the earlier constructor and sequencing migration. The later
+[interface parity plan](interface-parity.md) supersedes public module paths and
+client/connection details; current examples are in [the Rust guide](../doc/rust-examples.md).
+
 Goal: bring the Rust-facing API into line with the simplified Python API and the
 agreed concepts. This is an API migration, not an additional legacy-compatible
 constructor family. The existing low-level transport remains the backend.

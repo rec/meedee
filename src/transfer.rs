@@ -274,9 +274,9 @@ impl Capture {
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         let item = if let Ok(e) = crate::event_values::extract(&item) {
-            meedee::live::Item::Message(Box::new(e))
+            meedee::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            meedee::live::Item::Diagnostic(d.value.clone())
+            meedee::events::InputItem::Diagnostic(d.value.clone())
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
                 "expected Message or StreamDiagnostic",

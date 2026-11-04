@@ -178,7 +178,7 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         .getattr("modules")?
         .set_item("meedee._native", native)?;
     let clients = PyModule::import(py, "meedee._clients")?;
-    for name in ["Input", "Output", "InputConnection", "OutputConnection"] {
+    for name in ["Input", "Output"] {
         let class = clients.getattr(name)?;
         class.setattr("__module__", "meedee.midi")?;
         module.add(name, class)?;

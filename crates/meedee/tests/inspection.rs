@@ -25,7 +25,7 @@ fn archive_completion_is_separate_from_capture_loss() {
                     .unwrap(),
             )))
             .with_metadata(meedee::messages::Metadata {
-                source: Some("keys".into()),
+                stream: Some("keys".into()),
                 timestamp: Some(Timestamp {
                     ticks: -3,
                     clock: clock.clone(),
@@ -60,16 +60,16 @@ fn archive_completion_is_separate_from_capture_loss() {
         128,
     )
     .unwrap();
-    assert!(r.complete);
-    assert!(r.problem.is_none());
-    assert_eq!(r.records, 6);
-    assert_eq!(r.message_counts["NoteOn"], 1);
-    assert_eq!(r.clocks, [clock]);
-    assert_eq!(r.streams.len(), 1);
-    assert_eq!(r.gap_records, 2);
-    assert_eq!(r.lost_events, u128::from(u64::MAX) + 1);
-    assert_eq!(r.discontinuities, 1);
-    assert_eq!(r.untimed_events, 0);
+    assert!(r.complete());
+    assert!(r.problem().is_none());
+    assert_eq!(r.records(), 6);
+    assert_eq!(r.message_counts()["NoteOn"], 1);
+    assert_eq!(r.clocks(), &[clock]);
+    assert_eq!(r.streams().len(), 1);
+    assert_eq!(r.gap_records(), 2);
+    assert_eq!(r.lost_events(), u128::from(u64::MAX) + 1);
+    assert_eq!(r.discontinuities(), 1);
+    assert_eq!(r.untimed_events(), 0);
     // A valid prefix cannot establish a complete file, even after all events.
     data.truncate(data.len() - 1);
     let r = inspect(
@@ -80,23 +80,23 @@ fn archive_completion_is_separate_from_capture_loss() {
         128,
     )
     .unwrap();
-    assert!(!r.complete);
-    assert!(r.problem.unwrap().contains("truncated"));
-    assert_eq!(r.records, 6);
+    assert!(!r.complete());
+    assert!(r.problem().as_ref().unwrap().contains("truncated"));
+    assert_eq!(r.records(), 6);
 }
 
 #[test]
 fn malformed_input_returns_only_verified_prefix_counts() {
     let r = inspect(&b"\xf0\x7d\xf7\xf0\x01"[..], Format::Syx, 10, false, 128).unwrap();
-    assert!(!r.complete);
-    assert_eq!(r.records, 1);
-    assert_eq!(r.message_counts["SysEx"], 1);
-    assert!(r.problem.unwrap().contains("byte 5"));
+    assert!(!r.complete());
+    assert_eq!(r.records(), 1);
+    assert_eq!(r.message_counts()["SysEx"], 1);
+    assert!(r.problem().as_ref().unwrap().contains("byte 5"));
     let r = inspect(&b"invalid"[..], Format::Smf, 10, false, 128).unwrap();
-    assert!(!r.complete);
-    assert!(r.smf_header.is_none());
-    assert_eq!(r.records, 0);
-    assert!(r.problem.unwrap().contains("MThd"));
+    assert!(!r.complete());
+    assert!(r.smf_header().is_none());
+    assert_eq!(r.records(), 0);
+    assert!(r.problem().as_ref().unwrap().contains("MThd"));
 }
 
 #[test]

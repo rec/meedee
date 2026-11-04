@@ -1,6 +1,8 @@
 //! MIDI Tuning Standard (CA-020/CA-021/RP-020, RP-025/amd1).
 //! No transport, clocks, sleeping, or instrument operations occur here.
+pub use crate::event_views::Tuning as EventDecoder;
 use crate::messages::{PrimitiveMessage, SysEx, ValueError};
+pub use crate::tuning_query::{Query, QueryReport};
 
 const STEPS: f64 = 16384.0;
 const MAX_PITCH: u32 = 2_097_150; // 7F 7F 7F is not a frequency.

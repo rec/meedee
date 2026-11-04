@@ -1,4 +1,4 @@
-use meedee::{codecs, gm, messages::*, mpe, timecode, velocity};
+use meedee::{codecs, controls as velocity, gm, messages::*, mpe, timecode};
 
 #[test]
 fn extended_sysex_limits_unknown_ids_and_byte_order_are_preserved() {

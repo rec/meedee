@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 def run(
     query: tuning.Query,
-    receiver: midi.InputConnection,
-    output: midi.OutputConnection,
+    receiver: midi.Input,
+    output: midi.Output,
     *,
     cancel: events.Cancellation | None = None,
 ) -> tuning.QueryReport:
@@ -40,7 +40,7 @@ def run(
             now = monotonic_ns()
             if query.snapshot().status == "ready":
                 request = query.prepare(now)
-                output.send(request)
+                output(request)
                 query.confirm(monotonic_ns())
                 continue
             query.poll(now)

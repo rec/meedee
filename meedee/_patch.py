@@ -13,13 +13,13 @@ def run_patch(config: Patch) -> int:
     protocol = midi.Protocol.Midi1 if config.protocol == "midi1" else midi.Protocol.Ump
     backend = None if config.backend is None else getattr(midi.Backend, config.backend)
     router: routing.Router | None = None
-    connection: midi.InputConnection | None = None
+    connection: midi.Input | None = None
     interrupted = False
     failure: str | None = None
     data: dict[str, object]
     try:
         with ExitStack() as stack:
-            outputs: dict[str, midi.OutputConnection] = {}
+            outputs: dict[str, midi.Output] = {}
             for name in config.destinations:
                 client = midi.Output(
                     protocol=protocol, backend=backend, isolated=config.isolated
@@ -89,8 +89,8 @@ def run_patch(config: Patch) -> int:
 
 
 def forward(
-    connection: midi.InputConnection,
-    outputs: dict[str, midi.OutputConnection],
+    connection: midi.Input,
+    outputs: dict[str, midi.Output],
     router: routing.Router,
     duration: float | None,
 ) -> None:
@@ -122,7 +122,7 @@ def forward(
             if (error := connection.failure) is not None:
                 raise error
             try:
-                outputs[delivery.destination].send(delivery.message)
+                outputs[delivery.destination](delivery.message)
                 router.confirm(delivery.id)
             except KeyboardInterrupt:
                 if (pending := router.peek()) is not None and pending.id == delivery.id:

@@ -222,7 +222,7 @@ impl Router {
         }
     }
     fn admit(&mut self, event: &events::Payload) -> io::Result<()> {
-        if event.source().is_none() {
+        if event.stream().is_none() {
             return Err(invalid("routing requires a source identity"));
         }
         self.report.received = self
@@ -235,7 +235,7 @@ impl Router {
             .routes
             .iter()
             .enumerate()
-            .filter(|(_, r)| r.source == event.source().unwrap_or_default())
+            .filter(|(_, r)| r.source == event.stream().unwrap_or_default())
         {
             let info = classify(event)?;
             if info.protocol != r.protocol
@@ -483,4 +483,36 @@ fn wire_bytes(payload: &events::Payload) -> io::Result<usize> {
 }
 fn invalid(reason: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, reason)
+}
+
+#[derive(Clone, Debug)]
+pub struct PreviewOptions {
+    pub event_limit: usize,
+    pub byte_limit: usize,
+    pub payload_limit: usize,
+    pub detail_limit: usize,
+}
+impl Default for PreviewOptions {
+    fn default() -> Self {
+        Self {
+            event_limit: 128,
+            byte_limit: 8_388_608,
+            payload_limit: 1_048_576,
+            detail_limit: 128,
+        }
+    }
+}
+pub fn preview_file(
+    path: impl AsRef<std::path::Path>,
+    routes: Vec<Route>,
+    options: &PreviewOptions,
+) -> io::Result<Preview> {
+    preview(
+        std::fs::File::open(path)?,
+        routes,
+        options.event_limit,
+        options.byte_limit,
+        options.payload_limit,
+        options.detail_limit,
+    )
 }

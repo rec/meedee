@@ -1,4 +1,5 @@
 //! MTC wire values, SMPTE labels and caller-driven quarter-frame sequence lock.
+pub use crate::event_views::Timecode as EventAssembler;
 use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]

@@ -275,7 +275,7 @@ fn map_record(r: &mut archive::Record, o: &Options) -> io::Result<()> {
         }
         archive::Record::Event(e) => {
             let mut metadata = e.metadata().cloned().unwrap_or_default();
-            if let Some(source) = &mut metadata.source {
+            if let Some(source) = &mut metadata.stream {
                 map_id(source, &o.sources);
             }
             map_time(&mut metadata.timestamp, o)?;
@@ -303,7 +303,7 @@ fn map_record(r: &mut archive::Record, o: &Options) -> io::Result<()> {
 fn archive_equal(a: &archive::Record, b: &archive::Record, o: &Options) -> bool {
     match (a, b) {
         (archive::Record::Event(a), archive::Record::Event(b)) => {
-            a.source().unwrap_or_default() == b.source().unwrap_or_default()
+            a.stream().unwrap_or_default() == b.stream().unwrap_or_default()
                 && a == b
                 && time_equal(a.timestamp(), b.timestamp(), o)
                 && match (&a.span(), &b.span()) {

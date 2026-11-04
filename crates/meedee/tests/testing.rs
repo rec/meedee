@@ -1,7 +1,7 @@
 use meedee::messages::Message;
 use meedee::{
     events::Clock,
-    live::Item,
+    events::InputItem as Item,
     testing::{Input, ManualClock, Output},
     transport::{Error, Packet, Protocol},
 };

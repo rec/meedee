@@ -60,3 +60,12 @@ pub fn write(writer: &mut impl Write, message: &SysEx, limit: usize) -> io::Resu
     writer.write_all(message.data())?;
     writer.write_all(&[247])
 }
+
+impl Reader<std::io::BufReader<std::fs::File>> {
+    pub fn open(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Self::new(
+            std::io::BufReader::new(std::fs::File::open(path)?),
+            1_048_576,
+        )
+    }
+}

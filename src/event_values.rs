@@ -18,10 +18,10 @@ frozen!(Timestamp;ticks,clock;{
 #[pyclass(frozen, skip_from_py_object, module = "meedee.events")]
 #[derive(Clone)]
 pub struct SourceSpan {
-    pub value: model::Span,
+    pub value: model::SourceSpan,
 }
 frozen!(SourceSpan;first_packet,last_packet,first_timestamp,last_timestamp;{
-#[new]#[pyo3(signature=(*,first_packet,last_packet,first_timestamp=None,last_timestamp=None))]fn new(first_packet:&Bound<'_,PyAny>,last_packet:&Bound<'_,PyAny>,first_timestamp:Option<PyRef<'_,Timestamp>>,last_timestamp:Option<PyRef<'_,Timestamp>>)->PyResult<Self>{let value=model::Span{first_packet:uint(first_packet)?,last_packet:uint(last_packet)?,first_timestamp:first_timestamp.map(|v|v.value.clone()),last_timestamp:last_timestamp.map(|v|v.value.clone())};if value.first_packet>value.last_packet{return Err(PyValueError::new_err("reversed packet span"));}
+#[new]#[pyo3(signature=(*,first_packet,last_packet,first_timestamp=None,last_timestamp=None))]fn new(first_packet:&Bound<'_,PyAny>,last_packet:&Bound<'_,PyAny>,first_timestamp:Option<PyRef<'_,Timestamp>>,last_timestamp:Option<PyRef<'_,Timestamp>>)->PyResult<Self>{let value=model::SourceSpan{first_packet:uint(first_packet)?,last_packet:uint(last_packet)?,first_timestamp:first_timestamp.map(|v|v.value.clone()),last_timestamp:last_timestamp.map(|v|v.value.clone())};if value.first_packet>value.last_packet{return Err(PyValueError::new_err("reversed packet span"));}
 if let(Some(a),Some(b))=(&value.first_timestamp,&value.last_timestamp){if a.clock!=b.clock{return Err(PyValueError::new_err("a span cannot combine clock generations"));}}Ok(Self{value})}
 #[getter]fn first_packet(&self)->u64{self.value.first_packet}#[getter]fn last_packet(&self)->u64{self.value.last_packet}#[getter]fn first_timestamp(&self)->Option<Timestamp>{self.value.first_timestamp.clone().map(|value|Timestamp{value})}#[getter]fn last_timestamp(&self)->Option<Timestamp>{self.value.last_timestamp.clone().map(|value|Timestamp{value})}
 });
@@ -31,7 +31,7 @@ pub fn extract(object: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
         .metadata();
     let value = payload(object)?
         .with_metadata(meedee::messages::Metadata {
-            source: metadata.stream,
+            stream: metadata.stream,
             timestamp: metadata.timestamp,
             span: metadata.span,
         })
@@ -77,7 +77,7 @@ pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
         .extract::<PyRef<'_, crate::messages::Message>>()?
         .attach(crate::messages::Metadata {
             timestamp: metadata.timestamp,
-            stream: metadata.source,
+            stream: metadata.stream,
             span: metadata.span,
         })?;
     Ok(object)

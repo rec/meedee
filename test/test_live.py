@@ -205,6 +205,7 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
         closed = False
         worker_failure = None
         dropped_packets = 0
+        last_message_time = None
         clock = capture_clock
 
         def close(self) -> None:
@@ -260,6 +261,7 @@ def test_unified_input_delivers_decoded_messages_or_unchanged_packets(
         closed = False
         worker_failure = None
         dropped_packets = 0
+        last_message_time = None
         clock = capture_clock
 
         def close(self) -> None:
@@ -312,9 +314,13 @@ def test_raw_receive_queue_is_bounded_and_drains_before_reporting_overflow(
 ) -> None:
     callbacks: list[Callable[[events.ReceivedPacket], object]] = []
 
+    capture_clock = clock()
+
     class Connection:
+        clock = capture_clock
         closed = False
         dropped_packets = 0
+        last_message_time = None
         worker_failure = None
 
         def close(self) -> None:
@@ -360,6 +366,7 @@ def iterable_input(
         closed = False
         worker_failure = None
         dropped_packets = 0
+        last_message_time = None
         clock = capture_clock
 
         def close(self) -> None:
@@ -393,10 +400,9 @@ def test_direct_input_iteration_opens_first_port_and_closes_on_generator_close(
     iterator = client.with_errors()
     assert next(iterator) == messages.NoteOn(60, 100, 1)
     iterator.close()
-    # A second context can open after the iterator releases its connection.
-    with client as receiver:
-        assert next(iter(receiver)) == messages.NoteOn(60, 100, 1)
-    assert receiver.closed
+    assert client.closed
+    with pytest.raises(midi.StateError, match="closed"):
+        client.__enter__()
 
 
 @pytest.mark.parametrize("channels", [1, [1, 3], (1, 3), {1, 3}, []])
@@ -421,7 +427,11 @@ def test_input_channel_selection_filters_messages_but_keeps_diagnostics(
         )
         == 1
     )
-    assert all(isinstance(i, (messages.NoteOn, events.StreamDiagnostic)) for i in items)
+    assert any(isinstance(i, messages.TimingClock) for i in items)
+    assert all(
+        isinstance(i, (messages.NoteOn, messages.TimingClock, events.StreamDiagnostic))
+        for i in items
+    )
 
 
 @pytest.mark.parametrize("include_errors", [False, True])
@@ -474,11 +484,13 @@ def test_channel_selection_applies_to_callbacks_and_recordings(
     assert [i for i in observed if isinstance(i, messages.Message)] == [
         messages.NoteOn(60, 100, 1),
         messages.NoteOn(62, 100, 1),
+        messages.TimingClock(),
     ]
     reader = archive.Reader(path)
     try:
         assert [i for i in reader if isinstance(i, messages.Message)] == [
-            messages.NoteOn(62, 100, 1)
+            messages.NoteOn(62, 100, 1),
+            messages.TimingClock(),
         ]
     finally:
         reader.close()
@@ -495,9 +507,9 @@ def test_record_returns_memory_capture_and_file_round_trip(
     ]
     original = path.read_bytes()
     with pytest.raises(FileExistsError):
-        client.record(0, output=path)
+        midi.Input().record(0, output=path)
     assert path.read_bytes() == original
-    client.record("0 seconds", output=path, overwrite=True)
+    midi.Input().record("0 seconds", output=path, overwrite=True)
     reader = archive.Reader(path)
     try:
         assert [r for r in reader if isinstance(r, messages.Message)] == [
@@ -523,8 +535,7 @@ def test_input_is_automatically_collected_after_scope_exit(
         return weakref.ref(client)
 
     reference = open_input()
-    # The test fixture stores callbacks externally; a real transport owns them.
-    iterable_input.clear()
+    # Even externally retained transport callbacks must not keep the owner alive.
     gc.collect()
     assert reference() is None
 
@@ -549,12 +560,49 @@ def test_record_uses_duration_deadline_and_retains_terminal_failure(
     records = midi.Input(isolated=False).record(10)
     assert len([r for r in records if isinstance(r, messages.Message)]) == 1
 
-    def failed_receive(self: midi.InputConnection, *, timeout: float) -> None:
+    def failed_receive(self: midi.Input, *, timeout: float) -> None:
         raise midi.ResourceError("capture overflow")
 
     ticks = iter([100.0, 100.0])
-    monkeypatch.setattr(midi.InputConnection, "receive", failed_receive)
+    monkeypatch.setattr(midi.Input, "receive", failed_receive)
     records = midi.Input(isolated=False).record(10)
     failures = [r for r in records if isinstance(r, archive.Discontinuity)]
     assert len(failures) == 1
     assert failures[0].reason == "capture overflow"
+
+
+@pytest.mark.parametrize("pattern", ["Key", "Key*"])
+def test_input_pattern_connects_same_resource_and_close_is_terminal(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]], pattern: str
+) -> None:
+    client = midi.Input(port=pattern)
+    with client as receiver:
+        assert receiver is client
+        assert receiver.receive(timeout=0) == messages.NoteOn(60, 100, 1)
+    with pytest.raises(midi.StateError, match="closed"):
+        client.__enter__()
+
+
+def test_closed_input_releases_native_handles_but_retains_final_diagnostics(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    native_type = _native.Input
+    original_connect = native_type.connect
+    handles: list[weakref.ReferenceType[object]] = []
+
+    def connect(client: _native.Input, *args: object) -> object:
+        connection = original_connect(client, *args)
+        handles.extend([weakref.ref(client), weakref.ref(connection)])
+        return connection
+
+    monkeypatch.setattr(native_type, "connect", connect)
+    client = midi.Input()
+    client.__enter__()
+    captured_clock = client.clock
+    client.close()
+    gc.collect()
+    assert all(h() is None for h in handles)
+    assert client.clock == captured_clock
+    assert client.dropped_packets == 0
+    assert client.closed

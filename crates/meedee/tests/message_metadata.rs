@@ -1,4 +1,4 @@
-use meedee::events::{Clock, Span, Timestamp};
+use meedee::events::{Clock, SourceSpan, Timestamp};
 use meedee::messages::{
     AnyCommand, AnyMessage, Command, Message, Metadata, NoteOn, PrimitiveMessage,
 };
@@ -15,8 +15,8 @@ fn timestamp() -> Timestamp {
 fn metadata() -> Metadata {
     Metadata {
         timestamp: Some(timestamp()),
-        source: Some("keyboard".into()),
-        span: Some(Span {
+        stream: Some("keyboard".into()),
+        span: Some(SourceSpan {
             first_packet: 1,
             last_packet: 3,
             first_timestamp: Some(timestamp()),
@@ -47,11 +47,11 @@ fn provenance_survives_note_builders_and_clamped_transposition() {
     assert_eq!(note.metadata(), Some(&metadata()));
     assert_eq!(note.encode().unwrap(), [0x91, 127, 70]);
     assert_eq!(note.clone().without_channel().metadata(), note.metadata());
-    let changed = note.clone().with_source("second").unwrap();
+    let changed = note.clone().with_stream("second").unwrap();
     assert_eq!(changed.timestamp(), note.timestamp());
     assert_eq!(changed.span(), note.span());
-    assert_eq!(changed.source(), Some("second"));
-    assert_eq!(note.source(), Some("keyboard"));
+    assert_eq!(changed.stream(), Some("second"));
+    assert_eq!(note.stream(), Some("keyboard"));
     check_value(note.without_metadata());
 }
 
@@ -119,7 +119,7 @@ fn expanded_commands_retain_the_original_provenance() {
 #[test]
 fn metadata_rejects_inconsistent_clocks_spans_and_empty_sources() {
     let note = NoteOn::new(60).unwrap();
-    assert!(note.clone().with_source("").is_err());
+    assert!(note.clone().with_stream("").is_err());
     let mut reversed = metadata();
     reversed.span.as_mut().unwrap().last_packet = 0;
     assert!(note.clone().with_metadata(reversed).is_err());

@@ -11,7 +11,7 @@ use std::sync::{
 use std::thread;
 use std::time::{Duration, Instant};
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Report {
+pub struct RecordingReport {
     pub complete: bool,
     pub records: u64,
     pub gap_records: u64,
@@ -24,7 +24,7 @@ struct Admission {
     stopping: bool,
     finalizing: bool,
     failure: Option<String>,
-    result: Option<Report>,
+    result: Option<RecordingReport>,
     pressure: Option<crate::metrics::Pressure>,
 }
 struct Shared {
@@ -116,7 +116,7 @@ impl Recorder {
                 if let Err(e) = result {
                     s.failure.get_or_insert_with(|| e.to_string());
                 }
-                s.result = Some(Report {
+                s.result = Some(RecordingReport {
                     complete: s.failure.is_none(),
                     records: count,
                     gap_records: gaps,
@@ -221,7 +221,7 @@ impl Recorder {
             .pressure
             .clone()
     }
-    pub fn stop(&self, timeout: Duration) -> io::Result<Report> {
+    pub fn stop(&self, timeout: Duration) -> io::Result<RecordingReport> {
         let deadline = Instant::now()
             .checked_add(timeout)
             .ok_or_else(|| invalid(0, "timeout overflow"))?;

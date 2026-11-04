@@ -1,4 +1,9 @@
 > Historical transport design: the current Python output API, channel
+
+Current public API: see [interface parity](interface-parity.md). Earlier lifecycle
+entries below describe the low-level transport migration; they do not imply
+reusable public Python clients. Public Input/Output closure is now terminal.
+
 > inheritance and context cleanup supersede the original `send()` interface below.
 > Input now defaults to decoded events; use `raw=True` for the raw callbacks
 > described below. See [the API contract](api.md#unified-python-input).

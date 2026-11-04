@@ -18,7 +18,7 @@ from meedee import (
 )
 
 
-def connect(name: str, isolated: bool) -> midi.OutputConnection:
+def connect(name: str, isolated: bool) -> midi.Output:
     client = midi.Output(isolated=isolated)
     matches = [p for p in client.ports() if p.name == name]
     assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
@@ -26,8 +26,8 @@ def connect(name: str, isolated: bool) -> midi.OutputConnection:
 
 
 def respond(
-    receiver: midi.InputConnection,
-    output: midi.OutputConnection,
+    receiver: midi.Input,
+    output: midi.Output,
     request: tuning.BulkDumpRequest | tuning.BankedDumpRequest,
     reply: messages.SysEx,
 ) -> None:
@@ -35,9 +35,9 @@ def respond(
     assert isinstance(received, messages.Message), received
     assert codecs.encode(received) == codecs.encode(request)
     # Keep nonmatching traffic observable without pretending it is a reply.
-    output.send(messages.TimingClock())
-    output.send(messages.SysEx(data=b"\x7d\x01"))
-    output.send(reply)
+    output(messages.TimingClock())
+    output(messages.SysEx(data=b"\x7d\x01"))
+    output(reply)
     assert receiver.dropped_packets == 0 and receiver.failure is None
 
 

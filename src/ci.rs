@@ -2,7 +2,7 @@
 use crate::files::{bytes, frozen, limit, uint};
 use crate::messages::{integer, Message};
 use meedee::messages::PrimitiveMessage;
-use meedee::{ci as model, ci_session as session};
+use meedee::{ci as model, ci as session};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
@@ -527,7 +527,7 @@ fn error(e: meedee::messages::ValueError) -> PyErr {
 
 #[pyclass(module = "meedee.ci")]
 struct Browser {
-    value: meedee::ci_browser::Browser,
+    value: meedee::ci::Browser,
 }
 #[pymethods]
 impl Browser {
@@ -568,7 +568,7 @@ impl Browser {
         )
         .map_err(error)?;
         Ok(Self {
-            value: meedee::ci_browser::Browser::new(
+            value: meedee::ci::Browser::new(
                 session,
                 discovery_timeout,
                 endpoint_timeout,
@@ -650,7 +650,7 @@ impl Browser {
 }
 #[pyclass(frozen, module = "meedee.ci")]
 struct BrowseReport {
-    value: meedee::ci_browser::Report,
+    value: meedee::ci::BrowseReport,
 }
 #[pymethods]
 impl BrowseReport {
@@ -707,7 +707,7 @@ impl BrowseReport {
 }
 #[pyclass(frozen, module = "meedee.ci")]
 struct BrowseDiagnostic {
-    value: meedee::ci_browser::Diagnostic,
+    value: meedee::ci::BrowseDiagnostic,
 }
 #[pymethods]
 impl BrowseDiagnostic {

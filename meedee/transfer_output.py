@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from time import monotonic_ns, sleep
+from time import monotonic_ns
 from typing import TYPE_CHECKING
 
-from . import transfer
+from . import events, transfer
 
 if TYPE_CHECKING:
-    from . import events, midi
+    from . import midi
 
 
 def run(
     session: transfer.Session,
-    output: midi.OutputConnection,
+    output: midi.Output,
     *,
     cancel: events.Cancellation | None = None,
 ) -> transfer.Report:
@@ -25,6 +25,14 @@ def run(
     """
     from . import midi
 
+    initial = session.snapshot()
+    if (
+        initial.status != "active"
+        or initial.confirmed_messages
+        or initial.in_flight is not None
+    ):
+        raise ValueError("transfer session must be fresh")
+    cancel = events.Cancellation() if cancel is None else cancel
     try:
         while session.snapshot().status == "active":
             if cancel is not None and cancel.cancelled:
@@ -35,10 +43,10 @@ def run(
             if step is None:
                 deadline = session.snapshot().next_ready_ns
                 assert deadline is not None
-                sleep(min(0.05, max(0, deadline - now) / 1_000_000_000))
+                cancel.wait_for(min(0.05, max(0, deadline - now) / 1_000_000_000))
                 continue
             try:
-                output.send(step.message)
+                output(step.message)
             except (
                 midi.MidiError,
                 midi.StateError,

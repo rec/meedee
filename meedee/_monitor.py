@@ -163,7 +163,7 @@ def run_monitor(config: Monitor) -> int:
         return 2
 
 
-def watch(connection: midi.InputConnection, config: Monitor) -> int:
+def watch(connection: midi.Input, config: Monitor) -> int:
     session = Session(config, connection.stream, connection.clock)
     start = monotonic()
     interrupted = False

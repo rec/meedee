@@ -2,23 +2,23 @@
 use crate::event_values::{to_python, Rational, Timestamp};
 use crate::files::{frozen, os_error};
 use crate::packets::Clock;
-use meedee::playback as model;
+use meedee::events as model;
 use pyo3::exceptions::{PyException, PyStopIteration, PyTypeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 pyo3::create_exception!(_core, PlaybackError, PyException);
 #[pyclass(frozen, module = "meedee.events")]
 pub(crate) struct ClockMapping {
-    pub(crate) value: model::Mapping,
+    pub(crate) value: model::ClockMapping,
 }
 frozen!(ClockMapping;source,target,rate,offset,uncertainty;{
-#[new]#[pyo3(signature=(*,source,target,rate=None,offset=None,uncertainty=None))]fn new(source:PyRef<'_,Clock>,target:PyRef<'_,Clock>,rate:Option<PyRef<'_,Rational>>,offset:Option<PyRef<'_,Rational>>,uncertainty:Option<PyRef<'_,Rational>>)->PyResult<Self>{Ok(Self{value:model::Mapping::new(source.value.clone(),target.value.clone(),rate.map_or(meedee::events::Rational::new(1,1).expect("constant"),|v|v.value),offset.map_or(meedee::events::Rational::new(0,1).expect("constant"),|v|v.value),uncertainty.map(|v|v.value)).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
+#[new]#[pyo3(signature=(*,source,target,rate=None,offset=None,uncertainty=None))]fn new(source:PyRef<'_,Clock>,target:PyRef<'_,Clock>,rate:Option<PyRef<'_,Rational>>,offset:Option<PyRef<'_,Rational>>,uncertainty:Option<PyRef<'_,Rational>>)->PyResult<Self>{Ok(Self{value:model::ClockMapping::new(source.value.clone(),target.value.clone(),rate.map_or(meedee::events::Rational::new(1,1).expect("constant"),|v|v.value),offset.map_or(meedee::events::Rational::new(0,1).expect("constant"),|v|v.value),uncertainty.map(|v|v.value)).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
 #[getter]fn source(&self)->Clock{Clock{value:self.value.source.clone()}}#[getter]fn target(&self)->Clock{Clock{value:self.value.target.clone()}}#[getter]fn rate(&self)->Rational{Rational{value:self.value.rate}}#[getter]fn offset(&self)->Rational{Rational{value:self.value.offset}}#[getter]fn uncertainty(&self)->Option<Rational>{self.value.uncertainty.map(|value|Rational{value})}
 fn map_time(&self,timestamp:PyRef<'_,Timestamp>)->PyResult<Rational>{Ok(Rational{value:self.value.map(&timestamp.value).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
 });
 #[pyclass(frozen, module = "meedee.events")]
 struct PlannedEvent {
-    value: model::Planned,
+    value: model::PlannedEvent,
 }
 #[pymethods]
 impl PlannedEvent {
@@ -35,7 +35,7 @@ impl PlannedEvent {
 }
 #[pyclass(module = "meedee.events")]
 struct PlaybackPlan {
-    value: model::Planner,
+    value: model::PlaybackPlan,
 }
 #[pymethods]
 impl PlaybackPlan {
@@ -47,7 +47,7 @@ impl PlaybackPlan {
         #[pyo3(from_py_with=crate::ump::boolean)] allow_rounding: bool,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: model::Planner::new(
+            value: model::PlaybackPlan::new(
                 origin.value.clone(),
                 self::mappings(mappings)?,
                 allow_rounding,
@@ -77,6 +77,10 @@ impl Cancellation {
             value: model::Cancellation::default(),
         }
     }
+    fn wait_for(&self, py: Python<'_>, duration: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let duration = std::time::Duration::from_nanos(crate::units::duration(duration)?);
+        Ok(py.detach(|| self.value.wait_for(duration)))
+    }
     fn cancel(&self) {
         self.value.cancel();
     }
@@ -87,7 +91,7 @@ impl Cancellation {
 }
 #[pyclass(frozen, module = "meedee.events")]
 struct PlaybackReport {
-    value: model::Report,
+    value: model::PlaybackReport,
 }
 #[pymethods]
 impl PlaybackReport {
@@ -116,7 +120,7 @@ impl PlaybackReport {
         self.value.rounded_events
     }
 }
-fn mappings(values: Option<&Bound<'_, PyAny>>) -> PyResult<Vec<model::Mapping>> {
+fn mappings(values: Option<&Bound<'_, PyAny>>) -> PyResult<Vec<model::ClockMapping>> {
     let mut out = vec![];
     if let Some(values) = values {
         for v in values.try_iter()? {
@@ -163,7 +167,7 @@ fn play(
     #[pyo3(from_py_with=crate::ump::boolean)] metrics: bool,
 ) -> PyResult<PlaybackReport> {
     crate::callback::check_thread()?;
-    let planner = model::Planner::new(
+    let planner = model::PlaybackPlan::new(
         origin.value.clone(),
         self::mappings(mappings)?,
         allow_rounding,
@@ -211,8 +215,8 @@ fn play(
                 )?,
             )?;
             let cause = match failure.cause {
-                model::Cause::Input(e) => os_error(e),
-                model::Cause::Send(e) => e,
+                model::PlaybackCause::Input(e) => os_error(e),
+                model::PlaybackCause::Send(e) => e,
             };
             err.set_cause(py, Some(cause));
             Err(err)

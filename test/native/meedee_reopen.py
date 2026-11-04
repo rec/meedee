@@ -8,9 +8,9 @@ from meedee import messages, midi, ump
 def main() -> None:
     for protocol in (midi.Protocol.Midi1, midi.Protocol.Ump):
         for isolated in (True, False):
-            source = midi.Input(protocol=protocol, isolated=isolated)
-            sender = midi.Output(protocol=protocol, isolated=isolated)
             for cycle in range(1, 4):
+                source = midi.Input(protocol=protocol, isolated=isolated)
+                sender = midi.Output(protocol=protocol, isolated=isolated)
                 name = f"meedee-reopen-{uuid4().hex}"
                 context = f"{protocol}, isolated={isolated}, cycle={cycle}, name={name}"
                 print(f"creating virtual input: {context}", flush=True)
@@ -30,7 +30,7 @@ def main() -> None:
                                 value=0xFEDCBA98,
                             )
                         )
-                        output.send(value)
+                        output(value)
                         received = receiver.receive(timeout=2)
                         assert isinstance(received, messages.Message), received
                         assert received == value

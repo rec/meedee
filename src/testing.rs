@@ -221,7 +221,7 @@ impl Output {
             protocol: parse_protocol(protocol)?,
         })
     }
-    fn send(&mut self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn __call__(&mut self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<()> {
         let packet = crate::live::prepare_output(py, self.protocol, value)?;
         if packet.bind(py).is_instance_of::<PyTuple>() {
             let command = crate::messages::extract_command(value)?;

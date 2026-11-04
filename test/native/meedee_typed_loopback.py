@@ -21,7 +21,7 @@ def exercise(isolated: bool, destination: Path) -> None:
                 messages.NoteOff(channel=1, note=60, velocity=0),
             ]
             for n in notes:
-                output.send(n)
+                output(n)
             received = [receiver.receive(timeout=3) for _ in notes]
             assert all(isinstance(e, messages.Message) for e in received), received
             assert [e for e in received if isinstance(e, messages.Message)] == notes

@@ -1,10 +1,12 @@
 use meedee::messages::Message;
 use meedee::{
     events::Payload,
-    live::{Diagnostic, DiagnosticKind, Item},
+    events::{
+        InputItem as Item, StreamDiagnostic as Diagnostic, StreamDiagnosticKind as DiagnosticKind,
+    },
     messages::SysEx,
+    tuning::Query,
     tuning::{BankedDumpRequest, BulkDumpRequest, ChecksumStatus},
-    tuning_query::Query,
 };
 
 fn dump(kind: &str) -> SysEx {
@@ -28,7 +30,7 @@ fn event(raw: SysEx) -> Item {
     Item::Message(Box::new(
         (Payload::Midi1(meedee::messages::AnyMessage::SysEx(raw)))
             .with_metadata(meedee::messages::Metadata {
-                source: Some("s".into()),
+                stream: Some("s".into()),
                 timestamp: None,
                 span: None,
             })

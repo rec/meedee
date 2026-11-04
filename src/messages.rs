@@ -19,7 +19,7 @@ pub(crate) struct Message {
 pub(crate) struct Metadata {
     pub timestamp: Option<meedee::events::Timestamp>,
     pub stream: Option<String>,
-    pub span: Option<meedee::events::Span>,
+    pub span: Option<meedee::events::SourceSpan>,
 }
 impl Message {
     pub(crate) fn metadata(&self) -> Metadata {

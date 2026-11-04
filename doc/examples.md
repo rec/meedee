@@ -12,9 +12,8 @@ Connect a suitable keyboard or synth before running them. MIDI carries messages,
 not audio; configure the synth's sound and audio output separately. Channels are
 1..16, notes and velocities are 0..127, and program numbers are 1..128.
 
-Outputs run in-process by default. Use `isolated=True` for worker failure
-containment; neither mode requires a main guard. Input clients still default to
-isolation. Native MIDI 1 output tracks notes and selected controls for cleanup
+Inputs and outputs run in-process by default. Use `isolated=True` for worker failure
+containment; neither mode requires a main guard. Native MIDI 1 output tracks notes and selected controls for cleanup
 when explicitly closed or when leaving its context.
 
 ## 1. Play one note
@@ -26,7 +25,7 @@ from meedee.messages import Note
 from meedee.midi import Output
 
 with Output() as out:
-    out.send(Note("500 ms", 60))
+    out(Note("500 ms", 60))
 ```
 
 `Note` sends both the attack and release. Velocity defaults to 90; the channel
@@ -41,7 +40,7 @@ from meedee.messages import Note, Rest
 from meedee.midi import Output
 
 with Output(bpm=120) as out:  # Numeric durations are beats.
-    out.send(
+    out(
         Note(duration=1, note=60, velocity=90),
         Note(0.5, 62, 70),
         Note(0.5, 64, 100),
@@ -55,7 +54,8 @@ Explicit time units keep their meaning at any tempo; explicit beats require
 `bpm`. The clock and scheduling are automatic, without explicit clocks or sleeps.
 
 `Output(port="FLOW 8")` selects a unique name substring; `*` and `?` support
-wildcard matching. Two-stage `client.connect(client.ports()[0])` also works.
+wildcard matching. Input supports the same selection. Two-stage `client.connect(client.ports()[0])`
+returns the same object. Closing is terminal; create a new object to reconnect.
 For overlapping attacks, use `NoteOn` with delays and explicit `NoteOff` releases;
 `Note` instead releases before the next item starts. Numeric delays follow the
 same tempo rule as notes and rests.
@@ -95,9 +95,9 @@ from meedee.midi import Input, Output
 with Input() as input, Output() as output:
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
-            output.send(m.transpose(12))
+            output(m.transpose(12))
         else:
-            output.send(m)
+            output(m)
 ```
 
 `transpose()` returns a new message and clamps the note to 0..127. To handle
@@ -112,9 +112,9 @@ from meedee.midi import Input, Output
 with Input() as input, Output() as output:
     for m in input.with_errors():
         if isinstance(m, (NoteOn, NoteOff)):
-            output.send(m.transpose(12))
+            output(m.transpose(12))
         elif isinstance(m, Message):
-            output.send(m)
+            output(m)
         else:
             print("ERROR", m, file=sys.stderr)
 ```
@@ -129,23 +129,25 @@ from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
 with Input(channel=1) as input, Output() as out:
-    out.send(ProgramChange(34, channel=2))
-    out.send(ProgramChange(81, channel=3))
+    out(ProgramChange(34, channel=2))
+    out(ProgramChange(81, channel=3))
 
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out.send(m.replace(channel=2))
+                out(m.replace(channel=2))
             else:
-                out.send(m.replace(channel=3))
+                out(m.replace(channel=3))
+        elif getattr(m, "channel", None) is not None:
+            out(m.replace(channel=2))
+            out(m.replace(channel=3))
         else:
-            out.send(m.replace(channel=2))
-            out.send(m.replace(channel=3))
+            out(m)
 ```
 
-`Input(channel=1)` accepts only channel-1 messages. A container such as
-`Input(channel=[1, 4])` selects several channels. Channel-less traffic is excluded;
-diagnostics are always retained. `replace()` returns a new message.
+`Input(channel=1)` selects channel-1 voice messages. A container such as
+`Input(channel=[1, 4])` selects several channels. System messages, including clock
+and SysEx, pass through and are forwarded once. Diagnostics are always retained. `replace()` returns a new message.
 
 Alternatively, give each output a channel. An explicitly configured output
 channel overrides the channel on every MIDI 1 channel message sent through it:
@@ -155,24 +157,26 @@ from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
 with Input() as input, Output(channel=2) as out2, Output(channel=3) as out3:
-    out2.send(ProgramChange(34))
-    out3.send(ProgramChange(81))
+    out2(ProgramChange(34))
+    out3(ProgramChange(81))
 
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out2.send(m)
+                out2(m)
             else:
-                out3.send(m)
+                out3(m)
+        elif getattr(m, "channel", None) is not None:
+            out2(m)
+            out3(m)
         else:
-            out2.send(m)
-            out3.send(m)
+            out2(m)
 ```
 
 Use `Output()` for multiple channels: it preserves assigned message channels
 and uses channel 1 for unassigned messages. `Output(channel=1)` explicitly forces
 channel 1. The override applies to MIDI 1 message objects, full notes and compound
-commands; encoded packets and timestamped `play()` retain their explicit addressing.
+commands, including messages sent by `play()`; encoded packets retain their addressing.
 
 ## 6. Record and replay a performance
 
@@ -200,8 +204,9 @@ Output().play(Reader(filename))
 `record()` returns messages with their timing and source information, together
 with archive declarations and any diagnostics. File output
 writes the same capture; existing files are protected unless `overwrite=True`.
-Playback preserves timing between messages and trims initial silence. Both calls
-close their connections automatically, and `play()` closes an archive reader.
+Playback preserves timing between messages and trims initial silence. `record()` closes its input; the temporary output is finalized after playback.
+For an output kept in a variable, use a context or explicit `close()`. `play()`
+closes an archive reader.
 
 ## 7. Transpose a MIDI file
 
@@ -301,7 +306,7 @@ with Path("just-three.syx").open("xb") as stream:
 ```
 
 After the instrument has loaded it, select the tuning with
-`output.send(controls.tuning_program(channel=1, program=2))`, importing `controls`
+`output(controls.tuning_program(channel=1, program=2))`, importing `controls`
 from `meedee`. Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
@@ -334,14 +339,14 @@ sequence = [
 ]
 client = midi.Output()
 with client.connect(client.ports()[0]) as output:
-    output.send(zone)
+    output(zone)
     for voice in [root, moving]:
-        output.send(
+        output(
             controls.pitch_bend_sensitivity(
                 channel=voice.channel, semitones=48, cents=0
             )
         )
-        output.send(messages.PitchBend(channel=voice.channel, value=0))
+        output(messages.PitchBend(channel=voice.channel, value=0))
     print(output.play(sequence, origin=origin))
 ```
 
@@ -363,12 +368,7 @@ from meedee import ci, ci_live, midi
 identity = ci.Identity(
     manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
 )
-inputs = midi.Input(isolated=False)
-outputs = midi.Output()
-with (
-    inputs.connect(inputs.ports()[0]) as receiver,
-    outputs.connect(outputs.ports()[0]) as output,
-):
+with midi.Input() as receiver, midi.Output() as output:
     browser = ci.Browser(
         local_muid=randbelow(ci.MAX_MUID + 1),
         identity=identity,

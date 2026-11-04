@@ -1,15 +1,15 @@
 use meedee::messages::Message;
 use meedee::{
-    event_views::{self, Value, View},
     events::{Clock, Payload, Timestamp},
-    live::{Diagnostic, DiagnosticKind},
+    events::{ObservationValue as Value, View},
+    events::{StreamDiagnostic as Diagnostic, StreamDiagnosticKind as DiagnosticKind},
     messages::{AnyMessage, ControlChange, NoteOn},
     ump,
 };
 fn event(message: AnyMessage, ticks: i64) -> Payload {
     (Payload::Midi1(message))
         .with_metadata(meedee::messages::Metadata {
-            source: Some("s".into()),
+            stream: Some("s".into()),
             timestamp: Some(Timestamp {
                 ticks,
                 clock: Clock::new("c".into(), 1, 1_000_000_000, "test".into(), None).unwrap(),
@@ -20,7 +20,7 @@ fn event(message: AnyMessage, ticks: i64) -> Payload {
 }
 #[test]
 fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
-    let mut view = event_views::Controls::new(None).unwrap();
+    let mut view = meedee::controls::EventInterpreter::new(None).unwrap();
     view.feed(
         &event(
             AnyMessage::ControlChange(
@@ -101,12 +101,12 @@ fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
         ),
         5000,
     );
-    wrong = wrong.with_source("another").unwrap();
+    wrong = wrong.with_stream("another").unwrap();
     assert!(view.feed(&wrong, None).is_err());
 }
 #[test]
 fn velocity_and_ump_assembly_keep_exact_event_ranges() {
-    let mut v = event_views::Velocity::new(None).unwrap();
+    let mut v = meedee::controls::EventVelocityInterpreter::new(None).unwrap();
     v.feed(
         &event(
             AnyMessage::ControlChange(
@@ -135,7 +135,7 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
         .unwrap();
     assert_eq!((out[0].first_index, out[0].last_index), (Some(0), Some(1)));
     assert!(matches!(&out[0].value,Value::Velocity(v)if v.velocity==16383));
-    let mut assembler = event_views::Ump::new(1024, 8192, 64).unwrap();
+    let mut assembler = meedee::ump::EventAssembler::new(1024, 8192, 64).unwrap();
     let packets = ump::packetize_sysex7(2, &[125, 1, 2, 3, 4, 5, 6, 7]).unwrap();
     let mut a = event(
         AnyMessage::NoteOn(

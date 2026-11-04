@@ -1,13 +1,13 @@
 use meedee::{
-    comparison::{compare, Options},
     inspection::Format,
+    inspection::{compare, ComparisonOptions},
 };
 
 #[test]
 fn streaming_comparison_counts_differences_and_never_equates_invalid_prefixes() {
-    let o = Options {
+    let o = ComparisonOptions {
         detail_limit: 1,
-        ..Options::default()
+        ..ComparisonOptions::default()
     };
     let r = compare(
         &b"\xf0\x01\xf7\xf0\x01\xf7"[..],
@@ -28,7 +28,7 @@ fn streaming_comparison_counts_differences_and_never_equates_invalid_prefixes() 
 #[test]
 fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores_it() {
     use meedee::archive::{Reader, Record, Writer};
-    use meedee::events::{Clock, Payload, Span, Timestamp};
+    use meedee::events::{Clock, Payload, SourceSpan, Timestamp};
     use meedee::messages::{AnyMessage, Message, Metadata, NoteOn};
     let clock = Clock::new("clock".into(), 1, 1000, "test".into(), None).unwrap();
     let first = Payload::Midi1(AnyMessage::NoteOn(
@@ -39,8 +39,8 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
             ticks: 1,
             clock: clock.clone(),
         }),
-        source: Some("keys".into()),
-        span: Some(Span {
+        stream: Some("keys".into()),
+        span: Some(SourceSpan {
             first_packet: 1,
             last_packet: 2,
             first_timestamp: None,
@@ -66,7 +66,7 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
             .unwrap();
         writer
             .write(&Record::Stream {
-                id: message.source().unwrap().into(),
+                id: message.stream().unwrap().into(),
                 label: "keys".into(),
                 clock_identity: Some("clock".into()),
             })
@@ -92,14 +92,14 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
             bytes.as_slice(),
             later_bytes.as_slice(),
             Format::Archive,
-            &Options::default()
+            &ComparisonOptions::default()
         )
         .unwrap()
         .equal
     );
-    let options = Options {
+    let options = ComparisonOptions {
         tick_tolerance: 1,
-        ..Options::default()
+        ..ComparisonOptions::default()
     };
     assert!(
         compare(
@@ -111,10 +111,10 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
         .unwrap()
         .equal
     );
-    let changed_source = capture(&first.clone().with_source("other").unwrap());
-    let options = Options {
+    let changed_source = capture(&first.clone().with_stream("other").unwrap());
+    let options = ComparisonOptions {
         sources: [("keys".into(), "other".into())].into(),
-        ..Options::default()
+        ..ComparisonOptions::default()
     };
     assert!(
         compare(
@@ -129,15 +129,15 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
     let changed_span = capture(
         &first
             .clone()
-            .with_span(Span {
+            .with_span(SourceSpan {
                 last_packet: 3,
                 ..first.span().unwrap().clone()
             })
             .unwrap(),
     );
-    let options = Options {
+    let options = ComparisonOptions {
         ignore_timestamps: true,
-        ..Options::default()
+        ..ComparisonOptions::default()
     };
     assert!(
         !compare(

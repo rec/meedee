@@ -1,8 +1,8 @@
 //! Shared Rust MIDI toolkit. No Python interpreter or PyO3 dependency.
 
 pub mod ci;
-pub mod ci_browser;
-pub mod ci_session;
+mod ci_browser;
+mod ci_session;
 pub mod codecs;
 pub mod controls;
 pub mod gm;
@@ -17,31 +17,36 @@ pub mod topology;
 pub mod transfer;
 pub mod transport;
 pub mod tuning;
-pub mod tuning_query;
+mod tuning_query;
 pub mod ump;
 pub mod universal;
-pub mod velocity;
+mod velocity;
 
 pub mod archive;
 pub mod clip;
-pub mod comparison;
-pub mod event_views;
+mod comparison;
+mod event_views;
 pub mod events;
 pub mod file_io;
-pub mod file_timing;
+mod file_timing;
 pub mod inspection;
-pub mod inspection_timing;
-pub mod live;
-pub mod playback;
-pub mod recording;
+mod inspection_timing;
+mod live;
+mod playback;
+mod recording;
 pub mod smf;
 pub mod syx;
 
 mod sequence;
-pub use sequence::{Beats, Note, NoteDuration, Rest};
 
-mod output;
-pub use archive::Reader;
-pub use output::{Output, OutputValue};
 mod input;
-pub use input::{Input, InputErrors, Recording};
+pub mod midi;
+mod output;
+
+mod drivers;
+pub mod transfer_input;
+pub mod transfer_output;
+pub mod tuning_live;
+
+pub mod ci_live;
+pub mod discovery;

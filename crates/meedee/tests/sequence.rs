@@ -1,5 +1,5 @@
 use meedee::events::Rational;
-use meedee::{Beats, Note, NoteDuration, Rest};
+use meedee::messages::{Beats, Note, NoteDuration, Rest};
 use std::time::Duration;
 
 #[test]

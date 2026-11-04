@@ -2,7 +2,7 @@ use meedee::{
     ci::{
         self, Address, Body, DiscoveryInfo, Header, Identity, Management, Notice, BROADCAST_MUID,
     },
-    ci_session::{Route, Session, Update},
+    ci::{Route, Session, Update},
     messages::{PrimitiveMessage, SysEx},
 };
 fn identity() -> Identity {

@@ -2,7 +2,7 @@
 use crate::files::{limit, os_error};
 use crate::packets::Clock;
 use meedee::messages::Message;
-use meedee::{archive::Record, recording as model};
+use meedee::{archive as model, archive::Record};
 use pyo3::exceptions::{PyTimeoutError, PyValueError};
 use pyo3::prelude::*;
 use std::fs::File;
@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 #[pyclass(frozen, module = "meedee.archive")]
 struct RecordingReport {
-    value: model::Report,
+    value: model::RecordingReport,
 }
 #[pymethods]
 impl RecordingReport {
@@ -92,7 +92,7 @@ impl Recorder {
     }
     fn record(&self, record: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(d) = record.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            if d.value.kind == meedee::live::DiagnosticKind::ClockChange {
+            if d.value.kind == meedee::events::StreamDiagnosticKind::ClockChange {
                 return Ok(self.value.record(Record::Discontinuity {
                     stream: d.value.stream.clone(),
                     reason: d.value.reason.clone(),
@@ -106,7 +106,7 @@ impl Recorder {
         }
         let r = crate::archive::extract(record)?;
         if let Record::Event(e) = &r {
-            if e.source() != Some(self.stream.as_str()) {
+            if e.stream() != Some(self.stream.as_str()) {
                 return Err(PyValueError::new_err(
                     "recording source differs from event stream",
                 ));

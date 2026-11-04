@@ -313,7 +313,7 @@ impl Capture {
             }
             Item::Message(e) => e,
         };
-        if event.source().unwrap_or_default() != self.stream {
+        if event.stream().unwrap_or_default() != self.stream {
             self.fail("capture received an unrelated source");
             return Ok(());
         }
@@ -383,4 +383,37 @@ impl Capture {
         self.status = status;
         self.reason = Some(reason.chars().take(1024).collect());
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct ReadOptions {
+    pub message_limit: usize,
+    pub byte_limit: usize,
+    pub payload_limit: usize,
+}
+impl Default for ReadOptions {
+    fn default() -> Self {
+        Self {
+            message_limit: 256,
+            byte_limit: 8_388_608,
+            payload_limit: 1_048_576,
+        }
+    }
+}
+pub fn read_file(
+    path: impl AsRef<std::path::Path>,
+    gap: std::time::Duration,
+    options: &ReadOptions,
+) -> io::Result<Plan> {
+    let gap_ns = gap
+        .as_nanos()
+        .try_into()
+        .map_err(|_| invalid("gap exceeds u64 nanoseconds"))?;
+    Plan::read(
+        std::fs::File::open(path)?,
+        gap_ns,
+        options.message_limit,
+        options.byte_limit,
+        options.payload_limit,
+    )
 }

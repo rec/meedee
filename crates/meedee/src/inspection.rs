@@ -1,4 +1,8 @@
 //! Read-only file inspection using the canonical streaming readers.
+pub use crate::comparison::{
+    compare, Difference, Options as ComparisonOptions, Report as ComparisonReport,
+};
+pub use crate::inspection_timing::{TimingDiagnostic, TimingSegment};
 use crate::messages::Message;
 use crate::{archive, clip, events, messages, smf, syx, ump};
 use std::collections::BTreeMap;
@@ -16,23 +20,86 @@ pub enum Format {
 /// Completion does not certify lossless capture, device support or safe replay.
 #[derive(Clone, Debug, Default)]
 pub struct Report {
-    pub timing: crate::inspection_timing::Timing,
-    pub notes: crate::notes::Tracker,
-    pub complete: bool,
-    pub problem: Option<String>,
-    pub records: u64,
-    pub message_counts: BTreeMap<&'static str, u64>,
-    pub clocks: Vec<events::Clock>,
+    timing: crate::inspection_timing::Timing,
+    notes: crate::notes::Tracker,
+    complete: bool,
+    problem: Option<String>,
+    records: u64,
+    message_counts: BTreeMap<&'static str, u64>,
+    clocks: Vec<events::Clock>,
     /// Only archive Stream descriptors are retained here, in file order.
-    pub streams: Vec<archive::Record>,
-    pub smf_header: Option<smf::Header>,
+    streams: Vec<archive::Record>,
+    smf_header: Option<smf::Header>,
     /// SMF record counts per zero-based track, excluding inter-track chunks.
-    pub track_records: BTreeMap<u16, u64>,
-    pub gap_records: u64,
-    pub lost_events: u128,
-    pub discontinuities: u64,
-    pub untimed_events: u64,
-    pub opaque_records: u64,
+    track_records: BTreeMap<u16, u64>,
+    gap_records: u64,
+    lost_events: u128,
+    discontinuities: u64,
+    untimed_events: u64,
+    opaque_records: u64,
+}
+
+impl Report {
+    pub fn complete(&self) -> bool {
+        self.complete
+    }
+    pub fn problem(&self) -> &Option<String> {
+        &self.problem
+    }
+    pub fn records(&self) -> u64 {
+        self.records
+    }
+    pub fn message_counts(&self) -> &BTreeMap<&'static str, u64> {
+        &self.message_counts
+    }
+    pub fn clocks(&self) -> &Vec<events::Clock> {
+        &self.clocks
+    }
+    pub fn streams(&self) -> &Vec<archive::Record> {
+        &self.streams
+    }
+    pub fn smf_header(&self) -> &Option<smf::Header> {
+        &self.smf_header
+    }
+    pub fn track_records(&self) -> &BTreeMap<u16, u64> {
+        &self.track_records
+    }
+    pub fn gap_records(&self) -> u64 {
+        self.gap_records
+    }
+    pub fn lost_events(&self) -> u128 {
+        self.lost_events
+    }
+    pub fn discontinuities(&self) -> u64 {
+        self.discontinuities
+    }
+    pub fn untimed_events(&self) -> u64 {
+        self.untimed_events
+    }
+    pub fn opaque_records(&self) -> u64 {
+        self.opaque_records
+    }
+    pub fn note_state(&self) -> crate::notes::Report {
+        self.notes.snapshot()
+    }
+    pub fn source_counts(&self) -> &BTreeMap<String, u64> {
+        &self.timing.source_counts
+    }
+    pub fn timing_segments(&self) -> &[TimingSegment] {
+        &self.timing.segments
+    }
+    pub fn timing_diagnostics(&self) -> &[TimingDiagnostic] {
+        &self.timing.diagnostics
+    }
+    pub fn timestamp_regressions(&self) -> u64 {
+        self.timing.regressions
+    }
+    pub fn omitted_segments(&self) -> u64 {
+        self.timing.omitted_segments
+    }
+    pub fn omitted_diagnostics(&self) -> u64 {
+        self.timing.omitted_diagnostics
+    }
 }
 
 /// Caller-driven inspection of one live source. It owns no transport or thread.
@@ -82,7 +149,7 @@ impl Observer {
     }
     pub fn feed(&mut self, item: &crate::live::Item) -> io::Result<()> {
         if let crate::live::Item::Message(e) = item {
-            if e.source().is_none() {
+            if e.stream().is_none() {
                 return Err(crate::file_io::invalid(
                     0,
                     "observation requires a source identity",
@@ -90,7 +157,7 @@ impl Observer {
             }
         }
         let stream = match item {
-            crate::live::Item::Message(e) => e.source().unwrap_or_default(),
+            crate::live::Item::Message(e) => e.stream().unwrap_or_default(),
             crate::live::Item::Diagnostic(d) => &d.stream,
         };
         if stream != self.stream {
@@ -204,7 +271,7 @@ impl Report {
                             let clock = self.streams.iter().find_map(|r| match r {
                                 archive::Record::Stream {
                                     id, clock_identity, ..
-                                } if id == e.source().unwrap_or_default() => clock_identity.clone(),
+                                } if id == e.stream().unwrap_or_default() => clock_identity.clone(),
                                 _ => None,
                             });
                             self.observe_event(&e, clock.as_deref(), detail_limit);
@@ -310,9 +377,9 @@ impl Report {
     ) {
         let clock = e.timestamp().map(|t| t.clock.identity()).or(default_clock);
         self.notes
-            .feed(e.source().unwrap_or_default(), e, clock, detail_limit);
+            .feed(e.stream().unwrap_or_default(), e, clock, detail_limit);
         self.timing.observe(
-            e.source().unwrap_or_default(),
+            e.stream().unwrap_or_default(),
             clock,
             e.timestamp().map(|t| i128::from(t.ticks)),
             self.records - 1,
@@ -384,4 +451,47 @@ fn command_kind(value: &messages::AnyCommand) -> &'static str {
         BankProgramSelect(_) => "BankProgramSelect",
         ZoneConfiguration(_) => "ZoneConfiguration",
     }
+}
+
+/// File inspection with the same limits and preservation defaults as Python.
+#[derive(Clone, Debug)]
+pub struct Options {
+    pub payload_limit: usize,
+    pub preserve_unknown: bool,
+    pub detail_limit: usize,
+}
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            payload_limit: 1_048_576,
+            preserve_unknown: false,
+            detail_limit: 128,
+        }
+    }
+}
+pub fn inspect_file(
+    path: impl AsRef<std::path::Path>,
+    format: Format,
+    options: &Options,
+) -> io::Result<Report> {
+    inspect(
+        std::fs::File::open(path)?,
+        format,
+        options.payload_limit,
+        options.preserve_unknown,
+        options.detail_limit,
+    )
+}
+pub fn compare_files(
+    left: impl AsRef<std::path::Path>,
+    right: impl AsRef<std::path::Path>,
+    format: Format,
+    options: &ComparisonOptions,
+) -> io::Result<ComparisonReport> {
+    compare(
+        std::fs::File::open(left)?,
+        std::fs::File::open(right)?,
+        format,
+        options,
+    )
 }

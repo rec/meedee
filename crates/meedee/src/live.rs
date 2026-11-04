@@ -2,7 +2,7 @@
 use crate::messages::Message;
 use crate::{
     codecs,
-    events::{Clock, Payload, Span, Timestamp},
+    events::{Clock, Payload, SourceSpan, Timestamp},
     file_io::invalid,
     transport::{Packet, Protocol},
     ump,
@@ -195,9 +195,9 @@ impl Decoder {
                         &current
                     };
                     let event = (message).with_metadata(crate::messages::Metadata {
-                        source: Some(self.stream.clone()),
+                        stream: Some(self.stream.clone()),
                         timestamp: time.clone(),
-                        span: Some(Span {
+                        span: Some(SourceSpan {
                             first_packet: first.index,
                             last_packet: index,
                             first_timestamp: first.time.clone(),

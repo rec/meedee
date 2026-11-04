@@ -9,7 +9,7 @@ use crate::{
 use std::io::{self, Write};
 
 #[derive(Clone, Debug)]
-pub struct Report {
+pub struct QueryReport {
     pub status: &'static str,
     pub request_sent: bool,
     pub uncertain_send: bool,
@@ -24,7 +24,7 @@ pub struct Query {
     stream: String,
     timeout_ns: u64,
     tracker: Option<ReplyTracker>,
-    report: Report,
+    report: QueryReport,
 }
 impl Query {
     pub fn new(
@@ -41,7 +41,7 @@ impl Query {
             stream,
             timeout_ns,
             tracker: None,
-            report: Report {
+            report: QueryReport {
                 status: "ready",
                 request_sent: false,
                 uncertain_send: false,
@@ -101,7 +101,7 @@ impl Query {
             }
             Item::Message(e) => e,
         };
-        if event.source().unwrap_or_default() != self.stream {
+        if event.stream().unwrap_or_default() != self.stream {
             self.fail("query received an unrelated source");
             return Ok(());
         }
@@ -151,7 +151,7 @@ impl Query {
             self.finish("cancelled", reason);
         }
     }
-    pub fn snapshot(&self) -> Report {
+    pub fn snapshot(&self) -> QueryReport {
         self.report.clone()
     }
     pub fn write(&self, writer: &mut impl Write) -> io::Result<()> {

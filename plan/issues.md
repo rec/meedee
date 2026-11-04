@@ -129,19 +129,15 @@ endpoints retain their own failure behavior.
 ## A1. Raw transport and ownership can surprise Python users
 
 **Deliberate API limits.** Rust and Python share `Input`, `Output`, `Port`,
-protocol/backend/mode names and transport methods. Python adapts consuming Rust
-ownership: successful `close()` restores the original client and returns None.
-Every failed Rust open invalidates it. There are no compatibility aliases for
-the removed midir API, native naming arguments, ID lookup or Ignore filters.
+protocol/backend/mode names and transport methods. Python Input/Output now own
+both discovery and their connection, like the high-level Rust resources. Closing
+is terminal and releases the client/worker; reconnect with a new resource. Failed
+Rust opens invalidate native ownership. No old connection aliases remain.
 
-Retain the returned connection. Dropping it retires input delivery and schedules
-cleanup; immediate client reuse can fail until cleanup completes. Keeping the
-client variable alone does not keep its connection open. Connections hold their
-clients and expose callback edges to Python's collector, but GC timing is not a
-lifetime guarantee. Port snapshots hold metadata without keeping clients alive.
-Even a closed connection retains its reusable client. Closing that connection
-does not free the client's isolated-worker slot; retaining many such objects
-can exhaust the per-parent cap until those references and workers retire.
+Connect returns the same Python object. Retain it while using the connection, or
+use a context for checked cleanup. Internal callbacks do not retain the public
+owner. Finalization is best effort, not a lifetime guarantee. Port snapshots hold
+metadata without keeping clients alive.
 
 Receive callbacks take one immutable ReceivedPacket containing raw byte chunks
 or UMP batches, not complete musical Message objects. A chunk can contain partial

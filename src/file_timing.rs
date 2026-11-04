@@ -3,7 +3,7 @@ use crate::event_values::{Rational, Timestamp};
 use crate::files::{closed, limit, os_error, uint, Event as SmfEvent, Header, Stream};
 use crate::packets::Clock;
 use crate::playback::ClockMapping;
-use meedee::{file_timing as model, smf};
+use meedee::{clip, smf};
 use pyo3::prelude::*;
 #[pyclass(module = "meedee.smf")]
 struct MergedReader {
@@ -71,7 +71,7 @@ impl MergedReader {
 }
 #[pyclass(name = "TimedReader", module = "meedee.smf")]
 struct SmfTimedReader {
-    value: Option<model::SmfReader<Stream>>,
+    value: Option<smf::TimedReader<Stream>>,
 }
 #[pymethods]
 impl SmfTimedReader {
@@ -98,7 +98,7 @@ impl SmfTimedReader {
         let source = Stream::input(source)?;
         let value = py
             .detach(move || {
-                model::SmfReader::new(
+                smf::TimedReader::new(
                     smf::MergedReader::new(
                         source,
                         payload_limit,
@@ -153,7 +153,7 @@ impl SmfTimedReader {
 }
 #[pyclass(name = "TimedReader", module = "meedee.clip")]
 struct ClipTimedReader {
-    value: Option<model::ClipReader<Stream>>,
+    value: Option<clip::TimedReader<Stream>>,
 }
 #[pymethods]
 impl ClipTimedReader {
@@ -168,7 +168,7 @@ impl ClipTimedReader {
         let source = Stream::input(source)?;
         let value = py
             .detach(move || {
-                model::ClipReader::new(
+                clip::TimedReader::new(
                     meedee::clip::Reader::new(source, false)?,
                     stream,
                     include_configuration,
@@ -210,7 +210,7 @@ impl ClipTimedReader {
 }
 #[pyclass(frozen, module = "meedee.smf")]
 struct ExportReport {
-    value: model::ExportReport,
+    value: smf::ExportReport,
 }
 #[pymethods]
 impl ExportReport {
@@ -261,7 +261,7 @@ fn export_event(
         .try_into()
         .map_err(|_| pyo3::exceptions::PyValueError::new_err("tempo exceeds u32"))?;
     Ok(ExportReport {
-        value: model::export_smf(
+        value: smf::export_event(
             &event,
             &header.value,
             &origin.value,

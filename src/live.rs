@@ -1,12 +1,12 @@
 //! Native pure packet decoder and typed-send preparation.
 use crate::files::{limit, os_error, uint};
 use crate::packets::{Protocol, ReceivedPacket, UmpPacket};
-use meedee::{events::Payload, live as model};
+use meedee::{events as model, events::Payload};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 #[pyclass(frozen, module = "meedee.events")]
 pub struct StreamDiagnostic {
-    pub value: model::Diagnostic,
+    pub value: model::StreamDiagnostic,
 }
 #[pymethods]
 impl StreamDiagnostic {
@@ -21,10 +21,10 @@ impl StreamDiagnostic {
     #[getter]
     fn kind(&self) -> &'static str {
         match self.value.kind {
-            model::DiagnosticKind::Loss => "loss",
-            model::DiagnosticKind::Malformed => "malformed",
-            model::DiagnosticKind::ClockChange => "clock_change",
-            model::DiagnosticKind::Truncated => "truncated",
+            model::StreamDiagnosticKind::Loss => "loss",
+            model::StreamDiagnosticKind::Malformed => "malformed",
+            model::StreamDiagnosticKind::ClockChange => "clock_change",
+            model::StreamDiagnosticKind::Truncated => "truncated",
         }
     }
     #[getter]
@@ -48,7 +48,7 @@ impl StreamDiagnostic {
 }
 #[pyclass(module = "meedee.events")]
 struct PacketDecoder {
-    value: model::Decoder,
+    value: model::PacketDecoder,
 }
 #[pymethods]
 impl PacketDecoder {
@@ -60,7 +60,7 @@ impl PacketDecoder {
         #[pyo3(from_py_with=crate::units::bytes)] sysex_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: model::Decoder::new(stream, protocol.native(), sysex_limit)
+            value: model::PacketDecoder::new(stream, protocol.native(), sysex_limit)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
         })
     }
@@ -101,13 +101,15 @@ impl PacketDecoder {
         items(py, self.value.finish())
     }
 }
-fn items(py: Python<'_>, v: Vec<model::Item>) -> PyResult<Vec<Py<PyAny>>> {
+fn items(py: Python<'_>, v: Vec<model::InputItem>) -> PyResult<Vec<Py<PyAny>>> {
     v.into_iter().map(|v| item(py, v)).collect()
 }
-pub(crate) fn item(py: Python<'_>, v: model::Item) -> PyResult<Py<PyAny>> {
+pub(crate) fn item(py: Python<'_>, v: model::InputItem) -> PyResult<Py<PyAny>> {
     match v {
-        model::Item::Message(value) => crate::event_values::to_python(py, *value),
-        model::Item::Diagnostic(value) => Ok(Py::new(py, StreamDiagnostic { value })?.into_any()),
+        model::InputItem::Message(value) => crate::event_values::to_python(py, *value),
+        model::InputItem::Diagnostic(value) => {
+            Ok(Py::new(py, StreamDiagnostic { value })?.into_any())
+        }
     }
 }
 #[pyfunction]

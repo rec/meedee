@@ -58,8 +58,6 @@ def test_binding_error_categories_keep_their_builtin_bases(
     "handle",
     [
         midi.Port,
-        midi.InputConnection,
-        midi.OutputConnection,
     ],
 )
 def test_resource_handles_cannot_be_constructed_directly(handle: type[object]) -> None:

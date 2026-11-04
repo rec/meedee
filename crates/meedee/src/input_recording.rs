@@ -29,16 +29,16 @@ impl Input {
     /// The duration starts after opening. Closing drains already accepted packets.
     ///
     /// ```no_run
-    /// use meedee::{Input, Output};
+    /// use meedee::midi::{Input, Output};
     /// use std::time::Duration;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// Output::new().play(Input::new().record(Duration::from_secs(10))?)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn record(mut self, duration: Duration) -> io::Result<Recording> {
+    pub fn record(mut self, duration: Duration) -> crate::midi::Result<Recording> {
         if self.closed {
-            return Err(super::invalid("input is closed"));
+            return Err(super::invalid("input is closed").into());
         }
         Instant::now()
             .checked_add(duration)
@@ -64,7 +64,12 @@ impl Input {
             append(&mut recording.records, item, &stream, &mut clocks);
         }
         if let Err(error) = self.close() {
-            append(&mut recording.records, Err(error), &stream, &mut clocks);
+            append(
+                &mut recording.records,
+                Err(error.into()),
+                &stream,
+                &mut clocks,
+            );
         }
         while let Some(item) = self.next_item(None) {
             append(&mut recording.records, item, &stream, &mut clocks);
@@ -76,7 +81,8 @@ impl Input {
     /// a partial file, which the strict reader rejects.
     ///
     /// ```no_run
-    /// use meedee::{Input, Output, Reader};
+    /// use meedee::midi::{Input, Output};
+    /// use meedee::archive::{Reader};
     /// use std::time::Duration;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// Input::new().record_to(Duration::from_secs(10), "rec.meedee", true)?;
@@ -89,7 +95,7 @@ impl Input {
         duration: Duration,
         path: impl AsRef<Path>,
         overwrite: bool,
-    ) -> io::Result<Recording> {
+    ) -> crate::midi::Result<Recording> {
         let recording = self.record(duration)?;
         let file = OpenOptions::new()
             .write(true)

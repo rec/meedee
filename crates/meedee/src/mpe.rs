@@ -1,4 +1,5 @@
 //! Pure MPE zone configuration, explicit allocation and bounded channel tracking.
+pub use crate::event_views::Mpe as EventTracker;
 use crate::messages::{AnyMessage, Command, RpnSet, ValueError};
 
 #[derive(Clone, Debug)]

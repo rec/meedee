@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 #[pyclass(frozen, module = "meedee.metrics")]
 pub struct Distribution {
-    pub value: metrics::Histogram,
+    pub value: metrics::Distribution,
 }
 #[pymethods]
 impl Distribution {
@@ -54,7 +54,7 @@ impl Histogram {
     }
     fn snapshot(&self) -> Distribution {
         Distribution {
-            value: self.value.clone(),
+            value: self.value.snapshot(),
         }
     }
 }
@@ -66,19 +66,19 @@ pub struct Pressure {
 impl Pressure {
     #[getter]
     fn accepted_records(&self) -> u64 {
-        self.value.accepted_records
+        self.value.accepted_records()
     }
     #[getter]
     fn capacity_rejections(&self) -> u64 {
-        self.value.capacity_rejections
+        self.value.capacity_rejections()
     }
     #[getter]
     fn peak_reserved_records(&self) -> usize {
-        self.value.peak_reserved_records
+        self.value.peak_reserved_records()
     }
     #[getter]
     fn peak_reserved_bytes(&self) -> usize {
-        self.value.peak_reserved_bytes
+        self.value.peak_reserved_bytes()
     }
 }
 #[pyclass(frozen, module = "meedee.metrics")]
@@ -89,16 +89,16 @@ struct DeliveryReport {
 impl DeliveryReport {
     #[getter]
     fn events(&self) -> u64 {
-        self.value.events
+        self.value.events()
     }
     #[getter]
     fn elapsed_ns(&self) -> u64 {
-        self.value.elapsed_ns
+        self.value.elapsed_ns()
     }
     #[getter]
     fn intervals(&self) -> Distribution {
         Distribution {
-            value: self.value.intervals.clone(),
+            value: self.value.intervals().clone(),
         }
     }
 }

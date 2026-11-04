@@ -1,7 +1,9 @@
 use meedee::messages::Message;
 use meedee::{
     events::Payload,
-    live::{Diagnostic, DiagnosticKind, Item},
+    events::{
+        InputItem as Item, StreamDiagnostic as Diagnostic, StreamDiagnosticKind as DiagnosticKind,
+    },
     messages::{AnyMessage, SysEx},
     transfer::Capture,
 };
@@ -10,7 +12,7 @@ fn event(data: &[u8]) -> Item {
     Item::Message(Box::new(
         (Payload::Midi1(AnyMessage::SysEx(SysEx::new(data.to_vec()).unwrap())))
             .with_metadata(meedee::messages::Metadata {
-                source: Some("s".into()),
+                stream: Some("s".into()),
                 timestamp: None,
                 span: None,
             })

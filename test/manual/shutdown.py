@@ -18,9 +18,7 @@ def receive(packet: ReceivedPacket) -> None:
         raise RuntimeError("native shutdown test release deadline exceeded")
 
 
-def open_connections() -> tuple[
-    midi.InputConnection[ReceivedPacket], midi.OutputConnection
-]:
+def open_connections() -> tuple[midi.Input[ReceivedPacket], midi.Output]:
     token = f"meedee-shutdown-{uuid4().hex}"
     isolated = environ.get("MEEDEE_TEST_ISOLATED", "1") == "1"
     source = midi.Input(raw=True, isolated=isolated)
@@ -28,11 +26,11 @@ def open_connections() -> tuple[
     target = midi.Output(isolated=isolated)
     (port,) = (p for p in target.ports() if token in p.name)
     outgoing = target.connect(port)
-    outgoing.send(b"\x90\x3c\x7f")
+    outgoing(b"\x90\x3c\x7f")
     if not started.wait(5):
         raise RuntimeError("native callback did not start")
     for _ in range(100):
-        outgoing.send(b"\x90\x3d\x01")
+        outgoing(b"\x90\x3d\x01")
     # This handler runs before the extension's earlier cleanup handler.
     atexit.register(release.set)
     return incoming, outgoing

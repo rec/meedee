@@ -1,6 +1,16 @@
 //! Immutable events and exact clock arithmetic, independent of native transport.
+pub use crate::event_views::{Observation, Value as ObservationValue, View};
 use crate::file_io::invalid;
+pub use crate::live::{
+    send_message, Decoder as PacketDecoder, Diagnostic as StreamDiagnostic,
+    DiagnosticKind as StreamDiagnosticKind, Item as InputItem,
+};
 use crate::messages::{AnyCommand, AnyMessage};
+pub use crate::playback::{
+    play, Cancellation, Cause as PlaybackCause, Failure as PlaybackError, Mapping as ClockMapping,
+    MonotonicClock, Planned as PlannedEvent, Planner as PlaybackPlan, PlaybackClock,
+    Report as PlaybackReport,
+};
 use crate::ump::UmpMessage;
 use std::io;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -72,13 +82,13 @@ pub struct Timestamp {
     pub clock: Clock,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Span {
+pub struct SourceSpan {
     pub first_packet: u64,
     pub last_packet: u64,
     pub first_timestamp: Option<Timestamp>,
     pub last_timestamp: Option<Timestamp>,
 }
-impl Span {
+impl SourceSpan {
     pub fn validate(&self, timestamp: Option<&Timestamp>) -> io::Result<()> {
         if self.first_packet > self.last_packet {
             return Err(invalid(0, "reversed packet span"));

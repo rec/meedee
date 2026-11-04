@@ -17,7 +17,7 @@ UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
 tracked in [the plan](plan/meedee.md).
-`out.send(...)` accepts message objects, compound control/bank/MPE
+`out(...)` accepts message objects, compound control/bank/MPE
 commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
 
@@ -26,7 +26,7 @@ from meedee.messages import Note, Rest
 from meedee.midi import Output
 
 with Output(bpm=120) as out:
-    out.send(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
+    out(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
 ```
 
 `Note(duration, note, velocity=90, channel=None)` plays an attack and release;
@@ -48,8 +48,8 @@ full-note values or automatic cleanup.
 ## Files, typed I/O and exact time
 
 Rust users can start with the [practical Rust examples](doc/rust-examples.md).
-The crate exports `Input`, `Output`, `Note`, `Rest`, `Beats`, `Recording` and
-`Reader`. Use `Duration` for elapsed time and `Beats` with output tempo for music.
+The crate exports `midi::{Input, Output, Recording}`,
+`messages::{Note, Rest, Beats}` and `archive::Reader`. Use `Duration` for elapsed time and `Beats` with output tempo for music.
 `Input::new()` iterates messages; `Output::send` accepts individual values and
 `send_all` schedules heterogeneous sequences. `Input::record(Duration)` returns
 a capture accepted directly by `Output::play`; `Reader::open(path)` reads the
@@ -73,7 +73,7 @@ reader.close()
 
 score = smf.TimedReader("song.mid", stream="score")
 origin = score.origin  # Explicit zero preserves any leading silence.
-# With an opened OutputConnection:
+# With an opened Output:
 # output.play(score, origin=origin)
 score.close()
 ```
@@ -95,11 +95,10 @@ representations. Version 1 remains unpublished, with format freeze and future
 compatibility guarantees still owner decisions.
 
 `midi.Input()` decodes received packets into events; `midi.Input(raw=True)`
-returns unchanged transport packets. `midi.Output` opens one
-`OutputConnection` supporting `out.send(...)` for messages, compound operations and
+returns unchanged transport packets. `midi.Output` owns discovery and one connection, supporting `out(...)` for messages, compound operations and
 encoded bytes/UMP packets, and `play()` for timestamped events. Both use the same
-native transport. Inputs default to process isolation; outputs default to in-process
-transport, with `isolated=True` available. Typed input connections
+native transport. Inputs and outputs default to in-process
+transport, with `isolated=True` available. Inputs
 provide either a callback or `receive(timeout=..., cancel=...)`, returning an
 immutable `messages.Message` or `events.StreamDiagnostic`. Messages carry optional
 `timestamp`, `stream` and `span` fields directly. `replace()` and `transpose()`
@@ -109,7 +108,7 @@ Optional `EventInterpreter`,
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
 
-`InputConnection.dropped_packets` exposes the observed raw receive-drop
+`Input.dropped_packets` exposes the observed raw receive-drop
 count, including updates during silence. Poll it alongside `failure` when loss
 must stop a live session: typed queue overflow is reported through `failure`.
 Isolated updates are asynchronous, so neither property proves loss-free delivery
@@ -461,7 +460,7 @@ selection = gm.BankProgramSelect(
 packets = [codecs.encode(p) for p in codecs.expand(selection)]
 volume = controls.Controller.ChannelVolume.message(channel=1, value=100)
 zone = mpe.ZoneConfiguration(manager_channel=1, members=7)
-# An open MIDI 1.0 output can explicitly send selection or zone with out.send(...).
+# An open MIDI 1.0 output can explicitly send selection or zone with out(...).
 ```
 
 Rust owns the GM1 instrument/family and percussion maps, all 256 GM2 melodic
@@ -518,14 +517,14 @@ primitives = expand(command)
 interpreter = Interpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
 # An open MIDI 1.0 output can send the whole command:
-# connection.send(command)
+# connection(command)
 ```
 
 `ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
-identifier. Use `out.send(...)` for messages, compound commands or encoded packets.
+identifier. Use `out(...)` for messages, compound commands or encoded packets.
 Use primitive `encode()` for byte encoding and `expand()` to inspect commands.
 UMP outputs reject these MIDI 1.0 commands rather than translating silently.
 
@@ -587,7 +586,7 @@ sequences require source context and are not guessed. Returned primitive lists
 are not atomic live sends; output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
-negotiation runs automatically. `OutputConnection.send()` takes `midi.UmpPacket`;
+negotiation runs automatically. `Output.__call__()` takes `midi.UmpPacket`;
 construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
 has passed between test-owned virtual peers. Other native backends and physical
 MIDI 2.0 device compatibility remain unqualified.
@@ -601,13 +600,13 @@ output = Output()
 ports = output.ports()
 # Select an endpoint deliberately from this snapshot, for example ports[index].
 # with output.connect(ports[index]) as connection:
-#     connection.send(bytes([0x90, 60, 100]))
-#     connection.send(bytes([0x80, 60, 0]))
+#     connection(bytes([0x90, 60, 100]))
+#     connection(bytes([0x80, 60, 0]))
 ```
 
 `Input` and `Output` constructors accept keyword-only settings. Defaults are
 `protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
-`isolated=True` and `raw=False`; outputs default to `isolated=False`, `channel=1`, `port=None`,
+`isolated=False` and `raw=False`; outputs default to `isolated=False`, `channel=None`, `port=None`,
 and `bpm=None`.
 Input additionally accepts `timestamps=TimestampMode.Absolute` and
 `receive_byte_limit=8_388_608`. Choose `Protocol.Ump` explicitly for UMP, and
@@ -640,7 +639,7 @@ In raw mode, received packets are transport chunks, including partial SysEx or
 multiple UMPs. Raw mode does not assemble messages or apply `Ignore` filters.
 Use `Input()` for decoded events or `Input(raw=True)` for unchanged transport
 packets. Both modes support callbacks or bounded `receive()` queues.
-`OutputConnection.send()` accepts unsigned-byte buffers,
+`Output.__call__()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.
@@ -650,10 +649,10 @@ is no automatic resend, reconnection, tuning reset or all-notes-off on close.
 
 ## Ownership, isolation and failures
 
-Retain the returned connection. It keeps its client alive and owns its single
-open resource. The client is unavailable for discovery/opening while connected.
-Successful explicit `close()` restores the original client and returns `None`;
-context managers close too. Body and close failures are preserved together in a
+Input and Output each own discovery and one connection. `connect()` and
+`create_virtual()` return the same object. Discovery and a second connection are
+rejected while connected. `close()` is terminal and returns `None`; create a new
+object to reconnect. Context managers close too. Body and close failures are preserved together in a
 `BaseExceptionGroup`. `closed` is a momentary ownership snapshot, not device
 health or a reservation against another thread closing it.
 
@@ -667,7 +666,7 @@ Input silence does not identify unplugging, rebooting, unresponsiveness or an
 idle device. A failed send can already have changed physical state.
 
 With `isolated=True`, each client has a separate Python child process owning its
-native transport. This is the input default; outputs default to `isolated=False`. Input callbacks run in the parent. Native operation deadlines
+native transport. Inputs and outputs default to `isolated=False`. Input callbacks run in the parent. Native operation deadlines
 terminate a failed child; native errors, crashes and timeouts invalidate that
 client without automatically reopening it. `worker_failure` reports a known
 worker failure, not endpoint health. `isolated=False` uses the same Rust
@@ -682,9 +681,8 @@ is confirmed. At the limit construction raises ResourceError before starting
 another child. Startup failures release their reservation. These counts are
 separate from native-client/connection limits and are not a machine-wide memory
 budget or a guarantee that 32 workers fit on any particular host.
-Closing a connection preserves its reusable client and worker. Release unneeded
-clients and references from their connections when finished; asynchronous worker
-cleanup may keep a slot occupied briefly afterward.
+Closing Input or Output releases its native client and retires its isolated
+worker. Asynchronous worker cleanup may keep a slot occupied briefly afterward.
 
 Callbacks must be synchronous and return promptly. Deferred results are reported
 through `sys.unraisablehook`, without executing them; later delivery continues.
@@ -708,9 +706,9 @@ count, and driver loss is not measured.
 Application-retained data, Python/queue overhead and OS buffers are outside these
 budgets. Floods and allocation/process aborts remain possible.
 
-Destruction and cyclic GC retire delivery and schedule cleanup without waiting
-for a driver. Restoration is asynchronous; explicit close is the healthy reuse
-path. Failed checked cleanup retains native state and its owner thread until
+Finalization attempts close and releases the public resource. Native retirement
+can complete asynchronously; explicit close or a context gives checked cleanup.
+Finalization is not guaranteed and in-process close can wait for a driver. Failed checked cleanup retains native state and its owner thread until
 process exit without retry. The Rust core permits 32 native clients per process,
 including retained clients; the Python cleanup registry permits 32 connections
 and has four workers. Stalled callbacks or teardown can occupy all cleanup
@@ -992,7 +990,7 @@ event = receiver.receive()  # Decoded by the production packet decoder.
 
 sink = testing.Output(protocol="midi1")
 if isinstance(event, messages.Message):
-    sink.send(event)
+    sink(event)
 assert sink.take_packet() == b"\x90\x3c\x64"
 ```
 

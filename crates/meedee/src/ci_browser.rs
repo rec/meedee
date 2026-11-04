@@ -5,21 +5,21 @@ use crate::messages::{SysEx, ValueError};
 use std::collections::{BTreeSet, VecDeque};
 
 #[derive(Clone, Debug)]
-pub struct Diagnostic {
+pub struct BrowseDiagnostic {
     pub kind: String,
     pub peer_muid: Option<u32>,
     pub token: Option<u64>,
     pub reason: String,
 }
 #[derive(Clone, Debug)]
-pub struct Report {
+pub struct BrowseReport {
     pub status: &'static str,
     pub local_muid: u32,
     pub peers: Vec<Peer>,
     pub confirmed_actions: u64,
     pub uncertain_token: Option<u64>,
     pub pending_tokens: Vec<u64>,
-    pub diagnostics: Vec<Diagnostic>,
+    pub diagnostics: Vec<BrowseDiagnostic>,
     pub omitted_diagnostics: u64,
     pub problems: u64,
     pub reason: Option<String>,
@@ -31,7 +31,7 @@ pub struct Browser {
     timeout_ns: u64,
     deadline: Option<u64>,
     detail_limit: usize,
-    report: Report,
+    report: BrowseReport,
     outstanding: BTreeSet<u64>,
     targets: VecDeque<u32>,
 }
@@ -64,7 +64,7 @@ impl Browser {
             timeout_ns,
             deadline: None,
             detail_limit,
-            report: Report {
+            report: BrowseReport {
                 status: "ready",
                 local_muid,
                 peers: vec![],
@@ -148,7 +148,7 @@ impl Browser {
             self.targets.clear();
         }
     }
-    pub fn snapshot(&self) -> Report {
+    pub fn snapshot(&self) -> BrowseReport {
         let mut report = self.report.clone();
         report.pending_tokens = self.outstanding.iter().copied().collect();
         report
@@ -215,7 +215,7 @@ impl Browser {
                         self.report.problems += 1;
                     }
                     if self.report.diagnostics.len() < self.detail_limit {
-                        self.report.diagnostics.push(Diagnostic {
+                        self.report.diagnostics.push(BrowseDiagnostic {
                             kind: o.kind,
                             peer_muid: o.peer_muid,
                             token: o.token,

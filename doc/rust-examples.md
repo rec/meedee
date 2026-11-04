@@ -11,7 +11,8 @@ and velocities are 0..127, and program numbers are 1..128.
 ## 1. Play one note
 
 ```rust
-use meedee::{Note, Output};
+use meedee::messages::Note;
+use meedee::midi::Output;
 use std::time::Duration;
 
 Output::new().send(Note::new(Duration::from_millis(500), 60)?)?;
@@ -23,7 +24,8 @@ sends the attack and release. The temporary output closes when the statement end
 ## 2. Play a tune in beats
 
 ```rust
-use meedee::{Beats, Note, Output, Rest};
+use meedee::messages::{Beats, Note, Rest};
+use meedee::midi::Output;
 
 let mut out = Output::new().with_bpm(120)?;
 out.send_all([
@@ -45,7 +47,7 @@ notes, rests, messages and delays share one sequence.
 also work as wildcards. To choose from discovery, use:
 
 ```rust
-use meedee::Output;
+use meedee::midi::Output;
 
 let mut output = Output::new();
 let ports = output.ports()?;
@@ -56,12 +58,14 @@ out.close()?;
 
 This discovery example assumes there is at least one output. `Input` supports
 the same selection methods. The low-level `transport` module remains available
-for virtual ports, callbacks and backend-specific settings.
+for virtual ports, callbacks and backend-specific settings. Closing is terminal;
+create a new object to reconnect. Python `connect()` returns the same object; Rust
+`connect()` consumes and returns the resource to express ownership.
 
 ## 3. Print incoming messages
 
 ```rust
-use meedee::Input;
+use meedee::midi::Input;
 
 for message in Input::new() {
     println!("{message:?}");
@@ -76,7 +80,7 @@ system messages and diagnostics still pass through.
 ## 4. Transpose a keyboard
 
 ```rust
-use meedee::{Input, Output};
+use meedee::midi::{Input, Output};
 use meedee::events::Payload;
 use meedee::messages::AnyMessage;
 
@@ -99,7 +103,7 @@ separate timing wrappers.
 ## 5. Split a keyboard between two sounds
 
 ```rust
-use meedee::{Input, Output};
+use meedee::midi::{Input, Output};
 use meedee::events::Payload;
 use meedee::messages::{AnyMessage, ProgramChange};
 
@@ -117,16 +121,22 @@ for message in Input::new().with_channel(1)? {
     match key {
         Some(note) if note < 60 => low.send(message)?,
         Some(_) => high.send(message)?,
-        None => {
+        None if matches!(&message, Payload::Midi1(
+            AnyMessage::ControlChange(_) | AnyMessage::PolyPressure(_) |
+            AnyMessage::ChannelPressure(_) | AnyMessage::ProgramChange(_) |
+            AnyMessage::PitchBend(_)
+        )) => {
             low.send(message.clone())?;
             high.send(message)?;
         }
+        None => low.send(message)?,
     }
 }
 low.close()?;
 high.close()?;
 ```
 
+System messages pass through the input filter and are forwarded once.
 An explicitly configured output channel overrides a MIDI 1 message's channel.
 Without that setting, an output preserves assigned channels and supplies channel
 1 only for unassigned messages. To send several channels through one output,
@@ -135,7 +145,7 @@ leave its channel unset and use message builders such as `.with_channel(2)?`.
 ## 6. Record and replay
 
 ```rust
-use meedee::{Input, Output};
+use meedee::midi::{Input, Output};
 use std::time::Duration;
 
 Output::new().play(Input::new().record(Duration::from_secs(10))?)?;
@@ -148,7 +158,8 @@ To retain the result, bind it to a variable and print the whole recording.
 To save and read the capture:
 
 ```rust
-use meedee::{Input, Output, Reader};
+use meedee::midi::{Input, Output};
+use meedee::archive::Reader;
 use std::time::Duration;
 
 Input::new().record_to(Duration::from_secs(10), "rec.meedee", true)?;
@@ -164,19 +175,19 @@ complete file does not imply a loss-free performance.
 
 Replay stops at a gap, discontinuity, malformed record, timestamp regression or
 unmapped clock. Its error includes confirmed progress. Explicit clock mappings,
-rounding permission, cancellation and metrics are available in `playback`.
+rounding permission, cancellation and metrics are configured with `Output::with_playback`.
 
 ## 7. Handle input diagnostics explicitly
 
 ```rust
-use meedee::Input;
-use meedee::live::Item;
+use meedee::midi::Input;
+use meedee::events::InputItem;
 
 let mut input = Input::new();
 for item in input.with_errors() {
     match item? {
-        Item::Message(message) => println!("{message:?}"),
-        Item::Diagnostic(diagnostic) => eprintln!("{diagnostic:?}"),
+        InputItem::Message(message) => println!("{message:?}"),
+        InputItem::Diagnostic(diagnostic) => eprintln!("{diagnostic:?}"),
     }
 }
 ```
@@ -190,7 +201,7 @@ queue and SysEx limits; `with_transport` configures backend admission separately
 ## 8. Overlap notes and send a compound command
 
 ```rust
-use meedee::Output;
+use meedee::midi::Output;
 use meedee::messages::{NoteOn, RpnSet};
 use std::time::Duration;
 
@@ -221,7 +232,7 @@ failed transport can prevent cleanup.
 ## 9. Preserve provenance while editing a message
 
 ```rust
-use meedee::{Input, Output};
+use meedee::midi::{Input, Output};
 use meedee::events::Payload;
 use meedee::messages::{AnyMessage, Message};
 
@@ -246,7 +257,7 @@ resolves an unassigned channel for you.
 ## 10. Send native MIDI 2 messages
 
 ```rust
-use meedee::Output;
+use meedee::midi::Output;
 use meedee::transport::{OutputOptions, Protocol};
 use meedee::ump::{Midi2NoteOff, Midi2NoteOn};
 use std::time::Duration;
@@ -267,3 +278,139 @@ This needs a native UMP backend and endpoint. Group and channel are explicit;
 MIDI 2 velocity uses its native 16-bit range. There is no automatic protocol
 translation, full-note scheduling or cleanup for UMP. Raw packets likewise retain
 their own addressing. The `ump` module provides explicit translation when needed.
+
+## 11. Inspect and compare saved captures
+
+These operations open files, not MIDI ports. Reports keep capture quality separate
+from structural completeness.
+
+```rust
+use meedee::inspection::{self, ComparisonOptions, Format, Options};
+
+println!("{:?}", inspection::inspect_file("rec.meedee", Format::Archive, &Options::default())?);
+println!("{:?}", inspection::compare_files(
+    "rec.meedee", "other.meedee", Format::Archive, &ComparisonOptions::default(),
+)?);
+```
+
+For playback diagnostics, configure the output once. The options apply to each
+subsequent `play()` call; ordinary playback needs no options.
+
+```rust
+use meedee::archive::Reader;
+use meedee::midi::{Output, PlaybackOptions};
+
+let mut out = Output::new().with_playback(PlaybackOptions {
+    metrics: true,
+    ..Default::default()
+});
+println!("{:?}", out.play(Reader::open("rec.meedee")?)?);
+out.close()?;
+```
+
+`PlaybackOptions` also accepts an origin timestamp, clock mappings, rounding
+permission and a shared `events::Cancellation`. Inspection and metrics snapshots
+expose read-only getters with the same names as Python properties.
+
+## 12. Capture and restore a SysEx dump
+
+Initiate a one-message dump on the instrument within ten seconds. The capture
+retains complete messages, then creates a new backup file only after success.
+
+```rust
+use meedee::{midi::Input, transfer, transfer_input};
+use std::fs::OpenOptions;
+
+let mut input = Input::new();
+let mut capture = transfer::Capture::new(
+    input.stream()?.into(), 1, 10_000_000_000, 8_388_608, 1_048_576,
+)?;
+let report = transfer_input::run(&mut capture, &mut input, None)?;
+input.close()?;
+println!("{report:?}");
+if report.status == "completed" {
+    capture.write(&mut OpenOptions::new().write(true).create_new(true).open("backup.syx")?)?;
+}
+```
+
+Run this separately to restore the backup. The first output must be the intended
+instrument, ready to receive it. Sending a dump can replace sounds or settings;
+choose the gap from the device's documentation.
+
+```rust
+use meedee::{midi::Output, transfer, transfer_output};
+use std::time::Duration;
+
+let plan = transfer::read_file("backup.syx", Duration::from_millis(100), &Default::default())?;
+let mut session = transfer::Session::new(plan);
+let mut output = Output::new();
+println!("{:?}", transfer_output::run(&mut session, &mut output, None)?);
+output.close()?;
+```
+
+## 13. Query a tuning dump
+
+This asks device 0 for tuning program 2 through the first input/output pair.
+The final report includes a matching reply, timeout or failure with known progress.
+
+```rust
+use meedee::{midi::{Input, Output}, tuning, tuning_live};
+
+let mut input = Input::new();
+let mut output = Output::new();
+let mut query = tuning::Query::new(
+    tuning::BulkDumpRequest::new(0, 2)?.into(), input.stream()?.into(), 5_000_000_000,
+)?;
+println!("{:?}", tuning_live::run(&mut query, &mut input, &mut output, None)?);
+input.close()?;
+output.close()?;
+```
+
+Live drivers require fresh sessions and own their monotonic clocks. They borrow
+connections; the caller owns closing them. Failures never trigger automatic retries.
+High-level I/O errors use `midi::Error`; native categories and error causes remain
+available for inspection instead of being flattened into strings.
+
+## 14. Observe endpoint changes
+
+Each call performs one complete discovery scan. A failed or oversized scan stops
+the poller and retains its last complete snapshot.
+
+```rust
+use meedee::{discovery::Poller, midi::Protocol};
+
+let mut poller = Poller::new(Protocol::Midi1)?;
+println!("{:?}", poller.poll()?);
+// Call poll() again when the application wants another observation.
+poller.close();
+```
+
+Python additionally provides process isolation, CLI commands, unit strings and
+uFor integration. Rust uses typed durations, builders, enums and `Result` values;
+its `transport` and `file_io` modules expose lower-level native and streaming
+primitives. Corresponding workflows otherwise use the same public module names.
+
+## 15. Discover MIDI-CI devices
+
+This uses the experimental manufacturer identity 0x7D and a caller-selected local
+MUID. Choose a fresh unused MUID for a real scan. Python's example generates one
+with `secrets`; Rust leaves that choice to the application's random-number source.
+
+```rust
+use meedee::{ci, ci_live, midi::{Input, Output}};
+
+let mut input = Input::new();
+let mut output = Output::new();
+let identity = ci::Identity::new(vec![0x7d, 0, 0], 1, 1, vec![0; 4])?;
+let route = ci::Route::new(input.stream()?.into(), "device".into(), None)?;
+let session = ci::Session::new(12345, identity, route, 0, None, 1024, 128, 128, 8_388_608)?;
+let mut browser = ci::Browser::new(session, 3_000_000_000, 1_000_000_000, 30_000_000_000, 128)?;
+println!("{:?}", ci_live::run(&mut browser, &mut input, &mut output, &ci_live::Options::default())?);
+input.close()?;
+output.close()?;
+```
+
+`ci_live::Options` sets cancellation and SysEx assembly limits, matching Python's
+keyword options. Set both transports to UMP and give the route an explicit group
+for SysEx7. This scan sends Discovery and endpoint inquiries only; it performs no
+Profiles, Property Exchange or instrument configuration writes.

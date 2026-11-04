@@ -1,12 +1,12 @@
 //! Python one-shot queries over the shared MTS tracker and codecs.
 use crate::files::{os_error, Stream};
-use meedee::tuning_query;
+use meedee::tuning as tuning_query;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 
 #[pyclass(frozen, module = "meedee.tuning")]
 struct QueryReport {
-    value: tuning_query::Report,
+    value: tuning_query::QueryReport,
 }
 #[pymethods]
 impl QueryReport {
@@ -101,9 +101,9 @@ impl Query {
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         let item = if let Ok(e) = crate::event_values::extract(&item) {
-            meedee::live::Item::Message(Box::new(e))
+            meedee::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            meedee::live::Item::Diagnostic(d.value.clone())
+            meedee::events::InputItem::Diagnostic(d.value.clone())
         } else {
             return Err(PyTypeError::new_err("expected Message or StreamDiagnostic"));
         };

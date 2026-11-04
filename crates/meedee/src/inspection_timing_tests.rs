@@ -1,9 +1,9 @@
-use meedee::inspection_timing::Timing;
-use meedee::messages::Message;
+use crate::inspection_timing::Timing;
+use crate::messages::Message;
 
 #[test]
 fn live_observer_reuses_timing_without_double_counting_loss_counters() {
-    use meedee::{
+    use crate::{
         events::{Clock, Payload},
         inspection::Observer,
         live::{Diagnostic, DiagnosticKind, Item},
@@ -13,8 +13,8 @@ fn live_observer_reuses_timing_without_double_counting_loss_counters() {
     let mut o = Observer::new("s".into(), c, 2).unwrap();
     let e = Item::Message(Box::new(
         (Payload::Midi1(AnyMessage::TimingClock(TimingClock::new().unwrap())))
-            .with_metadata(meedee::messages::Metadata {
-                source: Some("s".into()),
+            .with_metadata(crate::messages::Metadata {
+                stream: Some("s".into()),
                 timestamp: None,
                 span: None,
             })
@@ -31,9 +31,9 @@ fn live_observer_reuses_timing_without_double_counting_loss_counters() {
     .unwrap();
     o.loss_counter_changed();
     let report = o.snapshot();
-    assert_eq!(report.lost_events, 3);
-    assert_eq!(report.records, 2);
-    assert!(!report.complete);
+    assert_eq!(report.lost_events(), 3);
+    assert_eq!(report.records(), 2);
+    assert!(!report.complete());
 }
 
 #[test]

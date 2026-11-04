@@ -15,18 +15,17 @@ impl Report {
     #[getter]
     fn note_state(&self) -> crate::notes::Report {
         crate::notes::Report {
-            value: self.value.notes.snapshot(),
+            value: self.value.note_state(),
         }
     }
     #[getter]
     fn source_counts(&self) -> BTreeMap<String, u64> {
-        self.value.timing.source_counts.clone()
+        self.value.source_counts().clone()
     }
     #[getter]
     fn timing_segments(&self) -> Vec<TimingSegment> {
         self.value
-            .timing
-            .segments
+            .timing_segments()
             .iter()
             .map(|v| TimingSegment { value: v.clone() })
             .collect()
@@ -34,44 +33,43 @@ impl Report {
     #[getter]
     fn timing_diagnostics(&self) -> Vec<TimingDiagnostic> {
         self.value
-            .timing
-            .diagnostics
+            .timing_diagnostics()
             .iter()
             .map(|v| TimingDiagnostic { value: v.clone() })
             .collect()
     }
     #[getter]
     fn timestamp_regressions(&self) -> u64 {
-        self.value.timing.regressions
+        self.value.timestamp_regressions()
     }
     #[getter]
     fn omitted_segments(&self) -> u64 {
-        self.value.timing.omitted_segments
+        self.value.omitted_segments()
     }
     #[getter]
     fn omitted_diagnostics(&self) -> u64 {
-        self.value.timing.omitted_diagnostics
+        self.value.omitted_diagnostics()
     }
     #[getter]
     fn complete(&self) -> bool {
-        self.value.complete
+        self.value.complete()
     }
     #[getter]
     fn problem(&self) -> Option<&str> {
-        self.value.problem.as_deref()
+        self.value.problem().as_deref()
     }
     #[getter]
     fn records(&self) -> u64 {
-        self.value.records
+        self.value.records()
     }
     #[getter]
     fn message_counts(&self) -> BTreeMap<&str, u64> {
-        self.value.message_counts.clone()
+        self.value.message_counts().clone()
     }
     #[getter]
     fn clocks(&self) -> Vec<crate::packets::Clock> {
         self.value
-            .clocks
+            .clocks()
             .iter()
             .map(|c| crate::packets::Clock { value: c.clone() })
             .collect()
@@ -79,7 +77,7 @@ impl Report {
     #[getter]
     fn streams(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
         self.value
-            .streams
+            .streams()
             .iter()
             .map(|r| crate::archive::to_python(py, r.clone()))
             .collect()
@@ -87,38 +85,40 @@ impl Report {
     #[getter]
     fn smf_header(&self) -> Option<crate::files::Header> {
         self.value
-            .smf_header
+            .smf_header()
             .clone()
             .map(|value| crate::files::Header { value })
     }
     #[getter]
     fn track_records(&self) -> BTreeMap<u16, u64> {
-        self.value.track_records.clone()
+        self.value.track_records().clone()
     }
     #[getter]
     fn gap_records(&self) -> u64 {
-        self.value.gap_records
+        self.value.gap_records()
     }
     #[getter]
     fn lost_events(&self) -> u128 {
-        self.value.lost_events
+        self.value.lost_events()
     }
     #[getter]
     fn discontinuities(&self) -> u64 {
-        self.value.discontinuities
+        self.value.discontinuities()
     }
     #[getter]
     fn untimed_events(&self) -> u64 {
-        self.value.untimed_events
+        self.value.untimed_events()
     }
     #[getter]
     fn opaque_records(&self) -> u64 {
-        self.value.opaque_records
+        self.value.opaque_records()
     }
     fn __repr__(&self) -> String {
         format!(
             "Report(records={}, complete={}, problem={:?})",
-            self.value.records, self.value.complete, self.value.problem
+            self.value.records(),
+            self.value.complete(),
+            self.value.problem()
         )
     }
 }
@@ -194,9 +194,9 @@ impl Observer {
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
         let item = if let Ok(e) = crate::event_values::extract(&item) {
-            meedee::live::Item::Message(Box::new(e))
+            meedee::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            meedee::live::Item::Diagnostic(d.value.clone())
+            meedee::events::InputItem::Diagnostic(d.value.clone())
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
                 "expected Message or StreamDiagnostic",
@@ -230,7 +230,7 @@ pub fn parse_format(format: &str) -> PyResult<inspection::Format> {
 
 #[pyclass(frozen, module = "meedee.inspection")]
 struct TimingSegment {
-    value: meedee::inspection_timing::TimingSegment,
+    value: meedee::inspection::TimingSegment,
 }
 #[pymethods]
 impl TimingSegment {
@@ -277,7 +277,7 @@ impl TimingSegment {
 }
 #[pyclass(frozen, module = "meedee.inspection")]
 struct TimingDiagnostic {
-    value: meedee::inspection_timing::TimingDiagnostic,
+    value: meedee::inspection::TimingDiagnostic,
 }
 #[pymethods]
 impl TimingDiagnostic {

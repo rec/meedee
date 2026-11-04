@@ -1,12 +1,12 @@
 use crate::files::{limit, os_error, uint, Stream};
-use meedee::comparison;
+use meedee::inspection;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
 #[pyclass(frozen, module = "meedee.inspection")]
 struct ComparisonReport {
-    value: comparison::Report,
+    value: inspection::ComparisonReport,
 }
 #[pymethods]
 impl ComparisonReport {
@@ -53,7 +53,7 @@ impl ComparisonReport {
 }
 #[pyclass(frozen, module = "meedee.inspection")]
 struct Difference {
-    value: comparison::Difference,
+    value: inspection::Difference,
 }
 #[pymethods]
 impl Difference {
@@ -84,7 +84,7 @@ fn compare_files(
     #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,
 ) -> PyResult<ComparisonReport> {
     let format = crate::inspection::parse_format(format)?;
-    let options = comparison::Options {
+    let options = inspection::ComparisonOptions {
         sources: source_map.unwrap_or_default(),
         clocks: clock_map.unwrap_or_default(),
         ignore_timestamps,
@@ -96,7 +96,7 @@ fn compare_files(
     let left = Stream::input(left)?;
     let right = Stream::input(right)?;
     let value = py
-        .detach(move || comparison::compare(left, right, format, &options))
+        .detach(move || inspection::compare(left, right, format, &options))
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::InvalidInput {
                 PyValueError::new_err(e.to_string())

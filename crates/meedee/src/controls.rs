@@ -1,7 +1,9 @@
 //! Optional observations of one source's primitive stream. Never replaces raw
 //! messages or infers physical units, lost messages, or unknown absolute values.
 
+pub use crate::event_views::{Controls as EventInterpreter, Velocity as EventVelocityInterpreter};
 use crate::messages::{AnyMessage, ControlChange};
+pub use crate::velocity::{VelocityInterpreter, VelocityObservation};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ParameterFamily {
