@@ -167,7 +167,20 @@ def test_ufor_source_choices_are_explicit_and_consistent(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as result:
-        cli.main(["ufor-preview", str(tmp_path / "absent"), *options])
+        cli.main(
+            [
+                "ufor-export",
+                str(tmp_path / "absent"),
+                str(tmp_path / "dump.syx"),
+                "--device-id",
+                "1",
+                "--program",
+                "0",
+                "--name",
+                "test",
+                *options,
+            ]
+        )
     assert result.value.code == 2 and reason in capsys.readouterr().err
 
 

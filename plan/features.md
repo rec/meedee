@@ -336,10 +336,10 @@ encoding a MIDI message.
 **Use:** Design a tuning once, audition it and prepare an explicit transfer.
 
 **Implemented foundation:** the optional Python
-[`meedee.tuning` bridge](ufor-tuning.md) previews selected keys and constructs
+[`meedee.tuning` bridge](ufor-tuning.md) converts individual notes and constructs
 ordinary/banked per-key MTS messages with explicit preservation and error policy.
 It opens no ports. Bounded bulk transfer-plan composition and optional offline
-CLI preview/exclusive SYX export now accept existing uFor Tuning JSON and Scala
+CLI exclusive SYX export accepts existing uFor Tuning JSON and Scala
 sources. Exported files use the existing explicit transfer workflow; no second
 sending host is added. Optional enge audition remains separate integration work.
 
@@ -350,7 +350,7 @@ gap-driven additions to the appropriate owner, not a second Scala/tuning stack.
 
 A CLI or GUI could compare intended and encoded pitches. Optional audition
 should use enge's existing synthesis/sampling. Sending tuning requires an explicit
-destination and action; it is not a side effect of previewing or loading a scale.
+destination and action; it is not a side effect of converting notes or loading a scale.
 
 ### E. Reuse uFor device descriptions, mappings and sequence plans
 
@@ -392,7 +392,7 @@ clock relationships, security and recovery, rather than part of these integratio
 | --- | --- | --- |
 | Implemented | Inspector, capture comparison/validation, note observation | Shared Rust/Python foundations and optional CLI |
 | Implemented in siblings | arpeg MIDI hosts, enge performance conversion/input, enveLFO MIDI mapping | Existing owners supply musical execution; do not duplicate them |
-| Implemented | uFor bulk tuning preview/export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in meedee |
+| Implemented | uFor note conversion and bulk export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in meedee |
 | Implemented foundation | Static routing, polling topology, bounded diagnostics and in-memory transports | Recovery and ownership cleanup are not implied |
 | Qualification gates | macOS/Windows/Linux backends, physical behavior and resource budgets | Build/software-loopback evidence cannot replace platform/backend evidence |
 | Standards gates | Deferred CI Profiles/Property Exchange, selected machine control | Acquire normative documents before dependent protocol implementation |

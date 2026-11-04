@@ -301,8 +301,8 @@ class TuningQuery(TuningPreview, frozen=True):
     ] = Field(default=1_048_576, gt=0)
 
 
-class UforPreview(BaseModel, frozen=True):
-    """Resolve uFor Tuning JSON or Scala pitches offline; requires meedee[ufor]."""
+class UforExport(BaseModel, frozen=True):
+    """Convert uFor notes to a new bulk-dump SYX file; requires meedee[ufor]."""
 
     source: tyro.conf.Positional[Path]
     source_format: Literal["tuning-json", "scala"]
@@ -311,6 +311,13 @@ class UforPreview(BaseModel, frozen=True):
     first_note: int = Field(default=0, ge=0, le=127)
     last_note: int = Field(default=127, ge=0, le=127)
     output: Literal["text", "json"] = "text"
+
+    destination: tyro.conf.Positional[Path]
+    device_id: int = Field(ge=0, le=126)
+    program: int = Field(ge=0, le=127)
+    name: str = Field(max_length=16, pattern=r"^[\x00-\x7f]*$")
+    bank: int | None = Field(default=None, ge=0, le=127)
+    preserve_unmapped: bool = False
 
     @model_validator(mode="after")
     def check_source(self) -> Self:
@@ -322,17 +329,6 @@ class UforPreview(BaseModel, frozen=True):
         elif self.root_note is not None or self.root_frequency is not None:
             raise ValueError("Tuning JSON supplies its own reference settings")
         return self
-
-
-class UforExport(UforPreview, frozen=True):
-    """Create a new bulk-dump SYX file offline; sending is a separate command."""
-
-    destination: tyro.conf.Positional[Path]
-    device_id: int = Field(ge=0, le=126)
-    program: int = Field(ge=0, le=127)
-    name: str = Field(max_length=16, pattern=r"^[\x00-\x7f]*$")
-    bank: int | None = Field(default=None, ge=0, le=127)
-    preserve_unmapped: bool = False
 
 
 class CiBrowse(BaseModel, frozen=True):
@@ -418,14 +414,13 @@ def run(args: list[str] | None = None) -> int:
             | SysexReceive
             | TuningPreview
             | TuningQuery
-            | UforPreview
             | UforExport
             | CiBrowse,
             args=args,
             prog="meedee",
         )
         command = type(command).model_validate(units.runtime_dump(command))
-        if isinstance(command, UforPreview):
+        if isinstance(command, UforExport):
             from ._ufor_cli import run_ufor
 
             return run_ufor(command)

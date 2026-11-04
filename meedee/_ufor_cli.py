@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from . import syx
-from ._cli import UforExport, UforPreview, emit
+from ._cli import UforExport, emit
 
 
-def run_ufor(config: UforPreview) -> int:
+def run_ufor(config: UforExport) -> int:
     try:
         from ufor import scala
         from ufor.tuning import Tuning
@@ -26,31 +26,21 @@ def run_ufor(config: UforPreview) -> int:
             root_note=config.root_note,
             root_frequency=config.root_frequency,
         )
-    result = tuning.preview(
-        source, notes=list(range(config.first_note, config.last_note + 1))
-    )
-    converted = sum(k.status == tuning.PitchStatus.CONVERTED for k in result.entries)
+    result: list[tuning.NoteTuning] = []
+    for note in range(config.first_note, config.last_note + 1):
+        try:
+            result.append(tuning.convert(source, note))
+        except KeyError as error:
+            if not config.preserve_unmapped:
+                raise ValueError(str(error)) from error
+            result.append(tuning.NoteTuning(note=note, pitch=tuning.NoChange()))
+        except ArithmeticError as error:
+            raise ValueError(f"cannot convert note {note}: {error}") from error
+    converted = sum(isinstance(k.pitch, tuning.Pitch) for k in result)
     data: dict[str, object] = {
-        "selected_keys": len(result.entries),
+        "selected_keys": len(result),
         "converted_keys": converted,
-        "entries": [
-            {
-                "note": k.note,
-                "status": k.status.value,
-                "frequency": None if k.frequency is None else str(k.frequency),
-                "semitone": None if k.pitch is None else k.pitch.semitone,
-                "fraction": None if k.pitch is None else k.pitch.fraction,
-                "encoded_frequency_hz": k.encoded_frequency_hz,
-                "error_cents": k.error_cents,
-                "reason": k.reason,
-            }
-            for k in result.entries
-        ],
     }
-    if not isinstance(config, UforExport):
-        data.update({"kind": "ufor_preview", "dry_run": True})
-        emit(data, config.output)
-        return 0 if converted == len(result.entries) else 1
     plan = tuning.bulk_plan(
         result,
         device_id=config.device_id,

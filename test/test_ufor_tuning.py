@@ -12,109 +12,71 @@ from ufor.tuning import Computed, FrequencyTable, IntervalPattern, RatioTable, T
 from meedee import codecs, messages, tuning
 
 
-def test_ratio_preview_preserves_exact_values_order_and_quantization_error() -> None:
+def test_conversion_returns_a_native_note_tuning() -> None:
     source = Tuning(source=RatioTable(values=["1", "3/2"]), root_note=69)
-    result = tuning.preview(source, notes=[70, 69, 71])
-    assert [k.note for k in result.entries] == [70, 69, 71]
-    fifth, root, missing = result.entries
-    assert fifth.frequency == Fraction(660)
-    assert isinstance(fifth.frequency, Fraction)
-    assert fifth.pitch == tuning.Pitch(semitone=76, fraction=320)
-    assert fifth.error_cents is not None and -0.0031 < fifth.error_cents < 0
-    assert fifth.pitch is not None
-    assert fifth.encoded_frequency_hz == fifth.pitch.frequency_hz
-    assert root.frequency == Fraction(440)
-    assert root.pitch == tuning.Pitch(semitone=69, fraction=0)
-    assert root.error_cents == 0
-    assert missing.status == tuning.PitchStatus.UNMAPPED
-    assert missing.frequency is None and missing.pitch is None
+    assert tuning.convert(source, 70) == tuning.NoteTuning(
+        note=70, pitch=tuning.Pitch(semitone=76, fraction=320)
+    )
+    assert tuning.convert(source, 69).pitch == tuning.Pitch(semitone=69, fraction=0)
+    with pytest.raises(KeyError, match="outside"):
+        tuning.convert(source, 71)
 
 
 @pytest.mark.parametrize(
     "source",
     [
-        Tuning(
-            source=FrequencyTable(values=["440", "660"], first_note=69), root_note=0
-        ),
+        Tuning(source=FrequencyTable(values=["440", "660"], first_note=69)),
         Tuning(source=IntervalPattern(intervals=["3/2"], repeat=False), root_note=69),
     ],
 )
 def test_finite_source_coverage_uses_its_actual_note_origin(source: Tuning) -> None:
-    result = tuning.preview(source, notes=[68, 69, 70, 71])
-    assert [k.status for k in result.entries] == [
-        tuning.PitchStatus.UNMAPPED,
-        tuning.PitchStatus.CONVERTED,
-        tuning.PitchStatus.CONVERTED,
-        tuning.PitchStatus.UNMAPPED,
-    ]
-    assert [k.frequency for k in result.entries] == [
-        None,
-        Fraction(440),
-        Fraction(660),
-        None,
-    ]
+    for n in [68, 71]:
+        with pytest.raises(KeyError):
+            tuning.convert(source, n)
+    assert tuning.convert(source, 69).pitch == tuning.Pitch(semitone=69, fraction=0)
+    assert tuning.convert(source, 70).pitch == tuning.Pitch(semitone=76, fraction=320)
 
 
 def test_scala_and_computed_tunings_use_existing_ufor_resolution() -> None:
     table = scala.parse_scala("Three steps\n3\n9/8\n3/2\n2/1\n", name="three")
-    source = Tuning(source=table)
-    result = tuning.preview(source, notes=[69, 70, 71, 72])
-    assert [k.frequency for k in result.entries] == [
-        Fraction(440),
-        Fraction(495),
-        Fraction(660),
-        Fraction(880),
-    ]
-    edo = Tuning(source=Computed(notes_per_octave=19))
-    resolved = tuning.preview(edo, notes=[69, 70, 88])
-    assert resolved.entries[0].frequency == Fraction(440)
-    assert isinstance(resolved.entries[1].frequency, float)
-    assert resolved.entries[1].frequency == edo(70)
-    assert resolved.entries[2].frequency == Fraction(880)
+    for source in [Tuning(source=table), Tuning(source=Computed(notes_per_octave=19))]:
+        for n in [69, 70, 71, 72]:
+            assert (
+                tuning.convert(source, n).pitch
+                == tuning.Pitch.from_frequency(frequency_hz=float(source(n))).pitch
+            )
 
 
-def test_missing_out_of_range_and_evaluation_errors_are_distinct() -> None:
+def test_invalid_frequencies_and_evaluation_errors_raise() -> None:
     source = Tuning(source=FrequencyTable(values=["1", "440", "100000"], first_note=60))
-    result = tuning.preview(source, notes=[59, 60, 61, 62])
-    assert [k.status for k in result.entries] == [
-        tuning.PitchStatus.UNMAPPED,
-        tuning.PitchStatus.OUT_OF_RANGE,
-        tuning.PitchStatus.CONVERTED,
-        tuning.PitchStatus.OUT_OF_RANGE,
-    ]
-    assert result.entries[1].frequency == Fraction(1)
-    # A caller-mutated expression is an evaluation error, not a missing key.
+    for n in [60, 62]:
+        with pytest.raises(ValueError, match="MTS frequency range"):
+            tuning.convert(source, n)
     assert isinstance(source.source, FrequencyTable)
     source.source.values[1] = "1/0"
-    failed = tuning.preview(source, notes=[61])
-    assert failed.entries[0].status == tuning.PitchStatus.EVALUATION_ERROR
-    assert failed.entries[0].reason
-    for item in [result, failed]:
-        with pytest.raises(ValueError):
-            tuning.note_changes(
-                item, device_id=1, program=0, realtime=True, preserve_unmapped=True
-            )
+    with pytest.raises((ArithmeticError, ValueError)):
+        tuning.convert(source, 61)
 
 
 @pytest.mark.parametrize("semitone, fraction, direction", [(0, 0, -1), (127, 16382, 1)])
 def test_out_of_range_exact_pitch_cannot_round_onto_a_valid_endpoint(
-    semitone: int,
-    fraction: int,
-    direction: int,
+    semitone: int, fraction: int, direction: int
 ) -> None:
     edge = Fraction(tuning.Pitch(semitone=semitone, fraction=fraction).frequency_hz)
     outside = edge + direction * Fraction(1, 10**30)
     assert float(outside) == float(edge)
     source = Tuning(source=FrequencyTable(values=[str(outside)], first_note=0))
-    result = tuning.preview(source, notes=[0])
-    assert result.entries[0].frequency == outside
-    assert result.entries[0].status == tuning.PitchStatus.OUT_OF_RANGE
+    with pytest.raises(ValueError, match="MTS frequency range"):
+        tuning.convert(source, 0)
 
 
 def test_bulk_requires_complete_resolution_or_explicit_preservation() -> None:
-    result = tuning.preview(
-        Tuning(source=FrequencyTable(values=["440"], first_note=69)), notes=[68, 69]
-    )
+    result = [
+        tuning.NoteTuning(note=68, pitch=tuning.NoChange()),
+        tuning.convert(
+            Tuning(source=FrequencyTable(values=["440"], first_note=69)), 69
+        ),
+    ]
     with pytest.raises(ValueError):
         tuning.bulk_dump(result, device_id=1, program=2, name="test")
     for bank in [None, 3]:
@@ -141,7 +103,7 @@ def test_bulk_requires_complete_resolution_or_explicit_preservation() -> None:
 
 
 def test_unselected_keys_need_preservation_for_bulk_but_not_for_note_changes() -> None:
-    result = tuning.preview(Tuning(source=Computed()), notes=[69])
+    result = [tuning.convert(Tuning(source=Computed()), 69)]
     with pytest.raises(ValueError, match="128"):
         tuning.bulk_dump(result, device_id=1, program=0, name="partial")
     message = tuning.note_changes(result, device_id=1, program=0, realtime=True)[0]
@@ -153,8 +115,7 @@ def test_unselected_keys_need_preservation_for_bulk_but_not_for_note_changes() -
 
 
 def test_full_keyboard_builds_both_bulk_formats_and_bounded_note_batches() -> None:
-    result = tuning.preview(Tuning(source=Computed()), notes=list(range(128)))
-    assert all(k.status == tuning.PitchStatus.CONVERTED for k in result.entries)
+    result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
     for bank in [None, 0]:
         message = tuning.bulk_dump(
             result, device_id=127, program=127, name="equal", bank=bank
@@ -174,7 +135,10 @@ def test_full_keyboard_builds_both_bulk_formats_and_bounded_note_batches() -> No
 
 
 def test_note_changes_preserve_only_explicit_unmapped_keys() -> None:
-    result = tuning.preview(Tuning(source=RatioTable(values=["1"])), notes=[69, 70])
+    result = [
+        tuning.convert(Tuning(source=RatioTable(values=["1"])), 69),
+        tuning.NoteTuning(note=70, pitch=tuning.NoChange()),
+    ]
     with pytest.raises(ValueError):
         tuning.note_changes(result, device_id=1, program=0, realtime=True)
     outgoing = tuning.note_changes(
@@ -188,26 +152,18 @@ def test_note_changes_preserve_only_explicit_unmapped_keys() -> None:
 
 
 @pytest.mark.parametrize(
-    "notes, exception",
-    [
-        ([], ValueError),
-        ([69, 69], ValueError),
-        ([128], ValueError),
-        ([True], TypeError),
-        ([69.0], TypeError),
-    ],
+    "note, exception",
+    [(-1, ValueError), (128, ValueError), (True, TypeError), (69.0, TypeError)],
 )
-def test_key_selection_is_bounded_distinct_and_strict(
-    notes: list[int], exception: type[Exception]
-) -> None:
+def test_conversion_requires_a_midi_note(note: int, exception: type[Exception]) -> None:
     with pytest.raises(exception):
-        tuning.preview(Tuning(source=Computed()), notes=notes)
+        tuning.convert(Tuning(source=Computed()), note)
 
 
 def test_message_builders_keep_native_validation_and_require_explicit_settings() -> (
     None
 ):
-    result = tuning.preview(Tuning(source=Computed()), notes=[69])
+    result = [tuning.convert(Tuning(source=Computed()), 69)]
     with pytest.raises(TypeError):
         tuning.note_changes(result, device_id=True, program=0, realtime=True)
     with pytest.raises(ValueError):
@@ -218,17 +174,16 @@ def test_message_builders_keep_native_validation_and_require_explicit_settings()
         )
 
 
-def test_detuning_uses_ufor_and_preview_records_do_not_change_with_source_edits() -> (
+def test_detuning_uses_ufor_and_converted_notes_do_not_change_with_source_edits() -> (
     None
 ):
     source = Tuning(source=RatioTable(values=["1"]), detune_cents=100)
-    result = tuning.preview(source, notes=[69])
-    assert result.entries[0].frequency == source(69)
-    assert result.entries[0].pitch == tuning.Pitch(semitone=70, fraction=0)
+    result = [tuning.convert(source, 69)]
+    assert result[0].pitch == tuning.Pitch(semitone=70, fraction=0)
     assert isinstance(source.source, RatioTable)
     source.source.values[0] = "2"
-    assert result.entries[0].pitch == tuning.Pitch(semitone=70, fraction=0)
-    result.entries.append(result.entries[0])
+    assert result[0].pitch == tuning.Pitch(semitone=70, fraction=0)
+    result.append(result[0])
     with pytest.raises(ValueError, match="distinct"):
         tuning.bulk_dump(
             result, device_id=1, program=0, name="duplicate", preserve_unmapped=True
@@ -238,12 +193,8 @@ def test_detuning_uses_ufor_and_preview_records_do_not_change_with_source_edits(
 @pytest.mark.parametrize("detune", [1e308, -1e308])
 def test_ufor_numeric_overflow_and_underflow_cannot_generate_mts(detune: float) -> None:
     source = Tuning(source=Computed(), detune_cents=detune)
-    result = tuning.preview(source, notes=[69])
-    assert result.entries[0].status == tuning.PitchStatus.EVALUATION_ERROR
-    with pytest.raises(ValueError, match="evaluation_error"):
-        tuning.note_changes(
-            result, device_id=1, program=0, realtime=True, preserve_unmapped=True
-        )
+    with pytest.raises((ArithmeticError, ValueError)):
+        tuning.convert(source, 69)
 
 
 @pytest.mark.parametrize("bank", [None, 3])
@@ -255,7 +206,7 @@ def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast
     from meedee import transfer, transfer_output
     from meedee.testing import Output
 
-    result = tuning.preview(Tuning(source=Computed()), notes=list(range(128)))
+    result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
     plan = tuning.bulk_plan(
         result,
         device_id=127,

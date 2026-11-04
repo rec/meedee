@@ -1,14 +1,10 @@
-"""MIDI Tuning Standard values, source previews and explicit message construction."""
+"""MIDI Tuning Standard values, note conversion and message construction."""
 
 from __future__ import annotations
 
 import sys
-from enum import StrEnum, auto
-from fractions import Fraction
 from math import isfinite
 from typing import TYPE_CHECKING
-
-from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from ufor.tuning import Tuning
@@ -20,121 +16,31 @@ _core.populate_tuning(sys.modules[__name__])
 del sys, _core
 
 
-class PitchStatus(StrEnum):
-    CONVERTED = auto()
-    UNMAPPED = auto()
-    OUT_OF_RANGE = auto()
-    EVALUATION_ERROR = auto()
-
-
-class KeyPreview(BaseModel, frozen=True):
-    note: int
-    status: PitchStatus
-    frequency: float | int | Fraction | None = None
-    pitch: tuning.Pitch | None = None
-    encoded_frequency_hz: float | None = None
-    error_cents: float | None = None
-    reason: str | None = None
-
-    model_config = {
-        "arbitrary_types_allowed": True,
-        "strict": True,
-        "extra": "forbid",
-        "allow_inf_nan": False,
-        "validate_default": True,
-    }
-
-
-class Preview(BaseModel, frozen=True):
-    entries: list[KeyPreview]
-
-    model_config = {
-        "strict": True,
-        "extra": "forbid",
-        "allow_inf_nan": False,
-        "validate_default": True,
-    }
-
-
-def preview(source: Tuning, *, notes: list[int]) -> Preview:
-    """Resolve selected keys in caller order; preserve uFor's exact result types."""
+def convert(source: Tuning, note: int) -> tuning.NoteTuning:
+    """Convert one source note to MTS; raise KeyError outside finite coverage."""
     from ufor.tuning import Tuning
 
     if not isinstance(source, Tuning):
         raise TypeError("source must be a uFor Tuning")
-    selected = _check_notes(notes)
-    definition = source.model_copy(deep=True)
+    _check_notes([note])
+    if not _covered(source, note):
+        raise KeyError(f"note {note} is outside the finite uFor tuning")
+    frequency = source(note)
+    if isinstance(frequency, float) and not isfinite(frequency):
+        raise ValueError("uFor resolved a non-finite frequency")
+    if frequency <= 0:
+        raise ValueError("uFor resolved a non-positive frequency")
     minimum = tuning.Pitch(semitone=0, fraction=0).frequency_hz
     maximum = tuning.Pitch(semitone=127, fraction=16382).frequency_hz
-    entries: list[KeyPreview] = []
-    for note in selected:
-        if not _covered(definition, note):
-            entries.append(
-                KeyPreview(
-                    note=note,
-                    status=PitchStatus.UNMAPPED,
-                    reason="key is outside the finite uFor tuning",
-                )
-            )
-            continue
-        try:
-            frequency = definition(note)
-        except (ArithmeticError, ValueError) as error:
-            entries.append(
-                KeyPreview(
-                    note=note,
-                    status=PitchStatus.EVALUATION_ERROR,
-                    reason=str(error),
-                )
-            )
-            continue
-        if isinstance(frequency, float) and not isfinite(frequency):
-            entries.append(
-                KeyPreview(
-                    note=note,
-                    status=PitchStatus.EVALUATION_ERROR,
-                    reason="uFor resolved a non-finite frequency",
-                )
-            )
-            continue
-        if frequency <= 0:
-            entries.append(
-                KeyPreview(
-                    note=note,
-                    frequency=frequency,
-                    status=PitchStatus.EVALUATION_ERROR,
-                    reason="uFor resolved a non-positive frequency",
-                )
-            )
-            continue
-        # Compare the original value before converting an exact Fraction to
-        # double. An out-of-range rational must not round onto an endpoint.
-        if not minimum <= frequency <= maximum:
-            entries.append(
-                KeyPreview(
-                    note=note,
-                    frequency=frequency,
-                    status=PitchStatus.OUT_OF_RANGE,
-                    reason="frequency is outside meedee's MTS frequency range",
-                )
-            )
-            continue
-        converted = tuning.Pitch.from_frequency(frequency_hz=float(frequency))
-        entries.append(
-            KeyPreview(
-                note=note,
-                frequency=frequency,
-                status=PitchStatus.CONVERTED,
-                pitch=converted.pitch,
-                encoded_frequency_hz=converted.pitch.frequency_hz,
-                error_cents=converted.error_cents,
-            )
-        )
-    return Preview(entries=entries)
+    # Compare exact values before float conversion can round onto an endpoint.
+    if not minimum <= frequency <= maximum:
+        raise ValueError("frequency is outside meedee's MTS frequency range")
+    pitch = tuning.Pitch.from_frequency(frequency_hz=float(frequency)).pitch
+    return tuning.NoteTuning(note=note, pitch=pitch)
 
 
 def bulk_dump(
-    result: Preview,
+    result: list[tuning.NoteTuning],
     *,
     device_id: int,
     program: int,
@@ -162,7 +68,7 @@ def bulk_dump(
 
 
 def bulk_plan(
-    result: Preview,
+    result: list[tuning.NoteTuning],
     *,
     device_id: int,
     program: int,
@@ -190,7 +96,7 @@ def bulk_plan(
 
 
 def note_changes(
-    result: Preview,
+    result: list[tuning.NoteTuning],
     *,
     device_id: int,
     program: int,
@@ -257,18 +163,15 @@ def _covered(definition: Tuning, note: int) -> bool:
     return True
 
 
-def _changes(result: Preview, preserve_unmapped: bool) -> list[tuning.NoteTuning]:
+def _changes(
+    result: list[tuning.NoteTuning], preserve_unmapped: bool
+) -> list[tuning.NoteTuning]:
     if type(preserve_unmapped) is not bool:
         raise TypeError("preserve_unmapped must be a boolean")
-    entries = result.entries.copy()
-    _check_notes([k.note for k in entries])
-    changes: list[tuning.NoteTuning] = []
-    for key in entries:
-        if key.status == PitchStatus.CONVERTED and key.pitch is not None:
-            value: tuning.Pitch | tuning.NoChange = key.pitch
-        elif key.status == PitchStatus.UNMAPPED and preserve_unmapped:
-            value = tuning.NoChange()
-        else:
-            raise ValueError(f"key {key.note} cannot be generated: {key.status.value}")
-        changes.append(tuning.NoteTuning(note=key.note, pitch=value))
+    changes = result.copy()
+    _check_notes([k.note for k in changes])
+    if not preserve_unmapped and any(
+        isinstance(k.pitch, tuning.NoChange) for k in changes
+    ):
+        raise ValueError("NoChange requires explicit preservation")
     return changes

@@ -1,11 +1,8 @@
 """MTS exact values. Device IDs and tuning banks/programs are 0–127."""
 
-from enum import Enum, StrEnum, auto
-from fractions import Fraction
+from enum import Enum
 from os import PathLike
 from typing import TYPE_CHECKING, BinaryIO
-
-from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from ufor.tuning import Tuning
@@ -420,27 +417,9 @@ class Query:
     def snapshot(self) -> QueryReport: ...
     def write(self, destination: str | PathLike[str] | BinaryIO) -> None: ...
 
-class PitchStatus(StrEnum):
-    CONVERTED = auto()
-    UNMAPPED = auto()
-    OUT_OF_RANGE = auto()
-    EVALUATION_ERROR = auto()
-
-class KeyPreview(BaseModel, frozen=True):
-    note: int
-    status: PitchStatus
-    frequency: float | int | Fraction | None = None
-    pitch: Pitch | None = None
-    encoded_frequency_hz: float | None = None
-    error_cents: float | None = None
-    reason: str | None = None
-
-class Preview(BaseModel, frozen=True):
-    entries: list[KeyPreview]
-
-def preview(source: Tuning, *, notes: list[int]) -> Preview: ...
+def convert(source: Tuning, note: int) -> NoteTuning: ...
 def bulk_dump(
-    result: Preview,
+    result: list[NoteTuning],
     *,
     device_id: int,
     program: int,
@@ -449,7 +428,7 @@ def bulk_dump(
     preserve_unmapped: bool = False,
 ) -> BulkDump | KeyBasedDump: ...
 def bulk_plan(
-    result: Preview,
+    result: list[NoteTuning],
     *,
     device_id: int,
     program: int,
@@ -459,7 +438,7 @@ def bulk_plan(
     preserve_unmapped: bool = False,
 ) -> transfer.Plan: ...
 def note_changes(
-    result: Preview,
+    result: list[NoteTuning],
     *,
     device_id: int,
     program: int,

@@ -162,11 +162,10 @@ users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
 ## Offline uFor tuning
 
-Python 3.13 users with `meedee[cli,ufor]` can run `meedee ufor-preview` and
-`meedee ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
+Python 3.13 users with `meedee[cli,ufor]` can run `meedee ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
 root note/frequency. Export creates an ordinary or banked bulk `.syx` file without
 overwriting; sending remains a separate `transfer-send` action. See the
-[offline tuning workflow](plan/ufor-tuning.md#offline-file-workflow).
+[offline tuning workflow](plan/ufor-tuning.md#offline-file-export).
 
 ## Request an MTS tuning dump
 
@@ -410,13 +409,14 @@ for units, names, checksum behavior and request tracking.
 ## Optional uFor tuning bridge
 
 Install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
-`meedee.tuning.preview(source, notes=[...])` resolves an existing uFor
-`Tuning`, retaining exact frequencies where available, encoded pitches and signed
-MTS rounding errors. Finite-source gaps and evaluation/range failures stay
-explicit. `bulk_dump()` and `note_changes()` construct messages with explicit
-device/program/bank and real-time settings. They open no ports and send nothing.
-Unmapped keys require deliberate `preserve_unmapped=True`; invalid pitches always
-block generation. See the [bridge contract](plan/ufor-tuning.md).
+`meedee.tuning.convert(source, note)` converts one note from an existing uFor
+`Tuning` to a native `NoteTuning`. Missing source notes raise `KeyError`; invalid
+frequencies and evaluation failures raise errors. Collect notes with a comprehension
+when building a multi-key message. `bulk_dump()` and `note_changes()` accept those
+notes and construct messages with explicit device/program/bank and real-time
+settings. They open no ports and send nothing. Omitted bulk keys or explicit
+`NoChange` values require `preserve_unmapped=True`. See the
+[bridge contract](plan/ufor-tuning.md).
 
 meedee supports Python 3.13 only, including patch releases. Ordinary installs
 use reccy for unit-aware Python inputs; uFor remains an optional extra.

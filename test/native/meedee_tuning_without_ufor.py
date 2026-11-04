@@ -22,15 +22,12 @@ def check_without_ufor() -> None:
     from meedee import tuning
 
     assert tuning.Pitch(semitone=69, fraction=0).frequency_hz == 440
-    result = tuning.Preview(
-        entries=[
-            tuning.KeyPreview(
-                note=69,
-                status=tuning.PitchStatus.CONVERTED,
-                pitch=tuning.Pitch(semitone=69, fraction=0),
-            )
-        ]
-    )
+    result = [
+        tuning.NoteTuning(
+            note=69,
+            pitch=tuning.Pitch(semitone=69, fraction=0),
+        )
+    ]
     assert tuning.bulk_dump(
         result, device_id=1, program=0, name="test", preserve_unmapped=True
     ).table.values[69] == tuning.Pitch(semitone=69, fraction=0)

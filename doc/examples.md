@@ -287,10 +287,10 @@ from ufor.tuning import RatioTable, Tuning
 from meedee import codecs, messages, syx, tuning
 
 source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
-preview = tuning.preview(source, notes=[69, 70, 71])
-print(preview)
+pitches = [tuning.convert(source, n) for n in [69, 70, 71]]
+print(pitches)
 dump = tuning.bulk_dump(
-    preview,
+    pitches,
     device_id=0,
     program=2,
     name="Just three",

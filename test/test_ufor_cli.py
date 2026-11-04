@@ -29,42 +29,18 @@ def forbid_devices(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(midi, n, forbidden)
 
 
-def test_json_and_scala_preview_keep_exact_values_and_report_omissions(
-    tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
+def test_scala_export_converts_each_selected_note(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    source = tmp_path / "tuning.json"
-    source.write_text(Tuning(source=RatioTable(values=["1", "3/2"])).model_dump_json())
-    before = source.read_bytes()
+    source = tmp_path / "scale.scl"
+    source.write_text("Three steps\n3\n9/8\n3/2\n2/1\n")
+    destination = tmp_path / "scale.syx"
     assert (
         invoke(
             [
-                "ufor-preview",
+                "ufor-export",
                 str(source),
-                "--source-format",
-                "tuning-json",
-                "--first-note",
-                "69",
-                "--last-note",
-                "71",
-                "--output",
-                "json",
-            ]
-        )
-        == 1
-    )
-    report = json.loads(capsys.readouterr().out)
-    assert report["dry_run"] and report["converted_keys"] == 2
-    assert [k["frequency"] for k in report["entries"]] == ["440", "660", None]
-    assert report["entries"][2]["status"] == "unmapped"
-    assert source.read_bytes() == before
-    scala = tmp_path / "scale.scl"
-    scala.write_text("Three steps\n3\n9/8\n3/2\n2/1\n")
-    assert (
-        invoke(
-            [
-                "ufor-preview",
-                str(scala),
+                str(destination),
                 "--source-format",
                 "scala",
                 "--root-note",
@@ -75,6 +51,13 @@ def test_json_and_scala_preview_keep_exact_values_and_report_omissions(
                 "69",
                 "--last-note",
                 "72",
+                "--device-id",
+                "1",
+                "--program",
+                "0",
+                "--name",
+                "scale",
+                "--preserve-unmapped",
                 "--output",
                 "json",
             ]
@@ -82,8 +65,11 @@ def test_json_and_scala_preview_keep_exact_values_and_report_omissions(
         == 0
     )
     report = json.loads(capsys.readouterr().out)
-    assert [k["frequency"] for k in report["entries"]] == ["440", "495", "660", "880"]
-    assert report["entries"][2]["error_cents"] != 0
+    assert report["converted_keys"] == 4
+    plan = transfer.read_file(destination, gap=0)
+    decoded = tuning.decode(plan.message(0))
+    assert decoded is not None and isinstance(decoded.message, tuning.BulkDump)
+    assert decoded.message.table.values[71] == tuning.Pitch(semitone=76, fraction=320)
 
 
 @pytest.mark.parametrize("bank", [None, 3])
@@ -173,7 +159,7 @@ def test_partial_export_requires_preservation_and_never_hides_invalid_pitches(
     failed = tmp_path / "invalid.syx"
     args[2] = str(failed)
     assert invoke(args + ["--preserve-unmapped"]) == 2 and not failed.exists()
-    assert "out_of_range" in capsys.readouterr().err
+    assert "MTS frequency range" in capsys.readouterr().err
 
 
 def test_bad_source_does_not_create_a_destination(
