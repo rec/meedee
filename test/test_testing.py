@@ -76,7 +76,9 @@ def test_decoded_overflow_and_explicit_loss_reset_interpretation() -> None:
 
 
 def test_ump_values_keep_native_width_and_protocol_mismatches_are_rejected() -> None:
-    message = ump.Midi2ControlChange(group=4, channel=2, controller=7, value=0xFEDCBA98)
+    message = messages.ControlChange(
+        version=2, group=4, channel=2, controller=7, value=0xFEDCBA98
+    )
     o = testing.Output(protocol="ump")
     o(message)
     packet = o.take_packet()

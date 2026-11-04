@@ -99,7 +99,7 @@ impl Note {
     }
 
     pub fn velocity(&self) -> u8 {
-        self.attack.velocity()
+        self.attack.velocity() as u8
     }
 
     pub fn channel(&self) -> Option<u8> {

@@ -71,8 +71,14 @@ fn metadata_is_ignored_by_equality_and_hash_across_message_families() {
         )
         .unwrap(),
     ));
-    check_value(ump::UmpMessage::Midi2NoteOn(
-        ump::Midi2NoteOn::new(1, 2, 60, 1234, 0, 0).unwrap(),
+    check_value(ump::UmpMessage::NoteOn(
+        meedee::messages::NoteOn::new_midi2(60)
+            .and_then(|m| m.with_group(1))
+            .and_then(|m| m.with_channel(2))
+            .and_then(|m| m.with_velocity(1234))
+            .and_then(|m| m.with_attribute_type(0))
+            .and_then(|m| m.with_attribute_data(0))
+            .unwrap(),
     ));
     check_value(ump::SysEx7Packet::new(1, 0, vec![125, 1]).unwrap());
     assert_ne!(NoteOn::new(60).unwrap(), NoteOn::new(61).unwrap());

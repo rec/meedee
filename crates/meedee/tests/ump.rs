@@ -1,4 +1,43 @@
 use meedee::{messages::*, ump::*};
+
+#[test]
+fn shared_channel_values_keep_versions_defaults_and_encoding_boundaries() {
+    let byte = NoteOn::new(60).unwrap().with_channel(1).unwrap();
+    let wide = NoteOn::new_midi2(60).unwrap();
+    assert_eq!(byte.version(), 1);
+    assert_eq!(byte.group(), None);
+    assert_eq!(wide.version(), 2);
+    assert_eq!(wide.group(), Some(1));
+    assert_eq!(wide.channel(), None);
+    assert_eq!(u32::from(wide.velocity()), scale_up(90, 7, 16).unwrap());
+    assert!(encode(&wide).is_err());
+    assert!(encode(&byte).is_err());
+    let wide = wide.with_channel(1).unwrap();
+    assert!(wide.encode().is_err());
+    assert_ne!(byte, wide);
+    assert!(to_midi2(&AnyMessage::NoteOn(wide.clone()), 1).is_err());
+    assert!(byte.clone().with_group(1).is_err());
+    assert!(byte.with_attribute_type(0).is_err());
+    assert_eq!(wide.clone().with_velocity(90).unwrap().velocity(), 90);
+    let attributed = wide
+        .with_attribute_type(3)
+        .unwrap()
+        .with_attribute_data(123)
+        .unwrap();
+    let shifted = attributed.transpose(12);
+    assert_eq!(shifted.note(), 72);
+    assert_eq!(shifted.attribute_data(), Some(123));
+    assert_eq!(shifted.version(), 2);
+    let bend = PitchBend::new_midi2()
+        .unwrap()
+        .with_value(i32::MAX.into())
+        .unwrap()
+        .with_channel(1)
+        .unwrap();
+    assert!(bend.encode().is_err());
+    assert_eq!(encode(&bend).unwrap(), [0x40e00000, u32::MAX]);
+}
+
 fn vectors() -> Vec<(&'static str, Vec<u32>)> {
     include_str!("fixtures/ump.txt")
         .lines()
@@ -23,11 +62,29 @@ fn independent_packets_cover_all_families_and_preserve_native_widths() {
         }
     }
     assert_eq!(
-        encode(&Midi2NoteOn::new(16, 16, 127, 65535, 3, 65535).unwrap()).unwrap(),
+        encode(
+            &meedee::messages::NoteOn::new_midi2(127)
+                .and_then(|m| m.with_group(16))
+                .and_then(|m| m.with_channel(16))
+                .and_then(|m| m.with_velocity(65535))
+                .and_then(|m| m.with_attribute_type(3))
+                .and_then(|m| m.with_attribute_data(65535))
+                .unwrap()
+        )
+        .unwrap(),
         [0x4f9f7f03, 0xffffffff]
     );
     assert_eq!(
-        encode(&Midi2ProgramChange::new(16, 16, 128, 1, 121, 3).unwrap()).unwrap(),
+        encode(
+            &meedee::messages::ProgramChange::new_midi2(128)
+                .and_then(|m| m.with_group(16))
+                .and_then(|m| m.with_channel(16))
+                .and_then(|m| m.with_options(1))
+                .and_then(|m| m.with_bank_msb(121))
+                .and_then(|m| m.with_bank_lsb(3))
+                .unwrap()
+        )
+        .unwrap(),
         [0x4fcf0001, 0x7f007903]
     );
     assert_eq!(
@@ -35,14 +92,51 @@ fn independent_packets_cover_all_families_and_preserve_native_widths() {
         [0x40407f7f, 0xffffffff]
     );
     assert_eq!(
-        encode(&Midi2PitchBend::new(1, 1, 0).unwrap()).unwrap(),
+        encode(
+            &meedee::messages::PitchBend::new_midi2()
+                .and_then(|m| m.with_group(1))
+                .and_then(|m| m.with_channel(1))
+                .and_then(|m| m.with_value(0))
+                .unwrap()
+        )
+        .unwrap(),
         [0x40e00000, 0x80000000]
     );
-    assert!(Midi2NoteOn::new(0, 1, 0, 0, 0, 0).is_err());
-    assert!(Midi2NoteOn::new(1, 17, 0, 0, 0, 0).is_err());
-    assert!(Midi2NoteOn::new(1, 1, 128, 0, 0, 0).is_err());
-    assert!(Midi2NoteOn::new(1, 1, 0, 65536, 0, 0).is_err());
-    assert!(Midi2NoteOn::new(1, 1, 0, 0, 0, 1).is_err());
+    assert!(meedee::messages::NoteOn::new_midi2(0)
+        .and_then(|m| m.with_group(0))
+        .and_then(|m| m.with_channel(1))
+        .and_then(|m| m.with_velocity(0))
+        .and_then(|m| m.with_attribute_type(0))
+        .and_then(|m| m.with_attribute_data(0))
+        .is_err());
+    assert!(meedee::messages::NoteOn::new_midi2(0)
+        .and_then(|m| m.with_group(1))
+        .and_then(|m| m.with_channel(17))
+        .and_then(|m| m.with_velocity(0))
+        .and_then(|m| m.with_attribute_type(0))
+        .and_then(|m| m.with_attribute_data(0))
+        .is_err());
+    assert!(meedee::messages::NoteOn::new_midi2(128)
+        .and_then(|m| m.with_group(1))
+        .and_then(|m| m.with_channel(1))
+        .and_then(|m| m.with_velocity(0))
+        .and_then(|m| m.with_attribute_type(0))
+        .and_then(|m| m.with_attribute_data(0))
+        .is_err());
+    assert!(meedee::messages::NoteOn::new_midi2(0)
+        .and_then(|m| m.with_group(1))
+        .and_then(|m| m.with_channel(1))
+        .and_then(|m| m.with_velocity(65536))
+        .and_then(|m| m.with_attribute_type(0))
+        .and_then(|m| m.with_attribute_data(0))
+        .is_err());
+    assert!(meedee::messages::NoteOn::new_midi2(0)
+        .and_then(|m| m.with_group(1))
+        .and_then(|m| m.with_channel(1))
+        .and_then(|m| m.with_velocity(0))
+        .and_then(|m| m.with_attribute_type(0))
+        .and_then(|m| m.with_attribute_data(1))
+        .is_err());
 }
 #[test]
 fn framing_recovers_by_declared_lengths_and_opaque_preservation_is_explicit() {
@@ -116,7 +210,15 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     );
     assert!(a.feed(&clock).is_empty());
     assert_eq!(a.active_streams(), 1);
-    let on = UmpMessage::Midi2NoteOn(Midi2NoteOn::new(1, 1, 60, 1, 0, 0).unwrap());
+    let on = UmpMessage::NoteOn(
+        meedee::messages::NoteOn::new_midi2(60)
+            .and_then(|m| m.with_group(1))
+            .and_then(|m| m.with_channel(1))
+            .and_then(|m| m.with_velocity(1))
+            .and_then(|m| m.with_attribute_type(0))
+            .and_then(|m| m.with_attribute_data(0))
+            .unwrap(),
+    );
     assert_eq!(
         a.feed(&on),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::Interrupted)]
@@ -200,20 +302,40 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
     assert_eq!(scale_up(64, 7, 32).unwrap(), 0x80000000);
     assert_eq!(scale_up(127, 7, 32).unwrap(), 0xffffffff);
     assert_eq!(scale_up(1, 7, 16).unwrap(), 0x200);
-    let v = UmpMessage::Midi2ControlChange(Midi2ControlChange::new(1, 1, 7, 0x80000001).unwrap());
+    let v = UmpMessage::ControlChange(
+        meedee::messages::ControlChange::new_midi2(7, 0x80000001)
+            .and_then(|m| m.with_group(1))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
+    );
     let denied = to_midi1(&v, false).unwrap();
     assert_eq!(denied.status, TranslationStatus::Quantized);
     assert!(!denied.converted());
     let allowed = to_midi1(&v, true).unwrap();
     assert!(allowed.converted());
     assert!(matches!(&allowed.messages[0],AnyMessage::ControlChange(v) if v.value()==64));
-    let attributed = UmpMessage::Midi2NoteOn(Midi2NoteOn::new(1, 1, 60, 65535, 3, 30720).unwrap());
+    let attributed = UmpMessage::NoteOn(
+        meedee::messages::NoteOn::new_midi2(60)
+            .and_then(|m| m.with_group(1))
+            .and_then(|m| m.with_channel(1))
+            .and_then(|m| m.with_velocity(65535))
+            .and_then(|m| m.with_attribute_type(3))
+            .and_then(|m| m.with_attribute_data(30720))
+            .unwrap(),
+    );
     assert_eq!(
         to_midi1(&attributed, true).unwrap().status,
         TranslationStatus::ProfileDependent
     );
-    let bank =
-        UmpMessage::Midi2ProgramChange(Midi2ProgramChange::new(1, 16, 128, 1, 121, 3).unwrap());
+    let bank = UmpMessage::ProgramChange(
+        meedee::messages::ProgramChange::new_midi2(128)
+            .and_then(|m| m.with_group(1))
+            .and_then(|m| m.with_channel(16))
+            .and_then(|m| m.with_options(1))
+            .and_then(|m| m.with_bank_msb(121))
+            .and_then(|m| m.with_bank_lsb(3))
+            .unwrap(),
+    );
     assert_eq!(
         to_midi1(&bank, false)
             .unwrap()
@@ -286,7 +408,15 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
         to_midi1(&null, false).unwrap().status,
         TranslationStatus::Unsupported
     );
-    let zero = UmpMessage::Midi2NoteOn(Midi2NoteOn::new(1, 1, 60, 0, 0, 0).unwrap());
+    let zero = UmpMessage::NoteOn(
+        meedee::messages::NoteOn::new_midi2(60)
+            .and_then(|m| m.with_group(1))
+            .and_then(|m| m.with_channel(1))
+            .and_then(|m| m.with_velocity(0))
+            .and_then(|m| m.with_attribute_type(0))
+            .and_then(|m| m.with_attribute_data(0))
+            .unwrap(),
+    );
     assert!(!to_midi1(&zero, false).unwrap().converted());
     assert!(
         matches!(&to_midi1(&zero,true).unwrap().messages[0],AnyMessage::NoteOn(v) if v.velocity()==1)

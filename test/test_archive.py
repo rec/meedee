@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import archive, events, gm, messages, midi, mpe, ump
+from meedee import archive, events, gm, messages, midi, mpe
 
 
 def values() -> list[object]:
@@ -36,7 +36,7 @@ def values() -> list[object]:
         (messages.NoteOn(channel=16, note=127, velocity=127)).replace(
             stream="source", timestamp=time, span=span
         ),
-        (ump.Midi2PitchBend(group=16, channel=16, value=2**31 - 1)).replace(
+        (messages.PitchBend(version=2, group=16, channel=16, value=2**31 - 1)).replace(
             stream="source"
         ),
         *[(c).replace(stream="source") for c in commands],
@@ -179,8 +179,8 @@ def test_v1_independent_vectors_check_future_headers_and_preserve_exact_bytes() 
         assert note.span.last_timestamp.ticks == -1
         wide = restored[4]
         assert isinstance(wide, messages.Message)
-        assert wide == ump.Midi2ControlChange(
-            group=16, channel=16, controller=7, value=0xFEDCBA98
+        assert wide == messages.ControlChange(
+            version=2, group=16, channel=16, controller=7, value=0xFEDCBA98
         )
         assert [r for r in restored[5:14] if isinstance(r, messages.Message)] == [
             r for r in values()[4:13] if isinstance(r, messages.Message)

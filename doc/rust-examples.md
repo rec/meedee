@@ -265,7 +265,7 @@ resolves an unassigned channel for you.
 ```rust
 use meedee::midi::Output;
 use meedee::transport::{OutputOptions, Protocol};
-use meedee::ump::{Midi2NoteOff, Midi2NoteOn};
+use meedee::messages::{NoteOff, NoteOn};
 use std::time::Duration;
 
 let mut out = Output::new().with_transport(OutputOptions {
@@ -273,14 +273,15 @@ let mut out = Output::new().with_transport(OutputOptions {
     ..OutputOptions::default()
 })?;
 out.send_all([
-    Midi2NoteOn::new(1, 1, 60, 40_000, 0, 0)?.into(),
+    NoteOn::new_midi2(60)?.with_velocity(40_000)?.into(),
     Duration::from_millis(500).into(),
-    Midi2NoteOff::new(1, 1, 60, 0, 0, 0)?.into(),
+    NoteOff::new_midi2(60)?.into(),
 ])?;
 out.close()?;
 ```
 
-This needs a native UMP backend and endpoint. Group and channel are explicit;
+This needs a native UMP backend and endpoint. Group defaults to 1; output
+resolves the channel.
 MIDI 2 velocity uses its native 16-bit range. There is no automatic protocol
 translation, full-note scheduling or cleanup for UMP. Raw packets likewise retain
 their own addressing. The `ump` module provides explicit translation when needed.

@@ -58,12 +58,15 @@ impl VelocityInterpreter {
         self.prefix.iter().flatten().map(|v| v.index).collect()
     }
     fn accept(&mut self, message: &AnyMessage, index: usize) -> Option<VelocityObservation> {
+        if message.version() != 1 {
+            return None;
+        }
         use AnyMessage::*;
         let (channel, note, velocity, on) = match message {
             ControlChange(v) => {
                 if v.controller() == 88 {
                     self.prefix[usize::from(v.channel()? - 1)] = Some(Prefix {
-                        value: v.value(),
+                        value: v.value() as u8,
                         index,
                     });
                 } else if v.controller() == 121 {
@@ -87,9 +90,9 @@ impl VelocityInterpreter {
             velocity: if zero {
                 0
             } else if let Some(p) = prefix {
-                (u16::from(velocity) << 7) | u16::from(p.value)
+                (velocity << 7) | u16::from(p.value)
             } else {
-                u16::from(velocity)
+                velocity
             },
             resolution: if prefix.is_some() && !zero { 14 } else { 7 },
             note_on: on && !zero,

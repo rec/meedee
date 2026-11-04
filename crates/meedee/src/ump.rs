@@ -63,16 +63,18 @@ macro_rules! scalar {
             words.truncate(word_count(words[0]));Ok(words)
         }})*
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
-        pub enum UmpMessage {$($name($name),)* Midi1(Midi1Packet),SysEx7(SysEx7Packet),SysEx8(SysEx8Packet),MixedDataSet(MixedDataSet),FlexData(FlexData),Stream(StreamMessage),Opaque(OpaquePacket)}
+        pub enum UmpMessage {$($name($name),)* NoteOn(crate::messages::NoteOn), NoteOff(crate::messages::NoteOff), PolyPressure(crate::messages::PolyPressure), ControlChange(crate::messages::ControlChange), ProgramChange(crate::messages::ProgramChange), ChannelPressure(crate::messages::ChannelPressure), PitchBend(crate::messages::PitchBend), Midi1(Midi1Packet),SysEx7(SysEx7Packet),SysEx8(SysEx8Packet),MixedDataSet(MixedDataSet),FlexData(FlexData),Stream(StreamMessage),Opaque(OpaquePacket)}
         impl UmpMessage {
             pub(crate) fn message_type(&self) -> u32 { match self {
                 $(Self::$name(_) => ($first as u32) >> 28,)*
+                Self::NoteOn(_) | Self::NoteOff(_) | Self::PolyPressure(_) | Self::ControlChange(_) | Self::ProgramChange(_) | Self::ChannelPressure(_) | Self::PitchBend(_) => 4,
                 Self::Midi1(v) => if v.message.encode().expect("validated MIDI 1 packet")[0] >= 240 { 1 } else { 2 },
                 Self::SysEx7(_) => 3, Self::SysEx8(_) | Self::MixedDataSet(_) => 5,
                 Self::FlexData(_) => 13, Self::Stream(_) => 15, Self::Opaque(v) => v.words()[0] >> 28,
             } }
             pub(crate) fn group(&self) -> Option<u8> { match self {
                 $(Self::$name(v) => { let _ = v; scalar_group!($name, v) },)*
+                Self::NoteOn(v) => v.group(), Self::NoteOff(v) => v.group(), Self::PolyPressure(v) => v.group(), Self::ControlChange(v) => v.group(), Self::ProgramChange(v) => v.group(), Self::ChannelPressure(v) => v.group(), Self::PitchBend(v) => v.group(),
                 Self::Midi1(v) => Some(v.group()), Self::SysEx7(v) => Some(v.group()),
                 Self::SysEx8(v) => Some(v.group()), Self::MixedDataSet(v) => Some(v.group()),
                 Self::FlexData(v) => Some(v.group()), Self::Stream(_) => None,
@@ -82,13 +84,14 @@ macro_rules! scalar {
         }
         impl UmpMessage { pub(crate) fn kind(&self) -> &'static str { match self {
             $(Self::$name(_) => stringify!($name),)*
+            Self::NoteOn(_) => "NoteOn", Self::NoteOff(_) => "NoteOff", Self::PolyPressure(_) => "PolyPressure", Self::ControlChange(_) => "ControlChange", Self::ProgramChange(_) => "ProgramChange", Self::ChannelPressure(_) => "ChannelPressure", Self::PitchBend(_) => "PitchBend",
             Self::Midi1(_) => "Midi1Packet", Self::SysEx7(_) => "SysEx7Packet",
             Self::SysEx8(_) => "SysEx8Packet", Self::MixedDataSet(_) => "MixedDataSet",
             Self::FlexData(_) => "FlexData", Self::Stream(_) => "StreamMessage",
             Self::Opaque(_) => "OpaquePacket",
         } } }
-        crate::messages::enum_metadata!(UmpMessage { $($name,)* Midi1, SysEx7, SysEx8, MixedDataSet, FlexData, Stream, Opaque });
-        impl UmpValue for UmpMessage {fn encode_words(&self)->Result<Vec<u32>,ValueError>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::Midi1(v)=>v.encode_words(),Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
+        crate::messages::enum_metadata!(UmpMessage { $($name,)* NoteOn, NoteOff, PolyPressure, ControlChange, ProgramChange, ChannelPressure, PitchBend, Midi1, SysEx7, SysEx8, MixedDataSet, FlexData, Stream, Opaque });
+        impl UmpValue for UmpMessage {fn encode_words(&self)->Result<Vec<u32>,ValueError>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::NoteOn(v)=>v.encode_words(),Self::NoteOff(v)=>v.encode_words(),Self::PolyPressure(v)=>v.encode_words(),Self::ControlChange(v)=>v.encode_words(),Self::ProgramChange(v)=>v.encode_words(),Self::ChannelPressure(v)=>v.encode_words(),Self::PitchBend(v)=>v.encode_words(),Self::Midi1(v)=>v.encode_words(),Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
         fn scalar_decode(words:&[u32])->Result<Option<UmpMessage>,ValueError>{
             let key=if words[0]>>28==0{words[0]&0xfff00000}else{words[0]&0xf0f00000};
             $(if key==$first {
@@ -96,7 +99,7 @@ macro_rules! scalar {
                 let value=$name::new($($field),*)?;
                 if value.encode_words()?!=words{return Err(ValueError("nonzero reserved scalar fields".into()));}
                 return Ok(Some(UmpMessage::$name(value)));
-            })*Ok(None)
+            })*channel_decode(words)
         }
     };
 }
@@ -105,16 +108,6 @@ fn validate_scalar(words: &[u32]) -> Result<(), ValueError> {
     if words[0] >> 28 == 4 {
         let status = (words[0] >> 20) & 15;
         let attr = words[0] & 255;
-        if matches!(status, 8 | 9) && attr == 0 && words[1] & 65535 != 0 {
-            return Err(ValueError(
-                "attribute_data must be zero for attribute_type=0".into(),
-            ));
-        }
-        if status == 12 && words[0] & 1 == 0 && words[1] & 65535 != 0 {
-            return Err(ValueError(
-                "bank bytes must be zero without bank-valid option".into(),
-            ));
-        }
         if status == 0 && !matches!(attr,1..=3|7|8|10|11|70..=79|91..=95) {
             return Err(ValueError("reserved registered per-note controller".into()));
         }
@@ -801,4 +794,124 @@ impl Capabilities {
             _ => None,
         }
     }
+}
+
+fn channel_header(
+    version: u8,
+    group: Option<u8>,
+    channel: Option<u8>,
+    status: u32,
+) -> Result<u32, ValueError> {
+    if version != 2 {
+        return Err(ValueError(
+            "use Midi1Packet for MIDI 1 UMP; conversion is explicit".into(),
+        ));
+    }
+    let channel = channel.ok_or_else(|| ValueError("message channel is unassigned".into()))?;
+    Ok(0x40000000
+        | u32::from(group.expect("MIDI 2 group") - 1) << 24
+        | status << 20
+        | u32::from(channel - 1) << 16)
+}
+macro_rules! channel_encoding {
+    ($($name:ident($v:ident) => ($status:expr, $first:expr, $second:expr);)*) => {$(
+        impl UmpValue for crate::messages::$name {
+            fn encode_words(&$v) -> Result<Vec<u32>, ValueError> {
+                let head = channel_header($v.version(), $v.group(), $v.channel(), $status)?;
+                Ok(vec![head | $first, $second])
+            }
+        }
+    )*};
+}
+channel_encoding! {
+    NoteOn(self) => (9, u32::from(self.note()) << 8 | u32::from(self.attribute_type().unwrap()), u32::from(self.velocity()) << 16 | u32::from(self.attribute_data().unwrap()));
+    NoteOff(self) => (8, u32::from(self.note()) << 8 | u32::from(self.attribute_type().unwrap()), u32::from(self.velocity()) << 16 | u32::from(self.attribute_data().unwrap()));
+    PolyPressure(self) => (10, u32::from(self.note()) << 8, self.pressure());
+    ControlChange(self) => (11, u32::from(self.controller()) << 8, self.value());
+    ProgramChange(self) => (12, u32::from(self.options().unwrap()), u32::from(self.program() - 1) << 24 | u32::from(self.bank_msb().unwrap()) << 8 | u32::from(self.bank_lsb().unwrap()));
+    ChannelPressure(self) => (13, 0, self.pressure());
+    PitchBend(self) => (14, 0, (i64::from(self.value()) + 2147483648) as u32);
+}
+impl TryFrom<AnyMessage> for UmpMessage {
+    type Error = ValueError;
+    fn try_from(value: AnyMessage) -> Result<Self, ValueError> {
+        macro_rules! channel { ($($name:ident),*) => { match value {
+            $(AnyMessage::$name(v) if v.version() == 2 => Ok(Self::$name(v)),)*
+            _ => Err(ValueError("MIDI 2 channel message required".into())),
+        } }; }
+        channel!(
+            NoteOn,
+            NoteOff,
+            PolyPressure,
+            ControlChange,
+            ProgramChange,
+            ChannelPressure,
+            PitchBend
+        )
+    }
+}
+fn channel_decode(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
+    if words[0] >> 28 != 4 {
+        return Ok(None);
+    }
+    use crate::messages as m;
+    let group = i64::from((words[0] >> 24) & 15) + 1;
+    let channel = i64::from((words[0] >> 16) & 15) + 1;
+    let field = i64::from((words[0] >> 8) & 127);
+    let kind = i64::from(words[0] & 255);
+    let data = i64::from(words[1] & 65535);
+    let value = match (words[0] >> 20) & 15 {
+        8 => UmpMessage::NoteOff(
+            m::NoteOff::new_midi2(field)?
+                .with_group(group)?
+                .with_channel(channel)?
+                .with_velocity(i64::from(words[1] >> 16))?
+                .with_attribute_type(kind)?
+                .with_attribute_data(data)?,
+        ),
+        9 => UmpMessage::NoteOn(
+            m::NoteOn::new_midi2(field)?
+                .with_group(group)?
+                .with_channel(channel)?
+                .with_velocity(i64::from(words[1] >> 16))?
+                .with_attribute_type(kind)?
+                .with_attribute_data(data)?,
+        ),
+        10 => UmpMessage::PolyPressure(
+            m::PolyPressure::new_midi2(field)?
+                .with_group(group)?
+                .with_channel(channel)?
+                .with_pressure(i64::from(words[1]))?,
+        ),
+        11 => UmpMessage::ControlChange(
+            m::ControlChange::new_midi2(field, i64::from(words[1]))?
+                .with_group(group)?
+                .with_channel(channel)?,
+        ),
+        12 => UmpMessage::ProgramChange(
+            m::ProgramChange::new_midi2(i64::from((words[1] >> 24) & 127) + 1)?
+                .with_group(group)?
+                .with_channel(channel)?
+                .with_options(i64::from(words[0] & 1))?
+                .with_bank_msb(i64::from((words[1] >> 8) & 127))?
+                .with_bank_lsb(i64::from(words[1] & 127))?,
+        ),
+        13 => UmpMessage::ChannelPressure(
+            m::ChannelPressure::new_midi2()?
+                .with_group(group)?
+                .with_channel(channel)?
+                .with_pressure(i64::from(words[1]))?,
+        ),
+        14 => UmpMessage::PitchBend(
+            m::PitchBend::new_midi2()?
+                .with_group(group)?
+                .with_channel(channel)?
+                .with_value(i64::from(words[1]) - 2147483648)?,
+        ),
+        _ => return Ok(None),
+    };
+    if value.encode_words()? != words {
+        return Err(ValueError("nonzero reserved scalar fields".into()));
+    }
+    Ok(Some(value))
 }

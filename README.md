@@ -550,12 +550,9 @@ PrimitiveMessage and Command subtraits for encoding and expansion.
 ## UMP and MIDI 2.0
 
 ```python
-from meedee import ump
+from meedee import messages, ump
 
-note = ump.Midi2NoteOn(
-    group=1, channel=1, note=60, velocity=50_000,
-    attribute_type=0, attribute_data=0,
-)
+note = messages.NoteOn(60, 50_000, channel=1, version=2)
 words = ump.encode(note)  # Immutable tuple of 32-bit words.
 assert ump.decode(words) == note
 report = ump.to_midi1(note)

@@ -70,7 +70,8 @@ def test_independent_sequences_and_smpte_export_have_explicit_loss_reports() -> 
         value, header=header, origin=reader.origin, allow_loss=True
     )
     assert accepted.events and accepted.rounding_error_ticks.numerator != 0
-    wide = ump.Midi2NoteOn(
+    wide = messages.NoteOn(
+        version=2,
         group=2,
         channel=1,
         note=60,
@@ -96,7 +97,8 @@ def test_clip_timed_reader_omits_file_markers_and_preserves_tempo() -> None:
         ump.start_of_clip(),
         ump.tempo(group=1, bpm=120.0),
         ump.DeltaClockstamp(ticks=480),
-        ump.Midi2NoteOn(
+        messages.NoteOn(
+            version=2,
             group=1,
             channel=1,
             note=60,

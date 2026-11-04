@@ -20,7 +20,11 @@ def wire_vectors() -> Iterator[tuple[messages.Message, bytes]]:
         fields, wire = line.split("|")
         name, *values = fields.split()
         constructor = getattr(messages, name)
-        names = list(inspect.signature(constructor).parameters)
+        names = [
+            n
+            for n, p in inspect.signature(constructor).parameters.items()
+            if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
+        ]
         if "channel" in names:
             names = ["channel"] + [n for n in names if n != "channel"]
         arguments = (
@@ -55,7 +59,7 @@ def test_new_messages_preserve_the_frozen_field_and_replacement_contract() -> No
         if isinstance(m, (messages.NoteOn, messages.SysEx)):
             continue  # Their complete representation contract already has a fixture.
         constructor = getattr(messages, type(m).__name__)
-        fields = constructor.__annotations__
+        fields = {n: constructor.__annotations__[n] for n in constructor.__match_args__}
         assert isinstance(m, messages.Message)
         assert constructor.__module__ == "meedee.messages"
         assert isinstance(constructor.__match_args__, tuple)
@@ -80,7 +84,10 @@ def test_new_messages_preserve_the_frozen_field_and_replacement_contract() -> No
             with pytest.raises(AttributeError):
                 setattr(m, f, 1)
             for v in (True, False, 1.5, "1", None, Integer(1)):
-                if f == "channel" and v is None:
+                if (
+                    v is None
+                    and inspect.signature(constructor).parameters[f].default is None
+                ):
                     continue
                 with pytest.raises(TypeError):
                     constructor(**(values | {f: v}))

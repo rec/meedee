@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import archive, events, inspection, messages, midi, smf, testing, ump
+from meedee import archive, events, inspection, messages, midi, smf, testing
 
 
 def capture(*, complete: bool = True, opaque: bool = False) -> bytes:
@@ -17,7 +17,9 @@ def capture(*, complete: bool = True, opaque: bool = False) -> bytes:
     writer.write((messages.TimingClock()).replace(stream="keys"))
     writer.write(
         (
-            ump.Midi2ControlChange(group=16, channel=16, controller=7, value=0xFEDCBA98)
+            messages.ControlChange(
+                version=2, group=16, channel=16, controller=7, value=0xFEDCBA98
+            )
         ).replace(stream="keys", timestamp=events.Timestamp(ticks=-1, clock=clock))
     )
     writer.write(archive.Gap(stream="keys", lost=3, reason="queue overflow"))

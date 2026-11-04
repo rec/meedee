@@ -87,6 +87,20 @@ def test_output_channel_overrides_messages_and_tracks_cleanup(
     assert transport.closed
 
 
+def test_midi2_output_resolves_channel_without_scaling_or_cleanup(
+    transport: NativeConnection,
+) -> None:
+    transport.sink = testing.Output(protocol="ump")
+    with midi.Output(protocol=midi.Protocol.Ump, channel=3) as out:
+        out(messages.NoteOn(60, 65535, version=2))
+        out(messages.NoteOff(60, channel=9, version=2))
+    assert transport.packets() == [
+        midi.UmpPacket(words=(0x40923C00, 0xFFFF0000)),
+        midi.UmpPacket(words=(0x40823C00, 0)),
+    ]
+    assert transport.closed
+
+
 def test_parameter_step_uses_output_channel_and_preserves_nrpn_family(
     transport: NativeConnection,
 ) -> None:

@@ -135,7 +135,8 @@ def test_clip_and_archive(tmp_path: Path) -> None:
         ump.start_of_clip(),
     ):
         writer.write(p)
-    note = ump.Midi2NoteOn(
+    note = messages.NoteOn(
+        version=2,
         group=1,
         channel=1,
         note=60,
@@ -153,7 +154,7 @@ def test_clip_and_archive(tmp_path: Path) -> None:
     def read_clip() -> None:
         reader = clip.Reader(path)
         try:
-            assert sum(isinstance(e, ump.Midi2NoteOn) for e in reader) == 2048
+            assert sum(isinstance(e, messages.NoteOn) for e in reader) == 2048
         finally:
             reader.close()
 

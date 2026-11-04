@@ -448,15 +448,16 @@ impl Command for ParameterStep {
 }
 
 encode_short! {
-    NoteOn(self) => vec![0x90 | (self.resolved_channel()? - 1), self.note(), self.velocity()];
-    NoteOff(self) => vec![0x80 | (self.resolved_channel()? - 1), self.note(), self.velocity()];
-    PolyPressure(self) => vec![0xa0 | (self.resolved_channel()? - 1), self.note(), self.pressure()];
-    ControlChange(self) => vec![0xb0 | (self.resolved_channel()? - 1), self.controller(), self.value()];
-    ProgramChange(self) => vec![0xc0 | (self.resolved_channel()? - 1), self.program() - 1];
-    ChannelPressure(self) => vec![0xd0 | (self.resolved_channel()? - 1), self.pressure()];
+    NoteOn(self) => vec![0x90 | (self.midi1_channel()? - 1), self.note(), self.velocity() as u8];
+    NoteOff(self) => vec![0x80 | (self.midi1_channel()? - 1), self.note(), self.velocity() as u8];
+    PolyPressure(self) => vec![0xa0 | (self.midi1_channel()? - 1), self.note(), self.pressure() as u8];
+    ControlChange(self) => vec![0xb0 | (self.midi1_channel()? - 1), self.controller(), self.value() as u8];
+    ProgramChange(self) => vec![0xc0 | (self.midi1_channel()? - 1), self.program() - 1];
+    ChannelPressure(self) => vec![0xd0 | (self.midi1_channel()? - 1), self.pressure() as u8];
     PitchBend(self) => {
-        let wire = (i32::from(self.value()) + 8192) as u16;
-        vec![0xe0 | (self.resolved_channel()? - 1), (wire & 127) as u8, (wire >> 7) as u8]
+        let channel = self.midi1_channel()?;
+        let wire = (self.value() + 8192) as u16;
+        vec![0xe0 | (channel - 1), (wire & 127) as u8, (wire >> 7) as u8]
     };
     QuarterFrame(self) => vec![0xf1, (self.message_type() << 4) | self.value()];
     SongPosition(self) => vec![0xf2, (self.position() & 127) as u8, (self.position() >> 7) as u8];

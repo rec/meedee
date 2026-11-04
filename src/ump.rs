@@ -41,10 +41,19 @@ macro_rules! scalar {
         pub(crate) fn extract(value:&Bound<'_,PyAny>)->PyResult<model::UmpMessage>{
             if let Ok(v)=value.extract::<PyRef<'_,Noop>>(){return Ok(model::UmpMessage::Noop(v.value.clone()));}
             $(if let Ok(v)=value.extract::<PyRef<'_,$name>>(){return Ok(model::UmpMessage::$name(v.value.clone()));})*
+            if let Ok(v) = messages::extract_midi2(value) { return Ok(v); }
             extract_packet(value)
         }
         pub(crate) fn to_python(py:Python<'_>,value:model::UmpMessage)->PyResult<Py<PyAny>>{match value{
             model::UmpMessage::Noop(value)=>object(py,Noop{value}),
+            model::UmpMessage::NoteOn(value)=>messages::to_python(py,meedee::messages::AnyMessage::NoteOn(value)),
+            model::UmpMessage::NoteOff(value)=>messages::to_python(py,meedee::messages::AnyMessage::NoteOff(value)),
+            model::UmpMessage::PolyPressure(value)=>messages::to_python(py,meedee::messages::AnyMessage::PolyPressure(value)),
+            model::UmpMessage::ControlChange(value)=>messages::to_python(py,meedee::messages::AnyMessage::ControlChange(value)),
+            model::UmpMessage::ProgramChange(value)=>messages::to_python(py,meedee::messages::AnyMessage::ProgramChange(value)),
+            model::UmpMessage::ChannelPressure(value)=>messages::to_python(py,meedee::messages::AnyMessage::ChannelPressure(value)),
+            model::UmpMessage::PitchBend(value)=>messages::to_python(py,meedee::messages::AnyMessage::PitchBend(value)),
+
             $(model::UmpMessage::$name(value)=>object(py,$name{value}),)*
             model::UmpMessage::Midi1(value)=>object(py,Midi1Packet{value}),
             model::UmpMessage::SysEx7(value)=>object(py,SysEx7Packet{value}),

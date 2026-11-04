@@ -68,8 +68,7 @@ bend, modulation, sustain, sostenuto, soft pedal and channel/polyphonic pressure
 Cleanup sends note-offs first, sorted by channel and note, then controller resets
 in the same deterministic order as Rust.
 Volume, pan, expression, programs and tuning are left alone. Reserve the channels
-for these examples; transport failure can prevent cleanup. UMP requires explicit
-addressing and does not support these full-note values or automatic cleanup.
+for these examples; transport failure can prevent cleanup. UMP does not support these full-note values or automatic cleanup.
 
 ## 3. See what your keyboard sends
 
@@ -465,3 +464,24 @@ with midi.Output() as out:
 `direction` is `1` or `-1`; it is not a step count. Family defaults to `"rpn"`.
 The output supplies the channel when it is unassigned. `controls.ParameterStep`
 is a separate observation returned when interpreting incoming controller messages.
+
+## Send native MIDI 2 messages
+
+The same channel-message classes support MIDI 2 with `version=2`. Group defaults
+to 1, and output resolves the channel. Values use their native MIDI 2 widths:
+
+```python
+from meedee.messages import NoteOn, NoteOff
+from meedee.midi import Output, Protocol
+
+with Output(protocol=Protocol.Ump) as out:
+    out(NoteOn(60, 40_000, version=2), "500 ms", NoteOff(60, version=2))
+```
+
+This requires a native UMP endpoint. Protocol conversion is always explicit.
+
+Omitted NoteOn velocity uses the scaled equivalent of MIDI 1 velocity 90.
+An explicitly supplied velocity is a raw 16-bit value. The same version selection
+applies to NoteOff, PolyPressure, ControlChange, ProgramChange, ChannelPressure
+and PitchBend. Use `ump.to_midi1()` or `ump.to_midi2()` for conversion;
+`replace(version=...)` cannot change the protocol.

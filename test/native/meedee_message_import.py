@@ -54,7 +54,9 @@ def main() -> None:
         ump_output = testing.Output(protocol="ump")
         ump_input = testing.Input(stream="ump-test", protocol="ump")
         ump_output(
-            ump.Midi2ControlChange(group=1, channel=1, controller=7, value=0xFFFFFFFF)
+            messages.ControlChange(
+                version=2, group=1, channel=1, controller=7, value=0xFFFFFFFF
+            )
         )
         recorded = ump_output.take_packet()
         assert recorded is not None
@@ -133,7 +135,7 @@ def main() -> None:
         assert ump.encode(ump.JrClock(ticks=65535)) == (0x0010FFFF,)
         assert ump.Assembler().active_streams == 0
         bend = ump.decode((0x40E00000, 0x80000000))
-        assert isinstance(bend, ump.Midi2PitchBend) and bend.value == 0
+        assert isinstance(bend, messages.PitchBend) and bend.value == 0
 
         assert ci.Header(source_muid=1, destination_muid=2).version == 2
         assert ci.Address.channel(channel=16).channel_number == 16

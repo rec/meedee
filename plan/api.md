@@ -147,10 +147,14 @@ RPN/NRPN identifiers and MTS tuning bank/program fields retain their standard
 ranges. These conventions apply to later MIDI 2.0 types too; wider controller
 and velocity values retain their protocol widths.
 
-Do not conflate a MIDI 1.0 type with its MIDI 2.0 counterpart. `NoteOn` has
-seven-bit velocity; a later `Midi2NoteOn` has its own explicit fields. The
-representation prototype initially implemented only `NoteOn` and `SysEx`.
-Slice 3 adds the other primitive MIDI 1.0 values and byte codecs below.
+The seven common channel-message types represent either MIDI version explicitly.
+Python selects `version=2`; Rust uses `new_midi2()`. The default is MIDI 1.
+Values retain native protocol widths: seven-bit velocity for MIDI 1, sixteen-bit
+velocity for MIDI 2. MIDI 2 defaults to group 1 and leaves channel unassigned
+until output resolves it. Omitted NoteOn velocity scales the default 90 using
+standard MIDI scaling; an explicitly supplied velocity is a native raw value.
+`replace()` cannot change version; explicit conversion reports loss and unsupported
+fields. MIDI 2-only attributes and bank fields are absent (`None`) on MIDI 1.
 
 ### SysEx ownership
 
@@ -366,7 +370,7 @@ The midi module exports Input, Output and Recording; messages exports Note, Rest
 and Beats; archive exports Reader. High-level failures use midi::Error, preserving
 transport categories and underlying causes. Output::with_playback configures
 origin, clock mappings, cancellation, rounding and metrics for later play calls.
-MIDI 1 channel constructors use payload-first defaults and optional channels;
+Shared channel constructors use payload-first defaults and optional channels;
 validated `with_*` builders replace payload fields and preserve metadata.
 Input defaults to lazy first-port selection and message iteration. Its borrowed
 `with_errors()` iterator yields events::InputItem values in midi::Result, retaining diagnostics;
@@ -376,9 +380,10 @@ accept a single channel or an iterator of channels and retain system messages.
 Output `send` accepts one value; `send_all` accepts heterogeneous OutputValues.
 Duration is elapsed time and Beats requires explicit output tempo. Sequence
 deadlines accumulate exactly before nanosecond rounding; validation precedes any
-send. Explicit output channels override MIDI 1 message channels; otherwise the
-message channel survives, with channel 1 filling an unset channel. MIDI 2/UMP
-keeps explicit group/channel addressing. No protocol conversion is implicit.
+send. Explicit output channels override shared MIDI 1 and MIDI 2 message channels;
+otherwise the message channel survives, with channel 1 filling an unset channel.
+MIDI 2 group defaults to 1. Other UMP types retain explicit addressing.
+No protocol conversion is implicit.
 
 Close/Drop releases confirmed MIDI 1 note counts and resets only changed pitch
 bend, CC1/64/66/67 and channel/polyphonic pressure. Drop reports errors best-effort;
@@ -734,8 +739,9 @@ returns ordered typed values or frozen diagnostics with cumulative word offsets.
 It retains at most three unfinished words, recovers at declared packet lengths,
 and reports truncation on finish. Reset discards pending state, retaining offsets.
 
-All scalar constructors are keyword-only and strictly reject coercion/bools for
-integer fields. Groups/channels are 1–16 and programs 1–128; wire conversion is
+UMP-only scalar constructors are keyword-only. Shared channel-message constructors
+accept positional payload fields and keyword-only version, group and MIDI 2 extras.
+All integer fields reject coercion/bools. Groups/channels are 1–16 and programs 1–128; wire conversion is
 internal. Pitch bend and per-note bend are signed -2^31 through 2^31-1, centered
 at zero. Relative controllers are signed two's-complement integers. Velocity and
 attribute data retain 16 bits; pressure and absolute controllers retain 32 bits.
@@ -749,7 +755,7 @@ velocity of zero is a sounding-note event, unlike MIDI 1 NoteOn zero.
 | --- | --- |
 | Utility | Noop, JrClock, JrTimestamp, DeltaClockstampTicksPerQuarter, DeltaClockstamp; no Group field |
 | System/MIDI 1.0 channel | Midi1Packet(group, message) reuses immutable MIDI 1 values; SysEx uses separate packetization |
-| MIDI 2.0 channel | Explicit Midi2NoteOn/Off, PolyPressure, ChannelPressure, ControlChange, ProgramChange, PitchBend, Registered/AssignableController, relative controllers, registered/assignable per-note controllers, per-note bend/management |
+| MIDI 2.0 channel | Shared versioned NoteOn/Off, PolyPressure, ChannelPressure, ControlChange, ProgramChange, PitchBend; MIDI 2-only Registered/AssignableController, relative controllers, registered/assignable per-note controllers, per-note bend/management |
 | Data64 | SysEx7Packet: format 0/1/2/3 = Complete/Start/Continue/End, at most six seven-bit bytes |
 | Data128 | SysEx8Packet: format, stream ID 0–255, up to thirteen payload bytes; explicit aborted End; MixedDataSet header/payload packets retain their fourteen bytes |
 | Flex Data | Group, optional channel, format, status bank/status and three data words; tempo/time-signature/metronome/key-signature factories and bounded UTF-8 packetization |

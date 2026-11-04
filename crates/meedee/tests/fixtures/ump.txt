@@ -4,12 +4,12 @@ JrClock|0010ffff
 JrTimestamp|00200000
 DeltaClockstampTicksPerQuarter|003003c0
 DeltaClockstamp|004fffff
-Midi2NoteOn|4f9f7f03 ffffffff
-Midi2NoteOff|40803c00 00000000
-Midi2PolyPressure|40a03c00 ffffffff
-Midi2ChannelPressure|40d00000 ffffffff
-Midi2PitchBend|40e00000 80000000
-Midi2ControlChange|41b20700 80000000
+NoteOn|4f9f7f03 ffffffff
+NoteOff|40803c00 00000000
+PolyPressure|40a03c00 ffffffff
+ChannelPressure|40d00000 ffffffff
+PitchBend|40e00000 80000000
+ControlChange|41b20700 80000000
 Midi2RelativeRegisteredController|40407f7f ffffffff
 Midi2RelativeAssignableController|40507f7f 80000000
 Midi2RegisteredController|40207f7f ffffffff
@@ -18,7 +18,7 @@ Midi2RegisteredPerNoteController|40003c03 ffffffff
 Midi2AssignablePerNoteController|40103cff ffffffff
 Midi2PerNoteManagement|40f03c03 00000000
 Midi2PerNotePitchBend|40603c00 80000000
-Midi2ProgramChange|4fcf0001 7f007903
+ProgramChange|4fcf0001 7f007903
 Midi1Packet|2f9f7f7f
 System|10f80000
 SysEx7Packet|30037d01 02000000

@@ -71,59 +71,64 @@ fn up(value: u32, src: u8, dst: u8) -> u32 {
     scale_up(value, src, dst).expect("validated field and constant bit widths")
 }
 pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessage>, ValueError> {
+    if message.version() != 1 {
+        return Err(ValueError("to_midi2 requires MIDI 1 input".into()));
+    }
     bounded(group, 1, 16, "group")?;
     let g = Some(group as u8);
     let value = match message {
-        AnyMessage::NoteOn(v) if v.velocity() == 0 => UmpMessage::Midi2NoteOff(Midi2NoteOff::new(
-            group,
-            v.resolved_channel()?.into(),
-            v.note().into(),
-            32768,
-            0,
-            0,
-        )?),
-        AnyMessage::NoteOn(v) => UmpMessage::Midi2NoteOn(Midi2NoteOn::new(
-            group,
-            v.resolved_channel()?.into(),
-            v.note().into(),
-            up(v.velocity().into(), 7, 16).into(),
-            0,
-            0,
-        )?),
-        AnyMessage::NoteOff(v) => UmpMessage::Midi2NoteOff(Midi2NoteOff::new(
-            group,
-            v.resolved_channel()?.into(),
-            v.note().into(),
-            up(v.velocity().into(), 7, 16).into(),
-            0,
-            0,
-        )?),
-        AnyMessage::PolyPressure(v) => UmpMessage::Midi2PolyPressure(Midi2PolyPressure::new(
-            group,
-            v.resolved_channel()?.into(),
-            v.note().into(),
-            up(v.pressure().into(), 7, 32).into(),
-        )?),
-        AnyMessage::ChannelPressure(v) => {
-            UmpMessage::Midi2ChannelPressure(Midi2ChannelPressure::new(
-                group,
-                v.resolved_channel()?.into(),
-                up(v.pressure().into(), 7, 32).into(),
-            )?)
-        }
-        AnyMessage::PitchBend(v) => UmpMessage::Midi2PitchBend(Midi2PitchBend::new(
-            group,
-            v.resolved_channel()?.into(),
-            i64::from(up((i32::from(v.value()) + 8192) as u32, 14, 32)) - 2147483648,
-        )?),
-        AnyMessage::ProgramChange(v) => UmpMessage::Midi2ProgramChange(Midi2ProgramChange::new(
-            group,
-            v.resolved_channel()?.into(),
-            v.program().into(),
-            0,
-            0,
-            0,
-        )?),
+        AnyMessage::NoteOn(v) if v.velocity() == 0 => UmpMessage::NoteOff(
+            crate::messages::NoteOff::new_midi2(v.note().into())
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| m.with_velocity(32768))
+                .and_then(|m| m.with_attribute_type(0))
+                .and_then(|m| m.with_attribute_data(0))?,
+        ),
+        AnyMessage::NoteOn(v) => UmpMessage::NoteOn(
+            crate::messages::NoteOn::new_midi2(v.note().into())
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| m.with_velocity(up(v.velocity().into(), 7, 16).into()))
+                .and_then(|m| m.with_attribute_type(0))
+                .and_then(|m| m.with_attribute_data(0))?,
+        ),
+        AnyMessage::NoteOff(v) => UmpMessage::NoteOff(
+            crate::messages::NoteOff::new_midi2(v.note().into())
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| m.with_velocity(up(v.velocity().into(), 7, 16).into()))
+                .and_then(|m| m.with_attribute_type(0))
+                .and_then(|m| m.with_attribute_data(0))?,
+        ),
+        AnyMessage::PolyPressure(v) => UmpMessage::PolyPressure(
+            crate::messages::PolyPressure::new_midi2(v.note().into())
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| m.with_pressure(up(v.pressure(), 7, 32).into()))?,
+        ),
+        AnyMessage::ChannelPressure(v) => UmpMessage::ChannelPressure(
+            crate::messages::ChannelPressure::new_midi2()
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| m.with_pressure(up(v.pressure(), 7, 32).into()))?,
+        ),
+        AnyMessage::PitchBend(v) => UmpMessage::PitchBend(
+            crate::messages::PitchBend::new_midi2()
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| {
+                    m.with_value(i64::from(up((v.value() + 8192) as u32, 14, 32)) - 2147483648)
+                })?,
+        ),
+        AnyMessage::ProgramChange(v) => UmpMessage::ProgramChange(
+            crate::messages::ProgramChange::new_midi2(v.program().into())
+                .and_then(|m| m.with_group(group))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
+                .and_then(|m| m.with_options(0))
+                .and_then(|m| m.with_bank_msb(0))
+                .and_then(|m| m.with_bank_lsb(0))?,
+        ),
         AnyMessage::ControlChange(v) => {
             if matches!(v.controller(), 0 | 6 | 32 | 38 | 88 | 96..=101) {
                 return Ok(report(
@@ -135,16 +140,15 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
                 ));
             }
             let value = if matches!(v.controller(), 84 | 126) {
-                u32::from(v.value()) << 25
+                v.value() << 25
             } else {
-                up(v.value().into(), 7, 32)
+                up(v.value(), 7, 32)
             };
-            UmpMessage::Midi2ControlChange(Midi2ControlChange::new(
-                group,
-                v.resolved_channel()?.into(),
-                v.controller().into(),
-                value.into(),
-            )?)
+            UmpMessage::ControlChange(
+                crate::messages::ControlChange::new_midi2(v.controller().into(), value.into())
+                    .and_then(|m| m.with_group(group))
+                    .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
+            )
         }
         AnyMessage::SysEx(v) => {
             return Ok(report(
@@ -195,8 +199,8 @@ pub fn to_midi1(
     };
     let output = match message {
         Midi1(v) => vec![v.message.clone()],
-        Midi2NoteOn(v) => {
-            if v.attribute_type != 0 {
+        NoteOn(v) => {
+            if v.attribute_type().unwrap() != 0 {
                 return Ok(report(
                     TranslationStatus::ProfileDependent,
                     "note attributes require explicit profile/manufacturer interpretation",
@@ -205,7 +209,7 @@ pub fn to_midi1(
                     allow_loss,
                 ));
             }
-            let velocity = scale(v.velocity.into(), 16, 7);
+            let velocity = scale(v.velocity().into(), 16, 7);
             let velocity = if velocity == 0 {
                 lost = true;
                 1
@@ -213,13 +217,13 @@ pub fn to_midi1(
                 velocity
             };
             vec![AnyMessage::NoteOn(
-                m::NoteOn::new(v.note.into())
+                m::NoteOn::new(v.note().into())
                     .and_then(|m| m.with_velocity(velocity))
-                    .and_then(|m| m.with_channel(v.channel.into()))?,
+                    .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
             )]
         }
-        Midi2NoteOff(v) => {
-            if v.attribute_type != 0 {
+        NoteOff(v) => {
+            if v.attribute_type().unwrap() != 0 {
                 return Ok(report(
                     TranslationStatus::ProfileDependent,
                     "note attributes require explicit profile/manufacturer interpretation",
@@ -229,30 +233,30 @@ pub fn to_midi1(
                 ));
             }
             vec![AnyMessage::NoteOff(
-                m::NoteOff::new(v.note.into())
-                    .and_then(|m| m.with_velocity(scale(v.velocity.into(), 16, 7)))
-                    .and_then(|m| m.with_channel(v.channel.into()))?,
+                m::NoteOff::new(v.note().into())
+                    .and_then(|m| m.with_velocity(scale(v.velocity().into(), 16, 7)))
+                    .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
             )]
         }
-        Midi2PolyPressure(v) => vec![AnyMessage::PolyPressure(
-            m::PolyPressure::new(v.note.into())
-                .and_then(|m| m.with_pressure(scale(v.pressure, 32, 7)))
-                .and_then(|m| m.with_channel(v.channel.into()))?,
+        PolyPressure(v) => vec![AnyMessage::PolyPressure(
+            m::PolyPressure::new(v.note().into())
+                .and_then(|m| m.with_pressure(scale(v.pressure(), 32, 7)))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
         )],
-        Midi2ChannelPressure(v) => vec![AnyMessage::ChannelPressure(
+        ChannelPressure(v) => vec![AnyMessage::ChannelPressure(
             m::ChannelPressure::new()
-                .and_then(|m| m.with_pressure(scale(v.pressure, 32, 7)))
-                .and_then(|m| m.with_channel(v.channel.into()))?,
+                .and_then(|m| m.with_pressure(scale(v.pressure(), 32, 7)))
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
         )],
-        Midi2PitchBend(v) => vec![AnyMessage::PitchBend(
+        PitchBend(v) => vec![AnyMessage::PitchBend(
             m::PitchBend::new()
                 .and_then(|m| {
-                    m.with_value(scale((i64::from(v.value) + 2147483648) as u32, 32, 14) - 8192)
+                    m.with_value(scale((i64::from(v.value()) + 2147483648) as u32, 32, 14) - 8192)
                 })
-                .and_then(|m| m.with_channel(v.channel.into()))?,
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
         )],
-        Midi2ControlChange(v) => {
-            if matches!(v.controller, 0 | 6 | 32 | 38 | 88 | 96..=101) {
+        ControlChange(v) => {
+            if matches!(v.controller(), 0 | 6 | 32 | 38 | 88 | 96..=101) {
                 return Ok(report(
                     TranslationStatus::ContextRequired,
                     "this MIDI 2 CC is ignored or has different MIDI 1 sequence semantics",
@@ -261,31 +265,31 @@ pub fn to_midi1(
                     allow_loss,
                 ));
             }
-            let value = if matches!(v.controller, 84 | 126) {
-                i64::from(v.value >> 25)
+            let value = if matches!(v.controller(), 84 | 126) {
+                i64::from(v.value() >> 25)
             } else {
-                scale(v.value, 32, 7)
+                scale(v.value(), 32, 7)
             };
             vec![AnyMessage::ControlChange(
-                m::ControlChange::new(v.controller.into(), value)
-                    .and_then(|m| m.with_channel(v.channel.into()))?,
+                m::ControlChange::new(v.controller().into(), value)
+                    .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
             )]
         }
-        Midi2ProgramChange(v) => {
+        ProgramChange(v) => {
             let mut output = vec![];
-            if v.options == 1 {
+            if v.options().unwrap() == 1 {
                 output.push(AnyMessage::ControlChange(
-                    m::ControlChange::new(0, v.bank_msb.into())
-                        .and_then(|m| m.with_channel(v.channel.into()))?,
+                    m::ControlChange::new(0, v.bank_msb().unwrap().into())
+                        .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
                 ));
                 output.push(AnyMessage::ControlChange(
-                    m::ControlChange::new(32, v.bank_lsb.into())
-                        .and_then(|m| m.with_channel(v.channel.into()))?,
+                    m::ControlChange::new(32, v.bank_lsb().unwrap().into())
+                        .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
                 ));
             }
             output.push(AnyMessage::ProgramChange(
-                m::ProgramChange::new(v.program.into())
-                    .and_then(|m| m.with_channel(v.channel.into()))?,
+                m::ProgramChange::new(v.program().into())
+                    .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
             ));
             output
         }

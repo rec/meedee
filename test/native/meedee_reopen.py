@@ -2,7 +2,7 @@
 
 from uuid import uuid4
 
-from meedee import messages, midi, ump
+from meedee import messages, midi
 
 
 def main() -> None:
@@ -23,7 +23,8 @@ def main() -> None:
                         value = (
                             messages.ControlChange(channel=16, controller=7, value=127)
                             if protocol == midi.Protocol.Midi1
-                            else ump.Midi2ControlChange(
+                            else messages.ControlChange(
+                                version=2,
                                 group=16,
                                 channel=16,
                                 controller=7,

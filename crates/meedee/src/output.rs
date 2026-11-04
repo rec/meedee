@@ -374,6 +374,37 @@ impl Output {
                         "opaque and file-only UMP require explicit raw packets",
                     ));
                 }
+                let message = match message {
+                    UmpMessage::NoteOn(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::NoteOn(v.with_channel(channel.into())?)
+                    }
+                    UmpMessage::NoteOff(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::NoteOff(v.with_channel(channel.into())?)
+                    }
+                    UmpMessage::PolyPressure(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::PolyPressure(v.with_channel(channel.into())?)
+                    }
+                    UmpMessage::ControlChange(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::ControlChange(v.with_channel(channel.into())?)
+                    }
+                    UmpMessage::ProgramChange(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::ProgramChange(v.with_channel(channel.into())?)
+                    }
+                    UmpMessage::ChannelPressure(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::ChannelPressure(v.with_channel(channel.into())?)
+                    }
+                    UmpMessage::PitchBend(v) => {
+                        let channel = self.channel.or(v.channel()).unwrap_or(1);
+                        UmpMessage::PitchBend(v.with_channel(channel.into())?)
+                    }
+                    v => v,
+                };
                 let packet = Packet::Ump(message.encode_words()?);
                 transport::validate_packet(self.options.protocol, &packet)
                     .map_err(transport_error)?;
@@ -803,7 +834,11 @@ impl From<NoteDuration> for OutputValue {
 }
 impl From<AnyMessage> for OutputValue {
     fn from(v: AnyMessage) -> Self {
-        Self::Message(Payload::Midi1(v))
+        Self::Message(if v.version() == 2 {
+            Payload::Ump(crate::ump::UmpMessage::try_from(v).expect("MIDI 2 channel message"))
+        } else {
+            Payload::Midi1(v)
+        })
     }
 }
 impl From<AnyCommand> for OutputValue {
@@ -1219,9 +1254,15 @@ mod tests {
     }
 
     #[test]
-    fn protocol_checks_precede_sends_and_ump_addresses_remain_explicit() {
+    fn protocol_checks_precede_sends_and_midi2_resolves_output_channel() {
         let mut f = Fixture::new();
-        let note = crate::ump::Midi2NoteOn::new(2, 3, 60, 1000, 0, 0).unwrap();
+        let note = crate::messages::NoteOn::new_midi2(60)
+            .and_then(|m| m.with_group(2))
+            .and_then(|m| m.with_channel(3))
+            .and_then(|m| m.with_velocity(1000))
+            .and_then(|m| m.with_attribute_type(0))
+            .and_then(|m| m.with_attribute_data(0))
+            .unwrap();
         assert!(f.output.send(note.clone()).is_err());
         assert_eq!(f.sink.borrow().snapshot().attempts, 0);
         f.output.options.protocol = Protocol::Ump;
@@ -1240,7 +1281,7 @@ mod tests {
         assert_eq!(
             f.packets(),
             vec![
-                Packet::Ump(vec![0x4192_3c00, 1000 << 16]),
+                Packet::Ump(vec![0x4198_3c00, 1000 << 16]),
                 Packet::Ump(vec![0])
             ]
         );
@@ -1273,20 +1314,13 @@ ump_values!(
     JrTimestamp => JrTimestamp,
     DeltaClockstampTicksPerQuarter => DeltaClockstampTicksPerQuarter,
     DeltaClockstamp => DeltaClockstamp,
-    Midi2NoteOff => Midi2NoteOff,
-    Midi2NoteOn => Midi2NoteOn,
-    Midi2PolyPressure => Midi2PolyPressure,
     Midi2RegisteredPerNoteController => Midi2RegisteredPerNoteController,
     Midi2AssignablePerNoteController => Midi2AssignablePerNoteController,
     Midi2PerNoteManagement => Midi2PerNoteManagement,
-    Midi2ControlChange => Midi2ControlChange,
     Midi2RegisteredController => Midi2RegisteredController,
     Midi2AssignableController => Midi2AssignableController,
     Midi2RelativeRegisteredController => Midi2RelativeRegisteredController,
     Midi2RelativeAssignableController => Midi2RelativeAssignableController,
-    Midi2ProgramChange => Midi2ProgramChange,
-    Midi2ChannelPressure => Midi2ChannelPressure,
-    Midi2PitchBend => Midi2PitchBend,
     Midi2PerNotePitchBend => Midi2PerNotePitchBend,
     Midi1Packet => Midi1,
     SysEx7Packet => SysEx7,

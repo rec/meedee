@@ -186,16 +186,113 @@ macro_rules! check_parameter {
     };
 }
 channel_messages! {
-    NoteOn(note) { note: u8 => with_note = 0..=127 => note, velocity: u8 => with_velocity = 0..=127 => 90 };
-    NoteOff(note) { note: u8 => with_note = 0..=127 => note, velocity: u8 => with_velocity = 0..=127 => 0 };
-    PolyPressure(note) { note: u8 => with_note = 0..=127 => note, pressure: u8 => with_pressure = 0..=127 => 0 };
-    ControlChange(controller, value) { controller: u8 => with_controller = 0..=127 => controller, value: u8 => with_value = 0..=127 => value };
-    ProgramChange(program) { program: u8 => with_program = 1..=128 => program };
-    ChannelPressure() { pressure: u8 => with_pressure = 0..=127 => 0 };
-    PitchBend() { value: i16 => with_value = -8192..=8191 => 0 };
     ControlChange14(controller, value) { controller: u8 => with_controller = 0..=31 => controller, value: u16 => with_value = 0..=16383 => value };
     RpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16382 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
     NrpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16383 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum ChannelFormat {
+    Midi1,
+    Midi2 { group: u8 },
+}
+
+macro_rules! channel_values {
+    ($($name:ident($($arg:ident),*) {
+        $($field:ident: $ty:ty => $setter:ident = ($low1:expr, $high1:expr, $low2:expr, $high2:expr) => ($initial1:expr, $initial2:expr)),*
+    } { $($extra:ident: $ety:ty => $esetter:ident = $max:expr),* };)*) => {$(
+        #[derive(Clone, Debug)]
+        pub struct $name { metadata: Option<Box<Metadata>>, format: ChannelFormat, channel: Option<u8>, $($field: $ty,)* $($extra: Option<$ety>,)* }
+        value_metadata!($name { format, channel, $($field,)* $($extra,)* });
+        impl $name {
+            pub fn new($($arg: i64),*) -> Result<Self, ValueError> {
+                Ok(Self { metadata: None, format: ChannelFormat::Midi1, channel: None,
+                    $($field: bounded($initial1, stringify!($field), $low1, $high1)? as $ty,)* $($extra: None,)* })
+            }
+            pub fn new_midi2($($arg: i64),*) -> Result<Self, ValueError> {
+                Ok(Self { metadata: None, format: ChannelFormat::Midi2 { group: 1 }, channel: None,
+                    $($field: bounded($initial2, stringify!($field), $low2, $high2)? as $ty,)* $($extra: Some(0),)* })
+            }
+            pub fn version(&self) -> u8 { match self.format { ChannelFormat::Midi1 => 1, ChannelFormat::Midi2 { .. } => 2 } }
+            pub fn group(&self) -> Option<u8> { match self.format { ChannelFormat::Midi1 => None, ChannelFormat::Midi2 { group } => Some(group) } }
+            pub fn with_group(mut self, group: i64) -> Result<Self, ValueError> {
+                if self.version() != 2 { return Err(ValueError("group requires MIDI 2; use Midi1Packet for MIDI 1 UMP".into())); }
+                self.format = ChannelFormat::Midi2 { group: bounded(group, "group", 1, 16)? as u8 }; Ok(self)
+            }
+            pub fn channel(&self) -> Option<u8> { self.channel }
+            pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
+                self.channel = Some(bounded(channel, "channel", 1, 16)? as u8); Ok(self)
+            }
+            pub fn without_channel(mut self) -> Self { self.channel = None; self }
+            pub(crate) fn resolved_channel(&self) -> Result<u8, ValueError> {
+                self.channel.ok_or_else(|| ValueError("message channel is unassigned".into()))
+            }
+            pub(crate) fn midi1_channel(&self) -> Result<u8, ValueError> {
+                if self.version() != 1 { return Err(ValueError("MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into())); }
+                self.resolved_channel()
+            }
+            $(pub fn $field(&self) -> $ty { self.$field }
+            pub fn $setter(mut self, value: i64) -> Result<Self, ValueError> {
+                let (lo, hi) = if self.version() == 1 { ($low1, $high1) } else { ($low2, $high2) };
+                self.$field = bounded(value, stringify!($field), lo, hi)? as $ty; Ok(self)
+            })*
+            $(pub fn $extra(&self) -> Option<$ety> { self.$extra }
+            pub fn $esetter(mut self, value: i64) -> Result<Self, ValueError> {
+                if self.version() != 2 { return Err(ValueError(concat!(stringify!($extra), " requires MIDI 2").into())); }
+                self.$extra = Some(bounded(value, stringify!($extra), 0, $max)? as $ety);
+                validate_channel_extra!($name, self)?; Ok(self)
+            })*
+        }
+    )*};
+}
+macro_rules! validate_channel_extra {
+    (NoteOn, $v:expr) => {
+        validate_note_attributes($v.attribute_type.unwrap(), $v.attribute_data.unwrap())
+    };
+    (NoteOff, $v:expr) => {
+        validate_note_attributes($v.attribute_type.unwrap(), $v.attribute_data.unwrap())
+    };
+    (ProgramChange, $v:expr) => {
+        if $v.options == Some(0) && ($v.bank_msb != Some(0) || $v.bank_lsb != Some(0)) {
+            Err(ValueError(
+                "bank bytes must be zero without bank-valid option".into(),
+            ))
+        } else {
+            Ok(())
+        }
+    };
+}
+fn validate_note_attributes(kind: u8, data: u16) -> Result<(), ValueError> {
+    if kind == 0 && data != 0 {
+        Err(ValueError(
+            "attribute_data must be zero for attribute_type=0".into(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+channel_values! {
+    NoteOn(note) {
+        note: u8 => with_note = (0,127,0,127) => (note,note),
+        velocity: u16 => with_velocity = (0,127,0,65535) => (90, crate::ump::scale_up(90,7,16)? as i64)
+    } { attribute_type: u8 => with_attribute_type = 3, attribute_data: u16 => with_attribute_data = 65535 };
+    NoteOff(note) {
+        note: u8 => with_note = (0,127,0,127) => (note,note),
+        velocity: u16 => with_velocity = (0,127,0,65535) => (0,0)
+    } { attribute_type: u8 => with_attribute_type = 3, attribute_data: u16 => with_attribute_data = 65535 };
+    PolyPressure(note) {
+        note: u8 => with_note = (0,127,0,127) => (note,note),
+        pressure: u32 => with_pressure = (0,127,0,4294967295) => (0,0)
+    } {};
+    ControlChange(controller,value) {
+        controller: u8 => with_controller = (0,127,0,127) => (controller,controller),
+        value: u32 => with_value = (0,127,0,4294967295) => (value,value)
+    } {};
+    ProgramChange(program) {
+        program: u8 => with_program = (1,128,1,128) => (program,program)
+    } { options: u8 => with_options = 1, bank_msb: u8 => with_bank_msb = 127, bank_lsb: u8 => with_bank_lsb = 127 };
+    ChannelPressure() { pressure: u32 => with_pressure = (0,127,0,4294967295) => (0,0) } {};
+    PitchBend() { value: i32 => with_value = (-8192,8191,-2147483648,2147483647) => (0,0) } {};
 }
 
 /// A single relative step of a registered or non-registered parameter.
@@ -343,8 +440,24 @@ enum_metadata!(AnyMessage {
     SysEx
 });
 impl AnyMessage {
+    pub fn version(&self) -> u8 {
+        match self {
+            Self::NoteOn(v) => v.version(),
+            Self::NoteOff(v) => v.version(),
+            Self::PolyPressure(v) => v.version(),
+            Self::ControlChange(v) => v.version(),
+            Self::ProgramChange(v) => v.version(),
+            Self::ChannelPressure(v) => v.version(),
+            Self::PitchBend(v) => v.version(),
+            _ => 1,
+        }
+    }
+
     /// Encoded byte count, independent of channel assignment.
     pub fn encoded_len(&self) -> usize {
+        if self.version() == 2 {
+            return 8;
+        }
         match self {
             Self::SysEx(v) => v.data().len() + 2,
             Self::NoteOn(_)

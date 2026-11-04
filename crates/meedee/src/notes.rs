@@ -240,19 +240,17 @@ fn action(message: &Payload) -> Option<(Option<u8>, &'static str, u8, Action)> {
         Payload::Ump(ump::UmpMessage::Midi1(v)) => {
             midi1(v.message()).map(|(c, a)| (Some(v.group()), "midi1", c, a))
         }
-        Payload::Ump(ump::UmpMessage::Midi2NoteOn(v)) => {
-            Some((Some(v.group()), "midi2", v.channel(), Action::On(v.note())))
+        Payload::Ump(ump::UmpMessage::NoteOn(v)) => {
+            Some((v.group(), "midi2", v.channel()?, Action::On(v.note())))
         }
-        Payload::Ump(ump::UmpMessage::Midi2NoteOff(v)) => {
-            Some((Some(v.group()), "midi2", v.channel(), Action::Off(v.note())))
+        Payload::Ump(ump::UmpMessage::NoteOff(v)) => {
+            Some((v.group(), "midi2", v.channel()?, Action::Off(v.note())))
         }
-        Payload::Ump(ump::UmpMessage::Midi2ControlChange(v))
-            if selected_control(v.controller()) =>
-        {
+        Payload::Ump(ump::UmpMessage::ControlChange(v)) if selected_control(v.controller()) => {
             Some((
-                Some(v.group()),
+                v.group(),
                 "midi2",
-                v.channel(),
+                v.channel()?,
                 Action::Control(v.controller(), v.value()),
             ))
         }
@@ -265,10 +263,9 @@ fn midi1(message: &messages::AnyMessage) -> Option<(u8, Action)> {
         NoteOn(v) if v.velocity() != 0 => Some((v.channel()?, Action::On(v.note()))),
         NoteOn(v) => Some((v.channel()?, Action::Off(v.note()))),
         NoteOff(v) => Some((v.channel()?, Action::Off(v.note()))),
-        ControlChange(v) if selected_control(v.controller()) => Some((
-            v.channel()?,
-            Action::Control(v.controller(), v.value().into()),
-        )),
+        ControlChange(v) if selected_control(v.controller()) => {
+            Some((v.channel()?, Action::Control(v.controller(), v.value())))
+        }
         SystemReset(_) => Some((0, Action::Reset)),
         _ => None,
     }

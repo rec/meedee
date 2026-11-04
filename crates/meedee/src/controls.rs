@@ -113,6 +113,9 @@ impl Interpreter {
             InputMessage::Other => Vec::new(),
             InputMessage::SystemReset => self.clear(None, index),
             InputMessage::ControlChange(message) => {
+                if message.version() != 1 {
+                    return Vec::new();
+                }
                 let Some(channel) = message.channel() else {
                     return Vec::new();
                 };
@@ -180,7 +183,7 @@ impl Channel {
             return Vec::new();
         };
         let controller = message.controller();
-        let value = message.value();
+        let value = message.value() as u8;
         let byte = IndexedByte { value, index };
         match controller {
             98..=101 => {

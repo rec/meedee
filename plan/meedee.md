@@ -259,9 +259,10 @@ File parsing has its own applicable running-status rules.
 
 ### MIDI 2.0 and UMP
 
-Provide explicit MIDI 2.0 types, for example `Midi2NoteOn`, rather than changing
-`NoteOn.velocity`'s resolution implicitly. MIDI 2.0 values retain their native
-widths, group/channel addressing, note attributes, and controller semantics.
+Use shared channel-message types with explicit version selection: Python
+`NoteOn(..., version=2)` and Rust `NoteOn::new_midi2(...)`. MIDI 2.0 values
+retain their native widths, group/channel addressing, note attributes and
+controller semantics. Changing version requires explicit conversion.
 Do not make every message carry a group when its UMP class has no group field.
 
 The UMP codec inventory must cover applicable utility, system, MIDI 1.0 channel,

@@ -38,11 +38,11 @@ impl BankProgramSelect {
         self
     }
     pub fn with_bank_msb(mut self, value: i64) -> Result<Self, ValueError> {
-        self.bank_msb = ControlChange::new(0, value)?.value();
+        self.bank_msb = ControlChange::new(0, value)?.value() as u8;
         Ok(self)
     }
     pub fn with_bank_lsb(mut self, value: i64) -> Result<Self, ValueError> {
-        self.bank_lsb = ControlChange::new(32, value)?.value();
+        self.bank_lsb = ControlChange::new(32, value)?.value() as u8;
         Ok(self)
     }
     pub fn with_program(mut self, program: i64) -> Result<Self, ValueError> {

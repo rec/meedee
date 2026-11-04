@@ -199,8 +199,14 @@ fn large_escape_records_stream_and_group_routing_is_not_silently_discarded() {
         ticks: 0,
         clock: clock.clone(),
     };
-    let event = (Payload::Ump(ump::UmpMessage::Midi2NoteOn(
-        ump::Midi2NoteOn::new(2, 1, 60, 65535, 0, 0).unwrap(),
+    let event = (Payload::Ump(ump::UmpMessage::NoteOn(
+        meedee::messages::NoteOn::new_midi2(60)
+            .and_then(|m| m.with_group(2))
+            .and_then(|m| m.with_channel(1))
+            .and_then(|m| m.with_velocity(65535))
+            .and_then(|m| m.with_attribute_type(0))
+            .and_then(|m| m.with_attribute_data(0))
+            .unwrap(),
     )))
     .with_metadata(meedee::messages::Metadata {
         stream: Some("s".into()),

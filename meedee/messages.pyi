@@ -46,9 +46,25 @@ class Message:
 
 class NoteOn(Message):
     def __init__(
-        self, note: int, velocity: int = 90, channel: int | None = None
+        self,
+        note: int,
+        velocity: int | None = None,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
+        attribute_type: int | None = None,
+        attribute_data: int | None = None,
     ) -> None: ...
     def transpose(self, semitones: int) -> NoteOn: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
+    @property
+    def attribute_type(self) -> int | None: ...
+    @property
+    def attribute_data(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -61,6 +77,10 @@ class NoteOn(Message):
         channel: int | None = ...,
         note: int = ...,
         velocity: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
+        attribute_type: int | None = ...,
+        attribute_data: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
@@ -81,9 +101,25 @@ class SysEx(Message):
 
 class NoteOff(Message):
     def __init__(
-        self, note: int, velocity: int = 0, channel: int | None = None
+        self,
+        note: int,
+        velocity: int | None = None,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
+        attribute_type: int | None = None,
+        attribute_data: int | None = None,
     ) -> None: ...
     def transpose(self, semitones: int) -> NoteOff: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
+    @property
+    def attribute_type(self) -> int | None: ...
+    @property
+    def attribute_data(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -96,6 +132,10 @@ class NoteOff(Message):
         channel: int | None = ...,
         note: int = ...,
         velocity: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
+        attribute_type: int | None = ...,
+        attribute_data: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
@@ -103,8 +143,18 @@ class NoteOff(Message):
 
 class PolyPressure(Message):
     def __init__(
-        self, note: int, pressure: int = 0, channel: int | None = None
+        self,
+        note: int,
+        pressure: int | None = None,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
     ) -> None: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -117,6 +167,8 @@ class PolyPressure(Message):
         channel: int | None = ...,
         note: int = ...,
         pressure: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
@@ -124,8 +176,18 @@ class PolyPressure(Message):
 
 class ControlChange(Message):
     def __init__(
-        self, controller: int, value: int, channel: int | None = None
+        self,
+        controller: int,
+        value: int,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
     ) -> None: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -138,13 +200,35 @@ class ControlChange(Message):
         channel: int | None = ...,
         controller: int = ...,
         value: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
     ) -> ControlChange: ...
 
 class ProgramChange(Message):
-    def __init__(self, program: int, channel: int | None = None) -> None: ...
+    def __init__(
+        self,
+        program: int,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
+        options: int | None = None,
+        bank_msb: int | None = None,
+        bank_lsb: int | None = None,
+    ) -> None: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
+    @property
+    def options(self) -> int | None: ...
+    @property
+    def bank_msb(self) -> int | None: ...
+    @property
+    def bank_lsb(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -154,13 +238,29 @@ class ProgramChange(Message):
         *,
         channel: int | None = ...,
         program: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
+        options: int | None = ...,
+        bank_msb: int | None = ...,
+        bank_lsb: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
     ) -> ProgramChange: ...
 
 class ChannelPressure(Message):
-    def __init__(self, pressure: int = 0, channel: int | None = None) -> None: ...
+    def __init__(
+        self,
+        pressure: int | None = None,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
+    ) -> None: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -170,13 +270,26 @@ class ChannelPressure(Message):
         *,
         channel: int | None = ...,
         pressure: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
     ) -> ChannelPressure: ...
 
 class PitchBend(Message):
-    def __init__(self, value: int = 0, channel: int | None = None) -> None: ...
+    def __init__(
+        self,
+        value: int | None = None,
+        channel: int | None = None,
+        *,
+        version: Literal[1, 2] = 1,
+        group: int | None = None,
+    ) -> None: ...
+    @property
+    def version(self) -> Literal[1, 2]: ...
+    @property
+    def group(self) -> int | None: ...
     @property
     def channel(self) -> int | None: ...
     @property
@@ -186,6 +299,8 @@ class PitchBend(Message):
         *,
         channel: int | None = ...,
         value: int = ...,
+        version: Literal[1, 2] = ...,
+        group: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,

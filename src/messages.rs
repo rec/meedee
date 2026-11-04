@@ -122,11 +122,6 @@ impl SysEx {
 }
 
 macro_rules! channel_value {
-    (NoteOn, $note:expr, $velocity:expr) => { messages::NoteOn::new($note).and_then(|m| m.with_velocity($velocity)) };
-    (NoteOff, $note:expr, $velocity:expr) => { messages::NoteOff::new($note).and_then(|m| m.with_velocity($velocity)) };
-    (PolyPressure, $note:expr, $pressure:expr) => { messages::PolyPressure::new($note).and_then(|m| m.with_pressure($pressure)) };
-    (ChannelPressure, $pressure:expr) => { messages::ChannelPressure::new().and_then(|m| m.with_pressure($pressure)) };
-    (PitchBend, $value:expr) => { messages::PitchBend::new().and_then(|m| m.with_value($value)) };
     (RpnSet, $parameter:expr, $value:expr, $resolution:expr) => { messages::RpnSet::new($parameter,$value).and_then(|m| m.with_resolution($resolution)) };
     (NrpnSet, $parameter:expr, $value:expr, $resolution:expr) => { messages::NrpnSet::new($parameter,$value).and_then(|m| m.with_resolution($resolution)) };
     ($name:ident, $($field:expr),*) => { messages::$name::new($($field),*) };
@@ -194,28 +189,108 @@ macro_rules! channel_message {
     };
 }
 
-macro_rules! note_message {
-    ($name:ident $signature:tt) => {
-        channel_message! { $name $signature { note, velocity };
-            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with=strict_integer)] semitones: i64) -> PyResult<Py<PyAny>> {
-                let py = slf.py();
-                let changes = PyDict::new(py);
+macro_rules! versioned_message {
+    ($name:ident $signature:tt { $($required:ident),* } { $($optional:ident => $setter:ident),* } { $($extra:ident => $extra_setter:ident),* } $(; $($method:item)*)?) => {
+        #[pyclass(frozen, extends=Message, module="meedee.messages")]
+        struct $name { value: messages::$name }
+        impl $name {
+            fn from_value(value: messages::$name) -> Self { Self { value } }
+            fn resolved(&self) -> PyResult<&messages::$name> {
+                if self.value.version() != 1 { return Err(PyValueError::new_err("expected MIDI 1; convert explicitly")); }
+                if self.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
+                Ok(&self.value)
+            }
+        }
+        #[pymethods]
+        impl $name {
+            #[new]
+            #[pyo3(signature=$signature)]
+            #[allow(clippy::too_many_arguments)]
+            fn new($($required: &Bound<'_, PyAny>,)* $($optional: Option<&Bound<'_, PyAny>>,)* channel: Option<&Bound<'_, PyAny>>, #[pyo3(from_py_with=strict_integer)] version: i64, group: Option<&Bound<'_, PyAny>>, $($extra: Option<&Bound<'_, PyAny>>),*) -> PyResult<PyClassInitializer<Self>> {
+                let mut value = match version {
+                    1 => messages::$name::new($(integer($required,stringify!($required))?),*),
+                    2 => messages::$name::new_midi2($(integer($required,stringify!($required))?),*),
+                    _ => return Err(PyValueError::new_err("version must be 1 or 2")),
+                }.map_err(value_error)?;
+                $(if let Some(v) = $optional { value = value.$setter(integer(v,stringify!($optional))?).map_err(value_error)?; })*
+                if let Some(v) = channel { value = value.with_channel(integer(v,"channel")?).map_err(value_error)?; }
+                if let Some(v) = group { value = value.with_group(integer(v,"group")?).map_err(value_error)?; }
+                $(if let Some(v) = $extra { value = value.$extra_setter(integer(v,stringify!($extra))?).map_err(value_error)?; })*
+                Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+            }
+            #[getter] fn channel(&self) -> Option<u8> { self.value.channel() }
+            #[getter] fn version(&self) -> u8 { self.value.version() }
+            #[getter] fn group(&self) -> Option<u8> { self.value.group() }
+            $(#[getter] fn $required(&self) -> i64 { i64::from(self.value.$required()) })*
+            $(#[getter] fn $optional(&self) -> i64 { i64::from(self.value.$optional()) })*
+            $(#[getter] fn $extra(&self) -> Option<i64> { self.value.$extra().map(i64::from) })*
+            fn __eq__(&self, other:&Bound<'_,PyAny>) -> bool { other.extract::<PyRef<'_,Self>>().is_ok_and(|v| self.value==v.value) }
+            fn __hash__(&self) -> u64 { value_hash(&self.value) }
+            fn __repr__(slf:PyRef<'_,Self>) -> PyResult<String> {
+                let py=slf.py();
+                let fields = if slf.value.version()==1 { vec![$(stringify!($required),)* $(stringify!($optional),)* "channel"] } else { vec![$(stringify!($required),)* $(stringify!($optional),)* "channel", "version", "group", $(stringify!($extra)),*] };
+                crate::tuning::render(slf.into_pyobject(py)?.as_any(), stringify!($name), &fields)
+            }
+            #[pyo3(signature=(**changes))]
+            fn replace<'py>(slf:PyRef<'py,Self>, changes:Option<&Bound<'py,PyDict>>) -> PyResult<Bound<'py,PyAny>> {
+                if let Some(v) = changes.map(|c| c.get_item("version")).transpose()?.flatten() {
+                    if integer(&v,"version")? != i64::from(slf.value.version()) { return Err(PyValueError::new_err("version cannot change through replace; convert explicitly")); }
+                }
+                let py=slf.py();
+                crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &[$(stringify!($required),)* $(stringify!($optional),)* "channel", "version", "group", $(stringify!($extra)),*],changes)
+            }
+            #[classattr] fn __annotations__(py:Python<'_>) -> PyResult<Bound<'_,PyDict>> {
+                let d=PyDict::new(py);
+                for field in [$(stringify!($required),)* $(stringify!($optional),)* "version"] { d.set_item(field,py.get_type::<PyInt>())?; }
+                for field in ["channel", "group", $(stringify!($extra)),*] { d.set_item(field,py.import("typing")?.getattr("Optional")?.get_item(py.get_type::<PyInt>())?)?; }
+                Ok(d)
+            }
+            #[classattr] fn __match_args__(py:Python<'_>) -> PyResult<Bound<'_,PyTuple>> { PyTuple::new(py,[$(stringify!($required),)* $(stringify!($optional),)* "channel"]) }
+            $($($method)*)?
+        }
+    };
+}
+macro_rules! versioned_note {
+    ($name:ident) => {
+        versioned_message! { $name (note, velocity=None, channel=None, *, version=1, group=None, attribute_type=None, attribute_data=None) {note} {velocity => with_velocity} {attribute_type => with_attribute_type, attribute_data => with_attribute_data};
+            fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=strict_integer)] semitones:i64) -> PyResult<Py<PyAny>> {
+                let py=slf.py(); let changes=PyDict::new(py);
                 changes.set_item("note", i64::from(slf.value.note()).saturating_add(semitones).clamp(0,127))?;
-                Ok(crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["note", "velocity", "channel"], Some(&changes))?.unbind())
+                Ok(Self::replace(slf,Some(&changes))?.unbind())
             }
         }
     };
 }
+versioned_note!(NoteOn);
+versioned_note!(NoteOff);
+versioned_message! { PolyPressure (note, pressure=None, channel=None, *, version=1, group=None) {note} {pressure => with_pressure} {} }
+versioned_message! { ControlChange (controller, value, channel=None, *, version=1, group=None) {controller,value} {} {} }
+versioned_message! { ProgramChange (program, channel=None, *, version=1, group=None, options=None, bank_msb=None, bank_lsb=None) {program} {} {options => with_options, bank_msb => with_bank_msb, bank_lsb => with_bank_lsb} }
+versioned_message! { ChannelPressure (pressure=None, channel=None, *, version=1, group=None) {} {pressure => with_pressure} {} }
+versioned_message! { PitchBend (value=None, channel=None, *, version=1, group=None) {} {value => with_value} {} }
+
+pub(crate) fn extract_midi2(value: &Bound<'_, PyAny>) -> PyResult<meedee::ump::UmpMessage> {
+    macro_rules! extract { ($($name:ident),*) => { $(if let Ok(v)=value.extract::<PyRef<'_,$name>>() { return meedee::ump::UmpMessage::try_from(messages::AnyMessage::$name(v.value.clone())).map_err(value_error); })* }; }
+    extract!(
+        NoteOn,
+        NoteOff,
+        PolyPressure,
+        ControlChange,
+        ProgramChange,
+        ChannelPressure,
+        PitchBend
+    );
+    Err(PyTypeError::new_err("expected a MIDI 2 channel message"))
+}
 
 macro_rules! message_classes {
-    (NoteOn $signature:tt { channel, note, velocity }; $($rest:tt)*) => {
-        note_message! { NoteOn $signature }
-        message_classes! { $($rest)* }
-    };
-    (NoteOff $signature:tt { channel, note, velocity }; $($rest:tt)*) => {
-        note_message! { NoteOff $signature }
-        message_classes! { $($rest)* }
-    };
+    (NoteOn $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
+    (NoteOff $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
+    (PolyPressure $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
+    (ControlChange $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
+    (ProgramChange $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
+    (ChannelPressure $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
+    (PitchBend $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
     ($name:ident $signature:tt { channel, $($field:ident),* }; $($rest:tt)*) => {
         channel_message! { $name $signature { $($field),* } }
         message_classes! { $($rest)* }
@@ -561,7 +636,18 @@ impl Note {
         validate_duration(duration)?;
         Ok(Self {
             duration: duration.clone().unbind(),
-            attack: Py::new(py, NoteOn::new(note, velocity, channel)?)?,
+            attack: Py::new(
+                py,
+                NoteOn::new(
+                    note.into_pyobject(py)?.as_any(),
+                    Some(velocity.into_pyobject(py)?.as_any()),
+                    channel,
+                    1,
+                    None,
+                    None,
+                    None,
+                )?,
+            )?,
         })
     }
     #[getter]
@@ -578,7 +664,7 @@ impl Note {
     }
     #[getter]
     fn channel(&self, py: Python<'_>) -> Option<i64> {
-        self.attack.borrow(py).channel()
+        self.attack.borrow(py).channel().map(i64::from)
     }
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         Ok(format!(

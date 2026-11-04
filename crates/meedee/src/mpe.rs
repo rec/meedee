@@ -258,6 +258,9 @@ impl Tracker {
         &mut self,
         message: &crate::messages::AnyMessage,
     ) -> Result<Vec<ChannelState>, ValueError> {
+        if message.version() != 1 {
+            return Err(ValueError("MPE requires MIDI 1 messages".into()));
+        }
         use crate::messages::AnyMessage::*;
         if matches!(message, SystemReset(_)) {
             self.reset();
@@ -296,8 +299,8 @@ impl Tracker {
             }
             NoteOn(v) => release_note(c, v.note(), manager_sustain),
             NoteOff(v) => release_note(c, v.note(), manager_sustain),
-            PitchBend(v) => c.bend = Some(v.value()),
-            ChannelPressure(v) => c.pressure = Some(v.pressure()),
+            PitchBend(v) => c.bend = Some(v.value() as i16),
+            ChannelPressure(v) => c.pressure = Some(v.pressure() as u8),
             ControlChange(v) => match v.controller() {
                 64 => {
                     c.sustain = Some(v.value() >= 64);
@@ -305,7 +308,7 @@ impl Tracker {
                         c.sustained.fill(0);
                     }
                 }
-                74 => c.timbre = Some(v.value()),
+                74 => c.timbre = Some(v.value() as u8),
                 120 => {
                     c.held.fill(0);
                     c.sustained.fill(0);

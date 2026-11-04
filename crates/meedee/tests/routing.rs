@@ -91,8 +91,11 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
     e = e
         .with_timestamp(events::Timestamp { ticks: -5, clock })
         .unwrap();
-    e = events::Payload::Ump(ump::UmpMessage::Midi2ControlChange(
-        ump::Midi2ControlChange::new(16, 16, 74, 0xfedcba98).unwrap(),
+    e = events::Payload::Ump(ump::UmpMessage::ControlChange(
+        meedee::messages::ControlChange::new_midi2(74, 0xfedcba98)
+            .and_then(|m| m.with_group(16))
+            .and_then(|m| m.with_channel(16))
+            .unwrap(),
     ))
     .with_metadata(e.metadata().unwrap().clone())
     .unwrap();

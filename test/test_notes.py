@@ -45,7 +45,8 @@ def test_ump_groups_and_protocols_preserve_zero_velocity_note_on_meaning() -> No
     tracker.feed(event(ump.Midi1Packet(group=16, message=on)))
     tracker.feed(
         event(
-            ump.Midi2NoteOn(
+            messages.NoteOn(
+                version=2,
                 group=16,
                 channel=1,
                 note=60,
@@ -86,7 +87,9 @@ def test_pedal_values_and_channel_modes_do_not_invent_sounding_voices() -> None:
     assert channel.notes[0].held == 0 and channel.notes[0].released == 2
     tracker.feed(
         event(
-            ump.Midi2ControlChange(group=1, channel=1, controller=64, value=0xFEDCBA98)
+            messages.ControlChange(
+                version=2, group=1, channel=1, controller=64, value=0xFEDCBA98
+            )
         )
     )
     assert tracker.snapshot().channels[1].sustain == 0xFEDCBA98

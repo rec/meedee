@@ -9,6 +9,66 @@ from native import meedee_messages
 from meedee import messages
 
 
+def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
+    import pytest
+
+    from meedee import codecs, events, ump
+
+    pairs = [
+        (messages.NoteOn(60, 127, 1), messages.NoteOn(60, 65535, 1, version=2)),
+        (messages.NoteOff(60, 127, 1), messages.NoteOff(60, 65535, 1, version=2)),
+        (
+            messages.PolyPressure(60, 127, 1),
+            messages.PolyPressure(60, 2**32 - 1, 1, version=2),
+        ),
+        (
+            messages.ControlChange(7, 127, 1),
+            messages.ControlChange(7, 2**32 - 1, 1, version=2),
+        ),
+        (messages.ProgramChange(128, 1), messages.ProgramChange(128, 1, version=2)),
+        (
+            messages.ChannelPressure(127, 1),
+            messages.ChannelPressure(2**32 - 1, 1, version=2),
+        ),
+        (messages.PitchBend(8191, 1), messages.PitchBend(2**31 - 1, 1, version=2)),
+    ]
+    timestamp = events.Timestamp(ticks=12, clock=events.Clock(identity="capture"))
+    for a, b in pairs:
+        assert type(a) is type(b) and a != b
+        assert (a.version, a.group, b.version, b.group) == (1, None, 2, 1)
+        assert codecs.encode(a)
+        assert ump.decode(ump.encode(b)) == b
+        marked = b.replace(timestamp=timestamp, stream="keyboard")
+        assert marked == b and hash(marked) == hash(b)
+        assert marked.replace(channel=2).timestamp == timestamp
+        assert marked.replace(channel=2).stream == "keyboard"
+        with pytest.raises(ValueError):
+            codecs.encode(b)
+        with pytest.raises((ValueError, TypeError)):
+            ump.encode(a)
+        with pytest.raises(ValueError, match="version"):
+            a.replace(version=2)
+        with pytest.raises(ValueError, match="version"):
+            b.replace(version=1)
+        with pytest.raises(ValueError):
+            a.replace(group=1)
+    note = messages.NoteOn(60, version=2)
+    assert note.channel is None and note.velocity == ump.scale_up(
+        value=90, source_bits=7, destination_bits=16
+    )
+    assert messages.NoteOn(60, 90, version=2).velocity == 90
+    with pytest.raises(ValueError):
+        ump.encode(note)
+    attributed = note.replace(channel=2, group=3, attribute_type=3, attribute_data=123)
+    shifted = attributed.replace(timestamp=timestamp).transpose(12)
+    assert shifted == attributed.replace(note=72)
+    assert shifted.timestamp == timestamp
+    with pytest.raises(ValueError):
+        messages.NoteOn(60, attribute_type=0)
+    with pytest.raises(ValueError):
+        messages.ProgramChange(1, options=0)
+
+
 def test_public_messages_preserve_the_frozen_representation_contract() -> None:
     meedee_messages.verify(messages)
 

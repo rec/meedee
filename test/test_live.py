@@ -72,7 +72,7 @@ def test_ump_framing_and_typed_send_never_downgrade_or_send_opaque_values() -> N
     decoder = events.PacketDecoder(stream="u", protocol=midi.Protocol.Ump)
     assert decoder.feed(packet(midi.UmpPacket(words=(0x40903C00,)), 0, 1)) == []
     value = decoder.feed(packet(midi.UmpPacket(words=(0xFFFF0000,)), 1, 2))[0]
-    assert isinstance(value, messages.Message) and isinstance(value, ump.Midi2NoteOn)
+    assert isinstance(value, messages.Message) and isinstance(value, messages.NoteOn)
     assert value.span is not None and value.span.first_packet == 0
     with pytest.raises(midi.CapabilityError):
         _native.prepare_output(midi.Protocol.Midi1, value)

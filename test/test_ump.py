@@ -25,18 +25,24 @@ def test_shared_vectors_preserve_every_family_and_frozen_native_values() -> None
         value = ump.decode(words)
         assert isinstance(value, messages.Message)
         assert ump.encode(value) == words
-        assert type(value).__module__ == "meedee.ump"
-        constructor = getattr(ump, type(value).__name__)
-        fields = constructor.__match_args__
+        namespace = messages if getattr(value, "version", None) == 2 else ump
+        assert type(value).__module__ == namespace.__name__
+        constructor = getattr(namespace, type(value).__name__)
+        fields = (
+            constructor.__annotations__
+            if namespace is messages
+            else constructor.__match_args__
+        )
         clone = constructor(**{f: getattr(value, f) for f in fields})
         assert clone == value and clone.replace() == value
         assert hash(clone) == hash(value)
         assert repr(value).startswith(type(value).__name__ + "(")
         for f in fields:
-            assert (
-                inspect.signature(type(value)).parameters[f].kind
-                == inspect.Parameter.KEYWORD_ONLY
-            )
+            if namespace is ump:
+                assert (
+                    inspect.signature(type(value)).parameters[f].kind
+                    == inspect.Parameter.KEYWORD_ONLY
+                )
             with pytest.raises(AttributeError):
                 setattr(value, f, None)
         with pytest.raises(TypeError):
@@ -50,7 +56,8 @@ def test_shared_vectors_preserve_every_family_and_frozen_native_values() -> None
             "StartOfClip",
         }:
             assert type(value).__name__ == name
-    on = ump.Midi2NoteOn(
+    on = messages.NoteOn(
+        version=2,
         group=16,
         channel=16,
         note=127,
@@ -63,7 +70,7 @@ def test_shared_vectors_preserve_every_family_and_frozen_native_values() -> None
     assert not hasattr(ump.JrClock(ticks=0), "group")
     assert not hasattr(ump.start_of_clip(), "group")
     for field in inspect.signature(type(on)).parameters:
-        for v in (True, 1.0, "1", None):
+        for v in (True, 1.0, "1"):
             with pytest.raises(TypeError):
                 on.replace(**{field: v})
     for changes in (
@@ -291,8 +298,14 @@ def test_endpoint_factories_and_capabilities_preserve_unknown_support() -> None:
             tx_jr=False,
         )
     caps = ump.Capabilities(midi1=False, midi2=True, sysex8_streams=1)
-    note = ump.Midi2NoteOn(
-        group=1, channel=1, note=60, velocity=65535, attribute_type=0, attribute_data=0
+    note = messages.NoteOn(
+        version=2,
+        group=1,
+        channel=1,
+        note=60,
+        velocity=65535,
+        attribute_type=0,
+        attribute_data=0,
     )
     assert caps.supports(note) is True
     assert (
@@ -321,10 +334,12 @@ def test_translation_reports_precision_and_never_guesses_compound_context() -> N
         assert ump.to_midi1(upgraded.messages[0]).messages == [original]
     zero = ump.to_midi2(messages.NoteOn(channel=1, note=60, velocity=0), group=1)
     assert (
-        isinstance(zero.messages[0], ump.Midi2NoteOff)
+        isinstance(zero.messages[0], messages.NoteOff)
         and zero.messages[0].velocity == 32768
     )
-    fine = ump.Midi2ControlChange(group=1, channel=1, controller=7, value=0x80000001)
+    fine = messages.ControlChange(
+        version=2, group=1, channel=1, controller=7, value=0x80000001
+    )
     denied = ump.to_midi1(fine)
     assert (
         not denied.converted
@@ -335,15 +350,22 @@ def test_translation_reports_precision_and_never_guesses_compound_context() -> N
     assert accepted.messages == [
         messages.ControlChange(channel=1, controller=7, value=64)
     ]
-    bank = ump.Midi2ProgramChange(
-        group=16, channel=16, program=128, options=1, bank_msb=121, bank_lsb=3
+    bank = messages.ProgramChange(
+        version=2,
+        group=16,
+        channel=16,
+        program=128,
+        options=1,
+        bank_msb=121,
+        bank_lsb=3,
     )
     assert ump.to_midi1(bank).messages == [
         messages.ControlChange(channel=16, controller=0, value=121),
         messages.ControlChange(channel=16, controller=32, value=3),
         messages.ProgramChange(channel=16, program=128),
     ]
-    attributed = ump.Midi2NoteOn(
+    attributed = messages.NoteOn(
+        version=2,
         group=1,
         channel=1,
         note=60,
