@@ -270,6 +270,10 @@ pub fn send_message(
         Payload::Ump(ump::UmpMessage::Stream(v)) if matches!(v.status(), 32 | 33) => Err(
             crate::transport::Error::Capability("clip markers are file-only records"),
         ),
-        Payload::Ump(v) => output.send(&Packet::Ump(v.encode_words())),
+        Payload::Ump(v) => {
+            output.send(&Packet::Ump(v.encode_words().map_err(|_| {
+                crate::transport::Error::Invalid("invalid or incomplete UMP message")
+            })?))
+        }
     }
 }

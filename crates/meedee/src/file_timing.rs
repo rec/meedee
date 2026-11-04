@@ -297,7 +297,7 @@ impl ClipTimeline {
             &Packet::Ump(if suppress {
                 vec![]
             } else {
-                entry.message.encode_words()
+                entry.message.encode_words()?
             }),
             clock,
             Some(timestamp),

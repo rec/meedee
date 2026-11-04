@@ -374,7 +374,7 @@ impl Output {
                         "opaque and file-only UMP require explicit raw packets",
                     ));
                 }
-                let packet = Packet::Ump(message.encode_words());
+                let packet = Packet::Ump(message.encode_words()?);
                 transport::validate_packet(self.options.protocol, &packet)
                     .map_err(transport_error)?;
                 Ok(Prepared::Packet(packet))

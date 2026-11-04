@@ -2,7 +2,6 @@
 use crate::events::{Clock, Payload};
 use crate::live::{Decoder, Item};
 use crate::transport::{validate_packet, Error, Packet, Protocol, Result};
-use crate::ump::UmpValue;
 use std::collections::VecDeque;
 
 #[derive(Debug, Default)]
@@ -369,7 +368,7 @@ fn item_size(item: &Item) -> usize {
         Item::Diagnostic(v) => v.reason.len(),
         Item::Message(e) => match e.as_ref() {
             Payload::Midi1(v) => v.encoded_len(),
-            Payload::Ump(v) => v.encode_words().len() * 4,
+            Payload::Ump(v) => v.encoded_len() * 4,
             Payload::Command(_) => 64,
         },
     }

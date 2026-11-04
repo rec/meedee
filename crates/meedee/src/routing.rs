@@ -525,7 +525,7 @@ pub(crate) fn classify(payload: &events::Payload) -> io::Result<Info> {
             "compound commands must be explicitly expanded before routing",
         )),
         events::Payload::Ump(v) => {
-            let words = ump::encode(v);
+            let words = ump::encode(v)?;
             let kind = words[0] >> 28;
             Ok(Info {
                 protocol: Protocol::Ump,
@@ -554,7 +554,7 @@ fn remap(payload: &events::Payload, route: &Route) -> io::Result<events::Payload
             }
         }
         events::Payload::Ump(v) if route.remap_group.is_some() || route.remap_channel.is_some() => {
-            let mut words = ump::encode(v);
+            let mut words = ump::encode(v)?;
             if let Some(g) = route.remap_group.filter(|_| info.group.is_some()) {
                 words[0] = (words[0] & !0x0f000000) | (u32::from(g - 1) << 24);
             }
@@ -585,7 +585,7 @@ fn wire_bytes(payload: &events::Payload) -> io::Result<usize> {
     Ok(match payload {
         events::Payload::Midi1(messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
         events::Payload::Midi1(v) => v.encode()?.len(),
-        events::Payload::Ump(v) => ump::encode(v).len() * 4,
+        events::Payload::Ump(v) => ump::encode(v)?.len() * 4,
         events::Payload::Command(_) => unreachable!("commands rejected during selection"),
     })
 }

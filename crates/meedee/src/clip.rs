@@ -188,7 +188,7 @@ impl<W: Write> Writer<W> {
         let result = (|| {
             let mut state = self.state.clone();
             state.accept(message.clone(), self.offset)?;
-            let bytes = ump::words_to_bytes(&message.encode_words(), false);
+            let bytes = ump::words_to_bytes(&message.encode_words()?, false);
             self.inner.write_all(&bytes)?;
             self.offset += bytes.len() as u64;
             self.state = state;

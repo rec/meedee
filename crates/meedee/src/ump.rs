@@ -22,7 +22,27 @@ pub use helpers::{
 include!("ump_values.rs");
 
 pub trait UmpValue: Message {
-    fn encode_words(&self) -> Vec<u32>;
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError>;
+}
+macro_rules! scalar_group {
+    (Noop, $v:ident) => {
+        None
+    };
+    (JrClock, $v:ident) => {
+        None
+    };
+    (JrTimestamp, $v:ident) => {
+        None
+    };
+    (DeltaClockstampTicksPerQuarter, $v:ident) => {
+        None
+    };
+    (DeltaClockstamp, $v:ident) => {
+        None
+    };
+    ($name:ident, $v:ident) => {
+        Some($v.group())
+    };
 }
 macro_rules! scalar {
     ($($name:ident [$first:expr,$second:expr] {$($field:ident:$ty:ty = $lo:literal ..= $hi:literal => [$word:literal,$shift:literal,$mask:literal,$bias:literal]),*};)*)=>{
@@ -32,18 +52,34 @@ macro_rules! scalar {
             #[allow(clippy::too_many_arguments)]
             pub fn new($($field:i64),*)->Result<Self,ValueError>{
                 $(let $field=bounded($field,$lo,$hi,stringify!($field))? as $ty;)*
-                let result=Self{metadata: None, $($field),*};validate_scalar(&result.encode_words())?;Ok(result)
+                let result=Self{metadata: None, $($field),*};validate_scalar(&result.encode_words()?)?;Ok(result)
             }
             $(pub fn $field(&self)->$ty{self.$field})*
         }
         crate::messages::value_metadata!($name { $($field),* });
-        impl UmpValue for $name {fn encode_words(&self)->Vec<u32>{
+        impl UmpValue for $name {fn encode_words(&self)->Result<Vec<u32>,ValueError>{
             let mut words=vec![$first as u32,$second as u32];
             $(words[$word]|=((self.$field as i64+$bias) as u32)<<$shift;)*
-            words.truncate(word_count(words[0]));words
+            words.truncate(word_count(words[0]));Ok(words)
         }})*
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
         pub enum UmpMessage {$($name($name),)* Midi1(Midi1Packet),SysEx7(SysEx7Packet),SysEx8(SysEx8Packet),MixedDataSet(MixedDataSet),FlexData(FlexData),Stream(StreamMessage),Opaque(OpaquePacket)}
+        impl UmpMessage {
+            pub(crate) fn message_type(&self) -> u32 { match self {
+                $(Self::$name(_) => ($first as u32) >> 28,)*
+                Self::Midi1(v) => if v.message.encode().expect("validated MIDI 1 packet")[0] >= 240 { 1 } else { 2 },
+                Self::SysEx7(_) => 3, Self::SysEx8(_) | Self::MixedDataSet(_) => 5,
+                Self::FlexData(_) => 13, Self::Stream(_) => 15, Self::Opaque(v) => v.words()[0] >> 28,
+            } }
+            pub(crate) fn group(&self) -> Option<u8> { match self {
+                $(Self::$name(v) => { let _ = v; scalar_group!($name, v) },)*
+                Self::Midi1(v) => Some(v.group()), Self::SysEx7(v) => Some(v.group()),
+                Self::SysEx8(v) => Some(v.group()), Self::MixedDataSet(v) => Some(v.group()),
+                Self::FlexData(v) => Some(v.group()), Self::Stream(_) => None,
+                Self::Opaque(v) => matches!(self.message_type(),1..=5|13).then_some(((v.words()[0] >> 24) & 15) as u8 + 1),
+            } }
+            pub(crate) fn encoded_len(&self) -> usize { word_count(self.message_type() << 28) }
+        }
         impl UmpMessage { pub(crate) fn kind(&self) -> &'static str { match self {
             $(Self::$name(_) => stringify!($name),)*
             Self::Midi1(_) => "Midi1Packet", Self::SysEx7(_) => "SysEx7Packet",
@@ -52,13 +88,13 @@ macro_rules! scalar {
             Self::Opaque(_) => "OpaquePacket",
         } } }
         crate::messages::enum_metadata!(UmpMessage { $($name,)* Midi1, SysEx7, SysEx8, MixedDataSet, FlexData, Stream, Opaque });
-        impl UmpValue for UmpMessage {fn encode_words(&self)->Vec<u32>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::Midi1(v)=>v.encode_words(),Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
+        impl UmpValue for UmpMessage {fn encode_words(&self)->Result<Vec<u32>,ValueError>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::Midi1(v)=>v.encode_words(),Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
         fn scalar_decode(words:&[u32])->Result<Option<UmpMessage>,ValueError>{
             let key=if words[0]>>28==0{words[0]&0xfff00000}else{words[0]&0xf0f00000};
             $(if key==$first {
                 $(let raw=(words[$word]>>$shift)&$mask;let $field=if stringify!($ty)=="i32"&&($bias as i64)==0{(raw as i32) as i64}else{i64::from(raw)-$bias};)*
                 let value=$name::new($($field),*)?;
-                if value.encode_words()!=words{return Err(ValueError("nonzero reserved scalar fields".into()));}
+                if value.encode_words()?!=words{return Err(ValueError("nonzero reserved scalar fields".into()));}
                 return Ok(Some(UmpMessage::$name(value)));
             })*Ok(None)
         }
@@ -95,7 +131,7 @@ pub fn word_count(first: u32) -> usize {
         _ => 4,
     }
 }
-pub fn encode(value: &(impl UmpValue + ?Sized)) -> Vec<u32> {
+pub fn encode(value: &(impl UmpValue + ?Sized)) -> Result<Vec<u32>, ValueError> {
     value.encode_words()
 }
 
@@ -126,12 +162,12 @@ impl Midi1Packet {
 }
 crate::messages::value_metadata!(Midi1Packet { group, message });
 impl UmpValue for Midi1Packet {
-    fn encode_words(&self) -> Vec<u32> {
-        let b = self.message.encode().expect("validated MIDI 1 packet");
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
+        let b = self.message.encode()?;
         let mut bytes = [0u8; 4];
         bytes[0] = if b[0] >= 240 { 0x10 } else { 0x20 } | (self.group - 1);
         bytes[1..1 + b.len()].copy_from_slice(&b);
-        vec![u32::from_be_bytes(bytes)]
+        Ok(vec![u32::from_be_bytes(bytes)])
     }
 }
 #[derive(Clone, Debug)]
@@ -171,12 +207,12 @@ crate::messages::value_metadata!(SysEx7Packet {
     data
 });
 impl UmpValue for SysEx7Packet {
-    fn encode_words(&self) -> Vec<u32> {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
         let mut b = [0u8; 8];
         b[0] = 0x30 | (self.group - 1);
         b[1] = self.format << 4 | self.data.len() as u8;
         b[2..2 + self.data.len()].copy_from_slice(&self.data);
-        bytes_words(&b)
+        Ok(bytes_words(&b))
     }
 }
 #[derive(Clone, Debug)]
@@ -235,7 +271,7 @@ crate::messages::value_metadata!(SysEx8Packet {
     aborted
 });
 impl UmpValue for SysEx8Packet {
-    fn encode_words(&self) -> Vec<u32> {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
         let mut b = [0u8; 16];
         b[0] = 0x50 | (self.group - 1);
         b[1] = self.format << 4
@@ -246,7 +282,7 @@ impl UmpValue for SysEx8Packet {
             };
         b[2] = self.stream_id;
         b[3..3 + self.data.len()].copy_from_slice(&self.data);
-        bytes_words(&b)
+        Ok(bytes_words(&b))
     }
 }
 /// Header/payload data is retained exactly; dataset transfer/acknowledgment is
@@ -297,12 +333,12 @@ crate::messages::value_metadata!(MixedDataSet {
     data
 });
 impl UmpValue for MixedDataSet {
-    fn encode_words(&self) -> Vec<u32> {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
         let mut b = [0u8; 16];
         b[0] = 0x50 | (self.group - 1);
         b[1] = if self.header { 0x80 } else { 0x90 } | self.mds_id;
         b[2..].copy_from_slice(&self.data);
-        bytes_words(&b)
+        Ok(bytes_words(&b))
     }
 }
 #[derive(Clone, Debug)]
@@ -369,8 +405,8 @@ crate::messages::value_metadata!(FlexData {
     data
 });
 impl UmpValue for FlexData {
-    fn encode_words(&self) -> Vec<u32> {
-        vec![
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
+        Ok(vec![
             0xd0000000
                 | u32::from(self.group - 1) << 24
                 | u32::from(self.format) << 22
@@ -380,7 +416,7 @@ impl UmpValue for FlexData {
             self.data[0],
             self.data[1],
             self.data[2],
-        ]
+        ])
     }
 }
 fn validate_flex(v: &FlexData) -> Result<(), ValueError> {
@@ -463,12 +499,12 @@ crate::messages::value_metadata!(StreamMessage {
     data
 });
 impl UmpValue for StreamMessage {
-    fn encode_words(&self) -> Vec<u32> {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
         let mut b = [0u8; 16];
         let h = 0xf0000000 | u32::from(self.format) << 26 | u32::from(self.status) << 16;
         b[..4].copy_from_slice(&h.to_be_bytes());
         b[2..].copy_from_slice(&self.data);
-        bytes_words(&b)
+        Ok(bytes_words(&b))
     }
 }
 fn validate_stream(v: &StreamMessage) -> Result<(), ValueError> {
@@ -530,8 +566,8 @@ impl OpaquePacket {
 }
 crate::messages::value_metadata!(OpaquePacket { words });
 impl UmpValue for OpaquePacket {
-    fn encode_words(&self) -> Vec<u32> {
-        self.words.clone()
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
+        Ok(self.words.clone())
     }
 }
 
@@ -761,7 +797,7 @@ impl Capabilities {
             ),
             UmpMessage::SysEx8(v) => Some(v.stream_id() < self.sysex8_streams),
             UmpMessage::SysEx7(_) => Some(self.midi1 || self.midi2),
-            _ if message.encode_words()[0] >> 28 == 4 => Some(self.midi2),
+            _ if message.message_type() == 4 => Some(self.midi2),
             _ => None,
         }
     }

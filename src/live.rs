@@ -2,6 +2,7 @@
 use crate::files::{limit, os_error, uint};
 use crate::packets::{Protocol, ReceivedPacket, UmpPacket};
 use meedee::{events as model, events::Payload};
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
 #[pyclass(frozen, module = "meedee.events")]
@@ -174,7 +175,9 @@ fn prepare_message(
                 return Ok(Py::new(
                     py,
                     UmpPacket {
-                        words: v.encode_words(),
+                        words: v
+                            .encode_words()
+                            .map_err(|e| PyValueError::new_err(e.to_string()))?,
                     },
                 )?
                 .into_any());
@@ -214,7 +217,10 @@ pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
             Payload::Midi1(v) => v.encoded_len(),
             Payload::Ump(v) => {
                 use meedee::ump::UmpValue;
-                v.encode_words().len() * 4
+                v.encode_words()
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?
+                    .len()
+                    * 4
             }
             Payload::Command(_) => 64,
         });

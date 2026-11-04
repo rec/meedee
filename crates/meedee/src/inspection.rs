@@ -399,8 +399,7 @@ impl Report {
         }
         // UMP counts are packet counts, including clock/configuration packets.
         // Classify by the wire family without copying arbitrary payloads.
-        let words = ump::encode(value);
-        self.count(match words[0] >> 28 {
+        self.count(match value.message_type() {
             0 => "UMP.Utility",
             1 => "UMP.System",
             2 => "UMP.Midi1ChannelVoice",

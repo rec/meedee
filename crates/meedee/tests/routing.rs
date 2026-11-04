@@ -103,11 +103,11 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
     let events::Payload::Ump(v) = &d.event else {
         panic!("expected UMP")
     };
-    assert_eq!(ump::encode(v), [0x40b04a00, 0xfedcba98]);
+    assert_eq!(ump::encode(v).unwrap(), [0x40b04a00, 0xfedcba98]);
     let events::Payload::Ump(v) = &e else {
         panic!("expected UMP")
     };
-    assert_eq!(ump::encode(v), [0x4fbf4a00, 0xfedcba98]);
+    assert_eq!(ump::encode(v).unwrap(), [0x4fbf4a00, 0xfedcba98]);
 }
 
 #[test]

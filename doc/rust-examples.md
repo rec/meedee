@@ -531,3 +531,18 @@ increment, and an unassigned channel. To use NRPN parameter 16383, select the
 family before that parameter: `ParameterStep::new(0)?.with_family(ParameterFamily::Nrpn)?.with_parameter(16383)?`.
 Each builder preserves a valid command. `controls::ParameterStep` remains the
 separate incoming observation type.
+
+UMP encoding returns `Result`, just like MIDI 1 encoding. Propagate encoding
+errors instead of assuming every value is ready to send:
+
+```rust
+use meedee::ump;
+
+let packet = ump::Noop::new()?;
+let words = ump::encode(&packet)?;
+println!("{words:?}");
+```
+
+Implementations of `ump::UmpValue` likewise return `Result<Vec<u32>, ValueError>`
+from `encode_words()`. Python's `ump.encode()` continues to return a tuple of
+words and raises an exception on failure.

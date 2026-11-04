@@ -17,25 +17,25 @@ fn vectors() -> Vec<(&'static str, Vec<u32>)> {
 fn independent_packets_cover_all_families_and_preserve_native_widths() {
     for (name, words) in vectors() {
         let value = decode(&words, false).unwrap_or_else(|e| panic!("{name}: {e}"));
-        assert_eq!(encode(&value), words, "{name}");
+        assert_eq!(encode(&value).unwrap(), words, "{name}");
         for n in 0..words.len() {
             assert!(decode(&words[..n], false).is_err());
         }
     }
     assert_eq!(
-        encode(&Midi2NoteOn::new(16, 16, 127, 65535, 3, 65535).unwrap()),
+        encode(&Midi2NoteOn::new(16, 16, 127, 65535, 3, 65535).unwrap()).unwrap(),
         [0x4f9f7f03, 0xffffffff]
     );
     assert_eq!(
-        encode(&Midi2ProgramChange::new(16, 16, 128, 1, 121, 3).unwrap()),
+        encode(&Midi2ProgramChange::new(16, 16, 128, 1, 121, 3).unwrap()).unwrap(),
         [0x4fcf0001, 0x7f007903]
     );
     assert_eq!(
-        encode(&Midi2RelativeRegisteredController::new(1, 1, 127, 127, -1).unwrap()),
+        encode(&Midi2RelativeRegisteredController::new(1, 1, 127, 127, -1).unwrap()).unwrap(),
         [0x40407f7f, 0xffffffff]
     );
     assert_eq!(
-        encode(&Midi2PitchBend::new(1, 1, 0).unwrap()),
+        encode(&Midi2PitchBend::new(1, 1, 0).unwrap()).unwrap(),
         [0x40e00000, 0x80000000]
     );
     assert!(Midi2NoteOn::new(0, 1, 0, 0, 0, 0).is_err());
@@ -68,7 +68,7 @@ fn framing_recovers_by_declared_lengths_and_opaque_preservation_is_explicit() {
     assert!(decode(&[0xb0000000, 1, 2], false).is_err());
     let opaque = decode(&[0xb0000000, 1, 2], true).unwrap();
     assert!(matches!(opaque, UmpMessage::Opaque(_)));
-    assert_eq!(encode(&opaque), [0xb0000000, 1, 2]);
+    assert_eq!(encode(&opaque).unwrap(), [0xb0000000, 1, 2]);
     d.feed(&[0x40903c00]);
     assert_eq!(d.finish().len(), 1);
     assert!(d.finish().is_empty());
@@ -246,7 +246,7 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
             words.push(seed);
         }
         let packet = decode(&words, true).unwrap();
-        assert_eq!(encode(&packet), words);
+        assert_eq!(encode(&packet).unwrap(), words);
         assembler.feed(&packet);
         assert!(assembler.retained_bytes() <= 64);
         assert!(assembler.active_streams() <= 2);

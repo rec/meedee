@@ -179,7 +179,7 @@ pub fn to_midi1(
     allow_loss: bool,
 ) -> Result<Translation<AnyMessage>, ValueError> {
     use UmpMessage::*;
-    let words = message.encode_words();
+    let words = message.encode_words()?;
     let group = if matches!(words[0] >> 28, 1..=5 | 13) {
         Some(((words[0] >> 24) & 15) as u8 + 1)
     } else {

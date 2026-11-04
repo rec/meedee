@@ -153,7 +153,7 @@ fn extract_packet(value: &Bound<'_, PyAny>) -> PyResult<model::UmpMessage> {
 }
 #[pyfunction]
 fn encode<'py>(py: Python<'py>, message: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    tuple(py, &model::encode(&extract(message)?))
+    tuple(py, &model::encode(&extract(message)?).map_err(error)?)
 }
 #[pyfunction]
 #[pyo3(signature=(words,*,preserve_unknown=false))]

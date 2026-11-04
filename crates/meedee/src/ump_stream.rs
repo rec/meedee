@@ -210,13 +210,7 @@ impl Assembler {
         self.pending.values().map(|p| p.first_index).collect()
     }
     fn accept(&mut self, value: &UmpMessage) -> Vec<AssemblyItem> {
-        let words = value.encode_words();
-        let mt = words[0] >> 28;
-        let group = if matches!(mt, 1..=5 | 13) {
-            Some(((words[0] >> 24) & 15) as u8 + 1)
-        } else {
-            None
-        };
+        let group = value.group();
         let realtime = matches!(value,UmpMessage::Midi1(v) if v.message().encode().expect("validated system message")[0]>=248);
         let mut out = Vec::new();
         // A different grouped non-realtime message interrupts SysEx7. FlexData

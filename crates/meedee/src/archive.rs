@@ -423,7 +423,7 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
                 }
                 Payload::Ump(v) => {
                     out.push(2);
-                    out.extend(ump::words_to_bytes(&v.encode_words(), false));
+                    out.extend(ump::words_to_bytes(&v.encode_words()?, false));
                 }
                 Payload::Command(v) => {
                     out.push(3);
@@ -792,7 +792,7 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
             let p = match e.as_ref() {
                 Payload::Midi1(m::AnyMessage::SysEx(v)) => v.data().len() + 2,
                 Payload::Midi1(v) => v.encoded_len(),
-                Payload::Ump(v) => v.encode_words().len() * 4,
+                Payload::Ump(v) => v.encode_words()?.len() * 4,
                 Payload::Command(_) => 34,
             };
             7 + e.stream().unwrap_or_default().len()

@@ -1778,3 +1778,12 @@ Archive bytes remain unchanged. Archive record equality and capture comparison
 include occurrence metadata, even though musical message equality ignores it.
 Archive and source-aware operations still require a stream identity; playback
 requires timestamps but does not invent or require a source identity.
+
+### Fallible UMP encoding
+
+Rust `ump::encode` and `UmpValue::encode_words` return
+`Result<Vec<u32>, messages::ValueError>`. Output, file writers, translation and
+routing propagate errors before handing off encoded words. Python `ump.encode`
+returns its existing tuple of words or raises `ValueError`. Capability and
+assembly classification use the message family/group directly, independently
+of whether a message is ready for wire encoding.
