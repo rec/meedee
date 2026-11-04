@@ -1,7 +1,6 @@
 """Static patch-bay host over typed connections and the shared Rust router."""
 
 from contextlib import ExitStack
-from time import monotonic
 
 from . import midi, routing
 from ._cli import Patch, emit
@@ -41,7 +40,7 @@ def run_patch(config: Patch) -> int:
                 event_limit=config.event_limit,
                 byte_limit=config.byte_limit,
             )
-            forward(connection, outputs, router, config.duration)
+            routing.run(router, connection, outputs, duration=config.duration)
     except KeyboardInterrupt:
         interrupted = True
         if router is not None and router.snapshot().pending:
@@ -86,60 +85,3 @@ def run_patch(config: Patch) -> int:
     )
     emit(data, config.output)
     return status
-
-
-def forward(
-    connection: midi.Input,
-    outputs: dict[str, midi.Output],
-    router: routing.Router,
-    duration: float | None,
-) -> None:
-    start = monotonic()
-    while duration is None or monotonic() - start < duration:
-        if connection.dropped_packets:
-            router.stop("input packet loss reported by transport counter")
-            return
-        if (error := connection.failure) is not None:
-            raise error
-        remaining = (
-            0.05
-            if duration is None
-            else min(0.05, max(0.0, duration - (monotonic() - start)))
-        )
-        item = connection.receive(timeout=remaining)
-        if item is None:
-            continue
-        try:
-            router.feed(item)
-        except ValueError:
-            if router.snapshot().stopped:
-                return
-            raise
-        while (delivery := router.peek()) is not None:
-            if connection.dropped_packets:
-                router.stop("input packet loss reported by transport counter")
-                return
-            if (error := connection.failure) is not None:
-                raise error
-            try:
-                outputs[delivery.destination](delivery.message)
-                router.confirm(delivery.id)
-            except KeyboardInterrupt:
-                if (pending := router.peek()) is not None and pending.id == delivery.id:
-                    router.fail(
-                        delivery.id, "send interrupted; delivery may have taken effect"
-                    )
-                raise
-            except (
-                midi.MidiError,
-                midi.StateError,
-                midi.CallbackThreadError,
-                midi.NativePanicError,
-                midi.ResourceError,
-                midi.WorkerError,
-                midi.WorkerTimeoutError,
-            ) as error:
-                router.fail(delivery.id, str(error))
-                raise
-        if router.snapshot().stopped:
-            return

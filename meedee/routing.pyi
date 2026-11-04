@@ -1,7 +1,16 @@
 from os import PathLike
 from typing import BinaryIO, Literal
 
-from . import events, messages
+from . import events, messages, midi
+
+def run(
+    router: Router,
+    receiver: midi.Input,
+    outputs: dict[str, midi.Output],
+    *,
+    duration: float | str | None = None,
+    cancel: events.Cancellation | None = None,
+) -> Report: ...
 
 class Route:
     def __init__(

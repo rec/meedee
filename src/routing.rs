@@ -86,8 +86,8 @@ impl Route {
 }
 
 #[pyclass(module = "meedee.routing")]
-struct Router {
-    value: routing::Router,
+pub(crate) struct Router {
+    pub(crate) value: routing::Router,
 }
 #[pymethods]
 impl Router {
@@ -167,8 +167,8 @@ impl Delivery {
     }
 }
 #[pyclass(frozen, module = "meedee.routing")]
-struct Report {
-    value: routing::Report,
+pub(crate) struct Report {
+    pub(crate) value: routing::Report,
 }
 #[pymethods]
 impl Report {
@@ -316,6 +316,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Delivery>()?;
     module.add_class::<Report>()?;
     module.add_class::<Preview>()?;
+    module.add_function(wrap_pyfunction!(crate::drivers::run_routing, module)?)?;
     module.add_function(wrap_pyfunction!(preview_file, module)?)
 }
 fn error(e: std::io::Error) -> PyErr {

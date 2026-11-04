@@ -452,3 +452,31 @@ For individual real-time changes, use
 These builders do not open ports or send messages. `None` selects the unbanked
 format; `Some(bank)` selects the banked format. The final boolean permits
 preserving unmapped keys and explicit `NoChange` entries.
+
+## Live routing with progress reports
+
+The same managed route forwards ten seconds of channel messages, remapped to channel 2:
+
+```rust
+use meedee::{midi::{Input, Output}, routing, transport::Protocol};
+use std::{collections::BTreeMap, time::Duration};
+
+let mut input = Input::new();
+let route = routing::Route::new(
+    "keys".into(), input.stream()?.into(), "synth".into(), Protocol::Midi1,
+    None, None, Some(2), None, false,
+)?;
+let mut router = routing::Router::new(vec![route], 128, 8_388_608)?;
+let mut outputs = BTreeMap::from([("synth".into(), Output::new())]);
+println!("{:?}", routing::run(
+    &mut router, &mut input, &mut outputs, Some(Duration::from_secs(10)), None,
+)?);
+input.close()?;
+for output in outputs.values_mut() { output.close()?; }
+```
+
+Known loss, overload or send failure stops all routes. On error,
+`router.snapshot()` retains confirmed sends and any uncertain delivery. The driver
+leaves connections open and generates no cleanup messages; closing the outputs
+applies their normal cleanup policy. The route's final boolean opts into non-channel
+traffic when `true`.

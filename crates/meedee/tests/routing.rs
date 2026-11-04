@@ -154,3 +154,43 @@ fn preview_verifies_completion_after_routing_stops_at_loss() {
     assert!(!prefix.complete);
     assert!(prefix.problem.is_some());
 }
+
+#[test]
+fn live_forwarding_retains_success_before_an_uncertain_fanout_send() {
+    use meedee::{drivers::Receiver, midi};
+    use std::{io, time::Duration};
+    struct Input(Option<events::InputItem>);
+    impl Receiver for Input {
+        fn receive(&mut self, _: Duration) -> midi::Result<Option<events::InputItem>> {
+            Ok(self.0.take())
+        }
+        fn check(&self) -> midi::Result<()> {
+            Ok(())
+        }
+    }
+    let mut input = Input(Some(events::InputItem::Message(Box::new(event("s", 60)))));
+    let mut router = routing::Router::new(vec![route("a", "s"), route("b", "s")], 8, 64).unwrap();
+    let mut destinations = Vec::new();
+    let result = routing::run_with(
+        &mut router,
+        &mut input,
+        |delivery| {
+            destinations.push(delivery.destination.clone());
+            if delivery.destination == "b" {
+                Err(io::Error::other("uncertain send").into())
+            } else {
+                Ok(())
+            }
+        },
+        &mut events::MonotonicClock::default(),
+        Some(Duration::from_secs(1)),
+        &events::Cancellation::default(),
+    );
+    assert!(result.is_err());
+    assert_eq!(destinations, ["a", "b"]);
+    let report = router.snapshot();
+    assert!(report.stopped);
+    assert_eq!(report.confirmed, 1);
+    assert_eq!(report.pending, 1);
+    assert_eq!(report.uncertain_delivery, Some(1));
+}

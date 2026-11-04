@@ -398,3 +398,24 @@ the device is offline. For native UMP, set both clients' protocol to
 See the [API contract](https://github.com/rec/meedee/blob/main/plan/api.md) and
 [MIDI-CI contract](https://github.com/rec/meedee/blob/main/plan/ci.md) for ownership,
 bounds and failure behavior.
+
+## Live routing with progress reports
+
+For a managed route, forward ten seconds from the first input to the first output,
+remapping channel messages to channel 2:
+
+```python
+from meedee import midi, routing
+
+with midi.Input() as source, midi.Output() as destination:
+    router = routing.Router(routes=[routing.Route(
+        name="keys", source=source.stream, destination="synth",
+        protocol="midi1", remap_channel=2,
+    )])
+    print(routing.run(router, source, {"synth": destination}, duration=10))
+```
+
+The driver stops all routes on known loss, overload or send failure. After an
+exception, `router.snapshot()` retains confirmed sends and any uncertain delivery.
+It leaves connections open; the surrounding contexts close them using their normal
+cleanup policy. Non-channel traffic requires `include_nonchannel=True` on the route.

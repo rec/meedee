@@ -5,7 +5,7 @@ from typing import Literal
 
 import pytest
 
-from meedee import archive, events, messages, routing, ump
+from meedee import archive, events, messages, midi, routing, testing, ump
 
 
 def route(
@@ -173,3 +173,18 @@ def test_route_configuration_rejects_ambiguous_identities() -> None:
         routing.Router(routes=[route(), route()])
     with pytest.raises(ValueError, match="protocol"):
         routing.Route(name="r", source="s", destination="o", protocol="midi1", group=1)
+
+
+def test_live_driver_preserves_uncertain_send_and_leaves_connections_open() -> None:
+    source = testing.Input(stream="s", protocol="midi1")
+    output = testing.Output(protocol="midi1")
+    source.inject(b"\x90\x3c\x5a", clock=events.Clock(identity="c"))
+    output.fail_next_send(accepted=True)
+    router = routing.Router(routes=[route()])
+    with pytest.raises(midi.SendError, match="simulated send failure"):
+        routing.run(router, source, {"out": output})  # ty: ignore[invalid-argument-type]
+    report = router.snapshot()
+    assert report.stopped and report.confirmed == 0
+    assert report.uncertain_delivery == 0 and report.pending == 1
+    assert output.take_packet() == b"\x9f\x3c\x5a"
+    assert not source.closed and not output.closed

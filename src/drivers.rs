@@ -334,6 +334,52 @@ pub(crate) fn run_ci(
         .map(|value| crate::ci::BrowseReport { value })
 }
 
+/// Forward messages using a router and caller-owned input/output connections.
+#[pyfunction(name = "run")]
+#[pyo3(signature=(router, receiver, outputs, *, duration=None, cancel=None))]
+pub(crate) fn run_routing(
+    py: Python<'_>,
+    mut router: PyRefMut<'_, crate::routing::Router>,
+    receiver: Bound<'_, PyAny>,
+    outputs: Bound<'_, PyDict>,
+    duration: Option<&Bound<'_, PyAny>>,
+    cancel: Option<PyRef<'_, crate::playback::Cancellation>>,
+) -> PyResult<crate::routing::Report> {
+    let duration = duration
+        .map(crate::units::duration)
+        .transpose()?
+        .map(Duration::from_nanos);
+    let token = cancel.map(|c| c.value.clone()).unwrap_or_default();
+    let calls = Calls::new(py);
+    let mut receiver = Input {
+        calls: &calls,
+        object: receiver,
+    };
+    let result = meedee::routing::run_with(
+        &mut router.value,
+        &mut receiver,
+        |delivery| {
+            let object = calls.convert(outputs.get_item(&delivery.destination).and_then(|v| {
+                v.ok_or_else(|| pyo3::exceptions::PyKeyError::new_err(delivery.destination.clone()))
+            }))?;
+            Output {
+                calls: &calls,
+                object,
+            }
+            .send(delivery.event.clone())
+        },
+        &mut meedee::events::MonotonicClock::default(),
+        duration,
+        &token,
+    );
+    if let Some(error) = calls.failure.borrow_mut().take() {
+        return Err(error);
+    }
+    result
+        .map(|value| crate::routing::Report { value })
+        .map_err(|e| PyValueError::new_err(e.to_string()))
+}
+
 #[pyclass(module = "meedee._core")]
 pub(crate) struct DiscoveryPollState {
     value: meedee::discovery::PollState,
