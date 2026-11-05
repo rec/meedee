@@ -149,3 +149,25 @@ def export_event(
     mapping: events.ClockMapping | None = None,
     allow_loss: bool = False,
 ) -> ExportReport: ...
+
+class Timeline:
+    def __init__(
+        self,
+        header: Header,
+        *,
+        stream: str,
+        sequence: int | None = None,
+        payload_limit: int | str = 1_048_576,
+    ) -> None: ...
+    @property
+    def clock(self) -> events.Clock: ...
+    @property
+    def origin(self) -> events.Timestamp: ...
+    def feed(
+        self, event: Event
+    ) -> list[messages.Message | events.StreamDiagnostic]: ...
+    def finish(self) -> list[messages.Message | events.StreamDiagnostic]: ...
+
+def validate_meta(
+    kind: int, data: bytes | bytearray | memoryview, *, offset: int = 0
+) -> None: ...

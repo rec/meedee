@@ -665,7 +665,14 @@ fn scale_up(
         .map_err(|_| PyValueError::new_err("invalid destination_bits"))?;
     model::scale_up(value, source, destination).map_err(error)
 }
+#[pyfunction]
+fn word_count(first: &Bound<'_, PyAny>) -> PyResult<usize> {
+    let first = u32::try_from(crate::files::uint(first)?)
+        .map_err(|_| PyValueError::new_err("first exceeds u32"))?;
+    Ok(model::word_count(first))
+}
 fn register_helpers(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(word_count, module)?)?;
     module.add_function(wrap_pyfunction!(tempo, module)?)?;
     module.add_function(wrap_pyfunction!(time_signature, module)?)?;
     module.add_function(wrap_pyfunction!(metronome, module)?)?;

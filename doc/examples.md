@@ -582,3 +582,52 @@ require `reset()` before changing source identity. Clock changes report
 `StateReset`; known-loss diagnostics reset pending state and retain their details.
 Use an explicit `group` for MIDI 1 interpretation inside UMP. Timecode reset
 preserves the requirement that host time never moves backwards.
+
+## Convert already-parsed file records into timed messages
+
+Use a timeline when records come from your own parsing or editing workflow.
+`smf.Timeline` accepts events in merged tick order, applying tempo changes exactly.
+For ordinary playback from a file, `smf.TimedReader` performs both steps for you.
+
+```python
+from meedee import smf
+
+reader = smf.MergedReader("performance.mid")
+timeline = smf.Timeline(reader.header, stream="performance")
+for event in reader:
+    for message in timeline.feed(event):
+        print(message)
+print(timeline.finish())
+```
+
+For a UMP Clip file, use the corresponding entry converter:
+
+```python
+from meedee import clip
+
+timeline = clip.Timeline(stream="performance")
+for entry in clip.Reader("performance.clip"):
+    for message in timeline.feed(entry):
+        print(message)
+print(timeline.finish())
+```
+
+Both expose `clock` and `origin`. Clip returns `None` until the corresponding
+clock/origin is established. `finish()` reports unfinished message fragments.
+Select `sequence` explicitly for a format-2 SMF; Clip can include configuration
+messages with `include_configuration=True`.
+
+## Inspect packet framing and validate MIDI-file metadata
+
+```python
+from meedee import smf, ump
+
+print(ump.word_count(0x40903C00))  # Two 32-bit words in this UMP packet.
+smf.validate_meta(81, b"\x07\xa1\x20")  # Valid tempo: 500,000 microseconds/beat.
+```
+
+`word_count()` checks the input is an unsigned 32-bit integer and reports framing
+length, including reserved message types. It does not validate a packet's contents.
+`validate_meta()` returns `None` on success and raises a file-validation error on
+failure. Supply `offset=...` to identify a byte position in that error. The SMF
+reader and writer already perform this validation during normal file operations.

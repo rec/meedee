@@ -5,6 +5,106 @@ use crate::packets::Clock;
 use crate::playback::ClockMapping;
 use meedee::{clip, smf};
 use pyo3::prelude::*;
+#[pyclass(name = "Timeline", module = "meedee.smf")]
+struct SmfTimeline {
+    value: smf::Timeline,
+}
+#[pymethods]
+impl SmfTimeline {
+    #[new]
+    #[pyo3(signature=(header,*,stream,sequence=None,payload_limit=1_048_576))]
+    fn new(
+        header: PyRef<'_, Header>,
+        stream: String,
+        sequence: Option<&Bound<'_, PyAny>>,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
+    ) -> PyResult<Self> {
+        let sequence = sequence
+            .map(uint)
+            .transpose()?
+            .map(|v| {
+                u16::try_from(v)
+                    .map_err(|_| pyo3::exceptions::PyValueError::new_err("sequence exceeds u16"))
+            })
+            .transpose()?;
+        Ok(Self {
+            value: smf::Timeline::new(header.value.clone(), stream, sequence, payload_limit)
+                .map_err(os_error)?,
+        })
+    }
+    #[getter]
+    fn clock(&self) -> Clock {
+        Clock {
+            value: self.value.clock().clone(),
+        }
+    }
+    #[getter]
+    fn origin(&self) -> Timestamp {
+        Timestamp {
+            value: self.value.origin(),
+        }
+    }
+    fn feed(&mut self, py: Python<'_>, event: PyRef<'_, SmfEvent>) -> PyResult<Vec<Py<PyAny>>> {
+        self.value
+            .feed(&event.value)
+            .map_err(os_error)?
+            .into_iter()
+            .map(|v| crate::live::item(py, v))
+            .collect()
+    }
+    fn finish(&mut self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
+        self.value
+            .finish()
+            .into_iter()
+            .map(|v| crate::live::item(py, v))
+            .collect()
+    }
+}
+#[pyclass(name = "Timeline", module = "meedee.clip")]
+struct ClipTimeline {
+    value: clip::Timeline,
+}
+#[pymethods]
+impl ClipTimeline {
+    #[new]
+    #[pyo3(signature=(*,stream,include_configuration=false))]
+    fn new(
+        stream: String,
+        #[pyo3(from_py_with=crate::ump::boolean)] include_configuration: bool,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            value: clip::Timeline::new(stream, include_configuration).map_err(os_error)?,
+        })
+    }
+    #[getter]
+    fn clock(&self) -> Option<Clock> {
+        self.value.clock().cloned().map(|value| Clock { value })
+    }
+    #[getter]
+    fn origin(&self) -> Option<Timestamp> {
+        self.value.origin().map(|value| Timestamp { value })
+    }
+    fn feed(
+        &mut self,
+        py: Python<'_>,
+        entry: PyRef<'_, crate::files::ClipEntry>,
+    ) -> PyResult<Vec<Py<PyAny>>> {
+        self.value
+            .feed(&entry.value)
+            .map_err(os_error)?
+            .into_iter()
+            .map(|v| crate::live::item(py, v))
+            .collect()
+    }
+    fn finish(&mut self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
+        self.value
+            .finish()
+            .into_iter()
+            .map(|v| crate::live::item(py, v))
+            .collect()
+    }
+}
+
 #[pyclass(module = "meedee.smf")]
 struct MergedReader {
     value: Option<smf::MergedReader<Stream>>,
@@ -274,6 +374,7 @@ fn export_event(
     })
 }
 pub fn register_smf(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<SmfTimeline>()?;
     m.add_class::<MergedReader>()?;
     m.add_class::<SmfTimedReader>()?;
     m.add_class::<ExportReport>()?;
@@ -281,5 +382,6 @@ pub fn register_smf(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 pub fn register_clip(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<ClipTimeline>()?;
     m.add_class::<ClipTimedReader>()
 }

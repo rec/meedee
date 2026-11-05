@@ -1821,3 +1821,16 @@ and remains reusable; resource counters remain available. Timecode retains lock
 inspection, full-frame relocation, feed/poll and explicit nondecreasing host time,
 including across resets. Tuning malformed inputs return the same errors through
 Decoder and stateless decode; decode remains the single-SysEx operation.
+
+### Direct Python file-timeline and codec bindings
+
+Python smf.Timeline(header, *, stream, sequence=None, payload_limit=1_048_576)
+and clip.Timeline(*, stream, include_configuration=False) expose the existing
+Rust timeline engines. feed()/finish() return message/StreamDiagnostic lists;
+clock and origin are properties, optional for Clip until established. SMF events
+must arrive in merged time order; format 2 requires an explicit sequence.
+No new timing, reset or lifecycle rules are introduced by these bindings.
+Python ump.word_count(first) requires a strict unsigned 32-bit integer and uses
+Rust framing lengths, including reserved types. smf.validate_meta(kind, data,
+*, offset=0) returns None or raises the existing file-validation error. Both
+helpers use the Rust implementation without duplicating format validation.

@@ -374,8 +374,8 @@ fn write_syx(
     destination.py().detach(|| stream.flush()).map_err(os_error)
 }
 #[pyclass(name = "Entry", frozen, module = "meedee.clip")]
-struct ClipEntry {
-    value: clip::Entry,
+pub(crate) struct ClipEntry {
+    pub(crate) value: clip::Entry,
 }
 #[pymethods]
 impl ClipEntry {
@@ -447,7 +447,18 @@ impl ClipWriter {
         Ok(())
     }
 }
+#[pyfunction]
+#[pyo3(signature=(kind,data,*,offset=0))]
+fn validate_meta(
+    kind: &Bound<'_, PyAny>,
+    data: &Bound<'_, PyAny>,
+    #[pyo3(from_py_with=uint)] offset: u64,
+) -> PyResult<()> {
+    let kind = u8::try_from(uint(kind)?).map_err(|_| PyValueError::new_err("kind exceeds u8"))?;
+    smf::validate_meta(kind, &bytes(data, usize::MAX)?, offset).map_err(os_error)
+}
 pub fn register_smf(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(validate_meta, m)?)?;
     m.add_class::<Header>()?;
     m.add_class::<Meta>()?;
     m.add_class::<SysExFragment>()?;

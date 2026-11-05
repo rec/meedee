@@ -615,3 +615,23 @@ For timecode, construct `timecode::Assembler::new(timeout_ns, group)` and call
 `locked()` exposes sequence lock. Reset clears assembly and source binding while
 preserving the monotonic host-clock requirement. Complete FullFrame SysEx relocates
 the observed position. Select a group explicitly for MIDI 1 inside UMP.
+
+## Incremental file timelines and codec helpers
+
+Python now exposes the existing Rust `smf::Timeline`, `clip::Timeline`,
+`ump::word_count` and `smf::validate_meta` operations directly.
+
+```rust
+use meedee::{smf, ump};
+
+let header = smf::Header::new(0, 1, 480, vec![])?;
+let mut timeline = smf::Timeline::new(header, "performance".into(), None, 1_048_576)?;
+println!("{:?}", timeline.origin());
+println!("{:?}", timeline.finish());
+println!("{}", ump::word_count(0x40903c00));
+smf::validate_meta(81, &[0x07, 0xa1, 0x20], 0)?;
+```
+
+Feed merged `smf::Event` records through `timeline.feed(&event)`. For Clip entries,
+construct `clip::Timeline::new(stream, include_configuration)` and use its
+`feed(&entry)`. Its `clock()` and `origin()` are optional until established.
