@@ -631,3 +631,24 @@ length, including reserved message types. It does not validate a packet's conten
 `validate_meta()` returns `None` on success and raises a file-validation error on
 failure. Supply `offset=...` to identify a byte position in that error. The SMF
 reader and writer already perform this validation during normal file operations.
+
+## Create a virtual MIDI port
+
+On a backend with virtual-port support, create a software source and receive
+its messages through the ordinary input API.
+
+```python
+from meedee.messages import NoteOn, NoteOff
+from meedee.midi import Input, Output
+
+with Output().create_virtual("meedee-example") as out:
+    with Input(port="meedee-example") as source:
+        out(NoteOn(60))
+        print(source.receive(timeout=1))
+        out(NoteOff(60))
+```
+
+`Input().create_virtual(name)` creates a software destination that other
+applications can send to. Both operations return the connected Input or Output.
+Closing is terminal. Rust offers the corresponding `create_virtual()` methods
+on `midi::Input` and `midi::Output`.

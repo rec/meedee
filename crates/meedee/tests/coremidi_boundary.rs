@@ -13,6 +13,78 @@ use std::sync::{
 use std::time::Duration;
 
 #[test]
+fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
+    use meedee::{events::InputItem, messages::Message, midi};
+    enable();
+    for protocol in [Protocol::Midi1, Protocol::Ump] {
+        for virtual_input in [true, false] {
+            let name = format!("high-level-{protocol:?}-{virtual_input}");
+            let mut input = midi::Input::new()
+                .with_transport(InputOptions {
+                    protocol,
+                    ..InputOptions::default()
+                })
+                .unwrap();
+            let mut output = midi::Output::new()
+                .with_transport(OutputOptions {
+                    protocol,
+                    ..OutputOptions::default()
+                })
+                .unwrap();
+            if virtual_input {
+                input = input.create_virtual(&name).unwrap();
+                let port = output
+                    .ports()
+                    .unwrap()
+                    .into_iter()
+                    .find(|p| p.name() == name)
+                    .unwrap();
+                output = output.connect(&port).unwrap();
+            } else {
+                output = output.create_virtual(&name).unwrap();
+                let port = input
+                    .ports()
+                    .unwrap()
+                    .into_iter()
+                    .find(|p| p.name() == name)
+                    .unwrap();
+                input = input.connect(&port).unwrap();
+            }
+            let packet = match protocol {
+                Protocol::Midi1 => Packet::Bytes(vec![0x90, 60, 100]),
+                Protocol::Ump => Packet::Ump(vec![0x40903c00, 0xc0000000]),
+            };
+            output.send(packet.clone()).unwrap();
+            let received = input
+                .receive(Some(Duration::from_secs(2)))
+                .unwrap()
+                .unwrap();
+            let InputItem::Message(message) = received else {
+                panic!("expected decoded message")
+            };
+            assert!(message.timestamp().is_some());
+            assert_eq!(message.stream(), Some(input.stream().unwrap()));
+            match message.as_ref() {
+                meedee::events::Payload::Midi1(meedee::messages::AnyMessage::NoteOn(v)) => {
+                    assert_eq!(v.velocity(), 100)
+                }
+                meedee::events::Payload::Ump(meedee::ump::UmpMessage::NoteOn(v)) => {
+                    assert_eq!(v.velocity(), 0xc000)
+                }
+                _ => panic!("unexpected decoded message"),
+            }
+            output.close().unwrap();
+            output.close().unwrap();
+            input.close().unwrap();
+            input.close().unwrap();
+            assert!(input.create_virtual(&name).is_err());
+            assert!(output.send(packet).is_err());
+            assert!(output.create_virtual(&name).is_err());
+        }
+    }
+}
+
+#[test]
 fn failed_discovery_returns_no_snapshot_and_allows_explicit_rediscovery() {
     enable();
     for protocol in [Protocol::Midi1, Protocol::Ump] {

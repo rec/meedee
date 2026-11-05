@@ -1834,3 +1834,14 @@ Python ump.word_count(first) requires a strict unsigned 32-bit integer and uses
 Rust framing lengths, including reserved types. smf.validate_meta(kind, data,
 *, offset=0) returns None or raises the existing file-validation error. Both
 helpers use the Rust implementation without duplicating format validation.
+
+
+### High-level Rust virtual ports
+
+Rust midi::Input::create_virtual(name) and midi::Output::create_virtual(name)
+open immediately and return the connected high-level object, matching Python.
+They use the ordinary input queue/decoder and output send/play/cleanup paths.
+Transport settings must be configured before opening. Backend capability and
+opening failures retain their transport cause in midi::Error::Connect.
+Close remains terminal and repeated close is harmless. No runtime qualification
+with real virtual endpoints is implied by the device-free boundary tests.

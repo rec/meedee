@@ -144,6 +144,18 @@ impl Output {
             })?));
         Ok(self)
     }
+    /// Create a virtual output with the same sending, playback and cleanup
+    /// lifecycle as a connected physical output.
+    pub fn create_virtual(mut self, name: &str) -> crate::midi::Result<Self> {
+        self.client()?;
+        let client = self.client.take().expect("initialized output client");
+        self.connection = Some(Connection::Native(
+            client
+                .create_virtual(name)
+                .map_err(crate::midi::Error::Connect)?,
+        ));
+        Ok(self)
+    }
     pub fn send(&mut self, value: impl Into<OutputValue>) -> crate::midi::Result<()> {
         let plan = self.prepare(std::iter::once(value.into()))?;
         self.execute(plan).map_err(crate::midi::Error::from)

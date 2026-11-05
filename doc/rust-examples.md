@@ -635,3 +635,31 @@ smf::validate_meta(81, &[0x07, 0xa1, 0x20], 0)?;
 Feed merged `smf::Event` records through `timeline.feed(&event)`. For Clip entries,
 construct `clip::Timeline::new(stream, include_configuration)` and use its
 `feed(&entry)`. Its `clock()` and `origin()` are optional until established.
+
+## Create a virtual MIDI port
+
+Create a software source and receive its messages using the ordinary MIDI types.
+The backend must support virtual ports.
+
+```rust
+use meedee::messages::{NoteOff, NoteOn};
+use meedee::midi::{Input, Output};
+use std::time::Duration;
+
+let mut output = Output::new().create_virtual("meedee-example")?;
+let mut input = Input::new();
+let port = input.ports()?.into_iter().find(|p| p.name() == "meedee-example").unwrap();
+let mut input = input.connect(&port)?;
+output.send(NoteOn::new(60)?)?;
+println!("{:?}", input.receive(Some(Duration::from_secs(1)))?);
+output.send(NoteOff::new(60)?)?;
+input.close()?;
+output.close()?;
+```
+
+`Input::new().create_virtual(name)` creates a software destination that other
+applications can send to. Both methods open immediately and return the same
+high-level type as `connect()`. Input retains decoding, channel filters, receive
+limits, timestamps and recording. Output retains sending, playback and cleanup.
+Closing is terminal and Drop performs the ordinary scoped cleanup. Unsupported
+backends return the transport capability error through `midi::Error::Connect`.

@@ -128,7 +128,13 @@ impl Input {
             .map_err(crate::midi::Error::Transport)
     }
     pub fn connect(mut self, port: &Port) -> crate::midi::Result<Self> {
-        self.connect_port(port)?;
+        self.open_connection(Some(port), "")?;
+        Ok(self)
+    }
+    /// Create a virtual input with the same decoding, limits and close lifecycle
+    /// as a connected physical input. Unsupported backends return a capability error.
+    pub fn create_virtual(mut self, name: &str) -> crate::midi::Result<Self> {
+        self.open_connection(None, name)?;
         Ok(self)
     }
     /// Receive one decoded message or diagnostic; None means the timeout elapsed.
@@ -234,21 +240,24 @@ impl Input {
         }
         Ok(self.client.as_ref().expect("initialized input"))
     }
-    fn connect_port(&mut self, port: &Port) -> io::Result<()> {
+    fn open_connection(&mut self, port: Option<&Port>, name: &str) -> io::Result<()> {
         self.client()?;
         let stream = events::fresh_identity("input")?;
         let decoder = Decoder::new(stream.clone(), self.options.protocol, self.sysex_limit)?;
         let queue = self.queue.clone();
         let client = self.client.take().expect("initialized input");
-        let connection = client
-            .connect(port, move |packet| {
-                queue.push(Ingress {
-                    packet: packet.packet,
-                    sequence: packet.sequence,
-                    timestamp: packet.timestamp_ns,
-                })
+        let callback = move |packet: transport::ReceivedPacket| {
+            queue.push(Ingress {
+                packet: packet.packet,
+                sequence: packet.sequence,
+                timestamp: packet.timestamp_ns,
             })
-            .map_err(|e| io::Error::from(crate::midi::Error::Connect(e)))?;
+        };
+        let connection = match port {
+            Some(port) => client.connect(port, callback),
+            None => client.create_virtual(name, callback),
+        }
+        .map_err(|e| io::Error::from(crate::midi::Error::Connect(e)))?;
         let native_clock = connection.clock();
         let enabled = native_clock.mode == transport::TimestampMode::Absolute;
         self.clock = Some(
@@ -275,7 +284,7 @@ impl Input {
         if self.decoder.is_none() && !self.closed {
             let ports = self.ports()?;
             let port = select_port(&ports, self.port.as_deref())?;
-            self.connect_port(port)?;
+            self.open_connection(Some(port), "")?;
         }
         Ok(())
     }
