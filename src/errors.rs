@@ -55,7 +55,7 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
         Error::Busy | Error::Closed => StateError::new_err(error.to_string()),
         Error::CallbackThread => CallbackThreadError::new_err(error.to_string()),
         Error::Resource(message) => ResourceError::new_err(message),
-        Error::Worker(message) => ResourceError::new_err(message),
+        Error::Worker(message) => WorkerError::new_err(message),
         Error::CompoundSend {
             completed_messages,
             total_messages,
@@ -66,7 +66,11 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
                 .and_then(|class| {
                     class.call1((cause.to_string(), completed_messages, total_messages))
                 }) {
-                Ok(error) => PyErr::from_value(error),
+                Ok(error) => {
+                    let error = PyErr::from_value(error);
+                    error.set_cause(py, Some(transport_error(*cause, operation)));
+                    error
+                }
                 Err(error) => error,
             }
         }),

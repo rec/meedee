@@ -85,8 +85,8 @@ fn compare_files(
 ) -> PyResult<ComparisonReport> {
     let format = crate::inspection::parse_format(format)?;
     let options = inspection::ComparisonOptions {
-        sources: source_map.unwrap_or_default(),
-        clocks: clock_map.unwrap_or_default(),
+        source_map: source_map.unwrap_or_default(),
+        clock_map: clock_map.unwrap_or_default(),
         ignore_timestamps,
         tick_tolerance,
         payload_limit,

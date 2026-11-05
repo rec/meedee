@@ -219,6 +219,11 @@ def test_named_controls_keep_distinct_units_and_reset_on_explicit_input() -> Non
     diagnostic = interpreter.feed(reset)[0].value
     assert isinstance(diagnostic, controls.Diagnostic)
     assert diagnostic.kind == controls.DiagnosticKind.StateReset
+    interpreter.feed(messages.ControlChange(7, 1, channel=1))
+    interpreter.feed(gm.reverb_parameter(device_id=1, parameter=1, value=64))
+    combined = interpreter.feed(messages.ControlChange(39, 2, channel=1))[0].value
+    assert isinstance(combined, controls.ControlObservation)
+    assert combined.value == 130
     for mode in (gm.Gm1On(device_id=1), gm.Gm2On(device_id=1), gm.GmOff(device_id=1)):
         interpreter.feed(messages.ControlChange(channel=1, controller=7, value=1))
         diagnostic = interpreter.feed(mode)[0].value

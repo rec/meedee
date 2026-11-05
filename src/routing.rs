@@ -167,6 +167,25 @@ impl Delivery {
     }
 }
 #[pyclass(frozen, module = "meedee.routing")]
+struct RouteReport {
+    value: routing::RouteReport,
+}
+#[pymethods]
+impl RouteReport {
+    #[getter]
+    fn admitted(&self) -> u64 {
+        self.value.admitted
+    }
+    #[getter]
+    fn confirmed(&self) -> u64 {
+        self.value.confirmed
+    }
+    #[getter]
+    fn capacity_rejections(&self) -> u64 {
+        self.value.capacity_rejections
+    }
+}
+#[pyclass(frozen, module = "meedee.routing")]
 pub(crate) struct Report {
     pub(crate) value: routing::Report,
 }
@@ -221,20 +240,11 @@ impl Report {
         self.value.uncertain_destination.as_deref()
     }
     #[getter]
-    fn routes(&self) -> BTreeMap<String, BTreeMap<&str, u64>> {
+    fn routes(&self) -> BTreeMap<String, RouteReport> {
         self.value
             .routes
             .iter()
-            .map(|(n, r)| {
-                (
-                    n.clone(),
-                    BTreeMap::from([
-                        ("admitted", r.admitted),
-                        ("confirmed", r.confirmed),
-                        ("capacity_rejections", r.capacity_rejections),
-                    ]),
-                )
-            })
+            .map(|(n, r)| (n.clone(), RouteReport { value: r.clone() }))
             .collect()
     }
 }
@@ -315,6 +325,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Router>()?;
     module.add_class::<Delivery>()?;
     module.add_class::<Report>()?;
+    module.add_class::<RouteReport>()?;
     module.add_class::<Preview>()?;
     module.add_function(wrap_pyfunction!(crate::drivers::run_routing, module)?)?;
     module.add_function(wrap_pyfunction!(preview_file, module)?)

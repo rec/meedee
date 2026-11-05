@@ -136,12 +136,29 @@ fn rational_arithmetic_and_rounding_never_use_floating_seconds() {
     assert_eq!(Rational::new(5, 2).unwrap().round(true).unwrap().0, 2);
     let c = Clock::new("c".into(), 1001, 30000, "SMPTE".into(), None).unwrap();
     assert_eq!(
-        meedee::events::timestamp_seconds(&Timestamp {
+        (Timestamp {
             ticks: 30000,
             clock: c
         })
+        .seconds()
         .unwrap(),
         Rational::new(1001, 1).unwrap()
+    );
+    let fractional = Timestamp {
+        ticks: -1,
+        clock: Clock::new("fractional".into(), 1001, 30000, "SMPTE".into(), None).unwrap(),
+    };
+    assert_eq!(
+        fractional.seconds().unwrap(),
+        Rational::new(-1001, 30000).unwrap()
+    );
+    let disabled = Timestamp {
+        ticks: 1,
+        clock: fractional.clock.with_transport(1, false),
+    };
+    assert_eq!(
+        disabled.seconds().unwrap_err().kind(),
+        std::io::ErrorKind::InvalidInput
     );
     assert!(Rational::new(i128::MAX, 1).unwrap().multiply(2, 1).is_err());
 }

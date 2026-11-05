@@ -42,9 +42,9 @@ def routing_data(report: routing.Report, *, preview: bool = False) -> dict[str, 
         confirmed: report.confirmed,
         "routes": {
             n: {
-                "admitted": s["admitted"],
-                confirmed: s["confirmed"],
-                "capacity_rejections": s["capacity_rejections"],
+                "admitted": s.admitted,
+                confirmed: s.confirmed,
+                "capacity_rejections": s.capacity_rejections,
             }
             for n, s in report.routes.items()
         },

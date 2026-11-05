@@ -21,9 +21,8 @@ counts. Python subclasses and unions, Rust enums, Python keyword arguments and
 Rust options/builders are already permitted by AGENTS.md. Adding Python wrapper
 classes just to reproduce every Rust enum would make the basic API harder to use.
 
-This document is a proposal, not authorization to implement its pending design
-choices. Only this plan is changed by the current task. Keep public-symbols.txt
-uncommitted throughout later work too.
+The user approved D1, D2 and D3. The implementation and evidence below record
+completion of all four slices. Keep public-symbols.txt uncommitted.
 
 ## What completion means
 
@@ -188,9 +187,9 @@ The accounting must cover R01–R35, K01–K09, E01–E09 and M01–M07: exactly
 entries. The GM decoder is deliberately referenced by several IDs because one
 coherent change closes all of those mappings; it is not several independent jobs.
 
-## Decisions needed before implementation
+## Approved design decisions
 
-### D1. One GM decoder and result family
+### D1. Approved: One GM decoder and result family
 
 Recommendation: make Rust gm::decode cover all six Python result classes, return
 one gm::GmMessage enum, and remove the public ModeMessage/ExtendedMessage split
@@ -204,7 +203,7 @@ the Rust decoder signature and exhaustive matches. Keeping the split avoids that
 migration but leaves the confirmed operation mismatch. Approve the consolidated
 decoder, its result name and explicit Rust limit argument before code changes.
 
-### D2. Typed per-route report snapshots in Python
+### D2. Approved: Typed per-route report snapshots in Python
 
 Recommendation: expose routing.RouteReport in Python with read-only admitted,
 confirmed and capacity_rejections properties, and change Report.routes to return
@@ -217,7 +216,7 @@ one public Python class. Keeping dictionaries is simpler in symbol count and can
 remain a documented representation adaptation, but retains weaker field typing.
 Approve the snapshot shape before changing the binding.
 
-### D3. Retain idiomatic representations and advanced reader operations
+### D3. Approved: Retain idiomatic representations and advanced reader operations
 
 Recommendation: resolve the remaining mappings through equivalent behavior and
 documented language adaptations, retaining Rust enums/options and its existing
@@ -230,3 +229,123 @@ clearly marked as verified adaptations. Requiring identical symbol sets would
 instead require a broader redesign and more user-facing types. Confirm that
 behavioral parity, rather than eliminating these valid representation entries,
 is the completion criterion for this batch.
+
+
+## Implementation audit
+
+The remaining representations were checked at their Rust definitions, Python
+stubs and binding conversions, then exercised by the existing device-free suites.
+The table names test files under crates/meedee/tests/ and test/ unless a core
+unit-test location is stated. These checks establish the listed operations and
+boundaries, not an exhaustive method-by-method audit or physical-device support.
+
+Fixed entries replace the old API without aliases. Adaptation entries retain the
+approved language representation. Exception entries retain previously approved
+language-specific behavior.
+
+| ID | Outcome | Source/binding review and regression evidence |
+| --- | --- | --- |
+| R01 | Adaptation | archive.rs / src/archive.rs; archive.rs and test_archive.py cover independent v1 bytes, unknown records, occurrence metadata and trailers. |
+| R02 | Adaptation | ci.rs / src/ci.rs; ci.rs and test_ci.py cover management bodies, versions, extensions, malformed input and shared vectors. |
+| R03 | Adaptation | ci.rs / src/ci.rs and message_metadata.rs; envelope validation and explicit message transformations retain metadata; bare SysEx decoding interprets payload. |
+| R04 | Adaptation | ci_session.rs / src/ci.rs; ci.rs and test_ci.py cover actions/observations, pending sends, early replies and loss. |
+| R05 | Adaptation | codecs.rs / src/messages.rs; byte_codec.rs and test_codecs.py exercise incremental framing and diagnostic ordering. |
+| R06 | Adaptation | controls.rs, event_views.rs / src/controls.rs; event_views.rs, test_controls.py and test_event_views.py cover observations and boundaries. |
+| R07 | Adaptation | live.rs, input_api.rs / src/live.rs and _clients.py; live.rs, coremidi_boundary.rs and test_live.py cover packets, filters and accepted-prefix diagnostics. |
+| R08 | Adaptation | event_views.rs / src/event_views.rs and profile_engines.rs; event_views.rs and test_event_views.py cover all merged owner families and reset context. |
+| R09 | Adaptation | events.rs / src/event_values.rs; message_metadata.rs, byte_codec.rs, ump.rs and test_messages.py cover dispatch, wire values and metadata. |
+| R10 | Adaptation | playback.rs / src/live.rs; live.rs and test_live.py cover cancellation, confirmed progress, causes and timing. |
+| R11 | Adaptation | live.rs / src/live.rs maps Loss, Malformed, ClockChange, Truncated to loss, malformed, clock_change, truncated; live.rs and test_live.py exercise the diagnostic paths. |
+| R12 | Fixed | gm.rs and gm_extensions.rs now return GmMessage; profile_engines.rs and test_profile_engines.py cover extended cases and limits. |
+| R13 | Fixed | gm.rs and src/profiles.rs use the same decoder; profiles.rs and test_profiles.py cover all three mode cases and reset policy. |
+| R14 | Adaptation | gm.rs / src/profiles.rs; profiles.rs and test_profiles.py verify exact names, result families, bank addresses and ordering. |
+| R15 | Adaptation | inspection.rs / src/inspection.rs parse_format; inspection.rs, comparison.rs and test_inspection.py cover all four explicit formats and argument failures. |
+| R16 | Adaptation | messages.rs, gm.rs, mpe.rs / src/messages.rs and profiles.rs; byte_codec.rs, message_metadata.rs and test_messages.py cover expansion and metadata. |
+| R17 | Adaptation | messages.rs / src/messages.rs; byte_codec.rs, ump.rs, test_messages.py and test_ump.py cover defaults, boundaries and MIDI versions. |
+| R18 | Exception | sequence.rs / src/messages.rs, src/units.rs and _clients.py; sequence.rs and test_output.py verify exact beats/tempo. Unit strings remain Python-only. |
+| R19 | Adaptation | messages.rs / src/messages.rs and event_values.rs; message_metadata.rs and test_event_views.py cover transformations, source/span validation and equality semantics. |
+| R20 | Exception | sequence.rs / src/messages.rs, src/units.rs and _clients.py; sequence.rs and test_output.py cover typed beats/time and Python numeric duration interpretation. |
+| R21 | Adaptation | messages.rs ValueError and binding value_error helpers; byte_codec.rs, test_messages.py and test_profiles.py cover pre-send rejection and checked fields. |
+| R22 | Fixed | midi.rs / native error mapping and _clients.py; midi core unit tests, transport_tests.rs, coremidi_boundary.rs, test_contract.py, test_testing.py and test_live.py cover categories, nested compound causes and retained Shared errors. |
+| R23 | Adaptation | input_api.rs / _clients.py; coremidi_boundary.rs and test_live.py cover raw/decoded iteration, callbacks, closure and terminal overflow after an accepted prefix. |
+| R24 | Adaptation | output.rs / _clients.py and src/messages.rs; output core unit tests and test_output.py cover heterogeneous values, channels, timing and cleanup. |
+| R25 | Adaptation | input_recording.rs / _clients.py; input core unit tests and test_live.py cover memory/file capture and playback. Retained output reuse is tested separately from temporary destruction. |
+| R26 | Fixed | src/routing.rs exposes frozen RouteReport values; routing.pyi and _routing_cli.py migrated. test_routing.py verifies detached counts, read-only properties and rejected admission; routing.rs covers confirmation/failure. |
+| R27 | Adaptation | smf.rs / src/files.rs; files.rs, file_timing.rs, test_files.py and test_file_timing.py retain tracks, metadata, fragments and unknown chunks. |
+| R28 | Fixed | transport/mod.rs and midi.rs / native error mapping; midi core unit tests, transport_tests.rs, coremidi_boundary.rs, test_testing.py and test_contract.py cover structured failures. Worker now maps consistently to WorkerError; compound errors preserve typed __cause__. Python process-isolation errors remain exceptions to parity. |
+| R29 | Adaptation | transport/mod.rs / src/packets.rs; coremidi_boundary.rs, test_packets.py and test_live.py cover bytes, UMP, fragments and protocol rejection. |
+| R30 | Adaptation | tuning.rs / src/tuning.rs; tuning.rs and test_tuning.py cover shared wire forms, explicit decode and checksum status. |
+| R31 | Adaptation | tuning.rs / src/tuning.rs; tuning.rs and test_tuning.py preserve Pitch/NoChange through encoding and bounded generation. |
+| R32 | Adaptation | ump assembly and event_views.rs / src/ump*.rs; ump.rs, event_views.rs, test_ump.py and test_event_views.py cover group/stream bounds and retained truncation detail. |
+| R33 | Adaptation | ump decoder / src/ump*.rs; ump.rs and test_ump.py cover word framing, diagnostic values and unknown packets. |
+| R34 | Adaptation | ump message enum / src/messages.rs and ump*.rs; ump.rs, byte_codec.rs and test_ump.py cover native widths and explicit conversion/encoding failure. |
+| R35 | Adaptation | universal.rs / src/profiles.rs; profiles.rs and test_profiles.py verify explicit interpretation, supported values and shared wire vectors. |
+| K01 | Adaptation | ci_live.rs / ci_live.py and src/drivers.rs; ci_live.rs core tests and test_ci_browser.py exercise fresh sessions, cancellation, UMP assembly and loss. |
+| K02 | Fixed | comparison.rs / src/comparison.rs; renamed Rust sources/clocks to source_map/clock_map. comparison.rs and test_comparison.py cover mapping, tolerances, limits and file completion. |
+| K03 | Adaptation | inspection.rs / src/inspection.rs and inspection.py; inspection.rs core tests, test_inspection.py and test_monitor.py cover filters, typed callbacks, snapshots and opt-in metrics. |
+| K04 | Adaptation | inspection.rs / src/inspection.rs; inspection.rs and test_inspection.py cover positive limits, prefix reports and preservation. |
+| K05 | Exception | output.rs / _clients.py; output core replay_options_persist test and test_output.py cover repeated playback. Persistent Rust builder configuration versus per-call Python keywords remains approved. |
+| K06 | Adaptation | routing.rs / src/routing.rs; routing.rs, test_routing.py and test_patch.py cover budgets, preview and confirmed/uncertain progress. |
+| K07 | Adaptation | transfer.rs / src/transfer.rs; transfer.rs and test_transfer.py cover explicit gaps, limits, whole messages and uncertain handoff. |
+| K08 | Exception | input.rs, input_api.rs, transport/mod.rs / _clients.py; coremidi_boundary.rs and test_live.py cover reachable high-level raw/callback/filter/limit operations. Python isolation remains separate. |
+| K09 | Exception | output.rs, transport/mod.rs / _clients.py; output core tests, coremidi_boundary.rs and test_output.py cover selection, protocol, defaults and closure. Python isolation remains separate. |
+| E01 | Adaptation | playback.rs uses monotonic time and cancellable waits; src/live.rs supplies Python host timing. live.rs and test_live.py cover scheduling/cancellation, not merely clock reads. |
+| E02 | Adaptation | output.rs delegates to playback::play; _clients.py delegates to native playback. Output core tests and test_output.py cover origin, progress, empty playback and retained-output reuse. |
+| E03 | Adaptation | live.rs send_message and output.rs share codec expansion/transport sends; live.rs, output core tests and test_live.py cover no implicit conversion and partial handoff. |
+| E04 | Fixed | Timestamp::seconds replaces timestamp_seconds, including all core/binding callers. archive.rs and test_archive.py cover exact fractions; disabled Rust clocks now return InvalidInput. Common Rational tests cover arithmetic overflow. |
+| E05 | Adaptation | file_io.rs / src/files.rs; files.rs and test_files.py cover bounded reads, borrowed-reader ownership, short writes and failures. |
+| E06 | Fixed | Only gm::decode is public; extension parsing is private. profiles.rs, profile_engines.rs and their Python counterparts cover both mode and extension families. |
+| E07 | Adaptation | inspection::compare_files opens files and delegates to compare; src/comparison.rs calls the same core for paths/readers. comparison.rs and test_comparison.py exercise reports and mappings. |
+| E08 | Adaptation | inspection::inspect_file delegates to inspect; src/inspection.rs shares that engine. inspection.rs and test_inspection.py exercise all formats and file errors. |
+| E09 | Adaptation | routing::preview_file delegates to preview; src/routing.rs calls that engine for Python paths/readers. routing.rs and test_routing.py exercise incomplete files and retained progress. |
+| M01 | Adaptation | midi.rs canonical re-export / src/packets.rs backend mapping; test_contract.py and test_packets.py check public values and native selection validation. |
+| M02 | Adaptation | transport::Clock is an advanced native descriptor; input.rs and src/packets.rs convert native generations to events::Clock units/origin/mode. live.rs, coremidi_boundary.rs and test_live.py cover clock provenance. |
+| M03 | Adaptation | midi.rs re-export / port binding; transport selection unit tests and test_contract.py cover strict handles and ambiguous/missing names. |
+| M04 | Adaptation | midi.rs re-export / src/packets.rs; coremidi_boundary.rs and test_live.py exercise both protocol paths. |
+| M05 | Adaptation | events.rs re-export / src/packets.rs; coremidi_boundary.rs and test_live.py cover sequence, optional time, raw fragments and semantic-clock mapping. |
+| M06 | Adaptation | midi.rs re-export / src/packets.rs; archive.rs, test_archive.py and test_packets.py cover disabled timing, clock units and typed values. |
+| M07 | Adaptation | midi.rs re-export / src/packets.rs; transport resolve_backend uses the compiled list. Platform-dependent backend availability remains explicit; no cross-platform runtime equivalence is inferred from the macOS checks. |
+
+### Options contract checked
+
+| Entry | Shared fields and defaults |
+| --- | --- |
+| K01 | cancel: fresh uncancelled token; message_limit: 1,048,576; byte_limit: 8,388,608. |
+| K02 | payload_limit: 1,048,576; detail_limit: 128; preserve_unknown: false; ignore_timestamps: false; tick_tolerance: 0; source_map/clock_map: empty. |
+| K03 | protocol: MIDI 1; types: empty; channel/group: unset; detail_limit: 128. Run duration/cancel/callback are optional in Python and explicit Rust arguments; metrics: false. Note-state interpretation belongs to the monitor, display history to the CLI. |
+| K04 | payload_limit: 1,048,576; preserve_unknown: false; detail_limit: 128. |
+| K05 | origin: inferred; mappings: empty; cancellation: initially clear; allow_rounding/metrics: false. Configuration lifetime is the approved language exception. |
+| K06 | event_limit: 128; byte_limit: 8,388,608; payload_limit: 1,048,576; detail_limit: 128. |
+| K07 | gap: explicit; message_limit: 256; byte_limit: 8,388,608; payload_limit: 1,048,576. Duration versus Python number/unit string is the established adaptation. |
+| K08 | protocol: MIDI 1; backend: automatic; timestamps: absolute; receive bytes: 8,388,608. High-level event_limit: 128; sysex_limit: 1,048,576; no channel filter/port pattern; raw and callback delivery opt-in. Rust callbacks use a typed builder, Python connection callbacks. |
+| K09 | protocol: MIDI 1; backend: automatic; channel/port/bpm: unset. Unassigned MIDI 1 channels resolve to 1; an explicitly configured output channel overrides assigned MIDI 1 message channels. |
+
+### Additional decisions resolved during implementation
+
+- Approved: reject disabled-clock Timestamp::seconds() with InvalidInput, matching Python's
+  rejection of disabled-clock Timestamp construction.
+- Approved: a retained output stays open after play() in both languages, until its normal
+  close/context/destruction cleanup. Inspection confirmed Python already did this:
+  its temporary-output regression observes destruction, not play() closing the
+  output. A new Python reuse regression makes the distinction explicit.
+- Approved: native and simulated Worker failures both map to Python WorkerError;
+  ResourceError is reserved for explicit resource/capacity failures.
+- CompoundSendError now retains its typed underlying __cause__, matching Rust's
+  nested error information, rather than retaining only its text.
+
+### Verification
+
+- Full Python suite: 561 passed after rebuilding the extension.
+- Rust workspace: 226 passed, five opt-in tests ignored, using the current compiler.
+- All 33 Rust guide snippets compiled with no_run wrappers; no guide I/O executed.
+- Strict core Clippy, cargo fmt, Python Ruff, 3.13 pyupgrade and ty check meedee passed.
+- Strict documentation build: no issues.
+- Superseded GM decoder/result names and timestamp_seconds have no remaining
+  source, example or test callers.
+- All 60 mapping IDs have an outcome and evidence; public-symbols.txt was
+  regenerated from Python declarations and fresh Rust documentation and remains
+  untracked.
+
+No physical devices, old Rust toolchains, publication or platform runtime
+qualification were used. Workspace compilation reports existing Python-binding
+warnings unrelated to these changes; strict core Clippy is clean.

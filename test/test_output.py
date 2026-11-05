@@ -456,6 +456,28 @@ def test_client_play_accepts_empty_capture(transport: NativeConnection) -> None:
     assert not transport.closed
 
 
+def test_playback_keeps_a_retained_output_available_for_reuse(
+    transport: NativeConnection,
+) -> None:
+    from meedee import events
+
+    timestamp = events.Timestamp(ticks=0, clock=events.Clock(identity="capture"))
+    note = messages.NoteOn(60, channel=1).replace(timestamp=timestamp)
+    with midi.Output() as output:
+        assert output.play([note]).sent_events == 1
+        assert not output.closed
+        assert output.play([note.transpose(7)]).sent_events == 1
+        output(messages.NoteOff(60), messages.NoteOff(67))
+        assert not output.closed
+    assert transport.closed
+    assert transport.packets() == [
+        b"\x90\x3c\x5a",
+        b"\x90\x43\x5a",
+        b"\x80\x3c\x00",
+        b"\x80\x43\x00",
+    ]
+
+
 @pytest.mark.parametrize("connected", [False, True])
 def test_output_is_automatically_collected_and_releases_notes(
     transport: NativeConnection,

@@ -315,5 +315,6 @@ def test_compound_output_failure_preserves_prefix_and_reports_progress() -> None
         output(messages.ControlChange14(channel=1, controller=7, value=128))
     assert failure.value.completed_messages == 1
     assert failure.value.total_messages == 2
+    assert isinstance(failure.value.__cause__, midi.ResourceError)
     assert output.take_packet() == b"\xb0\x07\x01"
     assert output.take_packet() is None

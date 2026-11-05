@@ -7,12 +7,12 @@ fn extended_sysex_limits_unknown_ids_and_byte_order_are_preserved() {
             .unwrap();
     assert_eq!(value.encode().unwrap(), wire("PressureDestination"));
     assert_eq!(
-        gm::decode_extended(
+        gm::decode(
             &SysEx::new(value.encode().unwrap()[1..12].to_vec()).unwrap(),
             1024
         )
         .unwrap(),
-        Some(gm::ExtendedMessage::ControllerDestination(value))
+        Some(gm::GmMessage::ControllerDestination(value))
     );
     let value =
         gm::GlobalParameterControl::new(1, vec![257], 2, 2, vec![(vec![1, 2], vec![3, 4])], 1024)
@@ -20,16 +20,28 @@ fn extended_sysex_limits_unknown_ids_and_byte_order_are_preserved() {
     assert_eq!(value.encode().unwrap(), wire("GlobalParameterControl"));
     let raw = SysEx::new(value.encode().unwrap()[1..14].to_vec()).unwrap();
     assert_eq!(
-        gm::decode_extended(&raw, 1024).unwrap(),
-        Some(gm::ExtendedMessage::GlobalParameterControl(value))
+        gm::decode(&raw, 1024).unwrap(),
+        Some(gm::GmMessage::GlobalParameterControl(value))
     );
     assert!(gm::GlobalParameterControl::new(1, vec![0], 0, 1, vec![], 1024).is_err());
     assert!(gm::KeyBasedControl::new(1, 1, 60, vec![(0, 0)], 1024).is_err());
     assert!(gm::KeyBasedControl::new(1, 1, 60, vec![(7, 0); 1025], 1024).is_err());
     assert!(gm::ControllerDestination::new(1, 1, 3, Some(32), vec![], 1024).is_err());
-    assert!(
-        gm::decode_extended(&SysEx::new(vec![127, 1, 4, 5, 127, 1, 1]).unwrap(), 1024).is_err()
+    assert!(gm::decode(&SysEx::new(vec![127, 1, 4, 5, 127, 1, 1]).unwrap(), 1024).is_err());
+    let value = gm::KeyBasedControl::new(1, 10, 36, vec![(7, 64), (120, 65)], 2).unwrap();
+    let bytes = value.encode().unwrap();
+    let raw = SysEx::new(bytes[1..bytes.len() - 1].to_vec()).unwrap();
+    assert!(gm::decode(&raw, 1).is_err());
+    assert_eq!(
+        gm::decode(&raw, 2).unwrap(),
+        Some(gm::GmMessage::KeyBasedControl(value))
     );
+    for data in [vec![126, 1, 9, 1], vec![127, 1, 9, 99], vec![1]] {
+        assert!(gm::decode(&SysEx::new(data).unwrap(), 0).is_err());
+    }
+    assert!(gm::decode(&SysEx::new(vec![127, 1, 9, 99]).unwrap(), 1024)
+        .unwrap()
+        .is_none());
 }
 #[test]
 fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() {

@@ -53,7 +53,13 @@ def test_midi1_remap_retains_source_span_and_immutable_snapshot() -> None:
     router.confirm(delivery.id)
     assert before.confirmed == 0 and router.snapshot().confirmed == 1
     before.routes.clear()
-    assert before.routes["r"]["admitted"] == 1
+    detail = before.routes["r"]
+    assert isinstance(detail, routing.RouteReport)
+    assert detail.admitted == 1 and detail.confirmed == 0
+    assert detail.capacity_rejections == 0
+    assert router.snapshot().routes["r"].confirmed == 1
+    with pytest.raises(AttributeError):
+        detail.confirmed = 2  # ty: ignore[invalid-assignment]
     with pytest.raises(AttributeError):
         delivery.destination = "elsewhere"  # ty: ignore[invalid-assignment]
 
@@ -100,6 +106,18 @@ def test_nonchannel_opt_in_and_group_selection_are_explicit() -> None:
     assert delivery.message == ump.Midi1Packet(
         group=16, message=messages.NoteOn(channel=1, note=60, velocity=0)
     )
+
+
+def test_route_report_retains_counts_after_capacity_failure() -> None:
+    router = routing.Router(routes=[route()], event_limit=1)
+    router.feed(event(messages.NoteOn(60, channel=1)))
+    before = router.snapshot().routes["r"]
+    with pytest.raises(ValueError):
+        router.feed(event(messages.NoteOn(61, channel=1)))
+    after = router.snapshot().routes["r"]
+    assert before.admitted == after.admitted == 1
+    assert before.confirmed == after.confirmed == 0
+    assert before.capacity_rejections == 0 and after.capacity_rejections == 1
 
 
 def test_failure_preserves_known_prefix_and_uncertain_delivery() -> None:

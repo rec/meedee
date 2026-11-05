@@ -87,6 +87,10 @@ def test_extended_sysex_preserves_unknown_ids_order_and_mixed_endianness() -> No
     assert gm.decode(raw, max_entries=1025) == large
     with pytest.raises(TypeError):
         gm.decode(raw, max_entries=True)
+    for d in (b"\x7e\x01\x09\x01", b"\x7f\x01\x09\x63", b"\x01"):
+        with pytest.raises(ValueError, match="positive"):
+            gm.decode(messages.SysEx(d), max_entries=0)
+    assert gm.decode(messages.SysEx(b"\x7f\x01\x09\x63")) is None
 
 
 def test_velocity_prefix_is_one_shot_per_channel_and_zero_note_on_ignores_it() -> None:

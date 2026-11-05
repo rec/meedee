@@ -249,16 +249,10 @@ mod gm {
         #[pyo3(from_py_with=engines::limit)] max_entries: usize,
     ) -> PyResult<Option<Py<PyAny>>> {
         let raw = message.extract::<PyRef<'_, crate::messages::SysEx>>()?;
-        let mode = model::decode(&raw.value).map_err(value_error)?;
-        if mode.is_none() {
-            return engines::decode_gm(py, &raw.value, max_entries);
-        }
-        mode.map(|message| match message {
-            model::ModeMessage::Gm1On(value) => object(py, Gm1On { value }),
-            model::ModeMessage::GmOff(value) => object(py, GmOff { value }),
-            model::ModeMessage::Gm2On(value) => object(py, Gm2On { value }),
-        })
-        .transpose()
+        model::decode(&raw.value, max_entries)
+            .map_err(value_error)?
+            .map(|message| engines::gm_to_python(py, message, max_entries))
+            .transpose()
     }
     pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module.add_class::<BankProgramSelect>()?;

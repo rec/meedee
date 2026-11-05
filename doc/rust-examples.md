@@ -459,7 +459,7 @@ preserving unmapped keys and explicit `NoChange` entries.
 The same managed route forwards ten seconds of channel messages, remapped to channel 2:
 
 ```rust
-use meedee::{midi::{Input, Output}, routing, transport::Protocol};
+use meedee::{midi::{Input, Output, Protocol}, routing};
 use std::{collections::BTreeMap, time::Duration};
 
 let mut input = Input::new();
@@ -481,6 +481,10 @@ Known loss, overload or send failure stops all routes. On error,
 leaves connections open and generates no cleanup messages; closing the outputs
 applies their normal cleanup policy. The route's final boolean opts into non-channel
 traffic when `true`.
+Report.routes maps route names to RouteReport snapshots containing admitted,
+confirmed and capacity_rejections counts. Python exposes the same fields on
+read-only routing.RouteReport values. Snapshots retain their counts as routing
+continues or fails.
 
 ## Monitor with typed observations
 
@@ -745,3 +749,52 @@ failure empty. Its stream and
 clock getters return a state error because no identity or clock was established.
 An unopened object starts with `closed() == false`. A normally closed input can
 still drain its accepted messages, using the existing iteration contract.
+
+## Recognize GM messages in a saved dump
+
+Read a saved dump without opening a MIDI port. One decoder recognizes GM mode
+changes, controller destinations, key controls and global parameters:
+
+```rust
+use meedee::{gm, syx};
+use std::fs::File;
+
+for message in syx::Reader::new(File::open("backup.syx")?, 1_048_576)? {
+    if let Some(decoded) = gm::decode(&message?, 1024)? {
+        println!("{decoded:?}");
+    }
+}
+```
+
+The result is GmMessage, with one variant for each concrete Python GM message
+class. Unknown messages return None; malformed supported messages return Err.
+The explicit positive entry limit corresponds to Python's max_entries keyword,
+whose default is 1024.
+
+## Read exact recorded times
+
+Timestamp::seconds() returns an exact Rational value, corresponding to Python's
+Timestamp.seconds property. Recorded tick units are preserved until conversion:
+
+```rust
+use meedee::{archive, messages::Message};
+
+for record in archive::Reader::open("rec.meedee")? {
+    if let archive::Record::Event(message) = record? {
+        if let Some(timestamp) = message.timestamp() {
+            println!("{:?}", timestamp.seconds()?);
+        }
+    }
+}
+```
+
+Rust keeps Read-based functions such as inspection::inspect alongside the path
+operation inspection::inspect_file. Python's inspect_file accepts either a path
+or a binary reader. Both use the same parser and limits. Rust option fields
+correspond to Python keywords, including ComparisonOptions.source_map and
+clock_map. with_playback settings persist across subsequent play calls; Python's
+play keywords apply to one call. Clocks are automatic in ordinary playback.
+play leaves a retained output open for subsequent playback or sending, with
+normal close/Drop cleanup. Rust compound-send errors retain their typed cause;
+Python exposes that cause through __cause__ and uses WorkerError for worker
+failures in both real and simulated transports.

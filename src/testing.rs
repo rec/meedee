@@ -336,7 +336,6 @@ fn error(e: transport::Error) -> PyErr {
         transport::Error::Closed => {
             crate::errors::StateError::new_err("simulated connection is closed")
         }
-        transport::Error::Worker(r) => crate::errors::WorkerError::new_err(r),
         e => crate::errors::transport_error(e, "send"),
     }
 }

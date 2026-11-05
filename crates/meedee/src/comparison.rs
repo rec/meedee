@@ -12,8 +12,8 @@ pub struct Options {
     pub ignore_timestamps: bool,
     pub tick_tolerance: u64,
     /// Explicit left-to-right archive identity mappings; values must be unique.
-    pub sources: BTreeMap<String, String>,
-    pub clocks: BTreeMap<String, String>,
+    pub source_map: BTreeMap<String, String>,
+    pub clock_map: BTreeMap<String, String>,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -23,8 +23,8 @@ impl Default for Options {
             preserve_unknown: false,
             ignore_timestamps: false,
             tick_tolerance: 0,
-            sources: BTreeMap::new(),
-            clocks: BTreeMap::new(),
+            source_map: BTreeMap::new(),
+            clock_map: BTreeMap::new(),
         }
     }
 }
@@ -106,13 +106,14 @@ impl Options {
                 "positive limits required; tolerance cannot accompany ignored timestamps",
             ));
         }
-        if format != Format::Archive && (!self.sources.is_empty() || !self.clocks.is_empty()) {
+        if format != Format::Archive && (!self.source_map.is_empty() || !self.clock_map.is_empty())
+        {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "identity mappings apply only to archives",
             ));
         }
-        for map in [&self.sources, &self.clocks] {
+        for map in [&self.source_map, &self.clock_map] {
             if map.len() > 128
                 || map.iter().any(|(k, v)| k.is_empty() || v.is_empty())
                 || map.values().collect::<BTreeSet<_>>().len() != map.len()
@@ -241,7 +242,7 @@ fn map_id(id: &mut String, map: &BTreeMap<String, String>) {
     }
 }
 fn map_clock(c: &mut events::Clock, o: &Options) -> io::Result<()> {
-    if let Some(id) = o.clocks.get(c.identity()) {
+    if let Some(id) = o.clock_map.get(c.identity()) {
         let mut mapped = events::Clock::new(
             id.clone(),
             c.numerator(),
@@ -268,15 +269,15 @@ fn map_record(r: &mut archive::Record, o: &Options) -> io::Result<()> {
         archive::Record::Stream {
             id, clock_identity, ..
         } => {
-            map_id(id, &o.sources);
+            map_id(id, &o.source_map);
             if let Some(c) = clock_identity {
-                map_id(c, &o.clocks);
+                map_id(c, &o.clock_map);
             }
         }
         archive::Record::Event(e) => {
             let mut metadata = e.metadata().cloned().unwrap_or_default();
             if let Some(source) = &mut metadata.stream {
-                map_id(source, &o.sources);
+                map_id(source, &o.source_map);
             }
             map_time(&mut metadata.timestamp, o)?;
             if let Some(span) = &mut metadata.span {
@@ -286,13 +287,13 @@ fn map_record(r: &mut archive::Record, o: &Options) -> io::Result<()> {
             **e = (**e).clone().with_metadata(metadata)?;
         }
         archive::Record::Gap { stream, .. } | archive::Record::Discontinuity { stream, .. } => {
-            map_id(stream, &o.sources)
+            map_id(stream, &o.source_map)
         }
         archive::Record::Metadata {
             stream, timestamp, ..
         } => {
             if let Some(s) = stream {
-                map_id(s, &o.sources);
+                map_id(s, &o.source_map);
             }
             map_time(timestamp, o)?;
         }

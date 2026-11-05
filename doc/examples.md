@@ -418,6 +418,9 @@ The driver stops all routes on known loss, overload or send failure. After an
 exception, `router.snapshot()` retains confirmed sends and any uncertain delivery.
 It leaves connections open; the surrounding contexts close them using their normal
 cleanup policy. Non-channel traffic requires `include_nonchannel=True` on the route.
+Report.routes maps route names to read-only RouteReport snapshots, each with
+admitted, confirmed and capacity_rejections counts. A snapshot keeps its counts
+when routing continues or fails.
 
 ## Monitor with typed observations
 
@@ -710,3 +713,45 @@ remain available once established. Closing an unopened input leaves those two
 properties unavailable. Output also exposes closed, and both kinds of object
 become terminally closed even when cleanup fails. Rust provides the corresponding
 `closed()`, `stream()`, `clock()`, `dropped_packets()` and `failure()` methods.
+
+## Recognize GM messages in a saved dump
+
+Inspect a saved SysEx dump without opening a MIDI port. The same decoder handles
+GM mode changes, controller destinations, key controls and global parameters:
+
+```python
+from meedee import gm, syx
+
+with syx.Reader("backup.syx") as dump:
+    for message in dump:
+        if (decoded := gm.decode(message)) is not None:
+            print(decoded)
+```
+
+Unknown messages return None; malformed supported messages raise ValueError.
+The default max_entries is 1024; pass a different positive limit when needed.
+Rust returns the corresponding GmMessage enum from the same decoding operation.
+
+## Read exact recorded times
+
+Timestamp.seconds is an exact Rational value in seconds, independent of the
+clock's original tick units. This prints the times attached to a saved performance:
+
+```python
+from meedee import archive, messages
+
+with archive.Reader("rec.meedee") as capture:
+    for message in capture:
+        if isinstance(message, messages.Message) and message.timestamp is not None:
+            print(message.timestamp.seconds)
+```
+
+Python file functions accept paths or binary readers. Rust keeps separate path
+and Read-based entry points, such as inspect_file and inspect. Rust options
+structs correspond to Python keyword arguments; they do not require extra Python
+objects. Rust with_playback settings persist across play calls, while Python's
+play keywords apply to the current call. Both create their playback clock
+automatically.
+play() leaves a retained output open for subsequent playback or sending; context
+exit, close() or destruction performs its usual cleanup. CompoundSendError keeps
+the underlying typed failure in __cause__, alongside its confirmed progress.

@@ -255,16 +255,10 @@ fn effect_parameter(
     let v = bounded(value, 0, 127)?;
     GlobalParameterControl::new(device_id, vec![slot], 1, 1, vec![(vec![p], vec![v])], 1024)
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ExtendedMessage {
-    ControllerDestination(ControllerDestination),
-    KeyBasedControl(KeyBasedControl),
-    GlobalParameterControl(GlobalParameterControl),
-}
-pub fn decode_extended(
+pub(super) fn decode(
     message: &SysEx,
     max_entries: usize,
-) -> Result<Option<ExtendedMessage>, ValueError> {
+) -> Result<Option<super::GmMessage>, ValueError> {
     let d = message.data();
     if d.len() < 4 || d[0] != 127 {
         return Ok(None);
@@ -279,7 +273,7 @@ pub fn decode_extended(
             } else {
                 None
             };
-            Ok(Some(ExtendedMessage::ControllerDestination(
+            Ok(Some(super::GmMessage::ControllerDestination(
                 ControllerDestination::new(
                     id,
                     i64::from(d[4]) + 1,
@@ -292,7 +286,7 @@ pub fn decode_extended(
         }
         (10, 1) => {
             require(d, 6)?;
-            Ok(Some(ExtendedMessage::KeyBasedControl(
+            Ok(Some(super::GmMessage::KeyBasedControl(
                 KeyBasedControl::new(
                     id,
                     i64::from(d[4]) + 1,
@@ -327,7 +321,7 @@ pub fn decode_extended(
                 .chunks_exact(pw + vw)
                 .map(|v| (v[..pw].to_vec(), v[pw..].to_vec()))
                 .collect();
-            Ok(Some(ExtendedMessage::GlobalParameterControl(
+            Ok(Some(super::GmMessage::GlobalParameterControl(
                 GlobalParameterControl::new(id, path, pw as i64, vw as i64, entries, max_entries)?,
             )))
         }

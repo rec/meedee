@@ -4,8 +4,8 @@ use crate::messages::{AnyMessage, Command, ControlChange, ProgramChange, ValueEr
 #[path = "gm_extensions.rs"]
 mod extensions;
 pub use extensions::{
-    chorus_parameter, decode_extended, reverb_parameter, ControllerDestination, ExtendedMessage,
-    GlobalParameterControl, KeyBasedControl,
+    chorus_parameter, reverb_parameter, ControllerDestination, GlobalParameterControl,
+    KeyBasedControl,
 };
 
 #[derive(Clone, Debug)]
@@ -299,15 +299,25 @@ macro_rules! modes {
 }
 modes!(Gm1On=>1,GmOff=>2,Gm2On=>3);
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ModeMessage {
+pub enum GmMessage {
     Gm1On(Gm1On),
     GmOff(GmOff),
     Gm2On(Gm2On),
+    ControllerDestination(ControllerDestination),
+    KeyBasedControl(KeyBasedControl),
+    GlobalParameterControl(GlobalParameterControl),
 }
-pub fn decode(message: &crate::messages::SysEx) -> Result<Option<ModeMessage>, ValueError> {
+/// Decode a supported GM mode or extended message, bounding parameter entries.
+pub fn decode(
+    message: &crate::messages::SysEx,
+    max_entries: usize,
+) -> Result<Option<GmMessage>, ValueError> {
+    if max_entries == 0 {
+        return Err(ValueError("limit must be positive".into()));
+    }
     let data = message.data();
     if data.len() < 3 || data[0] != 126 || data[2] != 9 {
-        return Ok(None);
+        return extensions::decode(message, max_entries);
     }
     if data.len() < 4 {
         return Err(ValueError("truncated GM header".into()));
@@ -319,9 +329,9 @@ pub fn decode(message: &crate::messages::SysEx) -> Result<Option<ModeMessage>, V
         return Err(ValueError("incorrect GM mode message length".into()));
     }
     Ok(Some(match data[3] {
-        1 => ModeMessage::Gm1On(Gm1On::new(data[1].into())?),
-        2 => ModeMessage::GmOff(GmOff::new(data[1].into())?),
-        _ => ModeMessage::Gm2On(Gm2On::new(data[1].into())?),
+        1 => GmMessage::Gm1On(Gm1On::new(data[1].into())?),
+        2 => GmMessage::GmOff(GmOff::new(data[1].into())?),
+        _ => GmMessage::Gm2On(Gm2On::new(data[1].into())?),
     }))
 }
 

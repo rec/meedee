@@ -103,11 +103,11 @@ fn merged_tracks_apply_tempo_in_stable_order_and_preserve_leading_silence() {
         480_000_000
     );
     assert_eq!(
-        meedee::events::timestamp_seconds(events[0].timestamp().unwrap()).unwrap(),
+        events[0].timestamp().unwrap().seconds().unwrap(),
         Rational::new(1, 4).unwrap()
     );
     assert_eq!(
-        meedee::events::timestamp_seconds(events[1].timestamp().unwrap()).unwrap(),
+        events[1].timestamp().unwrap().seconds().unwrap(),
         Rational::new(3, 8).unwrap()
     );
     let mut plan = meedee::events::PlaybackPlan::new(origin, vec![], false).unwrap();
@@ -135,7 +135,7 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
         panic!()
     };
     assert_eq!(
-        meedee::events::timestamp_seconds(e.timestamp().unwrap()).unwrap(),
+        e.timestamp().unwrap().seconds().unwrap(),
         Rational::new(1001, 1000).unwrap()
     );
     let target = Header::new(0, 1, 480, vec![]).unwrap();

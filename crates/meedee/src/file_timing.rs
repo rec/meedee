@@ -2,7 +2,7 @@
 use crate::messages::Message;
 use crate::{
     clip,
-    events::{timestamp_seconds, Clock, Payload, Rational, Timestamp},
+    events::{Clock, Payload, Rational, Timestamp},
     file_io::invalid,
     live,
     messages::{Command, PrimitiveMessage},
@@ -348,7 +348,7 @@ pub fn export_smf(
         ));
     };
     let seconds = if t.clock == origin.clock {
-        timestamp_seconds(t)?
+        t.seconds()?
     } else if let Some(m) = mapping {
         if m.target != origin.clock {
             return Err(invalid(0, "mapping target differs from export origin"));
@@ -360,7 +360,7 @@ pub fn export_smf(
             "clock mapping required",
         ));
     };
-    let relative = seconds.checked_sub(timestamp_seconds(origin)?)?;
+    let relative = seconds.checked_sub(origin.seconds()?)?;
     if relative.numerator() < 0 {
         return Ok(denied(
             ump::TranslationStatus::Unsupported,

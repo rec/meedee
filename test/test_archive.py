@@ -114,6 +114,9 @@ def test_clock_units_and_checked_values_are_distinct_from_raw_nanoseconds() -> N
     )
     time = events.Timestamp(ticks=30000, clock=clock)
     assert time.seconds == events.Rational(numerator=1001, denominator=1)
+    assert time.replace(ticks=-1).seconds == events.Rational(
+        numerator=-1001, denominator=30000
+    )
     with pytest.raises(TypeError):
         time.replace(ticks=True)
     with pytest.raises(AttributeError):

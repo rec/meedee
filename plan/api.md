@@ -664,7 +664,7 @@ raw SysEx and does not promote it. Callers retain raw bytes for unknown messages
 or byte-for-byte evidence. Typed GM mode messages explicitly fed to the control
 interpreter clear all cached channels with StateReset diagnostics, including
 GmOff as a conservative context boundary; raw SysEx is ignored. Rust accepts
-ModeMessage or the individual mode types as interpreter input. A caller selects
+GmMessage mode variants or the individual mode types as interpreter input. A caller selects
 which addressed mode changes are relevant to that source, or calls reset after
 known mode changes/loss; sending a value does not implicitly feed an interpreter.
 
@@ -1885,3 +1885,30 @@ pointing at the original error. Normal closure leaves failure empty, while
 check_health() continues to reject a closed input. Callback status records terminal
 closure independently of native cleanup completion. Examples and device-free
 regressions cover normal closure, unused objects, panic and failed cleanup.
+
+### Final module-level representation alignment
+
+Rust gm::decode(message, max_entries) now returns one gm::GmMessage covering GM
+mode and extended control messages. Python gm.decode retains its max_entries=1024
+keyword default. Both reject a zero limit, return None for unknown forms and
+reject malformed supported messages. Only GM mode changes reset interpretation
+state; extended controls do not become reset messages through consolidation.
+
+Python routing.Report.routes now returns dict[str, routing.RouteReport], with
+read-only admitted, confirmed and capacity_rejections properties. Rust keeps its
+existing typed per-route snapshots. CLI JSON retains the same plain field names.
+
+Rust Timestamp::seconds() replaces the public timestamp_seconds free function.
+It returns exact Rational seconds and rejects a disabled clock with InvalidInput;
+Python rejects such Timestamp construction. ComparisonOptions uses source_map
+and clock_map, matching Python keywords.
+
+Retained outputs stay open after play in both languages; normal close/context or
+destruction cleanup governs their lifetime. Rust playback options remain
+persistent builder settings, while Python play keywords apply to one call.
+Python native and simulated worker failures consistently raise WorkerError.
+CompoundSendError preserves its typed underlying __cause__ as well as progress.
+
+The scoped 60-path audit and evidence are recorded in fix-differences.md.
+Rust enums, options and advanced streaming/clock helpers remain approved language
+adaptations. This does not assert whole-API or platform runtime equivalence.

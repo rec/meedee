@@ -113,7 +113,7 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
     );
     let changed_source = capture(&first.clone().with_stream("other").unwrap());
     let options = ComparisonOptions {
-        sources: [("keys".into(), "other".into())].into(),
+        source_map: [("keys".into(), "other".into())].into(),
         ..ComparisonOptions::default()
     };
     assert!(

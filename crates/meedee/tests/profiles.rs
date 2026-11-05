@@ -66,14 +66,14 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
         if expected[0] == 240 {
             let raw = SysEx::new(expected[1..expected.len() - 1].to_vec()).unwrap();
             assert!(
-                gm::decode(&raw).unwrap().is_some()
+                gm::decode(&raw, 1024).unwrap().is_some()
                     || universal::decode(&raw).unwrap().is_some()
                     || timecode::decode(&raw).unwrap().is_some()
             );
             for size in 3..raw.data().len() {
                 let truncated = SysEx::new(raw.data()[..size].to_vec()).unwrap();
                 assert!(
-                    gm::decode(&truncated).is_err()
+                    gm::decode(&truncated, 1024).is_err()
                         || universal::decode(&truncated).is_err()
                         || timecode::decode(&truncated).is_err()
                 );
@@ -172,7 +172,7 @@ fn identity_and_universal_decoders_preserve_exact_fields_and_reject_corruption()
         vec![127, 1, 1, 2],
     ] {
         let raw = SysEx::new(data).unwrap();
-        assert!(gm::decode(&raw).unwrap().is_none());
+        assert!(gm::decode(&raw, 1024).unwrap().is_none());
         assert!(universal::decode(&raw).unwrap().is_none());
         assert!(timecode::decode(&raw).unwrap().is_none());
     }

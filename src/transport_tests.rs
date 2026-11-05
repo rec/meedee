@@ -212,6 +212,10 @@ fn python_compound_error_retains_progress_and_invalidates_the_connection() {
             2
         );
         assert_eq!(received.len(), 1);
+        assert_eq!(
+            error.cause(py).unwrap().get_type(py).name().unwrap(),
+            "SendError"
+        );
         // Failed is not the same as closed: native ownership is retained until
         // teardown finishes, but subsequent use must already be rejected.
         assert!(!outgoing.getattr("closed").unwrap().is_truthy().unwrap());
@@ -221,5 +225,22 @@ fn python_compound_error_retains_progress_and_invalidates_the_connection() {
         assert!(outgoing.call_method0("close").is_err());
         assert!(outgoing.getattr("closed").unwrap().is_truthy().unwrap());
         incoming.call_method0("close").unwrap();
+    });
+}
+
+#[test]
+fn worker_and_capacity_failures_keep_distinct_python_categories() {
+    Python::initialize();
+    Python::attach(|py| {
+        let worker = crate::errors::transport_error(
+            meedee::transport::Error::Worker("thread startup failed".into()),
+            "init",
+        );
+        assert!(worker.is_instance_of::<crate::errors::WorkerError>(py));
+        let resource = crate::errors::transport_error(
+            meedee::transport::Error::Resource("client capacity exhausted"),
+            "init",
+        );
+        assert!(resource.is_instance_of::<crate::errors::ResourceError>(py));
     });
 }

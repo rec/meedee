@@ -13,7 +13,7 @@ pub struct Timestamp {
 }
 frozen!(Timestamp;ticks,clock;{
 #[new]#[pyo3(signature=(*,ticks,clock))]fn new(ticks:&Bound<'_,PyAny>,clock:PyRef<'_,Clock>)->PyResult<Self>{let value=model::Timestamp{ticks:crate::messages::integer(&crate::units::normalize(ticks,"tick","integer")?,"ticks")?,clock:clock.value.clone()};if value.clock.mode()==Some(false){return Err(PyValueError::new_err("disabled clock has no timestamps"));}Ok(Self{value})}
-#[getter]fn ticks(&self)->i64{self.value.ticks}#[getter]fn clock(&self)->Clock{Clock{value:self.value.clock.clone()}}#[getter]fn seconds(&self)->PyResult<Rational>{Ok(Rational{value:model::timestamp_seconds(&self.value).map_err(value_error)?})}
+#[getter]fn ticks(&self)->i64{self.value.ticks}#[getter]fn clock(&self)->Clock{Clock{value:self.value.clock.clone()}}#[getter]fn seconds(&self)->PyResult<Rational>{Ok(Rational{value:self.value.seconds().map_err(value_error)?})}
 });
 #[pyclass(frozen, skip_from_py_object, module = "meedee.events")]
 #[derive(Clone)]

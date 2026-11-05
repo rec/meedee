@@ -219,25 +219,25 @@ fn replace<'py>(slf:PyRef<'py,Self>,changes:Option<&Bound<'py,PyDict>>)->PyResul
 let py=slf.py();super::replacement(slf.into_pyobject(py)?.as_any(),&["device_id","slot_path","parameter_width","value_width","entries","max_entries"],changes)
 }
 });
-pub(super) fn decode_gm(
+pub(super) fn gm_to_python(
     py: Python<'_>,
-    message: &meedee::messages::SysEx,
+    message: gm_model::GmMessage,
     max_entries: usize,
-) -> PyResult<Option<Py<PyAny>>> {
-    gm_model::decode_extended(message, max_entries)
-        .map_err(value_error)?
-        .map(|v| match v {
-            gm_model::ExtendedMessage::ControllerDestination(value) => {
-                object(py, ControllerDestination { value, max_entries })
-            }
-            gm_model::ExtendedMessage::KeyBasedControl(value) => {
-                object(py, KeyBasedControl { value, max_entries })
-            }
-            gm_model::ExtendedMessage::GlobalParameterControl(value) => {
-                object(py, GlobalParameterControl { value, max_entries })
-            }
-        })
-        .transpose()
+) -> PyResult<Py<PyAny>> {
+    match message {
+        gm_model::GmMessage::ControllerDestination(value) => {
+            object(py, ControllerDestination { value, max_entries })
+        }
+        gm_model::GmMessage::KeyBasedControl(value) => {
+            object(py, KeyBasedControl { value, max_entries })
+        }
+        gm_model::GmMessage::GlobalParameterControl(value) => {
+            object(py, GlobalParameterControl { value, max_entries })
+        }
+        gm_model::GmMessage::Gm1On(value) => object(py, super::gm::Gm1On { value }),
+        gm_model::GmMessage::Gm2On(value) => object(py, super::gm::Gm2On { value }),
+        gm_model::GmMessage::GmOff(value) => object(py, super::gm::GmOff { value }),
+    }
 }
 #[pyfunction]
 #[pyo3(signature=(*,device_id,parameter,value))]

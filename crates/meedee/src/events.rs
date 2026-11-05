@@ -82,6 +82,21 @@ pub struct Timestamp {
     pub ticks: i64,
     pub clock: Clock,
 }
+impl Timestamp {
+    /// Exact elapsed seconds in this clock's tick units.
+    pub fn seconds(&self) -> io::Result<Rational> {
+        if self.clock.mode() == Some(false) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "disabled clock has no timestamps",
+            ));
+        }
+        Rational::new(i128::from(self.ticks), 1)?.multiply(
+            self.clock.numerator().into(),
+            self.clock.denominator().into(),
+        )
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SourceSpan {
     pub first_packet: u64,
@@ -222,10 +237,6 @@ fn gcd(mut a: u128, mut b: u128) -> u128 {
         b = r;
     }
     a.max(1)
-}
-pub fn timestamp_seconds(t: &Timestamp) -> io::Result<Rational> {
-    Rational::new(i128::from(t.ticks), 1)?
-        .multiply(t.clock.numerator().into(), t.clock.denominator().into())
 }
 
 /// Opaque conversion/connection generation identity. It is not a timestamp origin.

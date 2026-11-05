@@ -4,6 +4,7 @@ use crate::{
     controls,
     events::{Clock, Payload, Timestamp},
     file_io::invalid,
+    gm::{self, GmMessage},
     live::Diagnostic,
     messages::{AnyMessage, SysEx},
     mpe, timecode, tuning, ump, velocity,
@@ -175,8 +176,16 @@ fn midi1(event: &Payload, group: Option<u8>) -> io::Result<Option<Cow<'_, AnyMes
     }
 }
 fn resets(message: &AnyMessage) -> bool {
-    matches!(message, AnyMessage::SystemReset(_))
-        || matches!(message,AnyMessage::SysEx(v)if crate::gm::decode(v).ok().flatten().is_some())
+    match message {
+        AnyMessage::SystemReset(_) => true,
+        AnyMessage::SysEx(message) => matches!(
+            gm::decode(message, 1024),
+            Ok(Some(
+                GmMessage::Gm1On(_) | GmMessage::Gm2On(_) | GmMessage::GmOff(_)
+            ))
+        ),
+        _ => false,
+    }
 }
 pub trait View {
     fn feed(&mut self, event: &Payload, now_ns: Option<u64>) -> io::Result<Vec<Observation>>;

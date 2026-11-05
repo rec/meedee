@@ -1,7 +1,7 @@
 //! Explicit clock mapping and cancellable caller-thread replay. No automatic cleanup sends.
 use crate::messages::Message;
 use crate::{
-    events::{timestamp_seconds, Clock, Payload, Rational, Timestamp},
+    events::{Clock, Payload, Rational, Timestamp},
     file_io::invalid,
 };
 use std::fmt;
@@ -42,7 +42,7 @@ impl Mapping {
         if t.clock != self.source {
             return Err(invalid(0, "mapping source clock differs"));
         }
-        timestamp_seconds(t)?
+        t.seconds()?
             .multiply(self.rate.numerator(), self.rate.denominator())?
             .checked_add(self.offset)
     }
@@ -69,7 +69,7 @@ impl Planner {
         if clock.mode() == Some(false) {
             return Err(invalid(0, "disabled playback origin"));
         }
-        let origin = timestamp_seconds(&origin)?;
+        let origin = origin.seconds()?;
         if mappings.len() > 128 {
             return Err(invalid(0, "too many clock mappings"));
         }
@@ -99,7 +99,7 @@ impl Planner {
             .timestamp()
             .ok_or_else(|| invalid(0, "playback requires an explicit timestamp"))?;
         let seconds = if timestamp.clock == self.clock {
-            timestamp_seconds(timestamp)?
+            timestamp.seconds()?
         } else {
             self.mappings
                 .iter()
