@@ -1,5 +1,5 @@
 //! Pure MPE zone configuration, explicit allocation and bounded channel tracking.
-pub use crate::event_views::Mpe as EventTracker;
+pub use crate::event_views::Mpe as Tracker;
 use crate::messages::{AnyMessage, Command, RpnSet, ValueError};
 
 #[derive(Clone, Debug)]
@@ -203,11 +203,11 @@ impl Default for Channel {
     }
 }
 #[derive(Clone, Debug)]
-pub struct Tracker {
+pub(crate) struct TrackerState {
     zone: ZoneConfiguration,
     channels: [Channel; 16],
 }
-impl Tracker {
+impl TrackerState {
     pub fn new(zone: ZoneConfiguration) -> Self {
         Self {
             zone,

@@ -130,52 +130,66 @@ def test_sysex_assembly_is_scoped_bounded_and_discards_incomplete_payloads() -> 
     data = bytes(range(128))
     assembler = ump.Assembler()
     result = [
-        v for p in ump.packetize_sysex7(group=16, data=data) for v in assembler.feed(p)
+        v
+        for p in ump.packetize_sysex7(group=16, data=data)
+        for v in [v.value for v in assembler.feed(p)]
     ]
     assert len(result) == 1 and isinstance(result[0], ump.AssembledData)
     assert result[0].data == data and result[0].group == 16
     assert assembler.active_streams == assembler.retained_bytes == 0
     one = ump.packetize_sysex8(group=1, stream_id=1, data=b"\xff" * 20)
     two = ump.packetize_sysex8(group=1, stream_id=2, data=b"\x80" * 14)
-    assembler.feed(one[0])
-    assembler.feed(two[0])
+    [v.value for v in assembler.feed(one[0])]
+    [v.value for v in assembler.feed(two[0])]
     assert assembler.active_streams == 2
-    assert assembler.feed(
-        ump.SysEx8Packet(group=1, format=3, stream_id=1, data=b"", aborted=True)
-    ) == [ump.AssemblyDiagnostic.Aborted]
-    result = assembler.feed(two[1])
+    assert [
+        v.value
+        for v in assembler.feed(
+            ump.SysEx8Packet(group=1, format=3, stream_id=1, data=b"", aborted=True)
+        )
+    ] == [ump.AssemblyDiagnostic.Aborted]
+    result = [v.value for v in assembler.feed(two[1])]
     assert isinstance(result[0], ump.AssembledData) and result[0].data == b"\x80" * 14
     assert result[0].stream_id == 2
-    assembler.feed(ump.SysEx7Packet(group=1, format=1, data=b"\x7d"))
-    assert (
-        assembler.feed(ump.Midi1Packet(group=1, message=messages.TimingClock())) == []
-    )
-    assert (
-        assembler.feed(
+    [v.value for v in assembler.feed(ump.SysEx7Packet(group=1, format=1, data=b"\x7d"))]
+    assert [
+        v.value
+        for v in assembler.feed(
+            ump.Midi1Packet(group=1, message=messages.TimingClock())
+        )
+    ] == []
+    assert [
+        v.value
+        for v in assembler.feed(
             ump.Midi1Packet(
                 group=2, message=messages.NoteOn(channel=1, note=60, velocity=100)
             )
         )
-        == []
-    )
-    assert assembler.feed(
-        ump.Midi1Packet(
-            group=1, message=messages.NoteOn(channel=1, note=60, velocity=100)
+    ] == []
+    assert [
+        v.value
+        for v in assembler.feed(
+            ump.Midi1Packet(
+                group=1, message=messages.NoteOn(channel=1, note=60, velocity=100)
+            )
         )
-    ) == [ump.AssemblyDiagnostic.Interrupted]
+    ] == [ump.AssemblyDiagnostic.Interrupted]
     small = ump.Assembler(message_limit=4, total_limit=4, max_streams=1)
-    small.feed(ump.SysEx7Packet(group=1, format=1, data=b"abcd"))
-    assert small.feed(ump.SysEx8Packet(group=2, format=1, stream_id=0, data=b"x")) == [
-        ump.AssemblyDiagnostic.StreamLimit
-    ]
-    assert small.feed(ump.SysEx7Packet(group=1, format=2, data=b"x")) == [
-        ump.AssemblyDiagnostic.PayloadLimit
-    ]
+    [v.value for v in small.feed(ump.SysEx7Packet(group=1, format=1, data=b"abcd"))]
+    assert [
+        v.value
+        for v in small.feed(ump.SysEx8Packet(group=2, format=1, stream_id=0, data=b"x"))
+    ] == [ump.AssemblyDiagnostic.StreamLimit]
+    assert [
+        v.value for v in small.feed(ump.SysEx7Packet(group=1, format=2, data=b"x"))
+    ] == [ump.AssemblyDiagnostic.PayloadLimit]
     assert small.retained_bytes == 0
-    assert small.feed(ump.SysEx7Packet(group=1, format=3, data=b"")) == []
-    assert small.finish() == []
-    small.feed(ump.SysEx7Packet(group=1, format=1, data=b"x"))
-    assert small.finish() == [ump.AssemblyDiagnostic.Truncated]
+    assert [
+        v.value for v in small.feed(ump.SysEx7Packet(group=1, format=3, data=b""))
+    ] == []
+    assert [v.value for v in small.finish()] == []
+    [v.value for v in small.feed(ump.SysEx7Packet(group=1, format=1, data=b"x"))]
+    assert [v.value for v in small.finish()] == [ump.AssemblyDiagnostic.Truncated]
     with pytest.raises(ValueError):
         ump.packetize_sysex7(group=1, data=b"\x80")
     with pytest.raises(ValueError):
@@ -192,11 +206,11 @@ def test_flex_and_stream_text_validate_complete_utf8_and_protocol_lengths() -> N
     packets = ump.packetize_flex_text(
         group=1, channel=16, status_bank=1, status=0, text=text
     )
-    result = [v for p in packets for v in assembler.feed(p)]
+    result = [v for p in packets for v in [v.value for v in assembler.feed(p)]]
     assert len(result) == 1 and isinstance(result[0], ump.AssembledData)
     assert (result[0].text, result[0].channel, result[0].status_bank) == (text, 16, 1)
     packets = ump.packetize_stream_text(status=18, function_block=31, text=text)
-    result = [v for p in packets for v in assembler.feed(p)]
+    result = [v for p in packets for v in [v.value for v in assembler.feed(p)]]
     assert isinstance(result[0], ump.AssembledData)
     assert (result[0].text, result[0].group, result[0].function_block) == (
         text,
@@ -223,7 +237,9 @@ def test_flex_and_stream_text_validate_complete_utf8_and_protocol_lengths() -> N
         status=0,
         data=(0xFF000000, 0, 0),
     )
-    assert assembler.feed(invalid) == [ump.AssemblyDiagnostic.MalformedText]
+    assert [v.value for v in assembler.feed(invalid)] == [
+        ump.AssemblyDiagnostic.MalformedText
+    ]
     assert ump.encode(ump.tempo(group=1, bpm=120.0)) == (
         0xD0100000,
         0x02FAF080,

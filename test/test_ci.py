@@ -104,7 +104,7 @@ def test_versions_malformed_frames_and_ump_sysex_keep_explicit_interpretation() 
     assembler = ump.Assembler()
     assembled = []
     for p in ump.packetize_sysex7(group=16, data=wire[1:-1]):
-        assembled.extend(assembler.feed(p))
+        assembled.extend([v.value for v in assembler.feed(p)])
     assert len(assembled) == 1 and isinstance(assembled[0], ump.AssembledData)
     assert ci.decode(messages.SysEx(data=assembled[0].data)) == values()[0]
     with pytest.raises(ValueError):

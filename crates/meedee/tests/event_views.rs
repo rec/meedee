@@ -76,6 +76,46 @@ fn anonymous_controls_preserve_timing_and_require_reset_before_source_changes() 
         Value::Boundary(loss)
     );
 }
+
+#[test]
+fn ump_finish_retains_group_and_last_contributing_timestamp() {
+    let mut assembler = ump::Assembler::new(1024, 2048, 4).unwrap();
+    let packets = ump::packetize_sysex7(3, &(0..20).collect::<Vec<u8>>()).unwrap();
+    let packet = |index: usize, ticks| {
+        Payload::Ump(ump::UmpMessage::SysEx7(packets[index].clone()))
+            .with_timestamp(Timestamp {
+                ticks,
+                clock: Clock::new("capture".into(), 1, 1_000_000_000, "test".into(), None).unwrap(),
+            })
+            .unwrap()
+    };
+    assembler.feed(&packet(0, 10)).unwrap();
+    assembler
+        .feed(&Payload::Ump(ump::UmpMessage::Noop(
+            ump::Noop::new().unwrap(),
+        )))
+        .unwrap();
+    assembler.feed(&packet(1, 20)).unwrap();
+    let out = assembler.finish();
+    assert_eq!(out.len(), 1);
+    assert_eq!(
+        (out[0].group, out[0].first_index, out[0].last_index),
+        (Some(3), Some(0), Some(2))
+    );
+    assert_eq!(out[0].first_timestamp.as_ref().unwrap().ticks, 10);
+    assert_eq!(out[0].last_timestamp.as_ref().unwrap().ticks, 20);
+    assert_eq!(
+        out[0].value,
+        Value::Ump(ump::AssemblyItem::Diagnostic(
+            ump::AssemblyDiagnostic::Truncated
+        ))
+    );
+    assert_eq!(
+        (assembler.active_streams(), assembler.retained_bytes()),
+        (0, 0)
+    );
+    assert!(assembler.finish().is_empty());
+}
 #[test]
 fn timed_controls_retain_only_active_contributors_and_reset_on_loss() {
     let mut view = meedee::controls::ControlInterpreter::new(None).unwrap();
@@ -175,7 +215,7 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
         .unwrap();
     assert_eq!((out[0].first_index, out[0].last_index), (Some(0), Some(1)));
     assert!(matches!(&out[0].value,Value::Velocity(v)if v.velocity==16383));
-    let mut assembler = meedee::ump::EventAssembler::new(1024, 8192, 64).unwrap();
+    let mut assembler = meedee::ump::Assembler::new(1024, 8192, 64).unwrap();
     let packets = ump::packetize_sysex7(2, &[125, 1, 2, 3, 4, 5, 6, 7]).unwrap();
     let mut a = event(
         AnyMessage::NoteOn(
@@ -189,7 +229,7 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
     a = Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone()))
         .with_metadata(a.metadata().unwrap().clone())
         .unwrap();
-    assert!(assembler.feed(&a, None).unwrap().is_empty());
+    assert!(assembler.feed(&a).unwrap().is_empty());
     a = a
         .clone()
         .with_timestamp(Timestamp {
@@ -200,7 +240,7 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
     a = Payload::Ump(ump::UmpMessage::SysEx7(packets[1].clone()))
         .with_metadata(a.metadata().unwrap().clone())
         .unwrap();
-    let out = assembler.feed(&a, None).unwrap();
+    let out = assembler.feed(&a).unwrap();
     assert_eq!(
         (out[0].group, out[0].first_index, out[0].last_index),
         (Some(2), Some(0), Some(1))

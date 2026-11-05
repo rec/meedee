@@ -370,7 +370,7 @@ class ReplyTracker:
         now_ns: int | str,
     ) -> bool: ...
 
-class EventDecoder:
+class Decoder:
     def __init__(self, *, group: int | None = None) -> None: ...
     def feed(
         self, value: messages.Message | events.StreamDiagnostic

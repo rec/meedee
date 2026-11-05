@@ -46,51 +46,69 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
     a.set_sustain(false);
     assert_eq!(a.allocate(62, 100).unwrap().channel(), 2);
     assert!(a.release(v.id(), 64).is_err());
-    let mut t = mpe::Tracker::new(zone);
+    let mut t = mpe::Tracker::new(zone, None).unwrap();
     assert_eq!(t.snapshot(2).unwrap().pitch_bend, None);
     assert_eq!(t.snapshot(2).unwrap().sustain, None);
     for note in [60, 60, 64] {
-        t.feed(&AnyMessage::NoteOn(
-            NoteOn::new(note)
-                .and_then(|m| m.with_velocity(100))
-                .and_then(|m| m.with_channel(2))
-                .unwrap(),
+        t.feed(&meedee::events::Payload::Midi1(
+            (AnyMessage::NoteOn(
+                NoteOn::new(note)
+                    .and_then(|m| m.with_velocity(100))
+                    .and_then(|m| m.with_channel(2))
+                    .unwrap(),
+            ))
+            .clone(),
         ))
         .unwrap();
     }
     assert!(t.snapshot(2).unwrap().ambiguous);
-    t.feed(&AnyMessage::ControlChange(
-        ControlChange::new(64, 127)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
+    t.feed(&meedee::events::Payload::Midi1(
+        (AnyMessage::ControlChange(
+            ControlChange::new(64, 127)
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        ))
+        .clone(),
     ))
     .unwrap();
-    t.feed(&AnyMessage::ControlChange(
-        ControlChange::new(123, 0)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
+    t.feed(&meedee::events::Payload::Midi1(
+        (AnyMessage::ControlChange(
+            ControlChange::new(123, 0)
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        ))
+        .clone(),
     ))
     .unwrap();
     assert_eq!(t.snapshot(2).unwrap().sustain, Some(true));
     assert_eq!(t.snapshot(2).unwrap().notes[0].sustained, 2);
-    t.feed(&AnyMessage::ControlChange(
-        ControlChange::new(64, 0)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
+    t.feed(&meedee::events::Payload::Midi1(
+        (AnyMessage::ControlChange(
+            ControlChange::new(64, 0)
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        ))
+        .clone(),
     ))
     .unwrap();
     assert!(t.snapshot(2).unwrap().notes.is_empty());
-    t.feed(&AnyMessage::NoteOn(
-        NoteOn::new(60)
-            .and_then(|m| m.with_velocity(100))
-            .and_then(|m| m.with_channel(2))
-            .unwrap(),
+    t.feed(&meedee::events::Payload::Midi1(
+        (AnyMessage::NoteOn(
+            NoteOn::new(60)
+                .and_then(|m| m.with_velocity(100))
+                .and_then(|m| m.with_channel(2))
+                .unwrap(),
+        ))
+        .clone(),
     ))
     .unwrap();
-    t.feed(&AnyMessage::ControlChange(
-        ControlChange::new(120, 0)
-            .and_then(|m| m.with_channel(1))
-            .unwrap(),
+    t.feed(&meedee::events::Payload::Midi1(
+        (AnyMessage::ControlChange(
+            ControlChange::new(120, 0)
+                .and_then(|m| m.with_channel(1))
+                .unwrap(),
+        ))
+        .clone(),
     ))
     .unwrap();
     assert!(t.snapshot(2).unwrap().notes.is_empty());
@@ -152,17 +170,25 @@ fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
 #[test]
 fn timecode_sequence_lock_requires_continuity_and_expires_without_extrapolation() {
     use timecode::*;
-    let mut a = Assembler::new(100).unwrap();
+    let mut a = Assembler::new(100, None).unwrap();
     let mut now = 0;
     for frame in [0, 2] {
         let n = [frame, 0, 0, 0, 0, 0, 0, 6];
         for (i, v) in n.into_iter().enumerate() {
             let r = a
-                .feed(&QuarterFrame::new(i as i64, v).unwrap(), now)
+                .feed(
+                    &meedee::events::Payload::Midi1(AnyMessage::QuarterFrame(
+                        QuarterFrame::new(i as i64, v).unwrap(),
+                    )),
+                    now,
+                )
                 .unwrap();
             now += 1;
             if i == 7 {
-                let o = r.observation.unwrap();
+                let meedee::events::ObservationValue::Timecode(v) = &r[0].value else {
+                    panic!("timecode expected")
+                };
+                let o = v.observation.as_ref().unwrap();
                 assert_eq!(o.encoded.frames(), frame as u8);
                 assert_eq!(o.compensated.frames(), frame as u8 + 2);
                 assert_eq!(o.locked, frame == 2);
@@ -170,7 +196,9 @@ fn timecode_sequence_lock_requires_continuity_and_expires_without_extrapolation(
         }
     }
     assert!(a.locked());
-    assert_eq!(a.poll(115).unwrap(), Some(AssemblyDiagnostic::Timeout));
+    assert!(
+        matches!(&a.poll(115).unwrap()[0].value, meedee::events::ObservationValue::Timecode(v) if v.diagnostic == Some(AssemblyDiagnostic::Timeout))
+    );
     assert!(!a.locked());
     assert!(a.poll(114).is_err());
     let p = Position::new(FrameRate::DropFrame30, 0, 0, 59, 29).unwrap();

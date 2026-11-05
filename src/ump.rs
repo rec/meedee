@@ -388,41 +388,6 @@ impl AssembledData {
         hash(&self.value)
     }
 }
-#[pyclass(module = "meedee.ump")]
-struct Assembler {
-    value: model::Assembler,
-}
-#[pymethods]
-impl Assembler {
-    #[new]
-    #[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]
-    fn new(
-        #[pyo3(from_py_with=crate::units::bytes)] message_limit: usize,
-        #[pyo3(from_py_with=crate::units::bytes)] total_limit: usize,
-        #[pyo3(from_py_with=limit)] max_streams: usize,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            value: model::Assembler::new(message_limit, total_limit, max_streams).map_err(error)?,
-        })
-    }
-    #[getter]
-    fn retained_bytes(&self) -> usize {
-        self.value.retained_bytes()
-    }
-    #[getter]
-    fn active_streams(&self) -> usize {
-        self.value.active_streams()
-    }
-    fn feed(&mut self, py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
-        assembly_outputs(py, self.value.feed(&extract(message)?))
-    }
-    fn finish(&mut self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
-        assembly_outputs(py, self.value.finish())
-    }
-    fn reset(&mut self) {
-        self.value.reset();
-    }
-}
 pub(crate) fn assembly_outputs(
     py: Python<'_>,
     values: Vec<model::AssemblyItem>,
@@ -538,7 +503,7 @@ fn register_packets(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<DataKind>()?;
     module.add_class::<AssembledData>()?;
     module.add_class::<AssemblyDiagnostic>()?;
-    module.add_class::<Assembler>()?;
+
     module.add_class::<TranslationStatus>()?;
     module.add_class::<Translation>()?;
     module.add_class::<Capabilities>()?;
@@ -580,13 +545,7 @@ pub(crate) fn boolean(v: &Bound<'_, PyAny>) -> PyResult<bool> {
     }
     v.extract()
 }
-fn limit(v: &Bound<'_, PyAny>) -> PyResult<usize> {
-    let n = int(v)?;
-    if n <= 0 {
-        return Err(PyValueError::new_err("limit must be positive"));
-    }
-    usize::try_from(n).map_err(|_| PyValueError::new_err("limit too large"))
-}
+
 fn words(v: &Bound<'_, PyAny>, max: usize) -> PyResult<Vec<u32>> {
     if !v.is_exact_instance_of::<PyTuple>() && !v.is_exact_instance_of::<PyList>() {
         return Err(PyTypeError::new_err(

@@ -104,7 +104,7 @@ immutable `messages.Message` or `events.StreamDiagnostic`. Messages carry option
 `timestamp`, `stream` and `span` fields directly. `replace()` and `transpose()`
 preserve this metadata; equality and hashing compare MIDI content only.
 Optional `ControlInterpreter`,
-`VelocityInterpreter`, `EventTracker`, `EventDecoder` and `EventAssembler`
+`VelocityInterpreter`, `Tracker`, tuning `Decoder` and the timecode/UMP `Assembler` classes
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views
 are source-scoped; UMP-to-MIDI-1 interpretation requires an explicit group.
 

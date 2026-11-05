@@ -181,7 +181,12 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     let mut a = Assembler::new(1024, 2048, 4).unwrap();
     let mut out = vec![];
     for p in packets {
-        out.extend(a.feed(&UmpMessage::SysEx7(p)));
+        out.extend(assembly_values(
+            a.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::SysEx7(p)).clone(),
+            ))
+            .unwrap(),
+        ));
     }
     let [AssemblyItem::Data(v)] = out.as_slice() else {
         panic!("expected one payload")
@@ -190,25 +195,52 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     assert_eq!(a.retained_bytes(), 0);
     let s1 = packetize_sysex8(1, 1, &[255; 20]).unwrap();
     let s2 = packetize_sysex8(1, 2, &[128; 14]).unwrap();
-    assert!(a.feed(&UmpMessage::SysEx8(s1[0].clone())).is_empty());
-    assert!(a.feed(&UmpMessage::SysEx8(s2[0].clone())).is_empty());
+    assert!(assembly_values(
+        a.feed(&meedee::events::Payload::Ump(
+            (UmpMessage::SysEx8(s1[0].clone())).clone()
+        ))
+        .unwrap()
+    )
+    .is_empty());
+    assert!(assembly_values(
+        a.feed(&meedee::events::Payload::Ump(
+            (UmpMessage::SysEx8(s2[0].clone())).clone()
+        ))
+        .unwrap()
+    )
+    .is_empty());
     assert_eq!(a.active_streams(), 2);
     assert_eq!(
-        a.feed(&UmpMessage::SysEx8(
-            SysEx8Packet::new(1, 3, 1, vec![], true).unwrap()
-        )),
+        assembly_values(
+            a.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::SysEx8(SysEx8Packet::new(1, 3, 1, vec![], true).unwrap())).clone()
+            ))
+            .unwrap()
+        ),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::Aborted)]
     );
-    let r = a.feed(&UmpMessage::SysEx8(s2[1].clone()));
+    let r = assembly_values(
+        a.feed(&meedee::events::Payload::Ump(
+            (UmpMessage::SysEx8(s2[1].clone())).clone(),
+        ))
+        .unwrap(),
+    );
     assert!(matches!(&r[0],AssemblyItem::Data(v) if v.data==[128;14]));
     assert_eq!(a.active_streams(), 0);
-    a.feed(&UmpMessage::SysEx7(
-        SysEx7Packet::new(1, 1, vec![1]).unwrap(),
-    ));
+    assembly_values(
+        a.feed(&meedee::events::Payload::Ump(
+            (UmpMessage::SysEx7(SysEx7Packet::new(1, 1, vec![1]).unwrap())).clone(),
+        ))
+        .unwrap(),
+    );
     let clock = UmpMessage::Midi1(
         Midi1Packet::new(1, AnyMessage::TimingClock(TimingClock::new().unwrap())).unwrap(),
     );
-    assert!(a.feed(&clock).is_empty());
+    assert!(assembly_values(
+        a.feed(&meedee::events::Payload::Ump((clock).clone()))
+            .unwrap()
+    )
+    .is_empty());
     assert_eq!(a.active_streams(), 1);
     let on = UmpMessage::NoteOn(
         meedee::messages::NoteOn::new_midi2(60)
@@ -220,32 +252,48 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
             .unwrap(),
     );
     assert_eq!(
-        a.feed(&on),
+        assembly_values(a.feed(&meedee::events::Payload::Ump((on).clone())).unwrap()),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::Interrupted)]
     );
     let mut bounded = Assembler::new(4, 4, 1).unwrap();
     let start = UmpMessage::SysEx7(SysEx7Packet::new(1, 1, vec![1; 4]).unwrap());
-    bounded.feed(&start);
+    assembly_values(
+        bounded
+            .feed(&meedee::events::Payload::Ump((start).clone()))
+            .unwrap(),
+    );
     assert_eq!(bounded.retained_bytes(), 4);
     assert_eq!(
-        bounded.feed(&UmpMessage::SysEx8(
-            SysEx8Packet::new(2, 1, 0, vec![1], false).unwrap()
-        )),
+        assembly_values(
+            bounded
+                .feed(&meedee::events::Payload::Ump(
+                    (UmpMessage::SysEx8(SysEx8Packet::new(2, 1, 0, vec![1], false).unwrap()))
+                        .clone()
+                ))
+                .unwrap()
+        ),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::StreamLimit)]
     );
     assert_eq!(
-        bounded.feed(&UmpMessage::SysEx7(
-            SysEx7Packet::new(1, 2, vec![1]).unwrap()
-        )),
+        assembly_values(
+            bounded
+                .feed(&meedee::events::Payload::Ump(
+                    (UmpMessage::SysEx7(SysEx7Packet::new(1, 2, vec![1]).unwrap())).clone()
+                ))
+                .unwrap()
+        ),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::PayloadLimit)]
     );
     assert_eq!(bounded.retained_bytes(), 0);
-    assert!(bounded
-        .feed(&UmpMessage::SysEx7(
-            SysEx7Packet::new(1, 3, vec![]).unwrap()
-        ))
-        .is_empty());
-    assert!(bounded.finish().is_empty());
+    assert!(assembly_values(
+        bounded
+            .feed(&meedee::events::Payload::Ump(
+                (UmpMessage::SysEx7(SysEx7Packet::new(1, 3, vec![]).unwrap())).clone()
+            ))
+            .unwrap()
+    )
+    .is_empty());
+    assert!(assembly_values(bounded.finish()).is_empty());
 }
 #[test]
 fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() {
@@ -254,7 +302,12 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
     let packets = packetize_flex_text(16, Some(16), 1, 0, text).unwrap();
     let mut result = vec![];
     for p in packets {
-        result.extend(a.feed(&UmpMessage::FlexData(p)));
+        result.extend(assembly_values(
+            a.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::FlexData(p)).clone(),
+            ))
+            .unwrap(),
+        ));
     }
     let [AssemblyItem::Data(v)] = result.as_slice() else {
         panic!("expected text")
@@ -263,7 +316,12 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
     assert_eq!(v.channel, Some(16));
     let mut result = vec![];
     for p in packetize_stream_text(18, Some(31), text).unwrap() {
-        result.extend(a.feed(&UmpMessage::Stream(p)));
+        result.extend(assembly_values(
+            a.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::Stream(p)).clone(),
+            ))
+            .unwrap(),
+        ));
     }
     let [AssemblyItem::Data(v)] = result.as_slice() else {
         panic!("expected stream text")
@@ -276,7 +334,12 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
     assert!(packetize_flex_text(1, None, 1, 0, &"x".repeat(385)).is_err());
     let bad = FlexData::new(1, 0, None, 1, 0, vec![0xff000000, 0, 0]).unwrap();
     assert_eq!(
-        a.feed(&UmpMessage::FlexData(bad)),
+        assembly_values(
+            a.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::FlexData(bad)).clone()
+            ))
+            .unwrap()
+        ),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::MalformedText)]
     );
 }
@@ -369,23 +432,42 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
         }
         let packet = decode(&words, true).unwrap();
         assert_eq!(encode(&packet).unwrap(), words);
-        assembler.feed(&packet);
+        assembly_values(
+            assembler
+                .feed(&meedee::events::Payload::Ump((packet).clone()))
+                .unwrap(),
+        );
         assert!(assembler.retained_bytes() <= 64);
         assert!(assembler.active_streams() <= 2);
     }
-    assembler.finish();
+    assembly_values(assembler.finish());
     assert_eq!(assembler.retained_bytes(), 0);
     assert_eq!(assembler.active_streams(), 0);
     let mut text = Assembler::new(1024, 2048, 4).unwrap();
     let start = FlexData::new(1, 1, None, 1, 0, vec![0x61616161; 3]).unwrap();
-    text.feed(&UmpMessage::FlexData(start));
+    assembly_values(
+        text.feed(&meedee::events::Payload::Ump(
+            (UmpMessage::FlexData(start)).clone(),
+        ))
+        .unwrap(),
+    );
     let cont = FlexData::new(1, 2, None, 1, 0, vec![0x61616161; 3]).unwrap();
     for _ in 0..31 {
-        text.feed(&UmpMessage::FlexData(cont.clone()));
+        assembly_values(
+            text.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::FlexData(cont.clone())).clone(),
+            ))
+            .unwrap(),
+        );
     }
     let end = FlexData::new(1, 3, None, 1, 0, vec![0; 3]).unwrap();
     assert_eq!(
-        text.feed(&UmpMessage::FlexData(end)),
+        assembly_values(
+            text.feed(&meedee::events::Payload::Ump(
+                (UmpMessage::FlexData(end)).clone()
+            ))
+            .unwrap()
+        ),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::TooManyPackets)]
     );
     for bend in -8192..=8191 {
@@ -421,4 +503,14 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
     assert!(
         matches!(&to_midi1(&zero,true).unwrap().messages[0],AnyMessage::NoteOn(v) if v.velocity()==1)
     );
+}
+
+fn assembly_values(observations: Vec<meedee::events::Observation>) -> Vec<AssemblyItem> {
+    observations
+        .into_iter()
+        .map(|v| match v.value {
+            meedee::events::ObservationValue::Ump(v) => v,
+            _ => panic!("UMP observation expected"),
+        })
+        .collect()
 }

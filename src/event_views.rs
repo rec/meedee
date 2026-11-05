@@ -134,38 +134,48 @@ struct Velocity {
     value: meedee::controls::VelocityInterpreter,
 }
 view_methods!(Velocity, true;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::VelocityInterpreter::new(selected(group)?).map_err(error)?})}});
-#[pyclass(name = "EventTracker", module = "meedee.mpe")]
+#[pyclass(name = "Tracker", module = "meedee.mpe")]
 struct Mpe {
-    value: meedee::mpe::EventTracker,
+    value: meedee::mpe::Tracker,
 }
-view_methods!(Mpe, false;{
-#[new]#[pyo3(signature=(*,zone,group=None))]fn new(zone:&Bound<'_,PyAny>,group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{let meedee::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)?else{return Err(PyTypeError::new_err("ZoneConfiguration required"));};Ok(Self{value:meedee::mpe::EventTracker::new(zone,selected(group)?).map_err(error)?})}
+view_methods!(Mpe, true;{
+#[pyo3(signature=(*,zone))] fn configure(&mut self, zone: &Bound<'_,PyAny>) -> PyResult<()> { let meedee::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)? else { return Err(PyTypeError::new_err("ZoneConfiguration required")); }; self.value.configure(zone); Ok(()) }
+
+#[new]#[pyo3(signature=(*,zone,group=None))]fn new(zone:&Bound<'_,PyAny>,group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{let meedee::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)?else{return Err(PyTypeError::new_err("ZoneConfiguration required"));};Ok(Self{value:meedee::mpe::Tracker::new(zone,selected(group)?).map_err(error)?})}
 #[pyo3(signature=(*,channel))]fn snapshot(&self,py:Python<'_>,channel:&Bound<'_,PyAny>)->PyResult<Py<PyAny>>{value_object(py,Value::Mpe(self.value.snapshot(crate::messages::integer(channel,"channel")?).map_err(|e|PyValueError::new_err(e.to_string()))?))}
 });
-#[pyclass(name = "EventAssembler", module = "meedee.ump")]
+#[pyclass(name = "Assembler", module = "meedee.ump")]
 struct Ump {
-    value: meedee::ump::EventAssembler,
+    value: meedee::ump::Assembler,
 }
-view_methods!(Ump, false;{#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:meedee::ump::EventAssembler::new(message_limit,total_limit,max_streams).map_err(error)?})}});
-#[pyclass(name = "EventDecoder", module = "meedee.tuning")]
+view_methods!(Ump, false;{
+#[getter] fn retained_bytes(&self)->usize {self.value.retained_bytes()}
+#[getter] fn active_streams(&self)->usize {self.value.active_streams()}
+fn finish(&mut self)->Vec<Observation> {output(self.value.finish())}
+#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:meedee::ump::Assembler::new(message_limit,total_limit,max_streams).map_err(error)?})}});
+#[pyclass(name = "Decoder", module = "meedee.tuning")]
 struct Tuning {
-    value: meedee::tuning::EventDecoder,
+    value: meedee::tuning::Decoder,
 }
 view_methods!(Tuning, false;{
-#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::tuning::EventDecoder::new(selected(group)?).map_err(error)?})}
-fn feed_assembled(&mut self,observation:PyRef<'_,Observation>)->PyResult<Vec<Observation>>{Ok(output(self.value.assembled(&observation.value).map_err(error)?))}
+#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::tuning::Decoder::new(selected(group)?).map_err(error)?})}
+fn feed_assembled(&mut self,observation:PyRef<'_,Observation>)->PyResult<Vec<Observation>>{Ok(output(self.value.feed_assembled(&observation.value).map_err(error)?))}
 });
-#[pyclass(name = "EventAssembler", module = "meedee.timecode")]
+#[pyclass(name = "Assembler", module = "meedee.timecode")]
 struct Timecode {
-    value: meedee::timecode::EventAssembler,
+    value: meedee::timecode::Assembler,
 }
 #[pymethods]
 impl Timecode {
+    #[getter]
+    fn locked(&self) -> bool {
+        self.value.locked()
+    }
     #[new]
     #[pyo3(signature=(*,timeout,group=None))]
     fn new(timeout: &Bound<'_, PyAny>, group: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
         Ok(Self {
-            value: meedee::timecode::EventAssembler::new(
+            value: meedee::timecode::Assembler::new(
                 crate::units::duration(timeout)?,
                 selected(group)?,
             )
@@ -182,7 +192,7 @@ impl Timecode {
             &mut self.value,
             value,
             Some(crate::units::nanoseconds(now_ns)?),
-            false,
+            true,
         )
     }
     #[pyo3(signature=(*,now_ns))]

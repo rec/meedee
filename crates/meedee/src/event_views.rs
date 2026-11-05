@@ -4,7 +4,7 @@ use crate::{
     controls,
     events::{Clock, Payload, Timestamp},
     file_io::invalid,
-    live::{Diagnostic, DiagnosticKind},
+    live::Diagnostic,
     messages::{AnyMessage, SysEx},
     mpe, timecode, tuning, ump, velocity,
 };
@@ -123,15 +123,15 @@ impl Context {
         let retained = retained.into_iter().collect::<BTreeSet<_>>();
         self.markers.retain(|i, _| retained.contains(i));
     }
-    fn clock_change(&self, event: &Payload, index: usize, group: Option<u8>) -> Observation {
+    fn state_reset(&self, index: usize, group: Option<u8>) -> Observation {
         self.observation(
-            Value::Boundary(Diagnostic {
-                stream: event.stream().unwrap_or_default().to_owned(),
-                packet: event.span().map_or(index as u64, |s| s.last_packet),
-                kind: DiagnosticKind::ClockChange,
-                lost: 0,
-                reason: "observed clock generation changed; view state reset".into(),
-            }),
+            Value::Control(controls::Observation::Diagnostic(controls::Diagnostic {
+                kind: controls::DiagnosticKind::StateReset,
+                channel: None,
+                controller: None,
+                first_index: index,
+                last_index: index,
+            })),
             group,
             None,
             Some(index),
@@ -344,14 +344,29 @@ impl View for VelocityInterpreter {
 }
 pub struct Mpe {
     context: Context,
-    state: mpe::Tracker,
+    state: mpe::TrackerState,
     group: Option<u8>,
 }
 impl Mpe {
+    pub fn configure(&mut self, zone: mpe::ZoneConfiguration) {
+        self.state.configure(zone);
+        self.context.reset();
+    }
+
+    pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
+        View::feed(self, message, None)
+    }
+    pub fn feed_diagnostic(&mut self, diagnostic: &Diagnostic) -> io::Result<Vec<Observation>> {
+        View::boundary(self, diagnostic)
+    }
+    pub fn reset(&mut self) {
+        View::reset(self);
+    }
+
     pub fn new(zone: mpe::ZoneConfiguration, selected: Option<u8>) -> io::Result<Self> {
         Ok(Self {
             context: Context::default(),
-            state: mpe::Tracker::new(zone),
+            state: mpe::TrackerState::new(zone),
             group: group(selected)?,
         })
     }
@@ -362,11 +377,11 @@ impl Mpe {
 impl View for Mpe {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event, false)?;
+        let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
-            out.push(self.context.clock_change(event, index, self.group));
+            out.push(self.context.state_reset(index, self.group));
         }
         if let Some(message) = message.as_deref() {
             if resets(message) {
@@ -401,13 +416,40 @@ impl View for Mpe {
 }
 pub struct Ump {
     context: Context,
-    state: ump::Assembler,
+    state: ump::AssemblyState,
 }
 impl Ump {
+    pub fn retained_bytes(&self) -> usize {
+        self.state.retained_bytes()
+    }
+    pub fn active_streams(&self) -> usize {
+        self.state.active_streams()
+    }
+    pub fn finish(&mut self) -> Vec<Observation> {
+        let out = self
+            .state
+            .finish_spanned()
+            .into_iter()
+            .map(|(v, g, a, b)| self.context.observation(Value::Ump(v), g, Some(a), Some(b)))
+            .collect();
+        self.context.prune(vec![]);
+        out
+    }
+
+    pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
+        View::feed(self, message, None)
+    }
+    pub fn feed_diagnostic(&mut self, diagnostic: &Diagnostic) -> io::Result<Vec<Observation>> {
+        View::boundary(self, diagnostic)
+    }
+    pub fn reset(&mut self) {
+        View::reset(self);
+    }
+
     pub fn new(message_limit: usize, total_limit: usize, max_streams: usize) -> io::Result<Self> {
         Ok(Self {
             context: Context::default(),
-            state: ump::Assembler::new(message_limit, total_limit, max_streams)
+            state: ump::AssemblyState::new(message_limit, total_limit, max_streams)
                 .map_err(|e| invalid(0, e))?,
         })
     }
@@ -417,11 +459,11 @@ impl View for Ump {
         let Payload::Ump(message) = &event else {
             return Err(invalid(0, "UMP events required"));
         };
-        let (index, changed) = self.context.event(event, false)?;
+        let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
-            out.push(self.context.clock_change(event, index, None));
+            out.push(self.context.state_reset(index, None));
         }
         for (value, first, last) in self.state.feed_spanned(message) {
             let group = if let ump::AssemblyItem::Data(v) = &value {
@@ -457,13 +499,23 @@ pub struct Tuning {
     group: Option<u8>,
 }
 impl Tuning {
+    pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
+        View::feed(self, message, None)
+    }
+    pub fn feed_diagnostic(&mut self, diagnostic: &Diagnostic) -> io::Result<Vec<Observation>> {
+        View::boundary(self, diagnostic)
+    }
+    pub fn reset(&mut self) {
+        View::reset(self);
+    }
+
     pub fn new(selected: Option<u8>) -> io::Result<Self> {
         Ok(Self {
             context: Context::default(),
             group: group(selected)?,
         })
     }
-    pub fn assembled(&mut self, observation: &Observation) -> io::Result<Vec<Observation>> {
+    pub fn feed_assembled(&mut self, observation: &Observation) -> io::Result<Vec<Observation>> {
         let Value::Ump(ump::AssemblyItem::Data(data)) = &observation.value else {
             return Err(invalid(0, "assembled SysEx7 observation required"));
         };
@@ -471,55 +523,50 @@ impl Tuning {
             return Err(invalid(0, "select the assembled SysEx7 group explicitly"));
         }
         let sysex = SysEx::new(data.data.clone()).map_err(|e| invalid(0, e))?;
-        let Some(value) = tuning::decode(&sysex).map_err(|e| invalid(0, e))? else {
-            return Ok(vec![]);
-        };
-        if self
-            .context
-            .stream
-            .as_ref()
-            .is_some_and(|s| Some(s) != observation.stream.as_ref())
-        {
-            return Err(invalid(0, "another source requires reset"));
+        let value = tuning::decode(&sysex).map_err(|e| invalid(0, e))?;
+        let event = Payload::Midi1(AnyMessage::SysEx(sysex))
+            .with_metadata(crate::messages::Metadata {
+                stream: observation.stream.clone(),
+                timestamp: observation
+                    .last_timestamp
+                    .clone()
+                    .or_else(|| observation.first_timestamp.clone()),
+                span: None,
+            })
+            .map_err(|e| invalid(0, e))?;
+        let (index, changed) = self.context.event(&event, true)?;
+        let mut out = Vec::new();
+        if changed {
+            out.push(self.context.state_reset(index, self.group));
         }
-        self.context.stream = observation.stream.clone();
-        self.context.bound = true;
-        let mut out = observation.clone();
-        out.value = Value::Tuning(Box::new(value));
-        Ok(vec![out])
+        if let Some(value) = value {
+            let mut decoded = observation.clone();
+            decoded.value = Value::Tuning(Box::new(value));
+            out.push(decoded);
+        }
+        self.context.prune(vec![]);
+        Ok(out)
     }
 }
 impl View for Tuning {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event, false)?;
+        let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
-            out.push(self.context.clock_change(event, index, self.group));
+            out.push(self.context.state_reset(index, self.group));
         }
         if let Some(AnyMessage::SysEx(s)) = message.as_deref() {
-            match tuning::decode(s) {
-                Ok(Some(v)) => out.push(self.context.observation(
+            if let Some(v) = tuning::decode(s).map_err(|e| invalid(0, e))? {
+                out.push(self.context.observation(
                     Value::Tuning(Box::new(v)),
                     self.group,
                     Some(index),
                     Some(index),
-                )),
-                Ok(None) => {}
-                Err(e) => out.push(self.context.observation(
-                    Value::Boundary(Diagnostic {
-                        stream: event.stream().unwrap_or_default().to_owned(),
-                        packet: event.span().map_or(index as u64, |s| s.last_packet),
-                        kind: DiagnosticKind::Malformed,
-                        lost: 0,
-                        reason: e.to_string(),
-                    }),
-                    self.group,
-                    Some(index),
-                    Some(index),
-                )),
+                ));
             }
         }
+
         self.context.prune(vec![]);
         Ok(out)
     }
@@ -538,14 +585,27 @@ impl View for Tuning {
 }
 pub struct Timecode {
     context: Context,
-    state: timecode::Assembler,
+    state: timecode::TimecodeState,
     group: Option<u8>,
 }
 impl Timecode {
+    pub fn locked(&self) -> bool {
+        self.state.locked()
+    }
+    pub fn feed(&mut self, message: &Payload, now_ns: u64) -> io::Result<Vec<Observation>> {
+        View::feed(self, message, Some(now_ns))
+    }
+    pub fn feed_diagnostic(&mut self, diagnostic: &Diagnostic) -> io::Result<Vec<Observation>> {
+        View::boundary(self, diagnostic)
+    }
+    pub fn reset(&mut self) {
+        View::reset(self);
+    }
+
     pub fn new(timeout: u64, selected: Option<u8>) -> io::Result<Self> {
         Ok(Self {
             context: Context::default(),
-            state: timecode::Assembler::new(timeout).map_err(|e| invalid(0, e))?,
+            state: timecode::TimecodeState::new(timeout).map_err(|e| invalid(0, e))?,
             group: group(selected)?,
         })
     }
@@ -573,11 +633,11 @@ impl View for Timecode {
     fn feed(&mut self, event: &Payload, now: Option<u64>) -> io::Result<Vec<Observation>> {
         let now = now.ok_or_else(|| invalid(0, "MTC view needs explicit monotonic now_ns"))?;
         let message = midi1(event, self.group)?;
-        let (index, changed) = self.context.event(event, false)?;
+        let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
-            out.push(self.context.clock_change(event, index, self.group));
+            out.push(self.context.state_reset(index, self.group));
         }
         let (value, complete_single) = match message.as_deref() {
             Some(AnyMessage::QuarterFrame(v)) => (
@@ -595,8 +655,15 @@ impl View for Timecode {
                 }
             }
             Some(v) if resets(v) => {
+                self.state.poll(now).map_err(|e| invalid(0, e))?;
                 self.state.reset();
-                (None, false)
+                (
+                    Some(timecode::AssemblyResult {
+                        observation: None,
+                        diagnostic: Some(timecode::AssemblyDiagnostic::Reset),
+                    }),
+                    true,
+                )
             }
             _ => (None, false),
         };

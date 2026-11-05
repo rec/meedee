@@ -433,48 +433,11 @@ frozen!(ChannelState;channel,notes,pitch_bend,pressure,timbre,sustain,ambiguous;
         self.value.ambiguous
     }
 });
-#[pyclass(module = "meedee.mpe")]
-struct Tracker {
-    value: mpe_model::Tracker,
-}
-#[pymethods]
-impl Tracker {
-    #[new]
-    #[pyo3(signature=(*,zone))]
-    fn new(zone: PyRef<'_, mpe::ZoneConfiguration>) -> Self {
-        Self {
-            value: mpe_model::Tracker::new(zone.value.clone()),
-        }
-    }
-    #[pyo3(signature=(*,zone))]
-    fn configure(&mut self, zone: PyRef<'_, mpe::ZoneConfiguration>) {
-        self.value.configure(zone.value.clone());
-    }
-    fn reset(&mut self) {
-        self.value.reset();
-    }
-    fn feed(&mut self, message: &Bound<'_, PyAny>) -> PyResult<Vec<ChannelState>> {
-        Ok(self
-            .value
-            .feed(&messages::extract_primitive(message)?)
-            .map_err(value_error)?
-            .into_iter()
-            .map(|value| ChannelState { value })
-            .collect())
-    }
-    #[pyo3(signature=(*,channel))]
-    fn snapshot(&self, channel: &Bound<'_, PyAny>) -> PyResult<ChannelState> {
-        Ok(ChannelState {
-            value: self.value.snapshot(int(channel)?).map_err(value_error)?,
-        })
-    }
-}
 pub(super) fn register_mpe(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Voice>()?;
     module.add_class::<Allocator>()?;
     module.add_class::<NoteState>()?;
     module.add_class::<ChannelState>()?;
-    module.add_class::<Tracker>()?;
     Ok(())
 }
 
@@ -640,72 +603,11 @@ frozen!(AssemblyResult;observation,diagnostic;{
         self.value.diagnostic.map(Into::into)
     }
 });
-#[pyclass(module = "meedee.timecode")]
-struct Assembler {
-    value: tc::Assembler,
-}
-#[pymethods]
-impl Assembler {
-    #[new]
-    #[pyo3(signature=(*,timeout))]
-    fn new(timeout: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self {
-            value: tc::Assembler::new(crate::units::duration(timeout)?).map_err(value_error)?,
-        })
-    }
-    #[getter]
-    fn locked(&self) -> bool {
-        self.value.locked()
-    }
-    fn reset(&mut self) {
-        self.value.reset();
-    }
-    #[pyo3(signature=(*,now_ns))]
-    fn poll(&mut self, now_ns: &Bound<'_, PyAny>) -> PyResult<Option<AssemblyDiagnostic>> {
-        Ok(self
-            .value
-            .poll(crate::units::nanoseconds(now_ns)?)
-            .map_err(value_error)?
-            .map(Into::into))
-    }
-    #[pyo3(signature=(message,*,now_ns))]
-    fn feed(
-        &mut self,
-        message: &Bound<'_, PyAny>,
-        now_ns: &Bound<'_, PyAny>,
-    ) -> PyResult<AssemblyResult> {
-        let now = crate::units::nanoseconds(now_ns)?;
-        let value = if let Ok(v) = message.extract::<PyRef<'_, timecode::FullFrame>>() {
-            self.value.relocate(&v.value, now).map_err(value_error)?
-        } else {
-            match messages::extract_primitive(message)? {
-                meedee::messages::AnyMessage::QuarterFrame(v) => {
-                    self.value.feed(&v, now).map_err(value_error)?
-                }
-                meedee::messages::AnyMessage::SystemReset(_) => {
-                    self.value.poll(now).map_err(value_error)?;
-                    self.value.reset();
-                    tc::AssemblyResult {
-                        observation: None,
-                        diagnostic: Some(tc::AssemblyDiagnostic::Reset),
-                    }
-                }
-                _ => {
-                    return Err(PyTypeError::new_err(
-                        "expected QuarterFrame, FullFrame or SystemReset",
-                    ))
-                }
-            }
-        };
-        Ok(AssemblyResult { value })
-    }
-}
 pub(super) fn register_timecode(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Position>()?;
     module.add_class::<AssemblyDiagnostic>()?;
     module.add_class::<TimecodeObservation>()?;
     module.add_class::<AssemblyResult>()?;
-    module.add_class::<Assembler>()?;
     Ok(())
 }
 pub(super) fn limit(value: &Bound<'_, PyAny>) -> PyResult<usize> {

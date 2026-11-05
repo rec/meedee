@@ -576,3 +576,42 @@ fragments and retains the original diagnostic. Clock changes report `StateReset`
 Call `reset()` before changing source identity, including between anonymous and
 named messages. Use `new(Some(group))` for MIDI 1 inside UMP. These interpreters
 do not interpret native MIDI 2 channel messages.
+
+## Track, assemble and decode with optional provenance
+
+The public owners are `mpe::Tracker`, `ump::Assembler`, `timecode::Assembler` and
+`tuning::Decoder`. Each accepts plain `events::Payload` messages as well as
+messages carrying metadata. `feed` returns observation vectors; source changes
+require `reset()`. Clock changes report `StateReset`, and `feed_diagnostic` clears
+pending state while retaining the original loss report.
+
+```rust
+use meedee::{events::Payload, messages::AnyMessage, mpe, tuning, ump};
+
+let zone = mpe::ZoneConfiguration::new(1, 2)?;
+let mut tracker = mpe::Tracker::new(zone.clone(), None)?;
+println!("{:?}", tracker.snapshot(2)?);
+tracker.configure(zone); // Clears notes, source binding and timing context.
+
+let mut assembler = ump::Assembler::new(1_048_576, 8_388_608, 64)?;
+let packets = ump::packetize_sysex7(2, &(0..20).collect::<Vec<u8>>())?;
+assembler.feed(&Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone())))?;
+println!("{:?}", assembler.finish());
+
+let sysex = meedee::messages::SysEx::new(vec![127, 1, 8, 2, 0, 1, 60, 60, 0, 0])?;
+println!("{:?}", tuning::decode(&sysex)?);
+let mut decoder = tuning::Decoder::new(None)?;
+println!("{:?}", decoder.feed(&Payload::Midi1(AnyMessage::SysEx(sysex)))?);
+```
+
+UMP `finish()` reports each truncated assembly's group and exact contributor range,
+clears pending data and permits further input. `retained_bytes()` and
+`active_streams()` expose current resource use. Tuning `feed_assembled(&observation)`
+decodes completed SysEx7 with its original provenance; `tuning::decode()` remains
+the stateless single-message operation. Both decoding paths return malformed-data errors.
+
+For timecode, construct `timecode::Assembler::new(timeout_ns, group)` and call
+`feed(&message, now_ns)` or `poll(now_ns)` with nondecreasing elapsed host time.
+`locked()` exposes sequence lock. Reset clears assembly and source binding while
+preserving the monotonic host-clock requirement. Complete FullFrame SysEx relocates
+the observed position. Select a group explicitly for MIDI 1 inside UMP.

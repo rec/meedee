@@ -1,5 +1,5 @@
 //! MTC wire values, SMPTE labels and caller-driven quarter-frame sequence lock.
-pub use crate::event_views::Timecode as EventAssembler;
+pub use crate::event_views::Timecode as Assembler;
 use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -230,7 +230,7 @@ pub struct AssemblyResult {
     pub diagnostic: Option<AssemblyDiagnostic>,
 }
 #[derive(Clone, Debug)]
-pub struct Assembler {
+pub(crate) struct TimecodeState {
     timeout_ns: u64,
     last_now: Option<u64>,
     last_input: Option<u64>,
@@ -240,7 +240,7 @@ pub struct Assembler {
     previous: Option<Position>,
     locked: bool,
 }
-impl Assembler {
+impl TimecodeState {
     pub fn new(timeout_ns: u64) -> Result<Self, ValueError> {
         if timeout_ns == 0 {
             return Err(ValueError("timeout_ns must be positive".into()));

@@ -133,12 +133,13 @@ struct Key {
 #[derive(Clone, Debug)]
 struct Pending {
     first_index: usize,
+    last_index: usize,
     data: Vec<u8>,
     packets: usize,
     discard: bool,
 }
 #[derive(Clone, Debug)]
-pub struct Assembler {
+pub(crate) struct AssemblyState {
     message_limit: usize,
     total_limit: usize,
     max_streams: usize,
@@ -148,7 +149,7 @@ pub struct Assembler {
     current_index: usize,
     completed_start: Option<usize>,
 }
-impl Assembler {
+impl AssemblyState {
     pub fn new(
         message_limit: usize,
         total_limit: usize,
@@ -178,16 +179,22 @@ impl Assembler {
         self.pending.clear();
         self.bytes = 0;
     }
-    pub fn finish(&mut self) -> Vec<AssemblyItem> {
-        let count = self.pending.values().filter(|v| !v.discard).count();
+    pub(crate) fn finish_spanned(&mut self) -> Vec<(AssemblyItem, Option<u8>, usize, usize)> {
+        let out = self
+            .pending
+            .iter()
+            .filter(|(_, v)| !v.discard)
+            .map(|(k, v)| {
+                (
+                    AssemblyItem::Diagnostic(AssemblyDiagnostic::Truncated),
+                    k.group,
+                    v.first_index,
+                    v.last_index,
+                )
+            })
+            .collect();
         self.reset();
-        vec![AssemblyItem::Diagnostic(AssemblyDiagnostic::Truncated); count]
-    }
-    pub fn feed(&mut self, value: &UmpMessage) -> Vec<AssemblyItem> {
-        self.feed_spanned(value)
-            .into_iter()
-            .map(|(v, _, _)| v)
-            .collect()
+        out
     }
     pub fn feed_spanned(&mut self, value: &UmpMessage) -> Vec<(AssemblyItem, usize, usize)> {
         let index = self.next_index;
@@ -207,7 +214,10 @@ impl Assembler {
             .collect()
     }
     pub(crate) fn retained_indexes(&self) -> Vec<usize> {
-        self.pending.values().map(|p| p.first_index).collect()
+        self.pending
+            .values()
+            .flat_map(|p| [p.first_index, p.last_index])
+            .collect()
     }
     fn accept(&mut self, value: &UmpMessage) -> Vec<AssemblyItem> {
         let group = value.group();
@@ -317,6 +327,7 @@ impl Assembler {
                 key.clone(),
                 Pending {
                     first_index: self.current_index,
+                    last_index: self.current_index,
                     data: Vec::new(),
                     packets: 0,
                     discard: false,
@@ -331,6 +342,7 @@ impl Assembler {
         };
         let mut data = data;
         if !pending.discard {
+            pending.last_index = self.current_index;
             pending.packets = pending.packets.saturating_add(1);
             let mut failure = None;
             if text {

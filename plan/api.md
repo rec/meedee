@@ -1805,3 +1805,19 @@ routing propagate errors before handing off encoded words. Python `ump.encode`
 returns its existing tuple of words or raises `ValueError`. Capability and
 assembly classification use the message family/group directly, independently
 of whether a message is ready for wire encoding.
+
+
+### Unified trackers, assemblers and tuning decoder
+
+`mpe.Tracker`, `ump.Assembler`, `timecode.Assembler` and `tuning.Decoder` replace
+the former ordinary/event pairs in Python and Rust. Parsing engines are private.
+Feed methods consistently return observation lists/vectors with optional source
+and contributor timing metadata. Anonymous input is one source; source identity
+changes require reset. Clock changes emit StateReset. Known loss resets pending
+state and retains the original diagnostic. Public reset returns nothing.
+MPE configure clears state, source binding and timing context. UMP finish reports
+per-assembly truncation with group and exact contributor range, clears fragments
+and remains reusable; resource counters remain available. Timecode retains lock
+inspection, full-frame relocation, feed/poll and explicit nondecreasing host time,
+including across resets. Tuning malformed inputs return the same errors through
+Decoder and stateless decode; decode remains the single-SysEx operation.

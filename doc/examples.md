@@ -513,3 +513,72 @@ Clock changes report `StateReset`. Call `reset()` before switching sources,
 including switching between anonymous and named messages. `reset()` returns nothing.
 For MIDI 1 inside UMP, select an explicit `group`; native MIDI 2 interpretation
 is not performed by these interpreters.
+
+## Track MPE notes and expression
+
+Track the first input using a lower MPE zone. The tracker reports observations
+with optional source/timing metadata; `snapshot()` returns current channel state.
+
+```python
+from meedee import midi, mpe
+
+tracker = mpe.Tracker(zone=mpe.ZoneConfiguration(manager_channel=1, members=2))
+for message in midi.Input():
+    for observation in tracker.feed(message):
+        print(observation)
+```
+
+`configure(zone=...)` clears tracked notes, source binding and timing context.
+
+## Assemble UMP and report an unfinished dump
+
+This example receives only the beginning of a synthetic SysEx7 dump. `finish()`
+reports truncation, including group and contributor indexes/timestamps when known.
+It clears pending fragments and leaves the assembler reusable.
+
+```python
+from meedee import ump
+
+assembler = ump.Assembler()
+packets = ump.packetize_sysex7(group=2, data=bytes(range(20)))
+assembler.feed(packets[0])
+print(assembler.finish())
+```
+
+## Decode tuning messages
+
+Use `tuning.decode()` for one complete SysEx message. Use `tuning.Decoder` for
+observation lists with source/timing metadata, including `feed_assembled()` for
+an observation produced by the UMP assembler.
+
+```python
+from meedee import syx, tuning
+
+message = next(syx.Reader("tuning.syx"))
+print(tuning.decode(message))
+print(tuning.Decoder().feed(message))
+```
+
+Both report malformed tuning through the same decoding errors.
+
+## Follow MIDI timecode
+
+Timecode assembly uses an explicit monotonic host clock for its timeout; received
+message timestamps remain provenance. `poll(now_ns=...)` checks for timeout during
+silence, and `locked` reports whether a continuous running sequence was observed.
+
+```python
+from time import monotonic_ns
+from meedee import midi, timecode
+
+assembler = timecode.Assembler(timeout="100 ms")
+for message in midi.Input():
+    for observation in assembler.feed(message, now_ns=monotonic_ns()):
+        print(observation)
+```
+
+All four classes accept anonymous messages, retain metadata when present and
+require `reset()` before changing source identity. Clock changes report
+`StateReset`; known-loss diagnostics reset pending state and retain their details.
+Use an explicit `group` for MIDI 1 interpretation inside UMP. Timecode reset
+preserves the requirement that host time never moves backwards.

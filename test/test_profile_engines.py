@@ -159,7 +159,7 @@ def test_mpe_tracker_keeps_overlap_and_sustain_separate_from_member_expression()
     assert tracker.snapshot(channel=2).sustain is None
     for n in (60, 64, 60):
         tracker.feed(messages.NoteOn(channel=2, note=n, velocity=100))
-    state = tracker.feed(messages.PitchBend(channel=2, value=300))[0]
+    state = tracker.feed(messages.PitchBend(channel=2, value=300))[0].value
     assert state.ambiguous and state.pitch_bend == 300
     assert [(n.note, n.held) for n in state.notes] == [(60, 2), (64, 1)]
     tracker.feed(messages.ControlChange(channel=1, controller=64, value=127))
@@ -177,7 +177,9 @@ def test_mpe_tracker_keeps_overlap_and_sustain_separate_from_member_expression()
     assert state.pitch_bend is state.pressure is state.timbre is state.sustain is None
     tracker.configure(zone=mpe.ZoneConfiguration(manager_channel=16, members=1))
     assert tracker.feed(messages.NoteOn(channel=2, note=60, velocity=100)) == []
-    assert tracker.feed(messages.NoteOn(channel=15, note=60, velocity=100))[0].notes
+    assert tracker.feed(messages.NoteOn(channel=15, note=60, velocity=100))[
+        0
+    ].value.notes
     tracker.feed(messages.SystemReset())
     assert tracker.snapshot(channel=15).notes == []
 
@@ -196,13 +198,21 @@ def test_mtc_lock_requires_continuity_and_expires_at_the_deadline() -> None:
         for q in quarter_cycle(frame):
             result = assembler.feed(q, now_ns=now)
             now += 1
-        assert result is not None and result.observation is not None
+        assert result is not None
+        result = result[0].value
+        assert (
+            isinstance(result, timecode.AssemblyResult)
+            and result.observation is not None
+        )
         assert result.observation.encoded.frames == frame
         assert result.observation.compensated.frames == frame + 2
         assert result.observation.locked == (frame == 2)
     assert assembler.locked
-    assert assembler.poll(now_ns=114) is None
-    assert assembler.poll(now_ns=115) == timecode.AssemblyDiagnostic.Timeout
+    assert assembler.poll(now_ns=114) == []
+    assert (
+        assembler.poll(now_ns=115)[0].value.diagnostic
+        == timecode.AssemblyDiagnostic.Timeout
+    )
     assert not assembler.locked
     with pytest.raises(ValueError):
         assembler.poll(now_ns=114)
@@ -210,6 +220,7 @@ def test_mtc_lock_requires_continuity_and_expires_at_the_deadline() -> None:
         assembler.feed(q, now_ns=116 + i)
     for i, q in enumerate(quarter_cycle(14)):
         result = assembler.feed(q, now_ns=124 + i)
+    result = result[0].value
     assert result.diagnostic == timecode.AssemblyDiagnostic.Discontinuity
     assert not assembler.locked
     assembler.reset()
@@ -217,6 +228,7 @@ def test_mtc_lock_requires_continuity_and_expires_at_the_deadline() -> None:
         for q in quarter_cycle(f, reverse=True):
             now = 200 if now < 200 else now + 1
             result = assembler.feed(q, now_ns=now)
+    result = result[0].value
     assert result.observation is not None and result.observation.locked
     assert (
         result.observation.direction == -1
@@ -234,11 +246,11 @@ def test_mtc_lock_requires_continuity_and_expires_at_the_deadline() -> None:
         now_ns=300,
     )
     assert (
-        relocated.diagnostic == timecode.AssemblyDiagnostic.Relocated
+        relocated[0].value.diagnostic == timecode.AssemblyDiagnostic.Relocated
         and not assembler.locked
     )
     bad = assembler.feed(messages.QuarterFrame(message_type=7, value=8), now_ns=301)
-    assert bad.diagnostic == timecode.AssemblyDiagnostic.Malformed
+    assert bad[0].value.diagnostic == timecode.AssemblyDiagnostic.Malformed
 
 
 def test_drop_frame_advances_skipped_labels_and_wraps_in_both_directions() -> None:

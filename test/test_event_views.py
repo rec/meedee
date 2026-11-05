@@ -177,13 +177,13 @@ def test_group_selection_and_reported_loss_cannot_mix_control_state() -> None:
 
 
 def test_mpe_and_mtc_views_do_not_invent_unobserved_state_or_native_time() -> None:
-    tracker = mpe.EventTracker(zone=mpe.ZoneConfiguration(manager_channel=1, members=2))
+    tracker = mpe.Tracker(zone=mpe.ZoneConfiguration(manager_channel=1, members=2))
     assert tracker.snapshot(channel=2).pitch_bend is None
     observations = tracker.feed(
         event(messages.NoteOn(channel=2, note=60, velocity=100), 1)
     )
     assert observations and isinstance(observations[0].value, mpe.ChannelState)
-    assembler = timecode.EventAssembler(timeout="100 ns")
+    assembler = timecode.Assembler(timeout="100 ns")
     assert (
         assembler.feed(
             event(messages.QuarterFrame(message_type=0, value=0), 10), now_ns=1
@@ -198,7 +198,7 @@ def test_mpe_and_mtc_views_do_not_invent_unobserved_state_or_native_time() -> No
 def test_ump_assembly_and_mts_decode_keep_the_group_and_contributor_span() -> None:
     payload = messages.SysEx(data=bytes([127, 1, 8, 2, 0, 1, 60, 60, 0, 0]))
     packets = ump.packetize_sysex7(group=2, data=payload.data)
-    assembler = ump.EventAssembler()
+    assembler = ump.Assembler()
     observations = [
         o for i, p in enumerate(packets) for o in assembler.feed(event(p, i + 10))
     ]
@@ -207,9 +207,80 @@ def test_ump_assembly_and_mts_decode_keep_the_group_and_contributor_span() -> No
         observations[0].first_timestamp is not None
         and observations[0].first_timestamp.ticks == 10
     )
-    decoded = tuning.EventDecoder(group=2).feed_assembled(observations[0])
+    decoder = tuning.Decoder(group=2)
+    decoded = decoder.feed_assembled(observations[0])
     assert decoded and isinstance(decoded[0].value, tuning.Decoded)
     assert (
         decoded[0].group == 2
         and decoded[0].last_timestamp == observations[0].last_timestamp
     )
+    fresh = ump.Assembler()
+    changed = [
+        o
+        for p in packets
+        for o in fresh.feed(
+            p.replace(
+                stream="s",
+                timestamp=events.Timestamp(
+                    ticks=30, clock=events.Clock(identity="new")
+                ),
+            )
+        )
+    ][0]
+    reset, decoded = decoder.feed_assembled(changed)
+    assert isinstance(reset.value, controls.Diagnostic)
+    assert reset.value.kind == controls.DiagnosticKind.StateReset
+    assert decoded.first_timestamp == changed.first_timestamp
+    assert decoded.last_timestamp == changed.last_timestamp
+
+
+def test_ump_finish_preserves_each_truncated_stream_and_is_reusable() -> None:
+    assembler = ump.Assembler()
+    packets = ump.packetize_sysex7(group=3, data=bytes(range(20)))
+    assembler.feed(event(packets[0], 10))
+    assembler.feed(event(ump.Noop(), 15))
+    assembler.feed(event(packets[1], 20))
+    other = ump.packetize_sysex8(group=4, stream_id=2, data=bytes(range(20)))
+    assembler.feed(event(other[0], 30))
+    result = assembler.finish()
+    assert len(result) == 2
+    assert all(i.value == ump.AssemblyDiagnostic.Truncated for i in result)
+    first = next(i for i in result if i.group == 3)
+    second = next(i for i in result if i.group == 4)
+    assert (first.first_index, first.last_index) == (0, 2)
+    assert first.first_timestamp is not None and first.first_timestamp.ticks == 10
+    assert first.last_timestamp is not None and first.last_timestamp.ticks == 20
+    assert (second.first_index, second.last_index) == (3, 3)
+    assert assembler.active_streams == assembler.retained_bytes == 0
+    assert assembler.finish() == []
+    complete = ump.packetize_sysex7(group=3, data=b"abc")[0]
+    assert isinstance(assembler.feed(event(complete, 40))[0].value, ump.AssembledData)
+
+
+def test_mpe_configuration_clears_source_binding_clock_and_notes() -> None:
+    zone = mpe.ZoneConfiguration(manager_channel=1, members=2)
+    tracker = mpe.Tracker(zone=zone)
+    tracker.feed(event(messages.NoteOn(60, channel=2), 10))
+    with pytest.raises(ValueError, match="source"):
+        tracker.feed(messages.NoteOn(62, channel=2))
+    tracker.configure(zone=zone)
+    assert tracker.snapshot(channel=2).notes == []
+    result = tracker.feed(messages.NoteOn(62, channel=2))
+    assert len(result) == 1 and result[0].stream is None
+    assert isinstance(result[0].value, mpe.ChannelState)
+    assert result[0].value.notes[0].note == 62
+
+
+def test_tuning_decoder_accepts_anonymous_messages_and_preserves_decode_errors() -> (
+    None
+):
+    message = messages.SysEx(data=bytes([127, 1, 8, 2, 0, 1, 60, 60, 0, 0]))
+    result = tuning.Decoder().feed(message)
+    assert len(result) == 1 and result[0].stream is None
+    assert isinstance(result[0].value, tuning.Decoded)
+    assert repr(result[0].value) == repr(tuning.decode(message))
+    malformed = messages.SysEx(data=message.data[:-1])
+    with pytest.raises(ValueError):
+        tuning.decode(malformed)
+    with pytest.raises(ValueError):
+        tuning.Decoder().feed(malformed)

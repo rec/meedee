@@ -2,7 +2,7 @@
 use crate::{
     ci::{BrowseReport, Browser},
     drivers::{self, Receiver, Sender},
-    events::{ObservationValue, Payload, View},
+    events::{ObservationValue, Payload},
     live::Item,
     messages::{AnyMessage, Message, PrimitiveMessage, SysEx},
     midi,
@@ -60,7 +60,7 @@ pub fn run_with(
 ) -> midi::Result<BrowseReport> {
     let route = browser.route().clone();
     let cancel = &options.cancel;
-    let mut assembler = ump::EventAssembler::new(options.message_limit, options.byte_limit, 1)?;
+    let mut assembler = ump::Assembler::new(options.message_limit, options.byte_limit, 1)?;
     let mut queue = VecDeque::from(browser.start(clock.now_ns())?);
     let mut sending = None;
     let result = (|| -> midi::Result<()> {
@@ -139,7 +139,7 @@ pub fn run_with(
                 (Payload::Ump(UmpMessage::SysEx7(packet)), Some(group))
                     if packet.group() == group =>
                 {
-                    for observation in assembler.feed(&message, None)? {
+                    for observation in assembler.feed(&message)? {
                         match observation.value {
                             ObservationValue::Ump(AssemblyItem::Data(data)) => {
                                 queue.extend(browser.feed(

@@ -138,7 +138,7 @@ class Output:
         if not self.answer:
             return
         if isinstance(message, ump.SysEx7Packet):
-            values = self.assembler.feed(message)
+            values = [v.value for v in self.assembler.feed(message)]
             if not values:
                 return
             data = values[0]

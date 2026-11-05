@@ -255,7 +255,7 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
     def receive(message: messages.Message) -> list[ci.Action]:
         for p in packets(message):
             i.inject(p, clock=clock(), timestamp_ns=time.now_ns)
-        assembler = ump.EventAssembler()
+        assembler = ump.Assembler()
         while (item := i.receive()) is not None:
             assert isinstance(item, messages.Message)
             if group is None:

@@ -1,6 +1,6 @@
 //! MIDI Tuning Standard (CA-020/CA-021/RP-020, RP-025/amd1).
 //! No transport, clocks, sleeping, or instrument operations occur here.
-pub use crate::event_views::Tuning as EventDecoder;
+pub use crate::event_views::Tuning as Decoder;
 use crate::messages::{PrimitiveMessage, SysEx, ValueError};
 pub use crate::tuning_query::{Query, QueryReport};
 

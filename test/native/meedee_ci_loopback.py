@@ -19,7 +19,7 @@ def dispatch(session: ci.Session, action: ci.Action, output: midi.Output) -> Non
     session.report_send(token=action.token, sent=True, now_ns=monotonic_ns())
 
 
-def receive(receiver: midi.Input, assembler: ump.EventAssembler) -> messages.SysEx:
+def receive(receiver: midi.Input, assembler: ump.Assembler) -> messages.SysEx:
     while True:
         value = receiver.receive(timeout=3)
         assert isinstance(value, messages.Message), value
@@ -65,7 +65,7 @@ def main() -> None:
         )
         dispatch(a_session, a_session.discover(now_ns=monotonic_ns()), a_out)
         updates = b_session.feed(
-            receive(b, ump.EventAssembler()),
+            receive(b, ump.Assembler()),
             input=b.stream,
             group=1,
             now_ns=monotonic_ns(),
@@ -74,7 +74,7 @@ def main() -> None:
         assert len(replies) == 1
         dispatch(b_session, replies[0], b_out)
         a_session.feed(
-            receive(a, ump.EventAssembler()),
+            receive(a, ump.Assembler()),
             input=a.stream,
             group=1,
             now_ns=monotonic_ns(),
