@@ -71,7 +71,14 @@ impl<T: 'static> Worker<T> {
     }
 }
 
-pub(super) struct CallbackScope(bool);
+pub(crate) fn ensure_control_thread() -> Result<()> {
+    if IN_CALLBACK.get() {
+        Err(Error::CallbackThread)
+    } else {
+        Ok(())
+    }
+}
+pub(crate) struct CallbackScope(bool);
 
 impl CallbackScope {
     pub fn enter() -> Self {

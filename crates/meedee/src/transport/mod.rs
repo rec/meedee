@@ -17,6 +17,7 @@ use std::sync::{Arc, Weak};
 
 use native::{Native, Receiver};
 use worker::Worker;
+pub(crate) use worker::{ensure_control_thread, CallbackScope};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

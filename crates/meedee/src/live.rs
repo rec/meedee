@@ -24,8 +24,8 @@ pub struct Diagnostic {
     pub reason: String,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Item {
-    Message(Box<Payload>),
+pub enum Item<T = Payload> {
+    Message(Box<T>),
     Diagnostic(Diagnostic),
 }
 #[derive(Clone)]

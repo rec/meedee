@@ -1,5 +1,5 @@
 //! In-memory capture with the same records used by file archives and replay.
-use super::Input;
+use super::Core;
 use crate::archive::{Record, Writer};
 use crate::live::{DiagnosticKind, Item};
 use crate::messages::Message;
@@ -23,7 +23,7 @@ impl IntoIterator for Recording {
         self.records.into_iter().map(Ok)
     }
 }
-impl Input {
+impl Core {
     /// Record for elapsed time, closing input and preserving diagnostics in the
     /// result. Setup errors return Err; receive failures become discontinuities.
     /// The duration starts after opening. Closing drains already accepted packets.

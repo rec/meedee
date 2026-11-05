@@ -11,6 +11,7 @@ pub use crate::playback::{
     MonotonicClock, Planned as PlannedEvent, Planner as PlaybackPlan, PlaybackClock,
     Report as PlaybackReport,
 };
+pub use crate::transport::ReceivedPacket;
 use crate::ump::UmpMessage;
 use std::io;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

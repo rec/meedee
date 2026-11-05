@@ -10,6 +10,9 @@ use std::time::{Duration, Instant};
 #[path = "input_recording.rs"]
 mod recording;
 pub use recording::Recording;
+#[path = "input_api.rs"]
+mod api;
+pub use api::{Input, InputErrors};
 
 /// Iterate over messages from the first input, reporting diagnostics to stderr.
 /// No native client is created until discovery or receiving. Drop closes input.
@@ -21,7 +24,7 @@ pub use recording::Recording;
 ///     println!("{message:?}");
 /// }
 /// ```
-pub struct Input {
+pub(super) struct Core {
     options: transport::InputOptions,
     port: Option<String>,
     channels: Option<u16>,
@@ -36,18 +39,23 @@ pub struct Input {
     reported_loss: u64,
     expected: u64,
     closed: bool,
+    raw: bool,
+    native_dropped: u64,
+    raw_pending: VecDeque<io::Result<Item<transport::ReceivedPacket>>>,
+    native_clock: Option<transport::Clock>,
 }
 
 /// Borrowed input iteration that retains decoding diagnostics and terminal errors.
-pub struct InputErrors<'a> {
-    input: &'a mut Input,
+#[cfg(test)]
+struct CoreErrors<'a> {
+    input: &'a mut Core,
 }
-impl Default for Input {
+impl Default for Core {
     fn default() -> Self {
         Self::new()
     }
 }
-impl Input {
+impl Core {
     pub fn new() -> Self {
         Self {
             options: transport::InputOptions::default(),
@@ -64,6 +72,10 @@ impl Input {
             reported_loss: 0,
             expected: 0,
             closed: false,
+            raw: false,
+            native_dropped: 0,
+            raw_pending: VecDeque::new(),
+            native_clock: None,
         }
     }
     pub fn with_channel(self, channel: i64) -> crate::midi::Result<Self> {
@@ -127,29 +139,6 @@ impl Input {
             .ports()
             .map_err(crate::midi::Error::Transport)
     }
-    pub fn connect(mut self, port: &Port) -> crate::midi::Result<Self> {
-        self.open_connection(Some(port), "")?;
-        Ok(self)
-    }
-    /// Create a virtual input with the same decoding, limits and close lifecycle
-    /// as a connected physical input. Unsupported backends return a capability error.
-    pub fn create_virtual(mut self, name: &str) -> crate::midi::Result<Self> {
-        self.open_connection(None, name)?;
-        Ok(self)
-    }
-    /// Receive one decoded message or diagnostic; None means the timeout elapsed.
-    pub fn receive(&mut self, timeout: Option<Duration>) -> crate::midi::Result<Option<Item>> {
-        let deadline = timeout
-            .map(|t| {
-                Instant::now()
-                    .checked_add(t)
-                    .ok_or_else(|| invalid("receive timeout exceeds clock range"))
-            })
-            .transpose()?;
-        self.next_item(deadline)
-            .transpose()
-            .map_err(crate::midi::Error::from)
-    }
     pub fn stream(&mut self) -> crate::midi::Result<&str> {
         if self.closed {
             return Err(invalid("input is closed").into());
@@ -172,7 +161,7 @@ impl Input {
         queued.saturating_add(
             self.connection
                 .as_ref()
-                .map_or(0, |c| c.diagnostics().dropped_packets()),
+                .map_or(self.native_dropped, |c| c.diagnostics().dropped_packets()),
         )
     }
     pub fn check_health(&self) -> crate::midi::Result<()> {
@@ -186,8 +175,9 @@ impl Input {
         }
         Ok(())
     }
-    pub fn with_errors(&mut self) -> InputErrors<'_> {
-        InputErrors { input: self }
+    #[cfg(test)]
+    fn with_errors(&mut self) -> CoreErrors<'_> {
+        CoreErrors { input: self }
     }
     /// Stop native delivery, drain accepted packets and finish partial decoding.
     /// Remaining messages/diagnostics can still be drained by either iterator.
@@ -201,6 +191,7 @@ impl Input {
             let diagnostics = connection.diagnostics();
             let result = connection.close().map(drop).map_err(transport_error);
             lost = diagnostics.dropped_packets();
+            self.native_dropped = lost;
             result
         } else {
             Ok(())
@@ -215,7 +206,22 @@ impl Input {
         };
         self.queue.changed.notify_all();
         for packet in packets {
-            self.decode(packet);
+            if self.raw {
+                self.raw_packet(packet);
+            } else {
+                self.decode(packet);
+            }
+        }
+        if self.raw {
+            if lost > self.reported_loss {
+                let diagnostic = self.raw_loss(
+                    lost - self.reported_loss,
+                    "packets dropped before input closed",
+                );
+                self.raw_pending.push_back(Ok(Item::Diagnostic(diagnostic)));
+                self.reported_loss = lost;
+            }
+            return result.map_err(crate::midi::Error::from);
         }
         if let Some(decoder) = self.decoder.as_mut() {
             if lost > self.reported_loss {
@@ -259,6 +265,7 @@ impl Input {
         }
         .map_err(|e| io::Error::from(crate::midi::Error::Connect(e)))?;
         let native_clock = connection.clock();
+        self.native_clock = Some(native_clock);
         let enabled = native_clock.mode == transport::TimestampMode::Absolute;
         self.clock = Some(
             Clock::new(
@@ -310,6 +317,49 @@ impl Input {
             Err(error) => self.pending.push_back(Err(error)),
         }
     }
+    fn raw_loss(&self, lost: u64, reason: &str) -> crate::live::Diagnostic {
+        crate::live::Diagnostic {
+            stream: self.stream.clone().expect("opened stream"),
+            packet: self.expected,
+            kind: DiagnosticKind::Loss,
+            lost,
+            reason: reason.into(),
+        }
+    }
+    fn raw_packet(&mut self, packet: Ingress) {
+        if packet.sequence > self.expected {
+            let lost = packet.sequence - self.expected;
+            self.reported_loss = self.reported_loss.saturating_add(lost);
+            let diagnostic = self.raw_loss(lost, "receive queue dropped packets");
+            self.raw_pending.push_back(Ok(Item::Diagnostic(diagnostic)));
+        }
+        self.expected = packet.sequence.saturating_add(1);
+        self.raw_pending
+            .push_back(Ok(Item::Message(Box::new(transport::ReceivedPacket {
+                packet: packet.packet,
+                sequence: packet.sequence,
+                timestamp_ns: packet.timestamp,
+                clock: self.native_clock.expect("opened native clock"),
+            }))));
+    }
+    fn next_raw(
+        &mut self,
+        deadline: Option<Instant>,
+    ) -> Option<io::Result<Item<transport::ReceivedPacket>>> {
+        if let Err(error) = self.open() {
+            return Some(Err(error));
+        }
+        loop {
+            if let Some(item) = self.raw_pending.pop_front() {
+                return Some(item);
+            }
+            match self.next_ingress(deadline)? {
+                Ok(IngressItem::Packet(packet)) => self.raw_packet(packet),
+                Ok(IngressItem::Loss(diagnostic)) => return Some(Ok(Item::Diagnostic(diagnostic))),
+                Err(error) => return Some(Err(error)),
+            }
+        }
+    }
     fn next_item(&mut self, deadline: Option<Instant>) -> Option<io::Result<Item>> {
         if let Err(error) = self.open() {
             if let Err(close_error) = self.close() {
@@ -341,49 +391,65 @@ impl Input {
                 }
                 return Some(item);
             }
-            if self.closed || deadline.is_some_and(|d| Instant::now() >= d) {
+            match self.next_ingress(deadline)? {
+                Ok(IngressItem::Packet(packet)) => self.decode(packet),
+                Ok(IngressItem::Loss(diagnostic)) => {
+                    let decoder = self.decoder.as_mut().expect("opened decoder");
+                    decoder.loss(diagnostic.lost, diagnostic.reason.clone());
+                    decoder.begin_at(self.expected);
+                    return Some(Ok(Item::Diagnostic(diagnostic)));
+                }
+                Err(error) => {
+                    if let Err(close_error) = self.close() {
+                        report(&close_error);
+                    }
+                    self.pending.push_back(Err(error));
+                }
+            }
+        }
+    }
+    fn next_ingress(&mut self, deadline: Option<Instant>) -> Option<io::Result<IngressItem>> {
+        loop {
+            if self.closed {
                 return None;
             }
             let mut state = self.queue.state.lock().unwrap_or_else(|p| p.into_inner());
             if let Some(packet) = state.packets.pop_front() {
                 state.bytes -= packet.size();
-                drop(state);
-                self.decode(packet);
-                continue;
+                return Some(Ok(IngressItem::Packet(packet)));
             }
             if state.next_sequence > self.expected {
                 let next = state.next_sequence;
                 drop(state);
-                let lost = next - self.expected;
-                self.reported_loss = self.reported_loss.saturating_add(lost);
+                let diagnostic =
+                    self.raw_loss(next - self.expected, "receive queue dropped packets");
+                self.reported_loss = self.reported_loss.saturating_add(diagnostic.lost);
                 self.expected = next;
-                let decoder = self.decoder.as_mut().expect("connected decoder");
-                let diagnostic = decoder.loss(lost, "receive queue dropped packets".into());
-                decoder.begin_at(next);
-                return Some(Ok(diagnostic));
+                return Some(Ok(IngressItem::Loss(diagnostic)));
+            }
+            if self.closed || deadline.is_some_and(|d| Instant::now() >= d) {
+                return None;
             }
             drop(state);
-            if let Some(connection) = &self.connection {
-                let health = if connection.callback_panicked() {
-                    Err(io::Error::other("input callback panicked"))
-                } else {
-                    connection.check_health().map_err(transport_error)
-                };
-                if let Err(error) = health {
-                    if let Err(close_error) = self.close() {
-                        report(&close_error);
-                    }
-                    self.pending.push_back(Err(error));
-                    continue;
-                }
+            let total = self.dropped_packets();
+            if let Err(error) = self.check_health() {
+                return Some(Err(error.into()));
             }
             let state = self.queue.state.lock().unwrap_or_else(|p| p.into_inner());
             if !state.packets.is_empty() {
                 continue;
             }
-            let wait = deadline.map_or(Duration::from_millis(100), |d| {
+            if total > self.reported_loss {
+                drop(state);
+                let diagnostic =
+                    self.raw_loss(total - self.reported_loss, "native receive dropped packets");
+                self.expected = self.expected.saturating_add(diagnostic.lost);
+                self.reported_loss = total;
+                return Some(Ok(IngressItem::Loss(diagnostic)));
+            }
+            let wait = deadline.map_or(Duration::from_millis(50), |d| {
                 d.saturating_duration_since(Instant::now())
-                    .min(Duration::from_millis(100))
+                    .min(Duration::from_millis(50))
             });
             drop(
                 self.queue
@@ -394,7 +460,7 @@ impl Input {
         }
     }
 }
-impl Iterator for Input {
+impl Iterator for Core {
     type Item = Payload;
     fn next(&mut self) -> Option<Payload> {
         loop {
@@ -411,7 +477,8 @@ impl Iterator for Input {
         }
     }
 }
-impl Iterator for InputErrors<'_> {
+#[cfg(test)]
+impl Iterator for CoreErrors<'_> {
     type Item = crate::midi::Result<Item>;
     fn next(&mut self) -> Option<Self::Item> {
         self.input
@@ -419,7 +486,7 @@ impl Iterator for InputErrors<'_> {
             .map(|r| r.map_err(crate::midi::Error::from))
     }
 }
-impl Drop for Input {
+impl Drop for Core {
     fn drop(&mut self) {
         if let Err(error) = self.close() {
             report(&error);
@@ -434,6 +501,10 @@ impl Drop for Input {
             }
         }
     }
+}
+enum IngressItem {
+    Packet(Ingress),
+    Loss(crate::live::Diagnostic),
 }
 struct Ingress {
     packet: Packet,
@@ -499,8 +570,8 @@ mod tests {
     use super::*;
     use crate::messages::{AnyMessage, Message};
 
-    fn input(protocol: transport::Protocol) -> Input {
-        let mut input = Input::new();
+    fn input(protocol: transport::Protocol) -> Core {
+        let mut input = Core::new();
         input.options.protocol = protocol;
         input.decoder = Some(Decoder::new("keyboard".into(), protocol, 1024).unwrap());
         input.stream = Some("keyboard".into());
@@ -652,7 +723,7 @@ mod tests {
         let weak = Arc::downgrade(&input.queue);
         drop(input);
         assert!(weak.upgrade().is_none());
-        let mut input = Input::new();
+        let mut input = Core::new();
         input.close().unwrap();
         assert!(input.with_errors().next().is_none());
         assert!(input.client.is_none());
@@ -703,7 +774,7 @@ mod tests {
             matches!(recording.records.last().unwrap(), crate::archive::Record::Discontinuity { reason, .. } if reason.contains("sequence exhausted"))
         );
         assert_eq!(recording.records.len(), 3);
-        assert!(Input::new()
+        assert!(Core::new()
             .record(Duration::MAX)
             .unwrap_err()
             .to_string()

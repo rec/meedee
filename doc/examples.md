@@ -652,3 +652,38 @@ with Output().create_virtual("meedee-example") as out:
 applications can send to. Both operations return the connected Input or Output.
 Closing is terminal. Rust offers the corresponding `create_virtual()` methods
 on `midi::Input` and `midi::Output`.
+
+## Receive raw packets
+
+Print ten received packets with their boundaries, sequence numbers and clocks.
+Use `with_errors()` to handle diagnostics explicitly.
+
+```python
+from itertools import islice
+from meedee.midi import Input
+
+for packet in islice(Input(raw=True), 10):
+    print(packet)
+```
+
+Rust selects the same mode with `Input::new().raw()?`, which produces a typed
+`Input<ReceivedPacket>`. Channel filtering and decoded recording require decoded input.
+
+## Receive through a callback
+
+Create a software destination and wait up to ten seconds for its first delivery.
+
+```python
+from queue import Queue
+from meedee.midi import Input
+
+received = Queue()
+with Input().create_virtual("meedee-callback", callback=received.put):
+    print(received.get(timeout=10))
+```
+
+Rust configures its callback through `with_callback(...)` before `connect()` or
+`create_virtual()`. Its callback receives a typed result containing data, a stream
+diagnostic or a terminal error. Both APIs serialize callback delivery and require
+callbacks to return promptly. Perform blocking MIDI operations on the controlling
+thread. Receive and iteration are unavailable while callbacks own delivery.

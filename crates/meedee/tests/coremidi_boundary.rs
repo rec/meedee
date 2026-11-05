@@ -13,6 +13,216 @@ use std::sync::{
 use std::time::Duration;
 
 #[test]
+fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
+    use meedee::{events::InputItem, midi};
+    enable();
+    for protocol in [Protocol::Midi1, Protocol::Ump] {
+        let name = format!("raw-input-{protocol:?}");
+        let mut input = midi::Input::new()
+            .raw()
+            .unwrap()
+            .with_transport(InputOptions {
+                protocol,
+                ..InputOptions::default()
+            })
+            .unwrap()
+            .with_receive_limits(1, 16, 1024)
+            .unwrap()
+            .create_virtual(&name)
+            .unwrap();
+        let output = Output::new(OutputOptions {
+            protocol,
+            ..OutputOptions::default()
+        })
+        .unwrap();
+        let port = output
+            .ports()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name() == name)
+            .unwrap();
+        let output = output.connect(&port).unwrap();
+        let packet = if protocol == Protocol::Midi1 {
+            Packet::Bytes(vec![0x90, 60])
+        } else {
+            Packet::Ump(vec![0x40903c00, 0xc0000000])
+        };
+        output.send(&packet).unwrap();
+        output.send(&packet).unwrap();
+        let InputItem::Message(first) = input
+            .receive(Some(Duration::from_secs(1)))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("packet expected")
+        };
+        assert_eq!(first.packet, packet);
+        assert_eq!(first.sequence, 0);
+        assert!(first.timestamp_ns.is_some());
+        let InputItem::Diagnostic(loss) = input
+            .receive(Some(Duration::from_secs(1)))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("loss expected")
+        };
+        assert_eq!(loss.lost, 1);
+        output.send(&packet).unwrap();
+        let InputItem::Message(next) = input
+            .receive(Some(Duration::from_secs(1)))
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("packet expected")
+        };
+        assert_eq!(next.sequence, 2);
+        assert_eq!(next.clock, first.clock);
+        input.close().unwrap();
+        assert!(input.receive(Some(Duration::ZERO)).unwrap().is_none());
+        assert_eq!(input.dropped_packets(), 1);
+        drop(output.close().unwrap());
+    }
+    assert!(midi::Input::new().with_channel(1).unwrap().raw().is_err());
+}
+
+#[test]
+fn high_level_callbacks_are_serial_guard_blocking_io_and_drain_on_close() {
+    use meedee::{events::InputItem, midi};
+    enable();
+    let (sender, receiver) = mpsc::channel();
+    let mut count = 0;
+    let mut input = midi::Input::new()
+        .with_callback(move |item| {
+            let InputItem::Message(_) = item.unwrap() else {
+                return;
+            };
+            count += 1;
+            let error = midi::Output::new()
+                .send(meedee::messages::NoteOn::new(60).unwrap())
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                midi::Error::Transport(Error::CallbackThread)
+            ));
+            sender.send((count, std::thread::current().id())).unwrap();
+        })
+        .unwrap()
+        .create_virtual("high-level-callback")
+        .unwrap();
+    assert!(input.receive(Some(Duration::ZERO)).is_err());
+    assert!(input.with_errors().next().unwrap().is_err());
+    let output = Output::new(OutputOptions::default()).unwrap();
+    let port = output
+        .ports()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name() == "high-level-callback")
+        .unwrap();
+    let output = output.connect(&port).unwrap();
+    output.send(&Packet::Bytes(vec![0x90, 60, 90])).unwrap();
+    output.send(&Packet::Bytes(vec![0x90, 61, 90])).unwrap();
+    input.close().unwrap();
+    let first = receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+    let second = receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+    assert_eq!((first.0, second.0), (1, 2));
+    assert_eq!(first.1, second.1);
+    assert_ne!(first.1, std::thread::current().id());
+    input.close().unwrap();
+    drop(output.close().unwrap());
+}
+
+#[test]
+fn high_level_raw_callback_panics_stop_delivery_and_remain_observable() {
+    use meedee::{events::InputItem, midi};
+    enable();
+    let (sender, receiver) = mpsc::channel();
+    let mut input = midi::Input::new()
+        .raw()
+        .unwrap()
+        .with_callback(move |item| {
+            let InputItem::Message(packet) = item.unwrap() else {
+                panic!("packet expected")
+            };
+            sender.send(packet.packet).unwrap();
+            panic!("intentional callback panic");
+        })
+        .unwrap()
+        .create_virtual("high-level-callback-panic")
+        .unwrap();
+    let output = Output::new(OutputOptions::default()).unwrap();
+    let port = output
+        .ports()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name() == "high-level-callback-panic")
+        .unwrap();
+    let output = output.connect(&port).unwrap();
+    let packet = Packet::Bytes(vec![0x90, 60]);
+    output.send(&packet).unwrap();
+    assert_eq!(
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap(),
+        packet
+    );
+    input.close().unwrap();
+    assert!(input
+        .check_health()
+        .unwrap_err()
+        .to_string()
+        .contains("callback panicked"));
+    assert!(receiver.try_recv().is_err());
+    drop(output.close().unwrap());
+}
+
+#[test]
+fn high_level_callbacks_report_native_loss_during_silence_and_close_failure() {
+    use meedee::{events::InputItem, midi};
+    enable();
+    let (sender, receiver) = mpsc::channel();
+    let mut input = midi::Input::new()
+        .raw()
+        .unwrap()
+        .with_transport(InputOptions {
+            receive_byte_limit: 1,
+            ..InputOptions::default()
+        })
+        .unwrap()
+        .with_callback(move |item| {
+            sender.send(item).unwrap();
+        })
+        .unwrap()
+        .create_virtual("callback-native-loss")
+        .unwrap();
+    let output = Output::new(OutputOptions::default()).unwrap();
+    let port = output
+        .ports()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name() == "callback-native-loss")
+        .unwrap();
+    let endpoint = u32::try_from(port.backend_id()).unwrap();
+    let output = output.connect(&port).unwrap();
+    output.send(&Packet::Bytes(vec![0x90, 60, 90])).unwrap();
+    let InputItem::Diagnostic(loss) = receiver
+        .recv_timeout(Duration::from_secs(2))
+        .unwrap()
+        .unwrap()
+    else {
+        panic!("loss expected")
+    };
+    assert_eq!(loss.lost, 1);
+    fail_disposal(endpoint);
+    assert!(input.close().is_err());
+    assert!(receiver
+        .recv_timeout(Duration::from_secs(1))
+        .unwrap()
+        .is_err());
+    assert!(input.check_health().is_err());
+    assert_eq!(input.dropped_packets(), 1);
+    input.close().unwrap();
+    drop(output);
+}
+
+#[test]
 fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
     use meedee::{events::InputItem, messages::Message, midi};
     enable();

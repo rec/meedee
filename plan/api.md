@@ -1845,3 +1845,27 @@ Transport settings must be configured before opening. Backend capability and
 opening failures retain their transport cause in midi::Error::Connect.
 Close remains terminal and repeated close is harmless. No runtime qualification
 with real virtual endpoints is implied by the device-free boundary tests.
+
+
+### Typed Rust raw input and queued callbacks
+
+Rust midi::Input<T = events::Payload> owns the shared receive implementation.
+raw() selects Input<events::ReceivedPacket> before opening or configuring callbacks.
+An existing channel filter makes this conversion fail. Raw input has no channel
+filter or decoded-recording methods. events::InputItem<T = Payload> retains the
+Message and Diagnostic variants. receive and with_errors preserve that typed
+shape, while ordinary iteration yields T and prints diagnostics/errors.
+
+with_callback configures one Send + 'static FnMut(Result<InputItem<T>, midi::Error>)
+before opening. connect/create_virtual return the same high-level owner and start
+a dedicated serial dispatch thread. It consumes the bounded queue, retaining packet
+order and loss diagnostics. Receive, iteration and recording are rejected while
+callback delivery is configured. Native loss counters are checked during silence.
+Callback panics are caught, stop delivery and remain observable through check_health.
+Blocking high-level MIDI operations are rejected on the callback thread using the
+existing transport callback guard. Close stops native admission, drains accepted
+input and joins dispatch, waiting for the active callback. Drop performs that same
+shutdown. Native close errors reach the callback and close caller. Repeated close
+is harmless. Captured native dropped-packet totals remain available after close.
+Python's existing raw and callback interfaces express the same operations with
+runtime mode selection and exception delivery.

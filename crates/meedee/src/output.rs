@@ -130,12 +130,14 @@ impl Output {
         Ok(self)
     }
     pub fn ports(&mut self) -> crate::midi::Result<Vec<Port>> {
+        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
         self.client()?
             .ports()
             .map_err(crate::midi::Error::Transport)
     }
     /// Connect a port from this output's most recent discovery snapshot.
     pub fn connect(mut self, port: &Port) -> crate::midi::Result<Self> {
+        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
         self.client()?;
         let client = self.client.take().expect("initialized output client");
         self.connection =
@@ -147,6 +149,7 @@ impl Output {
     /// Create a virtual output with the same sending, playback and cleanup
     /// lifecycle as a connected physical output.
     pub fn create_virtual(mut self, name: &str) -> crate::midi::Result<Self> {
+        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
         self.client()?;
         let client = self.client.take().expect("initialized output client");
         self.connection = Some(Connection::Native(
@@ -157,6 +160,7 @@ impl Output {
         Ok(self)
     }
     pub fn send(&mut self, value: impl Into<OutputValue>) -> crate::midi::Result<()> {
+        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
         let plan = self.prepare(std::iter::once(value.into()))?;
         self.execute(plan).map_err(crate::midi::Error::from)
     }
@@ -166,6 +170,7 @@ impl Output {
         &mut self,
         values: impl IntoIterator<Item = OutputValue>,
     ) -> crate::midi::Result<()> {
+        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
         let plan = self.prepare(values)?;
         self.execute(plan).map_err(crate::midi::Error::from)
     }
@@ -195,6 +200,9 @@ impl Output {
             report: Report::default(),
             cause: Cause::Input(error),
         };
+        transport::ensure_control_thread()
+            .map_err(transport_error)
+            .map_err(input_error)?;
         if self.closed {
             return Err(input_error(io::Error::new(
                 io::ErrorKind::NotConnected,
@@ -249,6 +257,7 @@ impl Output {
     /// pressure changed by confirmed sends. Other controller/program state is
     /// left alone. The transport closes even if a cleanup send fails.
     pub fn close(&mut self) -> crate::midi::Result<()> {
+        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
         if self.closed {
             return Ok(());
         }
@@ -481,6 +490,9 @@ impl Output {
 }
 impl Drop for Output {
     fn drop(&mut self) {
+        if self.client.is_none() && self.connection.is_none() {
+            return;
+        }
         if let Err(error) = self.close() {
             report(&error);
         }

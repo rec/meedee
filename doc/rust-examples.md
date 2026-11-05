@@ -663,3 +663,55 @@ high-level type as `connect()`. Input retains decoding, channel filters, receive
 limits, timestamps and recording. Output retains sending, playback and cleanup.
 Closing is terminal and Drop performs the ordinary scoped cleanup. Unsupported
 backends return the transport capability error through `midi::Error::Connect`.
+
+## Receive raw packets
+
+Raw input preserves packet boundaries, sequence numbers, native clocks and optional
+nanosecond timestamps. MIDI 1 packets may contain fragments or multiple messages.
+Rust infers `Input<ReceivedPacket>` from `raw()`.
+
+```rust
+use meedee::midi::Input;
+
+for packet in Input::new().raw()?.take(10) {
+    println!("{packet:?}");
+}
+```
+
+`receive(timeout)` and `with_errors()` return typed `InputItem<ReceivedPacket>`
+values, with `Message` containing the received packet and `Diagnostic` containing
+stream diagnostics. Default iteration reports diagnostics to stderr and yields
+packets. Decoded input keeps its existing `Input<Payload>` behavior. Raw input
+has no channel-filter or decoded-recording methods. Selecting raw mode rejects
+an existing channel filter and requires an unopened input without a callback.
+
+## Receive through a callback
+
+Create a software destination and wait up to ten seconds for its first delivery.
+Use `connect(&port)` for a physical input. The same builder works after `raw()`.
+
+```rust
+use meedee::midi::Input;
+use std::sync::mpsc;
+use std::time::Duration;
+
+let (sender, receiver) = mpsc::channel();
+let mut input = Input::new()
+    .with_callback(move |item| { let _ = sender.send(item); })?
+    .create_virtual("meedee-callback")?;
+println!("{:?}", receiver.recv_timeout(Duration::from_secs(10)));
+input.close()?;
+```
+
+Callbacks receive `midi::Result<InputItem<T>>`, including loss diagnostics and
+terminal errors. They run serially on a dedicated dispatch thread through the
+same bounded receive queue as iteration. Closures must be `Send + 'static` and
+return promptly. Blocking MIDI operations are rejected inside callbacks. Use a
+channel to ask the controlling thread to perform them.
+
+Receive, iteration and decoded recording are unavailable in callback mode.
+Callback panic stops further delivery and is observable through `check_health()`.
+Close stops native delivery, drains accepted input to the callback and joins the
+dispatch thread. It waits for an active callback to return. Closing is terminal.
+Dropped-packet counts remain readable after close. Callback health and loss
+counter updates from the dispatch thread can lag by its polling interval.
