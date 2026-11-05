@@ -12,6 +12,30 @@ import pytest
 from meedee import _native, archive, events, messages, midi, ump
 
 
+def test_unopened_diagnostics_remain_readable_without_native_initialization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected(**settings: object) -> None:
+        raise AssertionError("diagnostics initialized native MIDI")
+
+    monkeypatch.setattr(_native, "Input", unexpected)
+    monkeypatch.setattr(_native, "Output", unexpected)
+    source = midi.Input()
+    output = midi.Output()
+    assert not source.closed and not output.closed
+    assert source.dropped_packets == 0
+    assert source.failure is None
+    assert source.last_message_time is None and source.recording_report is None
+    source.close()
+    output.close()
+    assert source.closed and output.closed
+    assert source.dropped_packets == 0 and source.failure is None
+    assert source.last_message_time is None and source.recording_report is None
+    for field in ("stream", "clock"):
+        with pytest.raises(midi.StateError):
+            getattr(source, field)
+
+
 def clock() -> events.Clock:
     return events.Clock(
         identity="c", backend=midi.Backend.CoreMidi, mode=midi.TimestampMode.Absolute
@@ -238,6 +262,11 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
     report = receiver.stop_recording()
     assert report.complete is not lost
     receiver.close()
+    assert receiver.closed
+    assert receiver.clock == capture_clock
+    assert receiver.stream
+    assert receiver.dropped_packets == int(lost)
+    assert receiver.recording_report == report
     reader = archive.Reader(path, recover=lost)
     values = list(reader)
     assert len([v for v in values if isinstance(v, messages.Message)]) == 1
@@ -346,6 +375,7 @@ def test_raw_receive_queue_is_bounded_and_drains_before_reporting_overflow(
         first = packet(b"\xf8", 0, 100)
         callbacks[0](first)
         callbacks[0](packet(b"\xfa", 1, 200))
+        assert receiver.closed
         assert receiver.receive(timeout=0) == first
         with pytest.raises(midi.ResourceError, match="overflowed"):
             receiver.receive(timeout=0)
@@ -401,6 +431,44 @@ def test_direct_input_iteration_opens_first_port_and_closes_on_generator_close(
     assert next(iterator) == messages.NoteOn(60, 100, 1)
     iterator.close()
     assert client.closed
+    with pytest.raises(midi.StateError, match="closed"):
+        client.__enter__()
+
+
+def test_close_failure_retains_original_error_and_input_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture_clock = clock()
+    failure = midi.MidiError("native close failed")
+
+    class Connection:
+        clock = capture_clock
+        closed = False
+        dropped_packets = 3
+        worker_failure = None
+        last_message_time = None
+
+        def close(self) -> None:
+            raise failure
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def create_virtual(
+            self, name: str, callback: object, identity: str
+        ) -> Connection:
+            return Connection()
+
+    monkeypatch.setattr(_native, "Input", Client)
+    client = midi.Input(raw=True).create_virtual("fixture")
+    stream = client.stream
+    with pytest.raises(midi.MidiError) as caught:
+        client.close()
+    assert caught.value is failure and client.failure is failure
+    assert client.closed and client.dropped_packets == 3
+    assert client.stream == stream and client.clock == capture_clock
+    client.close()
     with pytest.raises(midi.StateError, match="closed"):
         client.__enter__()
 

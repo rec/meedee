@@ -1869,3 +1869,19 @@ shutdown. Native close errors reach the callback and close caller. Repeated clos
 is harmless. Captured native dropped-packet totals remain available after close.
 Python's existing raw and callback interfaces express the same operations with
 runtime mode selection and exception delivery.
+### Retained input diagnostics and terminal closure
+
+Rust Input/Output.closed() matches Python closed. Unopened objects start false.
+Explicit close and observed terminal input shutdown set it true at closure start,
+including callback panic and cleanup failure. Accepted input may still be drained.
+Opened input retains stream/clock after close. An unopened closed input returns
+state errors for those identities. dropped_packets and failure are readable in
+all states, returning zero/None before opening, with no native initialization or
+reopening. Python last_message_time and recording_report likewise return None
+before opening; their Rust parity is separate work.
+Rust failure() returns Option<Arc<midi::Error>>, preserving the first terminal
+error and its cause. Delivered retained errors use Error::Shared with source()
+pointing at the original error. Normal closure leaves failure empty, while
+check_health() continues to reject a closed input. Callback status records terminal
+closure independently of native cleanup completion. Examples and device-free
+regressions cover normal closure, unused objects, panic and failed cleanup.

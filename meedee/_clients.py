@@ -368,29 +368,25 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
     @property
     def dropped_packets(self) -> int:
         if self._connection is None:
-            self.__enter__()
-        assert self._connection is not None
+            return 0
         return self._connection.dropped_packets
 
     @property
     def last_message_time(self) -> float | None:
         if self._connection is None:
-            self.__enter__()
-        assert self._connection is not None
+            return None
         return self._connection.last_message_time
 
     @property
     def failure(self) -> Exception | None:
         if self._connection is None:
-            self.__enter__()
-        assert self._connection is not None
+            return None
         return self._connection.failure
 
     @property
     def recording_report(self) -> archive.RecordingReport | None:
         if self._connection is None:
-            self.__enter__()
-        assert self._connection is not None
+            return None
         return self._connection.recording_report
 
     def __del__(self) -> None:
@@ -1017,7 +1013,12 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
 
     @property
     def closed(self) -> bool:
-        return self._raw is None or self._raw.closed
+        return (
+            self._closing
+            or self.failure is not None
+            or self._raw is None
+            or self._raw.closed
+        )
 
     @property
     def dropped_packets(self) -> int:
@@ -1248,12 +1249,15 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             return
         with self._lock:
             self._closing = True
+        self._failure = self.failure
         failure: BaseException | None = None
         try:
             self._raw.close()
         except BaseException as error:
             # Preserve a transport failure if recording cleanup also fails.
             failure = error
+            if isinstance(error, Exception):
+                self._failure = self._failure or error
         try:
             with self._lock:
                 self._final_loss()
@@ -1269,6 +1273,8 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
                 if not self._recording_report.complete:
                     raise OSError(self._recording_report.failure)
         except BaseException as error:
+            if isinstance(error, Exception):
+                self._failure = self._failure or error
             if failure is not None:
                 raise BaseExceptionGroup(
                     "MIDI close and recording cleanup both failed", [failure, error]

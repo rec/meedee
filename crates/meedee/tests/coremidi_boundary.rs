@@ -13,6 +13,23 @@ use std::sync::{
 use std::time::Duration;
 
 #[test]
+fn unopened_diagnostics_survive_close_without_opening_native_clients() {
+    use meedee::midi;
+    let mut input = midi::Input::new();
+    let mut output = midi::Output::new();
+    assert!(!input.closed() && !output.closed());
+    assert_eq!(input.dropped_packets(), 0);
+    assert!(input.failure().is_none());
+    input.close().unwrap();
+    output.close().unwrap();
+    assert!(input.closed() && output.closed());
+    assert!(input.stream().is_err() && input.clock().is_err());
+    assert!(input.failure().is_none());
+    assert!(input.check_health().is_err());
+    assert_eq!(input.dropped_packets(), 0);
+}
+
+#[test]
 fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
     use meedee::{events::InputItem, midi};
     enable();
@@ -163,7 +180,14 @@ fn high_level_raw_callback_panics_stop_delivery_and_remain_observable() {
         receiver.recv_timeout(Duration::from_secs(1)).unwrap(),
         packet
     );
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while !input.closed() && std::time::Instant::now() < deadline {
+        std::thread::yield_now();
+    }
+    assert!(input.closed());
+    let failure = input.failure().unwrap();
     input.close().unwrap();
+    assert!(Arc::ptr_eq(&failure, &input.failure().unwrap()));
     assert!(input
         .check_health()
         .unwrap_err()
@@ -211,11 +235,25 @@ fn high_level_callbacks_report_native_loss_during_silence_and_close_failure() {
     };
     assert_eq!(loss.lost, 1);
     fail_disposal(endpoint);
-    assert!(input.close().is_err());
-    assert!(receiver
+    let close_error = input.close().unwrap_err();
+    assert!(input.closed());
+    let delivered = receiver
         .recv_timeout(Duration::from_secs(1))
         .unwrap()
-        .is_err());
+        .unwrap_err();
+    let failure = input.failure().unwrap();
+    assert!(matches!(
+        failure.as_ref(),
+        midi::Error::Transport(Error::Native(_))
+    ));
+    let midi::Error::Shared(delivered) = delivered else {
+        panic!("shared error expected")
+    };
+    let midi::Error::Shared(closed) = close_error else {
+        panic!("shared error expected")
+    };
+    assert!(Arc::ptr_eq(&failure, &delivered));
+    assert!(Arc::ptr_eq(&failure, &closed));
     assert!(input.check_health().is_err());
     assert_eq!(input.dropped_packets(), 1);
     input.close().unwrap();
@@ -260,6 +298,9 @@ fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
                     .unwrap();
                 input = input.connect(&port).unwrap();
             }
+            assert!(!input.closed() && !output.closed());
+            let stream = input.stream().unwrap().to_owned();
+            let clock = input.clock().unwrap().clone();
             let packet = match protocol {
                 Protocol::Midi1 => Packet::Bytes(vec![0x90, 60, 100]),
                 Protocol::Ump => Packet::Ump(vec![0x40903c00, 0xc0000000]),
@@ -287,6 +328,11 @@ fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
             output.close().unwrap();
             input.close().unwrap();
             input.close().unwrap();
+            assert!(input.closed() && output.closed());
+            assert_eq!(input.stream().unwrap(), stream);
+            assert_eq!(input.clock().unwrap(), &clock);
+            assert!(input.failure().is_none());
+            assert!(input.check_health().is_err());
             assert!(input.create_virtual(&name).is_err());
             assert!(output.send(packet).is_err());
             assert!(output.create_virtual(&name).is_err());

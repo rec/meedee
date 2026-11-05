@@ -715,3 +715,33 @@ Close stops native delivery, drains accepted input to the callback and joins the
 dispatch thread. It waits for an active callback to return. Closing is terminal.
 Dropped-packet counts remain readable after close. Callback health and loss
 counter updates from the dispatch thread can lag by its polling interval.
+
+## Inspect diagnostics after close
+
+Input and Output expose `closed()`. It becomes true at terminal closure, including
+when cleanup fails. Opened input retains its stream, clock, dropped-packet count
+and first terminal failure for inspection after close.
+
+```rust
+use meedee::midi::Input;
+
+let mut input = Input::new().create_virtual("meedee-diagnostics")?;
+input.close()?;
+println!("closed = {}", input.closed());
+println!("dropped packets = {}", input.dropped_packets());
+println!("{:?}", input.clock()?);
+println!("{:?}", input.failure());
+```
+
+`failure()` returns an optional shared, read-only `Arc<midi::Error>`, preserving
+its category and cause. Retained errors delivered by receive, callback, close or
+health checking use `midi::Error::Shared(error)`. Match `error.as_ref()` to inspect
+the original variant, or use the standard error `source()` chain. A normal close
+leaves failure empty, while `check_health()` reports that input is closed.
+
+Reading retained diagnostics after close performs no native calls and does not
+reopen resources. Closing an unopened input leaves dropped_packets at zero and
+failure empty. Its stream and
+clock getters return a state error because no identity or clock was established.
+An unopened object starts with `closed() == false`. A normally closed input can
+still drain its accepted messages, using the existing iteration contract.

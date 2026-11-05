@@ -253,6 +253,9 @@ impl Output {
         self.clock = clock;
         result
     }
+    pub fn closed(&self) -> bool {
+        self.closed
+    }
     /// Cleanup covers held note counts, pitch bend, CC1/64/66/67 and channel/poly
     /// pressure changed by confirmed sends. Other controller/program state is
     /// left alone. The transport closes even if a cleanup send fails.
@@ -261,6 +264,7 @@ impl Output {
         if self.closed {
             return Ok(());
         }
+        self.closed = true;
         let mut result = Ok(());
         if self.connection.is_some() {
             for message in std::mem::take(&mut self.state).cleanup() {
@@ -272,7 +276,6 @@ impl Output {
                 }
             }
         }
-        self.closed = true;
         self.client = None;
         if let Some(connection) = self.connection.take() {
             let closed = connection.close().map_err(transport_error);
@@ -1248,6 +1251,7 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("disconnected"));
+        assert!(f.output.closed());
         assert!(f.sink.borrow().snapshot().closed);
         assert_eq!(f.packets(), bytes(&[&[0x90, 60, 90]]));
         f.output.close().unwrap();

@@ -51,12 +51,13 @@ pub struct Input<T: Send + 'static = Payload> {
 }
 struct Dispatch {
     stop: Arc<AtomicBool>,
-    thread: JoinHandle<(Core, Option<transport::Error>)>,
+    thread: JoinHandle<(Core, Option<Arc<midi::Error>>)>,
 }
 #[derive(Default)]
 struct Status {
     dropped: u64,
-    failure: Option<transport::Error>,
+    closed: bool,
+    failure: Option<Arc<midi::Error>>,
 }
 /// Input iteration including stream diagnostics and terminal errors.
 pub struct InputErrors<'a, T: Send + 'static = Payload> {
@@ -185,24 +186,53 @@ impl<T: Send + 'static> Input<T> {
         self.start_dispatch()?;
         Ok(self)
     }
+    /// Whether terminal closure has started, even if accepted input remains.
+    pub fn closed(&self) -> bool {
+        self.status.lock().unwrap_or_else(|p| p.into_inner()).closed
+            || self.core.as_ref().is_some_and(|core| core.closed)
+    }
+    /// The first terminal failure, retained with its original category and cause.
+    pub fn failure(&self) -> Option<Arc<midi::Error>> {
+        self.status
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .failure
+            .clone()
+    }
     pub fn stream(&mut self) -> midi::Result<&str> {
-        transport::ensure_control_thread().map_err(midi::Error::Transport)?;
-        if self.dispatch.is_none() {
-            self.core_mut()?.stream()?;
-            self.start_dispatch()?;
+        if self.core.as_ref().is_some_and(|core| core.stream.is_some()) {
+            return Ok(self
+                .core
+                .as_ref()
+                .expect("retained input")
+                .stream
+                .as_deref()
+                .expect("retained stream"));
         }
+        if self.stream.is_some() {
+            return Ok(self.stream.as_deref().expect("retained stream"));
+        }
+        transport::ensure_control_thread().map_err(midi::Error::Transport)?;
+        self.core_mut()?.stream()?;
+        self.start_dispatch()?;
         if self.dispatch.is_some() {
-            Ok(self.stream.as_deref().expect("opened callback stream"))
+            Ok(self.stream.as_deref().unwrap())
         } else {
             self.core_mut()?.stream()
         }
     }
     pub fn clock(&mut self) -> midi::Result<&Clock> {
         self.stream()?;
-        if self.dispatch.is_some() {
-            Ok(self.clock.as_ref().expect("opened callback clock"))
+        if self.clock.is_some() {
+            Ok(self.clock.as_ref().expect("retained callback clock"))
         } else {
-            self.core_mut()?.clock()
+            Ok(self
+                .core
+                .as_ref()
+                .expect("opened input")
+                .clock
+                .as_ref()
+                .expect("opened clock"))
         }
     }
     pub fn dropped_packets(&self) -> u64 {
@@ -217,14 +247,11 @@ impl<T: Send + 'static> Input<T> {
         )
     }
     pub fn check_health(&self) -> midi::Result<()> {
-        if let Some(error) = self
-            .status
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .failure
-            .clone()
-        {
-            return Err(midi::Error::Transport(error));
+        if let Some(error) = self.failure() {
+            return Err(midi::Error::Shared(error));
+        }
+        if self.closed() {
+            return Err(invalid("input is closed").into());
         }
         if let Some(core) = &self.core {
             core.check_health()
@@ -247,10 +274,17 @@ impl<T: Send + 'static> Input<T> {
         let next = self.next;
         let core = self.core_mut()?;
         let value = next(core, deadline).transpose();
-        if value.is_err() {
-            let _ = core.close();
+        match value {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                let error = retained(midi::Error::from(error));
+                let _ = core.close();
+                let mut status = self.status.lock().unwrap_or_else(|p| p.into_inner());
+                status.closed = true;
+                status.failure.get_or_insert(error.clone());
+                Err(midi::Error::Shared(error))
+            }
         }
-        value.map_err(midi::Error::from)
     }
     pub fn with_errors(&mut self) -> InputErrors<'_, T> {
         InputErrors {
@@ -261,19 +295,44 @@ impl<T: Send + 'static> Input<T> {
     /// Stop delivery and wait for the current callback and accepted input to drain.
     pub fn close(&mut self) -> midi::Result<()> {
         transport::ensure_control_thread().map_err(midi::Error::Transport)?;
+        if self.dispatch.is_none() && self.core.is_none() && self.closed() {
+            return Ok(());
+        }
+        self.status.lock().unwrap_or_else(|p| p.into_inner()).closed = true;
         if let Some(dispatch) = self.dispatch.take() {
             dispatch.stop.store(true, Ordering::Release);
             let (core, close_error) = dispatch.thread.join().map_err(|_| {
-                midi::Error::Transport(transport::Error::Worker(
+                let error = Arc::new(midi::Error::Transport(transport::Error::Worker(
                     "input dispatch thread panicked".into(),
-                ))
+                )));
+                self.status
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .failure
+                    .get_or_insert(error.clone());
+                midi::Error::Shared(error)
             })?;
             self.core = Some(core);
             if let Some(error) = close_error {
-                return Err(midi::Error::Transport(error));
+                self.status
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .failure
+                    .get_or_insert(error.clone());
+                return Err(midi::Error::Shared(error));
             }
         }
-        self.core_mut()?.close()
+        let result = self.core_mut()?.close();
+        if let Err(error) = result {
+            let error = Arc::new(error);
+            self.status
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .failure
+                .get_or_insert(error.clone());
+            return Err(midi::Error::Shared(error));
+        }
+        Ok(())
     }
     fn start_dispatch(&mut self) -> midi::Result<()> {
         if self.callback.is_none() {
@@ -295,17 +354,19 @@ impl<T: Send + 'static> Input<T> {
                 loop {
                     if stopped.load(Ordering::Acquire) && !core.closed {
                         if let Err(error) = core.close() {
-                            let failure = transport_failure(&error);
+                            let failure = retained(error);
                             status
                                 .lock()
                                 .unwrap_or_else(|p| p.into_inner())
                                 .failure
                                 .get_or_insert(failure.clone());
-                            close_error = Some(failure);
+                            close_error = Some(failure.clone());
                             if core.raw {
-                                core.raw_pending.push_back(Err(error.into()));
+                                core.raw_pending
+                                    .push_back(Err(midi::Error::Shared(failure.clone()).into()));
                             } else {
-                                core.pending.push_back(Err(error.into()));
+                                core.pending
+                                    .push_back(Err(midi::Error::Shared(failure.clone()).into()));
                             }
                         }
                     }
@@ -313,19 +374,27 @@ impl<T: Send + 'static> Input<T> {
                     status.lock().unwrap_or_else(|p| p.into_inner()).dropped =
                         core.dropped_packets();
                     if let Some(item) = item {
+                        let item = item.map_err(|error| {
+                            let error = retained(midi::Error::from(error));
+                            let mut status = status.lock().unwrap_or_else(|p| p.into_inner());
+                            status.closed = true;
+                            status.failure.get_or_insert(error.clone());
+                            midi::Error::Shared(error)
+                        });
                         let terminal = item.is_err();
-                        if let Err(error) = &item {
-                            status.lock().unwrap_or_else(|p| p.into_inner()).failure =
-                                Some(input_failure(error));
-                        }
                         let delivered =
                             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                                 let _scope = transport::CallbackScope::enter();
-                                callback(item.map_err(midi::Error::from));
+                                callback(item);
                             }));
                         if delivered.is_err() {
-                            status.lock().unwrap_or_else(|p| p.into_inner()).failure =
-                                Some(transport::Error::Worker("input callback panicked".into()));
+                            let mut state = status.lock().unwrap_or_else(|p| p.into_inner());
+                            state.closed = true;
+                            state.failure.get_or_insert_with(|| {
+                                Arc::new(midi::Error::Transport(transport::Error::Worker(
+                                    "input callback panicked".into(),
+                                )))
+                            });
                             failed = true;
                             break;
                         }
@@ -338,7 +407,7 @@ impl<T: Send + 'static> Input<T> {
                     }
                 }
                 if let Err(error) = core.close() {
-                    let failure = transport_failure(&error);
+                    let failure = retained(error);
                     status
                         .lock()
                         .unwrap_or_else(|p| p.into_inner())
@@ -350,7 +419,11 @@ impl<T: Send + 'static> Input<T> {
                     core.pending.clear();
                     core.raw_pending.clear();
                 }
-                status.lock().unwrap_or_else(|p| p.into_inner()).dropped = core.dropped_packets();
+                {
+                    let mut state = status.lock().unwrap_or_else(|p| p.into_inner());
+                    state.closed = true;
+                    state.dropped = core.dropped_packets();
+                }
                 (core, close_error)
             })
             .map_err(midi::Error::Io)?;
@@ -358,24 +431,10 @@ impl<T: Send + 'static> Input<T> {
         Ok(())
     }
 }
-fn input_failure(error: &io::Error) -> transport::Error {
-    if let Some(cause) = error.get_ref() {
-        if let Some(cause) = cause.downcast_ref::<midi::Error>() {
-            return transport_failure(cause);
-        }
-        if let Some(cause) = cause.downcast_ref::<transport::Error>() {
-            return cause.clone();
-        }
-    }
-    transport::Error::Worker(error.to_string())
-}
-fn transport_failure(error: &midi::Error) -> transport::Error {
+fn retained(error: midi::Error) -> Arc<midi::Error> {
     match error {
-        midi::Error::Transport(e)
-        | midi::Error::Connect(e)
-        | midi::Error::Init(e)
-        | midi::Error::Send(e) => e.clone(),
-        _ => transport::Error::Worker(error.to_string()),
+        midi::Error::Shared(error) => error,
+        error => Arc::new(error),
     }
 }
 impl<T: Send + 'static> Iterator for Input<T> {

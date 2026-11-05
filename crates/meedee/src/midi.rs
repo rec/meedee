@@ -14,6 +14,8 @@ pub enum Error {
     Send(crate::transport::Error),
     Transport(crate::transport::Error),
     Io(std::io::Error),
+    /// A retained failure also available through Input::failure().
+    Shared(std::sync::Arc<Error>),
     Value(crate::messages::ValueError),
 }
 
@@ -22,6 +24,7 @@ impl std::fmt::Display for Error {
         match self {
             Self::Init(e) | Self::Connect(e) | Self::Send(e) | Self::Transport(e) => e.fmt(f),
             Self::Io(e) => e.fmt(f),
+            Self::Shared(e) => e.fmt(f),
             Self::Value(e) => e.fmt(f),
         }
     }
@@ -32,6 +35,7 @@ impl std::error::Error for Error {
         Some(match self {
             Self::Init(e) | Self::Connect(e) | Self::Send(e) | Self::Transport(e) => e,
             Self::Io(e) => e,
+            Self::Shared(e) => e.as_ref(),
             Self::Value(e) => e,
         })
     }

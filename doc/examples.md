@@ -687,3 +687,26 @@ Rust configures its callback through `with_callback(...)` before `connect()` or
 diagnostic or a terminal error. Both APIs serialize callback delivery and require
 callbacks to return promptly. Perform blocking MIDI operations on the controlling
 thread. Receive and iteration are unavailable while callbacks own delivery.
+
+## Inspect diagnostics after close
+
+Opened inputs retain their stream, clock, dropped-packet count and terminal
+failure after close. This works even when close raises a cleanup error.
+
+```python
+from meedee.midi import Input
+
+with Input().create_virtual("meedee-diagnostics") as source:
+    print(source.clock)
+print(source.closed)
+print(source.dropped_packets)
+print(source.clock)
+print(source.failure)
+```
+
+Reading closed, dropped_packets or failure never opens an input. An unopened
+input has zero drops and no failure, including after close. Stream and clock
+remain available once established. Closing an unopened input leaves those two
+properties unavailable. Output also exposes closed, and both kinds of object
+become terminally closed even when cleanup fails. Rust provides the corresponding
+`closed()`, `stream()`, `clock()`, `dropped_packets()` and `failure()` methods.
