@@ -20,7 +20,7 @@ impl Receiver for midi::Input {
         self.check_health()
     }
     fn receive(&mut self, timeout: Duration) -> midi::Result<Option<Item>> {
-        self.receive(Some(timeout))
+        self.receive(Some(timeout), None)
     }
     fn check(&self) -> midi::Result<()> {
         self.check_health()?;
@@ -52,7 +52,8 @@ pub(crate) fn invalid(reason: &str) -> midi::Error {
     std::io::Error::new(std::io::ErrorKind::InvalidInput, reason).into()
 }
 pub(crate) fn interrupted(error: &midi::Error) -> bool {
-    matches!(error, midi::Error::Io(e) if e.kind() == std::io::ErrorKind::Interrupted)
+    matches!(error, midi::Error::Cancelled)
+        || matches!(error, midi::Error::Io(e) if e.kind() == std::io::ErrorKind::Interrupted)
 }
 pub(crate) fn input_loss(error: &midi::Error) -> bool {
     matches!(

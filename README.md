@@ -120,6 +120,12 @@ fields must be checked. By default any observed input loss or write/admission
 failure makes recording incomplete. `best_effort=True` permits explicit gap
 records, not silent loss. Capture defaults to 128 in-flight records and 8 MiB of
 payload. General file records default to a configurable 1 MiB payload limit.
+Rust exposes the same attachment through Input::start_recording(path, options)
+and stop_recording(timeout). Recording runs without receive calls and can accompany
+callbacks. A stop timeout retains the stopping recorder for a later retry, including
+after input close; recording_report retains the last finalized report.
+Direct receive returns None only on timeout. Normal closure and cancellation
+are distinct errors; cancellation leaves queued input and the connection usable.
 
 `output.play(source, origin=..., mappings=..., cancel=...)` runs on the caller's
 thread. It requires timestamped events and explicit mappings between unrelated
@@ -689,14 +695,17 @@ Closing Input or Output releases its native client and retires its isolated
 worker. Asynchronous worker cleanup may keep a slot occupied briefly afterward.
 
 Callbacks must be synchronous and return promptly. Deferred results are reported
-through `sys.unraisablehook`, without executing them; later delivery continues.
-Callback exceptions are reported the same way. Blocking MIDI operations are
+through `sys.unraisablehook`, without executing them. A callback exception or
+deferred result stops further delivery, retains the original failure and closes
+the input safely outside the callback. An attached recording becomes incomplete. Blocking MIDI operations are
 forbidden from callbacks and error hooks, including operations on other clients.
 No internal Rust lock is held while calling user code. A callback must not wait
 for its closer or a lock/queue held by its closer. Arbitrary Python or extension
 code cannot be forcibly cancelled; callback draining can wait indefinitely.
-`last_message_time` records Python monotonic seconds at callback start, separate
-from native timestamps, and survives close.
+`last_message_time` records local host monotonic time at raw packet ingress,
+before channel filtering, independently of receiving or callbacks. Python uses
+monotonic seconds and Rust uses Instant. It survives close and remains separate
+from optional native MIDI timestamps.
 
 Native receive admission bounds owned in-flight payloads to 8 MiB per input by
 default. Each isolated receive queue additionally holds at most 128 packets and

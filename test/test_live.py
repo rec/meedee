@@ -2,7 +2,7 @@
 
 import gc
 import weakref
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
 from threading import Thread
@@ -631,7 +631,7 @@ def test_record_uses_duration_deadline_and_retains_terminal_failure(
     def failed_receive(self: midi.Input, *, timeout: float) -> None:
         raise midi.ResourceError("capture overflow")
 
-    ticks = iter([100.0, 100.0])
+    ticks = iter([100.0, 100.0, 100.0])
     monkeypatch.setattr(midi.Input, "receive", failed_receive)
     records = midi.Input(isolated=False).record(10)
     failures = [r for r in records if isinstance(r, archive.Discontinuity)]
@@ -674,3 +674,240 @@ def test_closed_input_releases_native_handles_but_retains_final_diagnostics(
     assert client.clock == captured_clock
     assert client.dropped_packets == 0
     assert client.closed
+
+
+def test_cancelled_receive_preserves_data_and_filtered_packets_update_activity(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+) -> None:
+    from time import monotonic
+
+    source = midi.Input(channel=2)
+    source.__enter__()
+    callback = iterable_input[-1]
+    before = monotonic()
+    callback(packet(b"\x90\x3c\x64", 1, 1))
+    activity = source.last_message_time
+    assert activity is not None and before <= activity <= monotonic()
+    assert source.receive(timeout=0) is None
+    callback(packet(b"\x91\x3e\x64", 2, 2))
+    cancel = events.Cancellation()
+    cancel.cancel()
+    with pytest.raises(InterruptedError):
+        source.receive(timeout=0, cancel=cancel)
+    assert not source.closed and source.failure is None
+    value = source.receive(timeout=0)
+    assert isinstance(value, messages.NoteOn) and value.note == 62
+    source.close()
+    final_activity = source.last_message_time
+    callback(packet(b"\x91\x40\x64", 3, 3))
+    assert source.last_message_time == final_activity
+    with pytest.raises(midi.StateError, match="closed"):
+        source.receive(timeout=0)
+    assert list(source.with_errors()) == []
+
+
+def test_stopping_recording_can_be_retried_after_timeout_and_input_close(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    original = archive.Recorder
+
+    class Recorder:
+        def __init__(self, destination: Path, **settings: object) -> None:
+            self.inner = original(destination, **settings)
+            self.attempts = 0
+
+        def record(self, value: object) -> bool:
+            return self.inner.record(value)
+
+        def fail(self, reason: str) -> None:
+            self.inner.fail(reason)
+
+        def stop(self, *, timeout: float = 5.0) -> archive.RecordingReport:
+            self.attempts += 1
+            if self.attempts <= 2:
+                raise TimeoutError("writer remains busy")
+            return self.inner.stop(timeout=timeout)
+
+    monkeypatch.setattr(archive, "Recorder", Recorder)
+    source = midi.Input()
+    source.__enter__()
+    recorder = source.start_recording(tmp_path / "retry.meedee")
+    with pytest.raises(TimeoutError):
+        source.stop_recording(timeout=0.001)
+    assert source.recording_report is None
+    with pytest.raises(midi.StateError, match="active"):
+        source.start_recording(tmp_path / "second.meedee")
+    with pytest.raises(TimeoutError):
+        source.close()
+    assert source.closed and source.recording_report is None
+    report = source.stop_recording(timeout=1)
+    assert report.complete
+    assert source.recording_report == report
+    assert recorder.attempts == 3
+
+
+@pytest.mark.parametrize("during_connect", [False, True])
+def test_callback_failure_is_retained_stops_delivery_and_closes_transport(
+    monkeypatch: pytest.MonkeyPatch,
+    during_connect: bool,
+    tmp_path: Path,
+) -> None:
+    import sys
+    from threading import Event
+
+    capture_clock = clock()
+    closed = Event()
+    release = Event()
+    completed = Event()
+    close_calls: list[int] = []
+    callbacks: list[Callable[[events.ReceivedPacket], object]] = []
+    reported: list[object] = []
+    failure = ValueError("user callback failed")
+    seen: list[object] = []
+
+    def callback(value: object) -> None:
+        seen.append(value)
+        raise failure
+
+    class Connection:
+        clock = capture_clock
+        closed = False
+        dropped_packets = 0
+        worker_failure = None
+        last_message_time = None
+
+        def close(self) -> None:
+            close_calls.append(1)
+            closed.set()
+            assert release.wait(2)
+            self.closed = True
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def create_virtual(
+            self,
+            name: str,
+            deliver: Callable[[events.ReceivedPacket], object],
+            identity: str,
+        ) -> Connection:
+            callbacks.append(deliver)
+            if during_connect:
+                deliver(packet(b"\x90\x3c\x64", 0, 1))
+            return Connection()
+
+    monkeypatch.setattr(_native, "Input", Client)
+    monkeypatch.setattr(sys, "unraisablehook", reported.append)
+    source = midi.Input().create_virtual("callback-failure", callback)
+    if not during_connect:
+        source.start_recording(tmp_path / "failed-callback.meedee")
+        callbacks[0](packet(b"\x90\x3c\x64", 0, 1))
+    assert closed.wait(2)
+
+    def close_on_controlling_thread() -> None:
+        source.close()
+        completed.set()
+
+    closer = Thread(target=close_on_controlling_thread)
+    closer.start()
+    try:
+        assert not completed.wait(0.02)
+    finally:
+        release.set()
+        closer.join(2)
+    assert completed.is_set() and close_calls == [1]
+    assert source.closed and source.failure is failure
+    if not during_connect:
+        try:
+            report = source.stop_recording(timeout=2)
+        except midi.StateError:
+            report = source.recording_report
+        assert report is not None and not report.complete
+        assert source.recording_report == report
+    callbacks[0](packet(b"\x90\x3e\x64", 1, 2))
+    assert len(seen) == 1 and len(reported) == 1
+    with pytest.raises(midi.StateError, match="closed"):
+        source.__enter__()
+    source.close()
+
+
+def test_raw_recording_attachment_is_rejected_without_opening_a_port(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def unexpected(**settings: object) -> None:
+        raise AssertionError("raw recording initialized native MIDI")
+
+    monkeypatch.setattr(_native, "Input", unexpected)
+    source = midi.Input(raw=True)
+    path = tmp_path / "raw.meedee"
+    with pytest.raises(midi.StateError, match="decoded input"):
+        source.start_recording(path)
+    assert not source.closed and not path.exists()
+    source.close()
+
+
+def test_callback_cleanup_allows_reentrant_close_from_callable_destruction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+    from threading import Event
+
+    destroyed = Event()
+    entered = Event()
+    release = Event()
+    callbacks: list[Callable[[events.ReceivedPacket], object]] = []
+    capture_clock = clock()
+
+    class Connection:
+        clock = capture_clock
+        closed = False
+        dropped_packets = 0
+        worker_failure = None
+        last_message_time = None
+
+        def close(self) -> None:
+            entered.set()
+            assert release.wait(2)
+            self.closed = True
+
+    class Client:
+        def __init__(self, **settings: object) -> None:
+            pass
+
+        def create_virtual(
+            self,
+            name: str,
+            callback: Callable[[events.ReceivedPacket], object],
+            identity: str,
+        ) -> Connection:
+            callbacks.append(callback)
+            return Connection()
+
+    class Callback:
+        def __call__(self, value: object) -> Iterator[object]:
+            return (v for v in ())
+
+        def __del__(self) -> None:
+            source.close()
+            destroyed.set()
+
+    monkeypatch.setattr(_native, "Input", Client)
+    monkeypatch.setattr(sys, "unraisablehook", lambda error: None)
+    source = midi.Input()
+    source.create_virtual("reentrant-close", Callback())
+    callbacks[0](packet(b"\x90\x3c\x64", 0, 1))
+    assert entered.wait(2)
+    closer = Thread(target=source.close, daemon=True)
+    closer.start()
+    try:
+        assert not destroyed.wait(0.02)
+    finally:
+        release.set()
+    closer.join(2)
+    assert destroyed.wait(2) and not closer.is_alive()
+    assert source.closed
+    assert isinstance(source.failure, TypeError)
+    source.close()

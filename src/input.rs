@@ -137,6 +137,10 @@ impl InputConnection {
             .saturating_add(self.resource.callback.as_ref().map_or(0, |c| c.discarded()))
     }
     #[getter]
+    fn worker_failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.resource.callback.as_ref().and_then(|c| c.failure(py))
+    }
+    #[getter]
     fn last_message_time(&self) -> Option<f64> {
         self.resource
             .callback
@@ -165,6 +169,7 @@ impl InputConnection {
         self.resource.callback.as_ref().unwrap().traverse(visit)
     }
     fn __clear__(&self) {
+        self.resource.callback.as_ref().unwrap().clear();
         lifecycle::defer(self.resource.clone());
     }
 }

@@ -755,3 +755,58 @@ automatically.
 play() leaves a retained output open for subsequent playback or sending; context
 exit, close() or destruction performs its usual cleanup. CompoundSendError keeps
 the underlying typed failure in __cause__, alongside its confirmed progress.
+
+
+## Record while processing input
+
+This starts background recording, receives one message or waits up to ten seconds,
+then finalizes the file. Recording also works with callbacks and does not depend
+on calls to receive.
+
+```python
+from meedee import midi
+
+with midi.Input() as source:
+    source.start_recording("rec.meedee")
+    print(source.receive(timeout=10))
+    print(source.stop_recording())
+```
+
+The recorder has its own bounded admission budget. A receive-queue overflow does
+not by itself discard data admitted to the recorder. Inspect the final report:
+loss, unfinished messages, callback failure or writer failure can make it incomplete.
+Starting creates or truncates the destination file. Raw inputs cannot attach a
+decoded archive recorder.
+
+If stop_recording times out, it stops admitting records but retains the recorder.
+Call stop_recording again to obtain the final report, even after closing the input.
+A new recording cannot start until finalization succeeds. recording_report keeps
+the last finalized report after close.
+
+## Cancel a receive without closing the input
+
+A cancellation token can be shared with another thread to interrupt a wait:
+
+```python
+from meedee import events, midi
+
+cancel = events.Cancellation()
+with midi.Input() as source:
+    print(source.receive(timeout=10, cancel=cancel))
+```
+
+Calling cancel.cancel() makes receive raise InterruptedError without consuming a
+queued message or closing the input. Omit cancel on the next call to receive again.
+None means timeout; after accepted input drains, normal closure raises StateError
+and terminal failure raises the retained error. Iteration ends quietly on normal
+closure and with_errors yields a terminal input failure once.
+
+last_message_time is local host monotonic seconds at the latest observed raw
+packet, before channel filtering. It is None until a packet arrives, updates
+independently of consuming messages and remains readable after close. Rust exposes
+the same observation as Option<Instant>. Neither is a MIDI timestamp.
+
+A user callback exception stops further delivery and starts safe cleanup. failure
+retains that exact exception, while sys.unraisablehook reports it to stderr.
+An attached recording is marked incomplete. Do blocking MIDI work on the
+controlling thread; receive and iteration remain unavailable in callback mode.

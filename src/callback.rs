@@ -53,12 +53,17 @@ impl CallbackBridge {
         self.callback.last_message_time()
     }
 
+    #[getter]
+    fn failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.callback.failure(py)
+    }
+
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         self.callback.traverse(visit)
     }
 
     fn __clear__(&self) {
-        self.callback.retire();
+        self.callback.clear();
     }
 }
 
@@ -98,11 +103,19 @@ impl Callback {
                 last_message_time: None,
                 accepting: true,
                 active: 0,
+                failure: None,
             }),
             drained: Condvar::new(),
             failed: AtomicBool::new(false),
             discarded: AtomicU64::new(0),
         })
+    }
+
+    pub fn failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.recover(self.state.lock())
+            .failure
+            .as_ref()
+            .map(|e| e.clone_ref(py))
     }
 
     pub fn discarded(&self) -> u64 {
@@ -178,6 +191,12 @@ impl Callback {
                 ))
             });
             if let Err(error) = result {
+                self.recover(self.state.lock()).accepting = false;
+                // Normalizing an exception can execute Python and release the GIL.
+                // Do it before taking the gate lock; readers may hold the GIL.
+                let failure = error.clone_ref(py).into_value(py).into_any();
+                let previous = self.recover(self.state.lock()).failure.replace(failure);
+                drop(previous);
                 error.write_unraisable(py, Some(callable));
             }
         });
@@ -187,7 +206,8 @@ impl Callback {
         let state = self.recover(self.state.lock());
         visit.call(&state.callable)?;
         visit.call(&state.clock)?;
-        visit.call(&state.result_types)
+        visit.call(&state.result_types)?;
+        visit.call(&state.failure)
     }
 
     pub fn last_message_time(&self) -> Option<f64> {
@@ -206,6 +226,12 @@ impl Callback {
         };
         // Decref can invoke arbitrary Python destructors. Never do it under a lock.
         drop(retired);
+    }
+
+    pub fn clear(&self) {
+        self.retire();
+        let failure = self.recover(self.state.lock()).failure.take();
+        drop(failure);
     }
 
     pub fn drain(&self) -> PyResult<()> {
@@ -255,6 +281,7 @@ struct DispatchState {
     last_message_time: Option<f64>,
     accepting: bool,
     active: usize,
+    failure: Option<Py<PyAny>>,
 }
 
 struct Delivery<'a> {
@@ -558,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    fn callback_errors_are_reported_and_later_messages_still_arrive() {
+    fn callback_errors_stop_delivery_and_retain_the_original_failure() {
         let _test = TEST_LOCK.lock().unwrap();
         Python::initialize();
         Python::attach(|py| {
@@ -582,7 +609,15 @@ mod tests {
                 .unwrap();
             let messages: Vec<(i64, Vec<u8>)> =
                 recorder.getattr("messages").unwrap().extract().unwrap();
-            assert_eq!(messages.len(), 2);
+            assert_eq!(messages.len(), 1);
+            let state = driver
+                .get()
+                .callback
+                .recover(driver.get().callback.state.lock());
+            assert!(!state.accepting);
+            let failure = state.failure.as_ref().unwrap().bind(py);
+            assert!(failure.is_instance_of::<pyo3::exceptions::PyValueError>());
+            assert_eq!(failure.str().unwrap().to_string(), "callback failed");
             let reports: Vec<String> = errors.getattr("errors").unwrap().extract().unwrap();
             assert_eq!(reports, vec!["callback failed"]);
             let close_errors: Vec<String> =
@@ -595,6 +630,37 @@ mod tests {
                 .get_item(0)
                 .unwrap()
                 .is(&recorder));
+        });
+    }
+
+    #[test]
+    fn exception_normalization_can_inspect_the_callback_gate() {
+        let _test = TEST_LOCK.lock().unwrap();
+        Python::initialize();
+        Python::attach(|py| {
+            let module = fixtures(py);
+            let context = module.call_method0("capture_errors").unwrap();
+            context.call_method0("__enter__").unwrap();
+            let recorder = module.getattr("Recorder").unwrap().call0().unwrap();
+            let bridge = Py::new(py, CallbackBridge::new(py, recorder.unbind()).unwrap()).unwrap();
+            let kind = module
+                .getattr("InspectingError")
+                .unwrap()
+                .cast_into::<pyo3::types::PyType>()
+                .unwrap();
+            let error = PyErr::from_type(kind, (bridge.clone_ref(py),));
+            bridge.get().callback.deliver(move |_| Err(error));
+            let failure = bridge.get().failure(py).unwrap();
+            assert!(failure.bind(py).getattr("observed").unwrap().is_none());
+            assert_eq!(
+                failure.bind(py).str().unwrap().to_string(),
+                "inspection while normalizing"
+            );
+            context
+                .call_method1("__exit__", (py.None(), py.None(), py.None()))
+                .unwrap();
+            bridge.get().retire();
+            bridge.get().callback.drain().unwrap();
         });
     }
 

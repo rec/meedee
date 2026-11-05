@@ -67,7 +67,7 @@ fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
         output.send(&packet).unwrap();
         output.send(&packet).unwrap();
         let InputItem::Message(first) = input
-            .receive(Some(Duration::from_secs(1)))
+            .receive(Some(Duration::from_secs(1)), None)
             .unwrap()
             .unwrap()
         else {
@@ -77,7 +77,7 @@ fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
         assert_eq!(first.sequence, 0);
         assert!(first.timestamp_ns.is_some());
         let InputItem::Diagnostic(loss) = input
-            .receive(Some(Duration::from_secs(1)))
+            .receive(Some(Duration::from_secs(1)), None)
             .unwrap()
             .unwrap()
         else {
@@ -86,7 +86,7 @@ fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
         assert_eq!(loss.lost, 1);
         output.send(&packet).unwrap();
         let InputItem::Message(next) = input
-            .receive(Some(Duration::from_secs(1)))
+            .receive(Some(Duration::from_secs(1)), None)
             .unwrap()
             .unwrap()
         else {
@@ -95,7 +95,10 @@ fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
         assert_eq!(next.sequence, 2);
         assert_eq!(next.clock, first.clock);
         input.close().unwrap();
-        assert!(input.receive(Some(Duration::ZERO)).unwrap().is_none());
+        assert!(matches!(
+            input.receive(Some(Duration::ZERO), None),
+            Err(midi::Error::Closed)
+        ));
         assert_eq!(input.dropped_packets(), 1);
         drop(output.close().unwrap());
     }
@@ -126,7 +129,7 @@ fn high_level_callbacks_are_serial_guard_blocking_io_and_drain_on_close() {
         .unwrap()
         .create_virtual("high-level-callback")
         .unwrap();
-    assert!(input.receive(Some(Duration::ZERO)).is_err());
+    assert!(input.receive(Some(Duration::ZERO), None).is_err());
     assert!(input.with_errors().next().unwrap().is_err());
     let output = Output::new(OutputOptions::default()).unwrap();
     let port = output
@@ -146,6 +149,77 @@ fn high_level_callbacks_are_serial_guard_blocking_io_and_drain_on_close() {
     assert_ne!(first.1, std::thread::current().id());
     input.close().unwrap();
     drop(output.close().unwrap());
+}
+
+#[test]
+fn attached_recording_with_callbacks_retains_activity_and_marks_panics_incomplete() {
+    use meedee::{archive, events::InputItem, midi};
+    enable();
+    for panic in [false, true] {
+        let name = format!("callback-recording-{panic}");
+        let path = std::env::temp_dir().join(format!(
+            "meedee-callback-recording-{}-{panic}-{}.meedee",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+        ));
+        let (sent, received) = mpsc::channel();
+        let mut input = midi::Input::new()
+            .with_callback(move |item| {
+                let item = item.unwrap();
+                let message = matches!(item, InputItem::Message(_));
+                sent.send(item).unwrap();
+                assert!(!(panic && message), "intentional recording callback panic");
+            })
+            .unwrap()
+            .create_virtual(&name)
+            .unwrap();
+        input
+            .start_recording(&path, &midi::RecordingOptions::default())
+            .unwrap();
+        let output = Output::new(OutputOptions::default()).unwrap();
+        let port = output
+            .ports()
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name() == name)
+            .unwrap();
+        let output = output.connect(&port).unwrap();
+        let start = std::time::Instant::now();
+        output.send(&Packet::Bytes(vec![0x90, 60, 90])).unwrap();
+        received.recv_timeout(Duration::from_secs(2)).unwrap();
+        if panic {
+            let deadline = start + Duration::from_secs(2);
+            while !input.closed() {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::yield_now();
+            }
+            assert!(input.close().is_err());
+        } else {
+            input.close().unwrap();
+        }
+        assert_eq!(input.recording_report().unwrap().complete, !panic);
+        let activity = input.last_message_time().unwrap();
+        assert!(activity >= start);
+        assert_eq!(input.last_message_time(), Some(activity));
+        let records =
+            archive::Reader::new(std::fs::File::open(&path).unwrap(), 1_048_576, true, false)
+                .unwrap()
+                .collect::<std::io::Result<Vec<_>>>()
+                .unwrap();
+        assert_eq!(
+            records
+                .iter()
+                .filter(|r| matches!(r, archive::Record::Event(_)))
+                .count(),
+            1
+        );
+        input.close().unwrap();
+        drop(output.close().unwrap());
+        std::fs::remove_file(path).unwrap();
+    }
 }
 
 #[test]
@@ -307,7 +381,7 @@ fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
             };
             output.send(packet.clone()).unwrap();
             let received = input
-                .receive(Some(Duration::from_secs(2)))
+                .receive(Some(Duration::from_secs(2)), None)
                 .unwrap()
                 .unwrap();
             let InputItem::Message(message) = received else {

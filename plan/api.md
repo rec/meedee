@@ -1859,8 +1859,8 @@ shape, while ordinary iteration yields T and prints diagnostics/errors.
 with_callback configures one Send + 'static FnMut(Result<InputItem<T>, midi::Error>)
 before opening. connect/create_virtual return the same high-level owner and start
 a dedicated serial dispatch thread. It consumes the bounded queue, retaining packet
-order and loss diagnostics. Receive, iteration and recording are rejected while
-callback delivery is configured. Native loss counters are checked during silence.
+order and loss diagnostics. Receive, iteration and timed record/record_to are rejected while
+callback delivery is configured; attached background recording is supported. Native loss counters are checked during silence.
 Callback panics are caught, stop delivery and remain observable through check_health.
 Blocking high-level MIDI operations are rejected on the callback thread using the
 existing transport callback guard. Close stops native admission, drains accepted
@@ -1878,7 +1878,8 @@ Opened input retains stream/clock after close. An unopened closed input returns
 state errors for those identities. dropped_packets and failure are readable in
 all states, returning zero/None before opening, with no native initialization or
 reopening. Python last_message_time and recording_report likewise return None
-before opening; their Rust parity is separate work.
+before opening. Rust now exposes last_message_time as Option<Instant> and
+recording_report as an optional retained report, as specified below.
 Rust failure() returns Option<Arc<midi::Error>>, preserving the first terminal
 error and its cause. Delivered retained errors use Error::Shared with source()
 pointing at the original error. Normal closure leaves failure empty, while
@@ -1912,3 +1913,40 @@ CompoundSendError preserves its typed underlying __cause__ as well as progress.
 The scoped 60-path audit and evidence are recorded in fix-differences.md.
 Rust enums, options and advanced streaming/clock helpers remain approved language
 adaptations. This does not assert whole-API or platform runtime equivalence.
+
+### Input method-level parity
+
+- Rust Input::start_recording(path, &RecordingOptions) attaches the existing
+  archive recorder and returns Arc<archive::Recorder>. Defaults and path behavior
+  match Python: label="", best_effort=false, payload_limit=1,048,576,
+  record_limit=128, byte_limit=8,388,608, metrics=false. Starting creates or
+  truncates the file. Raw input cannot attach decoded recording.
+- Background decoding/recording continues without receive calls and works with
+  callbacks. The existing bounded dispatcher is reused. Receive capacity and
+  recorder admission are independent: a receive overflow alone does not invalidate
+  records successfully admitted to the writer. Capture begins at attachment;
+  already decoded messages waiting for receive are not retroactively recorded.
+- stop_recording uses a positive bounded timeout. Timeout retains a stopping
+  recorder, stops new recording admission and permits retry even after input close.
+  A new recorder cannot attach until the prior one has finalized. The report
+  remains available afterward; an unfinished stop does not invent a report.
+  Recorder incompleteness returns a report; input close reports incomplete
+  finalization as an error. No writer thread is forcibly terminated.
+- last_message_time records locally observed raw-packet ingress before channel
+  filtering, independent of consuming messages and user callback delivery. It
+  starts None and survives close. Python returns host monotonic seconds; Rust
+  returns Option<Instant>. Neither is the MIDI packet timestamp.
+- Rust receive(timeout, cancel) replaces receive(timeout), with optional typed
+  duration and borrowed Cancellation. Cancellation has priority when observed,
+  returns midi::Error::Cancelled / Python InterruptedError, consumes no queued
+  item and leaves the input reusable. It does not interrupt a native driver call.
+- None/Ok(None) means timeout only. After accepted input drains, normal closure
+  raises Python StateError / Rust Error::Closed; retained terminal failure is
+  returned instead when present. Iteration suppresses normal closure and
+  with_errors yields one terminal failure.
+- Callback exceptions/panics stop further delivery, retain the original Python
+  exception or Rust panic failure, mark attached recording incomplete and are
+  reported to stderr. Teardown occurs outside callback scope. Python handles
+  callbacks that fail before connection setup returns. Receive and iteration
+  remain unavailable in callback mode. Callback references and retained errors
+  remain visible to Python cyclic GC.

@@ -12,7 +12,7 @@ mod recording;
 pub use recording::Recording;
 #[path = "input_api.rs"]
 mod api;
-pub use api::{Input, InputErrors};
+pub use api::{Input, InputErrors, RecordingOptions};
 
 /// Iterate over messages from the first input, reporting diagnostics to stderr.
 /// No native client is created until discovery or receiving. Drop closes input.
@@ -43,6 +43,8 @@ pub(super) struct Core {
     native_dropped: u64,
     raw_pending: VecDeque<io::Result<Item<transport::ReceivedPacket>>>,
     native_clock: Option<transport::Clock>,
+    recording: Option<recording::Attachment>,
+    recording_report: Option<crate::archive::RecordingReport>,
 }
 
 /// Borrowed input iteration that retains decoding diagnostics and terminal errors.
@@ -76,6 +78,8 @@ impl Core {
             native_dropped: 0,
             raw_pending: VecDeque::new(),
             native_clock: None,
+            recording: None,
+            recording_report: None,
         }
     }
     pub fn with_channel(self, channel: i64) -> crate::midi::Result<Self> {
@@ -218,14 +222,19 @@ impl Core {
             }
             return result.map_err(crate::midi::Error::from);
         }
+        let mut final_items = Vec::new();
         if let Some(decoder) = self.decoder.as_mut() {
             if lost > self.reported_loss {
-                self.pending.push_back(Ok(decoder.loss(
+                final_items.push(decoder.loss(
                     lost - self.reported_loss,
                     "packets dropped before input closed".into(),
-                )));
+                ));
+                self.reported_loss = lost;
             }
-            self.pending.extend(decoder.finish().into_iter().map(Ok));
+            final_items.extend(decoder.finish());
+        }
+        for item in final_items {
+            self.accept_item(item);
         }
         result.map_err(crate::midi::Error::from)
     }
@@ -306,11 +315,25 @@ impl Core {
                             self.reported_loss = self.reported_loss.saturating_add(d.lost);
                         }
                     }
-                    self.pending.push_back(Ok(item));
+                    self.accept_item(item);
                 }
             }
             Err(error) => self.pending.push_back(Err(error)),
         }
+    }
+    fn accept_item(&mut self, item: Item) {
+        if let (Some(mask), Item::Message(message)) = (self.channels, &item) {
+            match crate::routing::classify(message) {
+                Ok(info) if info.channel.is_some_and(|c| mask & (1 << (c - 1)) == 0) => return,
+                Err(error) => {
+                    self.pending.push_back(Err(error));
+                    return;
+                }
+                _ => {}
+            }
+        }
+        self.record_item(&item);
+        self.pending.push_back(Ok(item));
     }
     fn raw_loss(&self, lost: u64, reason: &str) -> crate::live::Diagnostic {
         crate::live::Diagnostic {
@@ -371,19 +394,6 @@ impl Core {
                     self.pending.clear();
                     return Some(item);
                 }
-                if let Ok(Item::Message(message)) = &item {
-                    if let Some(mask) = self.channels {
-                        match crate::routing::classify(message) {
-                            Ok(info)
-                                if info.channel.is_some_and(|c| mask & (1 << (c - 1)) == 0) =>
-                            {
-                                continue
-                            }
-                            Err(error) => return Some(Err(error)),
-                            _ => {}
-                        }
-                    }
-                }
                 return Some(item);
             }
             match self.next_ingress(deadline)? {
@@ -392,7 +402,9 @@ impl Core {
                     let decoder = self.decoder.as_mut().expect("opened decoder");
                     decoder.loss(diagnostic.lost, diagnostic.reason.clone());
                     decoder.begin_at(self.expected);
-                    return Some(Ok(Item::Diagnostic(diagnostic)));
+                    let item = Item::Diagnostic(diagnostic);
+                    self.record_item(&item);
+                    return Some(Ok(item));
                 }
                 Err(error) => {
                     if let Err(close_error) = self.close() {
@@ -422,9 +434,6 @@ impl Core {
                 self.expected = next;
                 return Some(Ok(IngressItem::Loss(diagnostic)));
             }
-            if self.closed || deadline.is_some_and(|d| Instant::now() >= d) {
-                return None;
-            }
             drop(state);
             let total = self.dropped_packets();
             if let Err(error) = self.check_health() {
@@ -441,6 +450,9 @@ impl Core {
                 self.expected = self.expected.saturating_add(diagnostic.lost);
                 self.reported_loss = total;
                 return Some(Ok(IngressItem::Loss(diagnostic)));
+            }
+            if deadline.is_some_and(|d| Instant::now() >= d) {
+                return None;
             }
             let wait = deadline.map_or(Duration::from_millis(50), |d| {
                 d.saturating_duration_since(Instant::now())
@@ -527,6 +539,7 @@ struct QueueState {
     lost: u64,
     closed: bool,
     next_sequence: u64,
+    last_message_time: Option<Instant>,
 }
 impl Queue {
     fn new(packet_limit: usize, byte_limit: usize) -> Self {
@@ -542,6 +555,7 @@ impl Queue {
         if state.closed {
             return;
         }
+        state.last_message_time = Some(Instant::now());
         state.next_sequence = packet.sequence.saturating_add(1);
         let size = packet.size();
         if state.packets.len() == self.packet_limit || size > self.byte_limit - state.bytes {
@@ -581,6 +595,147 @@ mod tests {
             timestamp: Some(sequence as i64 * 100),
         }
     }
+    #[test]
+    fn cancellation_preserves_queued_input_and_closure_is_distinct_from_timeout() {
+        let core = input(transport::Protocol::Midi1).with_channel(2).unwrap();
+        let queue = core.queue.clone();
+        let start = Instant::now();
+        queue.push(packet(0, &[0x90, 60, 90, 0x91, 62, 90]));
+        let mut input = Input::decoded(core);
+        let cancel = crate::events::Cancellation::default();
+        cancel.cancel();
+        assert!(matches!(
+            input.receive(None, Some(&cancel)),
+            Err(crate::midi::Error::Cancelled)
+        ));
+        assert!(!input.closed() && input.failure().is_none());
+        let activity = input.last_message_time().unwrap();
+        assert!(activity >= start);
+        let Some(Item::Message(message)) = input.receive(Some(Duration::ZERO), None).unwrap()
+        else {
+            panic!("selected message");
+        };
+        assert!(
+            matches!(message.as_ref(), Payload::Midi1(AnyMessage::NoteOn(m)) if m.note() == 62)
+        );
+        assert!(input.receive(Some(Duration::ZERO), None).unwrap().is_none());
+        input.close().unwrap();
+        assert_eq!(input.last_message_time(), Some(activity));
+        assert_eq!(input.stream().unwrap(), "keyboard");
+        assert_eq!(input.clock().unwrap().identity(), "test-clock");
+        assert!(matches!(
+            input.receive(Some(Duration::ZERO), None),
+            Err(crate::midi::Error::Closed)
+        ));
+        assert!(input.with_errors().next().is_none());
+        assert!(input.failure().is_none());
+    }
+
+    #[test]
+    fn attached_recording_runs_without_receiving_and_has_independent_capacity() {
+        let core = input(transport::Protocol::Midi1)
+            .with_receive_limits(1, 8192, 1024)
+            .unwrap();
+        let queue = core.queue.clone();
+        let mut input = Input::decoded(core);
+        queue.push(packet(0, &[0x90, 50, 90, 0x90, 52, 90]));
+        assert!(matches!(
+            input.receive(Some(Duration::ZERO), None).unwrap(),
+            Some(Item::Message(_))
+        ));
+        let path = std::env::temp_dir().join(format!(
+            "meedee-background-{}-{:?}.meedee",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let recorder = input
+            .start_recording(
+                &path,
+                &RecordingOptions {
+                    metrics: true,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        queue.push(packet(1, &[0x90, 60, 90, 0x90, 62, 90, 0x90, 64, 90]));
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while recorder.pressure().unwrap().accepted_records < 3 {
+            assert!(Instant::now() < deadline, "background recorder did not run");
+            std::thread::yield_now();
+        }
+        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        assert!(report.complete && report.records == 5);
+        assert!(input.failure().is_some()); // receive capacity is independent
+        let records = crate::archive::Reader::open(&path)
+            .unwrap()
+            .collect::<io::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(
+            records
+                .iter()
+                .filter(|r| matches!(r, crate::archive::Record::Event(_)))
+                .count(),
+            3
+        );
+        input.close().unwrap();
+        assert_eq!(input.recording_report(), Some(report));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn recording_stop_accounts_for_a_lost_tail_once() {
+        let core = input(transport::Protocol::Midi1)
+            .with_receive_limits(2, 8192, 1024)
+            .unwrap();
+        let queue = core.queue.clone();
+        for sequence in 0..3 {
+            queue.push(packet(sequence, &[0x90, 60, 90]));
+        }
+        let path = std::env::temp_dir().join(format!(
+            "meedee-stop-loss-{}-{}.meedee",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut input = Input::decoded(core);
+        input
+            .start_recording(
+                &path,
+                &RecordingOptions {
+                    best_effort: true,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        assert!(report.complete);
+        assert_eq!(report.gap_records, 1);
+        input.close().unwrap();
+        assert_eq!(input.dropped_packets(), 1);
+        assert_eq!(input.recording_report(), Some(report));
+        let records = crate::archive::Reader::open(&path)
+            .unwrap()
+            .collect::<io::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(
+            records
+                .iter()
+                .filter_map(|r| if let crate::archive::Record::Gap { lost, .. } = r {
+                    Some(lost)
+                } else {
+                    None
+                })
+                .sum::<u64>(),
+            1
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
     #[test]
     fn input_iterates_messages_with_provenance_and_channel_filtering() {
         let mut input = input(transport::Protocol::Midi1)
@@ -742,7 +897,7 @@ mod tests {
         let input = input(transport::Protocol::Midi1);
         input.queue.push(packet(0, &[0x90, 60, 90]));
         input.queue.push(packet(2, &[0x90, 62]));
-        let recording = input.record(Duration::ZERO).unwrap();
+        let recording = Input::decoded(input).record(Duration::ZERO).unwrap();
         assert!(matches!(&recording.records[0], Record::Clock(_)));
         assert!(matches!(&recording.records[1], Record::Stream { id, .. } if id=="keyboard"));
         assert!(
@@ -764,12 +919,12 @@ mod tests {
     fn recording_retains_terminal_receive_failure_as_a_discontinuity() {
         let input = input(transport::Protocol::Midi1);
         input.queue.push(packet(u64::MAX, &[0x90, 60, 90]));
-        let recording = input.record(Duration::ZERO).unwrap();
+        let recording = Input::decoded(input).record(Duration::ZERO).unwrap();
         assert!(
             matches!(recording.records.last().unwrap(), crate::archive::Record::Discontinuity { reason, .. } if reason.contains("sequence exhausted"))
         );
         assert_eq!(recording.records.len(), 3);
-        assert!(Core::new()
+        assert!(Input::new()
             .record(Duration::MAX)
             .unwrap_err()
             .to_string()
@@ -780,7 +935,9 @@ mod tests {
     fn recording_times_out_on_silence_and_releases_the_receiver() {
         let input = input(transport::Protocol::Midi1);
         let queue = Arc::downgrade(&input.queue);
-        let recording = input.record(Duration::from_millis(1)).unwrap();
+        let recording = Input::decoded(input)
+            .record(Duration::from_millis(1))
+            .unwrap();
         assert_eq!(recording.records.len(), 2);
         assert!(queue.upgrade().is_none());
     }
@@ -797,7 +954,9 @@ mod tests {
         ));
         let first = input(transport::Protocol::Midi1);
         first.queue.push(packet(0, &[0x90, 60, 90, 0x80, 60, 0]));
-        let recording = first.record_to(Duration::ZERO, &path, false).unwrap();
+        let recording = Input::decoded(first)
+            .record_to(Duration::ZERO, &path, false)
+            .unwrap();
         let original = std::fs::read(&path).unwrap();
         assert_eq!(
             crate::archive::Reader::open(&path)
@@ -807,10 +966,10 @@ mod tests {
             recording.records
         );
         assert!(
-            matches!(input(transport::Protocol::Midi1).record_to(Duration::ZERO, &path, false).unwrap_err(), crate::midi::Error::Io(e) if e.kind() == io::ErrorKind::AlreadyExists)
+            matches!(Input::decoded(input(transport::Protocol::Midi1)).record_to(Duration::ZERO, &path, false).unwrap_err(), crate::midi::Error::Io(e) if e.kind() == io::ErrorKind::AlreadyExists)
         );
         assert_eq!(std::fs::read(&path).unwrap(), original);
-        let second = input(transport::Protocol::Midi1)
+        let second = Input::decoded(input(transport::Protocol::Midi1))
             .record_to(Duration::ZERO, &path, true)
             .unwrap();
         assert_eq!(

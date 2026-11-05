@@ -13,7 +13,7 @@ from itertools import chain
 from os import PathLike
 from pathlib import Path
 from queue import Empty, Full
-from threading import Lock
+from threading import Lock, RLock, Thread
 from time import monotonic
 from types import TracebackType
 from typing import cast
@@ -194,6 +194,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         transport._closed = False
         connection._raw = transport
         self._connection = connection
+        connection._schedule_callback_close()
         return connection
 
     def record(
@@ -215,6 +216,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             raise ValueError("duration must be finite and nonnegative")
         if self._raw_mode:
             raise midi.StateError("recording requires decoded input (raw=False)")
+        if self._connection is not None and self._connection._bridge is not None:
+            raise midi.StateError("recording is unavailable in callback mode")
         records: list[
             events.Clock
             | archive.Stream
@@ -254,7 +257,9 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         return records
 
     def __enter__(self) -> Input[T]:
-        if self._closed:
+        # An early receive overflow may still have an accepted prefix to drain.
+        # Entering its existing ownership scope does not reopen the transport.
+        if self._closed or (self._connection is not None and self._connection._closing):
             raise midi.StateError("input is closed")
         if self._connection is None:
             self.connect(_native.select_port(self.ports(), self._port, "input"))
@@ -304,13 +309,15 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             if self._closed:
                 return
             self._closed = True
-            try:
-                if self._connection is not None:
-                    self._connection.close()
-            finally:
-                self._native = None
-                if self._context is not None:
-                    self._context.dispose()
+        # Teardown may release user callbacks and run Python destructors.
+        # Do not hold the initialization lock across that reentrant work.
+        try:
+            if self._connection is not None:
+                self._connection.close()
+        finally:
+            self._native = None
+            if self._context is not None:
+                self._context.dispose()
 
     def receive(
         self,
@@ -318,6 +325,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         timeout: float | str | None = None,
         cancel: events.Cancellation | None = None,
     ) -> T | None:
+        if cancel is not None and cancel.cancelled:
+            raise InterruptedError("MIDI receive cancelled")
         if self._connection is None:
             self.__enter__()
         assert self._connection is not None
@@ -334,6 +343,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         byte_limit: int | str = 8_388_608,
         metrics: bool = False,
     ) -> archive.Recorder:
+        if self._raw_mode:
+            raise midi.StateError("recording requires decoded input (raw=False)")
         self.__enter__()
         assert self._connection is not None
         return self._connection.start_recording(
@@ -378,7 +389,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         return self._connection.last_message_time
 
     @property
-    def failure(self) -> Exception | None:
+    def failure(self) -> BaseException | None:
         if self._connection is None:
             return None
         return self._connection.failure
@@ -689,7 +700,9 @@ class _InputTransport[T]:
         )
 
     @property
-    def worker_failure(self) -> Exception | None:
+    def worker_failure(self) -> BaseException | None:
+        if self._native is not None:
+            return self._native.worker_failure
         return None if self._context is None else self._context.failure_exception
 
     @property
@@ -956,12 +969,16 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
     _queue: ReceiveQueue[T]
     _lock: LockType
     _closing: bool
-    _failure: Exception | None
+    _failure: BaseException | None
     _recorder: archive.Recorder | None
     _recording_starting: bool
     _known_lost: int
     _ignored_on_close: int
     _recording_report: archive.RecordingReport | None
+    _recording_stopping: bool
+    _last_message_time: float | None
+    _callback_cleanup_started: bool
+    _close_lock: RLock
 
     def __init__(self) -> None:
         raise TypeError("connection handles are created by Input")
@@ -999,6 +1016,10 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
         connection._known_lost = 0
         connection._ignored_on_close = 0
         connection._recording_report = None
+        connection._recording_stopping = False
+        connection._last_message_time = None
+        connection._callback_cleanup_started = False
+        connection._close_lock = RLock()
         return connection
 
     @property
@@ -1026,20 +1047,20 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
         return 0 if self._raw is None else self._raw.dropped_packets
 
     @property
-    def failure(self) -> Exception | None:
-        return self._failure or (
-            None if self._raw is None else self._raw.worker_failure
-        )
+    def failure(self) -> BaseException | None:
+        if self._failure is not None:
+            return self._failure
+        if self._bridge is not None and (failure := self._bridge.failure) is not None:
+            return failure
+        return None if self._raw is None else self._raw.worker_failure
 
     @property
-    def worker_failure(self) -> Exception | None:
+    def worker_failure(self) -> BaseException | None:
         return None if self._raw is None else self._raw.worker_failure
 
     @property
     def last_message_time(self) -> float | None:
-        if self._bridge is not None:
-            return self._bridge.last_message_time
-        return None if self._raw is None else self._raw.last_message_time
+        return self._last_message_time
 
     @property
     def recording_report(self) -> archive.RecordingReport | None:
@@ -1052,8 +1073,10 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
         for item in items:
             if isinstance(item, events.StreamDiagnostic) and item.kind == "loss":
                 self._known_lost += item.lost
-            if self._recorder is not None and not isinstance(
-                item, events.ReceivedPacket
+            if (
+                self._recorder is not None
+                and not self._recording_stopping
+                and not isinstance(item, events.ReceivedPacket)
             ):
                 self._recorder.record(item)
             if self._bridge is None and self._failure is None:
@@ -1070,6 +1093,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             if self._closing:
                 self._ignored_on_close += 1
                 return
+            self._last_message_time = monotonic()
             items: list[
                 messages.Message | events.StreamDiagnostic | events.ReceivedPacket
             ] = [packet] if self._decoder is None else list(self._decoder.feed(packet))
@@ -1088,6 +1112,36 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
                     self._bridge.deliver(item)
                 else:
                     self._bridge.deliver_typed(item)
+                if (failure := self._bridge.failure) is not None:
+                    with self._lock:
+                        self._failure = failure
+                        self._closing = True
+                        if self._recorder is not None:
+                            self._recorder.fail(str(failure))
+                    self._schedule_callback_close()
+                    break
+
+    def _schedule_callback_close(self) -> None:
+        with self._lock:
+            if (
+                self._raw is None
+                or self._bridge is None
+                or self._bridge.failure is None
+                or self._callback_cleanup_started
+            ):
+                return
+            self._callback_cleanup_started = True
+        Thread(
+            target=self._close_after_callback,
+            name="meedee callback cleanup",
+            daemon=True,
+        ).start()
+
+    def _close_after_callback(self) -> None:
+        try:
+            self.close()
+        except INPUT_ERRORS as error:
+            print(error, file=sys.stderr)
 
     def __iter__(self) -> Iterator[messages.Message | events.ReceivedPacket]:
         for item in self.with_errors():
@@ -1232,56 +1286,73 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
 
     def stop_recording(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
         _native.check_thread()
+        timeout = _units.real(timeout, "second")
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError("timeout must be positive and finite")
         with self._lock:
-            self._final_loss()
             recorder = self._recorder
-            self._recorder = None
-        if recorder is None:
-            raise midi.StateError("no recording is attached")
-        if self._decoder is not None and self._decoder.pending:
-            recorder.fail("recording ended with an unfinished message")
-        self._recording_report = recorder.stop(timeout=timeout)
-        return self._recording_report
+            if recorder is None:
+                raise midi.StateError("no recording is attached")
+            if not self._recording_stopping:
+                self._final_loss()
+                if self._decoder is not None and self._decoder.pending:
+                    recorder.fail("recording ended with an unfinished message")
+                self._recording_stopping = True
+        return self._finish_recording(recorder, timeout)
+
+    def _finish_recording(
+        self, recorder: archive.Recorder, timeout: float | str = 5.0
+    ) -> archive.RecordingReport:
+        report = recorder.stop(timeout=timeout)
+        with self._lock:
+            self._recording_report = report
+            if self._recorder is recorder:
+                self._recorder = None
+                self._recording_stopping = False
+        return report
 
     def close(self) -> None:
         _native.check_thread()
-        if self._raw is None or self._closing and self._raw.closed:
-            return
-        with self._lock:
-            self._closing = True
-        self._failure = self.failure
-        failure: BaseException | None = None
-        try:
-            self._raw.close()
-        except BaseException as error:
-            # Preserve a transport failure if recording cleanup also fails.
-            failure = error
-            if isinstance(error, Exception):
-                self._failure = self._failure or error
-        try:
+        with self._close_lock:
+            if self._raw is None or self._closing and self._raw.closed:
+                return
             with self._lock:
-                self._final_loss()
-                if self._decoder is not None:
-                    self._accept(list(self._decoder.finish()))
-                recorder = self._recorder
-                self._recorder = None
-            if self._bridge is not None:
-                self._bridge.retire()
-                self._bridge.drain()
-            if recorder is not None:
-                self._recording_report = recorder.stop()
-                if not self._recording_report.complete:
-                    raise OSError(self._recording_report.failure)
-        except BaseException as error:
-            if isinstance(error, Exception):
-                self._failure = self._failure or error
+                self._closing = True
+            self._failure = self.failure
+            failure: BaseException | None = None
+            try:
+                self._raw.close()
+            except BaseException as error:
+                # Preserve a transport failure if recording cleanup also fails.
+                failure = error
+                if isinstance(error, Exception) and self._failure is None:
+                    self._failure = error
+            try:
+                with self._lock:
+                    self._final_loss()
+                    if self._decoder is not None:
+                        self._accept(list(self._decoder.finish()))
+                    recorder = self._recorder
+                    if recorder is not None:
+                        self._recording_stopping = True
+                if self._bridge is not None:
+                    self._bridge.retire()
+                    self._bridge.drain()
+                if recorder is not None:
+                    self._finish_recording(recorder)
+                    assert self._recording_report is not None
+                    if not self._recording_report.complete:
+                        raise OSError(self._recording_report.failure)
+            except BaseException as error:
+                if isinstance(error, Exception) and self._failure is None:
+                    self._failure = error
+                if failure is not None:
+                    raise BaseExceptionGroup(
+                        "MIDI close and recording cleanup both failed", [failure, error]
+                    ) from None
+                raise
             if failure is not None:
-                raise BaseExceptionGroup(
-                    "MIDI close and recording cleanup both failed", [failure, error]
-                ) from None
-            raise
-        if failure is not None:
-            raise failure
+                raise failure
 
     def __enter__(self) -> _InputState[T]:
         if self.closed:

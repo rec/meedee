@@ -268,6 +268,7 @@ def test_send_snapshots_mutable_and_strided_buffers(
     )
 
     class LocalConnection:
+        worker_failure = None
         clock = Clock(identity="test")
         dropped_packets = 0
         last_message_time = None
@@ -319,6 +320,7 @@ def test_context_exit_preserves_body_and_close_failures(
 ) -> None:
 
     class LocalConnection:
+        worker_failure = None
         clock = Clock(identity="test")
         dropped_packets = 0
         last_message_time = None
@@ -426,8 +428,10 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
     received = Event()
 
     class LocalConnection:
+        worker_failure = None
         clock = Clock(identity="test")
         dropped_packets = 0
+        closed = False
 
         def __init__(self, bridge: CallbackBridge) -> None:
             self.bridge = bridge
@@ -649,7 +653,7 @@ def test_initialization_timeout_reaps_the_new_worker(
 @pytest.mark.parametrize(
     "kind", ["coroutine", "generator", "async_generator", "awaitable"]
 )
-def test_deferred_results_are_reported_without_execution_and_delivery_continues(
+def test_deferred_results_stop_delivery_without_execution(
     isolated: bool, kind: str, workers: list[Popen[bytes]]
 ) -> None:
     executed = Event()
@@ -701,9 +705,11 @@ def test_deferred_results_are_reported_without_execution_and_delivery_continues(
         reported.set()
 
     class LocalConnection:
+        worker_failure = None
         clock = Clock(identity="test")
         dropped_packets = 0
         last_message_time = None
+        closed = False
 
         def __init__(self, bridge: CallbackBridge) -> None:
             self.bridge = bridge
@@ -739,9 +745,11 @@ def test_deferred_results_are_reported_without_execution_and_delivery_continues(
         source = input_client("twice", isolated=isolated)
         connection = source.connect(source.ports()[0], receive)
         assert reported.wait(3)
-        assert delivered.wait(3)
+        assert not delivered.is_set()
+        assert connection.closed
+        assert connection.failure is errors[0]
         connection.close()
-        assert messages == [b"\x90<\x7f", b"\xf8"]
+        assert messages == [b"\x90<\x7f"]
         assert len(errors) == 1 and "deferred work" in str(errors[0])
         assert not executed.is_set()
         if inspect.iscoroutine(returned[0]):

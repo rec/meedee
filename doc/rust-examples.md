@@ -655,7 +655,7 @@ let mut input = Input::new();
 let port = input.ports()?.into_iter().find(|p| p.name() == "meedee-example").unwrap();
 let mut input = input.connect(&port)?;
 output.send(NoteOn::new(60)?)?;
-println!("{:?}", input.receive(Some(Duration::from_secs(1)))?);
+println!("{:?}", input.receive(Some(Duration::from_secs(1)), None)?);
 output.send(NoteOff::new(60)?)?;
 input.close()?;
 output.close()?;
@@ -682,7 +682,7 @@ for packet in Input::new().raw()?.take(10) {
 }
 ```
 
-`receive(timeout)` and `with_errors()` return typed `InputItem<ReceivedPacket>`
+`receive(timeout, cancel)` and `with_errors()` return typed `InputItem<ReceivedPacket>`
 values, with `Message` containing the received packet and `Diagnostic` containing
 stream diagnostics. Default iteration reports diagnostics to stderr and yields
 packets. Decoded input keeps its existing `Input<Payload>` behavior. Raw input
@@ -713,7 +713,8 @@ same bounded receive queue as iteration. Closures must be `Send + 'static` and
 return promptly. Blocking MIDI operations are rejected inside callbacks. Use a
 channel to ask the controlling thread to perform them.
 
-Receive, iteration and decoded recording are unavailable in callback mode.
+Receive, iteration and timed record/record_to are unavailable in callback mode.
+Attached background recording is available through start_recording.
 Callback panic stops further delivery and is observable through `check_health()`.
 Close stops native delivery, drains accepted input to the callback and joins the
 dispatch thread. It waits for an active callback to return. Closing is terminal.
@@ -798,3 +799,66 @@ play leaves a retained output open for subsequent playback or sending, with
 normal close/Drop cleanup. Rust compound-send errors retain their typed cause;
 Python exposes that cause through __cause__ and uses WorkerError for worker
 failures in both real and simulated transports.
+
+
+## Record while processing input
+
+Attach the existing archive recorder while retaining normal input access.
+Recording runs independently of receive calls and also supports callback inputs.
+
+```rust
+use meedee::midi::{Input, RecordingOptions};
+use std::time::Duration;
+
+let mut input = Input::new();
+input.start_recording("rec.meedee", &RecordingOptions::default())?;
+println!("{:?}", input.receive(Some(Duration::from_secs(10)), None)?);
+println!("{:?}", input.stop_recording(Duration::from_secs(5))?);
+input.close()?;
+```
+
+The returned Arc<archive::Recorder> gives access to the same recorder, including
+opt-in pressure metrics. RecordingOptions matches Python's label, best_effort,
+payload_limit, record_limit, byte_limit and metrics keywords. File handling matches
+Python's existing recorder: starting a recording creates or truncates the path.
+
+Recording has independent admission. Receive-queue overflow does not by itself
+make a successfully retained recording incomplete. Known loss, unfinished messages,
+callback panic and writer failure remain visible in the final report. Raw input
+cannot attach decoded archive recording.
+
+A stop timeout retains the stopping recorder. Retry stop_recording later, including
+after close, to obtain the final report. No replacement recording can start until
+finalization succeeds. recording_report() retains the completed snapshot after
+close; an unfinished stop does not invent a report.
+
+## Cancel a receive without closing the input
+
+Share Cancellation with another thread to interrupt a receive:
+
+```rust
+use meedee::{events::Cancellation, midi::Input};
+use std::time::Duration;
+
+let cancel = Cancellation::default();
+let mut input = Input::new();
+println!("{:?}", input.receive(Some(Duration::from_secs(10)), Some(&cancel))?);
+input.close()?;
+```
+
+cancel.cancel() makes receive return Error::Cancelled without consuming queued
+input or closing the connection. Pass None as the next cancellation argument to
+receive again. Ok(None) means timeout only. After accepted input drains, normal
+closure returns Error::Closed; a terminal failure returns the retained error.
+Ordinary iteration stops quietly on normal closure; with_errors returns a terminal
+failure once.
+
+last_message_time() returns Option<Instant> at raw packet ingress, before channel
+filtering, independently of consuming messages. Python exposes monotonic seconds
+for the same host observation. Both retain the value after close and return None
+before any packet. This time is independent of the MIDI packet's optional timestamp.
+
+A callback panic stops further calls, retains its failure and closes the transport
+outside callback scope. Attached recording becomes incomplete. Python follows
+the same policy for callback exceptions, preserving the original exception in
+failure and reporting it to stderr.

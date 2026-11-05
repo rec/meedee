@@ -349,3 +349,39 @@ language-specific behavior.
 No physical devices, old Rust toolchains, publication or platform runtime
 qualification were used. Workspace compilation reports existing Python-binding
 warnings unrelated to these changes; strict core Clippy is clean.
+
+## Method-level input follow-up
+
+The user subsequently requested the five concrete method/behavior gaps remaining
+after the module-scope audit. All six design recommendations were approved before
+implementation: independent background recording with a shared recorder handle,
+host ingress activity (Python seconds/Rust Instant), receive-only cancellation,
+explicit closure errors, terminal callback failure, and retryable recorder stops.
+
+Implementation reuses the archive recorder and Rust's input dispatcher, with a
+shared internal input owner so controls can stop recording while a callback runs.
+The dispatcher releases the input lock before waiting for ingress or calling user
+code. Native ingress and decoded delivery remain bounded. No new transport,
+scheduler, dependency or Python runtime isolation mechanism was introduced.
+
+Coverage includes recording without receive calls; callback recording success and
+panic; receive-capacity independence; no retroactive recording of decoded pending
+messages; exact cancellation/closure behavior; retained activity; callback failure
+before and after connection setup; original exception identity; and retry after
+recorder timeout and input close. Both guides, the API contract and README were
+updated. public-symbols.txt remains uncommitted.
+
+Final verification:
+
+- Full Python suite: 567 passed without warnings.
+- Rust workspace: 233 passed, 5 opt-in tests ignored, using the current compiler.
+- All 35 Rust guide snippets compiled with no_run wrappers; no guide I/O executed.
+- Strict core Clippy, cargo fmt, Python Ruff, 3.13 pyupgrade and ty check meedee passed.
+- Strict documentation build: no issues.
+- Concurrency regressions cover exception normalization outside native callback
+  locks, overlapping automatic/explicit close, and callable-destructor reentry.
+- Closed inputs retain stream/clock metadata and host ingress activity; cancellation
+  preserves the accepted prefix and leaves the input reusable.
+
+Physical-device and cross-platform runtime qualification remain separate; no old
+Rust toolchain was run locally. Additional work beyond the prompt: None.

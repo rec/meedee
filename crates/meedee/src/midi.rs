@@ -1,6 +1,6 @@
 //! Native MIDI discovery, input, output and scoped connections.
 
-pub use crate::input::{Input, InputErrors, Recording};
+pub use crate::input::{Input, InputErrors, Recording, RecordingOptions};
 #[doc(hidden)]
 pub use crate::output::{select_port_index, OutputState};
 pub use crate::output::{Output, OutputValue, PlaybackOptions};
@@ -14,6 +14,8 @@ pub enum Error {
     Send(crate::transport::Error),
     Transport(crate::transport::Error),
     Io(std::io::Error),
+    Closed,
+    Cancelled,
     /// A retained failure also available through Input::failure().
     Shared(std::sync::Arc<Error>),
     Value(crate::messages::ValueError),
@@ -24,6 +26,8 @@ impl std::fmt::Display for Error {
         match self {
             Self::Init(e) | Self::Connect(e) | Self::Send(e) | Self::Transport(e) => e.fmt(f),
             Self::Io(e) => e.fmt(f),
+            Self::Closed => f.write_str("input is closed"),
+            Self::Cancelled => f.write_str("MIDI receive cancelled"),
             Self::Shared(e) => e.fmt(f),
             Self::Value(e) => e.fmt(f),
         }
@@ -35,6 +39,7 @@ impl std::error::Error for Error {
         Some(match self {
             Self::Init(e) | Self::Connect(e) | Self::Send(e) | Self::Transport(e) => e,
             Self::Io(e) => e,
+            Self::Closed | Self::Cancelled => return None,
             Self::Shared(e) => e.as_ref(),
             Self::Value(e) => e,
         })

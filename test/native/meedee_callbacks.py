@@ -146,3 +146,14 @@ def verify_send_boundary(output: Output) -> None:
         else:
             raise AssertionError("send accepted a non-bytes argument")
     output.send(b"\x90\x3c\x7f")
+
+
+class FailureSource(Protocol):
+    @property
+    def failure(self) -> BaseException | None: ...
+
+
+class InspectingError(Exception):
+    def __init__(self, source: FailureSource) -> None:
+        super().__init__("inspection while normalizing")
+        self.observed = source.failure
