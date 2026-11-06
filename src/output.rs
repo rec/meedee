@@ -52,6 +52,7 @@ impl Output {
         backend: Option<Backend>,
     ) -> PyResult<Self> {
         check_blocking_thread()?;
+        lifecycle::initialize(py)?;
         let native = py
             .detach(|| {
                 native_call("create output", || {

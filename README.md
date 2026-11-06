@@ -1,12 +1,18 @@
 # meedee
 
 A Rust MIDI toolkit with matching Python bindings for macOS, Windows and Linux,
-using vendored [libremidi](https://github.com/celtera/libremidi) for native transport. Python
-imports are `meedee.midi`, `meedee.events`, `meedee.messages`, `meedee.codecs`,
-`meedee.controls`, `meedee.tuning`, `meedee.gm`, `meedee.universal`, `meedee.mpe`,
-`meedee.timecode`, `meedee.ump`, `meedee.smf`, `meedee.syx`, `meedee.clip` and
-`meedee.archive` and `meedee.ci`; the package root is empty. The Python convenience
+using vendored [libremidi](https://github.com/celtera/libremidi) for native transport.
+Use `import meedee as md` for common classes such as `md.Input`, `md.Output`,
+`md.Note` and `md.NoteOn`. All public submodules are also available, for example
+`md.tuning`, `md.ump` and `md.archive`. The explicit `meedee.__all__` contains
+classes and submodules; functions remain module-qualified. The Python convenience
 API uses reccy for unit parsing; the Rust crate needs no Python interpreter.
+
+The common root names are the original class objects. `Reader` and `Writer` refer
+to the archive format, `Decoder` to the MIDI 1 byte codec, `Route` to routing, and
+`ParameterStep` to the compound MIDI command. Specialist names such as `Tracker`,
+`Session` and `Report` stay in their submodules. Importing the package does not
+load the optional CLI implementation or uFor adapter dependencies.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented but native platform qualification remains incomplete. Immutable
@@ -22,11 +28,9 @@ commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
 
 ```python
-from meedee.messages import Note, Rest
-from meedee.midi import Output
+import meedee as md
 
-with Output(bpm=120) as out:
-    out.send(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
+md.Output().send(md.Note("500 ms", 60))
 ```
 
 `Note(duration, note, velocity=90, channel=None)` plays an attack and release;
@@ -48,8 +52,18 @@ full-note values or automatic cleanup.
 ## Files, typed I/O and exact time
 
 Rust users can start with the [practical Rust examples](doc/rust-examples.md).
-The crate exports `midi::{Input, Output, Recording}`,
-`messages::{Note, Rest, Beats}` and `archive::Reader`. Use `Duration` for elapsed time and `Beats` with output tempo for music.
+The Rust crate also exposes common types at its root: `meedee::{Input, Output,
+Note, Rest, Beats, Reader}`. The canonical submodule paths remain available.
+Use `Duration` for elapsed time and `Beats` with output tempo for music.
+For a function body returning `Result<(), Box<dyn std::error::Error>>`:
+
+```rust
+use meedee::{Note, Output};
+use std::time::Duration;
+
+Output::new().send(Note::new(Duration::from_millis(500), 60)?)?;
+```
+
 `Input::new()` iterates messages; `Output::send` accepts individual values,
 heterogeneous sequences and timestamped recordings. `Input::record(Duration)` returns
 a capture accepted directly by `Output::send`; `Reader::open(path)` reads the
@@ -729,8 +743,11 @@ including retained clients; the Python cleanup registry permits 32 connections
 and has four workers. Stalled callbacks or teardown can occupy all cleanup
 workers. There is no global quota across isolated processes.
 
-Importing transport initializes cleanup workers without opening a MIDI device.
-Importing messages/events alone does not start them. Interpreter shutdown retires
+Importing meedee eagerly loads public submodules and validates interpreter
+compatibility, without starting cleanup workers or opening a MIDI device.
+Constructing Input/Output also starts no workers. Native cleanup workers start
+when the first native client is created; isolated-process cleanup is registered
+when the first child is started. Interpreter shutdown retires
 callbacks and drains cleanup; isolated children that exceed their deadline are
 terminated and reaped. In-process driver calls and parent callbacks can still
 block shutdown. Forced termination bypasses graceful cleanup. Free-threaded

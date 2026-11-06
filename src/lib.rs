@@ -128,7 +128,7 @@ fn populate_events(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    lifecycle::initialize(module.py())?;
+    lifecycle::validate_interpreter(module.py())?;
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
     packets::register_transport(module)?;
     let py = module.py();

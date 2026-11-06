@@ -745,7 +745,7 @@ monotonic caller-clock requirement.
 ## Slice 7 UMP/MIDI 2.0 contract
 
 The pure `meedee.ump` namespace exposes frozen native Message subclasses backed
-by Rust values. It does not import transport, initialize workers, perform I/O or
+by Rust values. It creates no transport clients, initializes no workers, performs no I/O and does not
 attach host timestamps. `encode` returns an immutable tuple of 32-bit words;
 `decode` requires exactly one UMP. Decoder.feed accepts word lists/tuples and
 returns ordered typed values or frozen diagnostics with cumulative word offsets.
@@ -1121,7 +1121,7 @@ or sent. The existing MPE tracker retains its separate zone/member semantics.
 Rust `routing::Route` and Python `routing.Route` specify name, exact source and
 destination identities, protocol, optional channel/group selectors and optional
 channel/group remaps. Python protocol values are `"midi1"` or `"ump"`, allowing
-configuration and preview without importing transport clients. Channels/groups
+configuration and preview without constructing transport clients. Channels/groups
 use 1-16; byte MIDI rejects group options. Python routes are frozen; Rust fields
 are private and constructor-validated. No mandatory dependency is added.
 
@@ -1345,7 +1345,7 @@ The public Rust `testing` module and Python `meedee.testing` provide `ManualCloc
 `Input`, `Output` and independent frozen Python `InputReport` / `OutputReport`
 snapshots. They initialize no native lifecycle, clients, threads, timers or sleeps.
 Python constructors require `protocol="midi1"|"ump"` so even test construction
-does not require importing the native MIDI module. Rust uses the existing
+does not create a native MIDI client. Rust uses the existing
 `transport::Protocol` and `Packet` values. This is a small receive/send-compatible
 testing surface, not another selectable native backend or a complete replacement
 for discovery, callback, recording, playback or compound-send connection methods.
@@ -1614,7 +1614,7 @@ queued input is eligible; there is no automatic drain or time alignment. Blockin
 in-process drivers or arbitrary caller code can exceed the observation deadline.
 
 `meedee tuning-preview --device-id ID --program P [--bank B] --timeout SECONDS`
-prints the exact request bytes and deadline duration without importing native MIDI
+prints the exact request bytes and deadline duration without initializing native MIDI resources
 or opening ports. `meedee tuning-query DESTINATION` takes those same fields plus
 required `--input-port NAME --output-port NAME`. It uses process isolation by
 default and resolves both exact, unique names before opening either endpoint.
@@ -1967,5 +1967,31 @@ original exception type, with report/completed_events attached; validation befor
 execution may raise without progress attributes. Rust returns Failure with its
 report and typed cause. Sending does not close the output. No legacy
 aliases remain. See both guides for equivalent scalar and recorded-source usage.
+
+Additional work beyond the prompt: None.
+
+
+## Common package-root classes
+
+Python eagerly imports all public submodules and re-exports a curated set of
+common classes through meedee.__all__. Functions remain module-qualified; this
+iteration adds no function exports or renames. Root classes are the exact same
+objects as their canonical submodule classes, retaining __module__, identity,
+serialization and typing behavior. Reader/Writer select archive types, Decoder
+the MIDI 1 byte codec, Route the routing definition, and ParameterStep the
+compound message. Ambiguous Tracker/Session/Report names stay module-qualified.
+
+The Rust crate root exposes the corresponding common values and I/O, retaining
+idiomatic enums, traits and options where Python uses classes and keywords.
+Existing error and tuning-value representation differences remain explicit:
+Rust Error/TuningValue correspond to Python's exception classes and Pitch/NoChange.
+No new wrappers or duplicated implementations are introduced.
+
+Eager import validates the supported interpreter but starts no native cleanup
+workers, isolated workers or MIDI clients. Native cleanup workers initialize
+before the first native client is created; isolated cleanup registration occurs
+at the first child startup. Optional CLI implementation and uFor dependencies
+remain lazy. Import-all behavior replaces previous module-presence assumptions;
+pure value/file construction still performs no native MIDI initialization.
 
 Additional work beyond the prompt: None.

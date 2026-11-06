@@ -371,9 +371,13 @@ class Context:
 
 def start_worker() -> subprocess.Popen[bytes]:
     """Reserve startup and retain retiring processes until exit is confirmed."""
+    global SHUTDOWN_REGISTERED
     with REGISTRY_LOCK:
         if SHUTTING_DOWN:
             raise _native.StateError("MIDI interpreter shutdown has begun")
+        if not SHUTDOWN_REGISTERED:
+            atexit.register(shutdown)
+            SHUTDOWN_REGISTERED = True
         for slot in range(MAX_WORKERS):
             process = WORKERS[slot]
             if not STARTING_WORKERS[slot] and (
@@ -568,4 +572,4 @@ WORKERS: list[subprocess.Popen[bytes] | None] = [None] * MAX_WORKERS
 DELIVERIES: weakref.WeakSet[Delivery] = weakref.WeakSet()
 REGISTRY_LOCK = Lock()
 SHUTTING_DOWN = False
-atexit.register(shutdown)
+SHUTDOWN_REGISTERED = False

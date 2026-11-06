@@ -136,7 +136,7 @@ impl<C: Send, N: Send> Resource for Managed<C, N> {
     }
 }
 
-pub fn initialize(py: Python<'_>) -> PyResult<()> {
+pub fn validate_interpreter(py: Python<'_>) -> PyResult<()> {
     // SAFETY: attached to a live interpreter; process state requires the main interpreter.
     if unsafe { pyo3::ffi::PyInterpreterState_GetID(pyo3::ffi::PyInterpreterState_Get()) } != 0 {
         return Err(PyRuntimeError::new_err(
@@ -151,6 +151,11 @@ pub fn initialize(py: Python<'_>) -> PyResult<()> {
             "meedee requires a standard GIL-enabled Python build; free-threaded builds are unsupported",
         ));
     }
+    Ok(())
+}
+
+pub fn initialize(py: Python<'_>) -> PyResult<()> {
+    validate_interpreter(py)?;
     if RUNTIME.get().is_none() {
         let runtime = Runtime::start().map_err(|error| {
             ResourceError::new_err(format!("start MIDI cleanup workers: {error}"))

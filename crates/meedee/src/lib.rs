@@ -51,3 +51,36 @@ pub mod tuning_live;
 
 pub mod ci_live;
 pub mod discovery;
+
+// Common values and I/O; specialist operations remain in their public modules.
+pub use archive::{Reader, Recorder, RecordingReport, Writer};
+pub use codecs::Decoder;
+pub use controls::{
+    ControlInterpreter, Controller, ParameterFamily, StepDirection, VelocityInterpreter,
+};
+pub use events::{
+    Cancellation, Clock, ClockMapping, PacketDecoder, PlaybackPlan, PlaybackReport, Rational,
+    ReceivedPacket, SourceSpan, StreamDiagnostic, Timestamp,
+};
+pub use gm::{BankProgram, BankProgramSelect, DrumKit, Gm1On, Gm2On, GmOff, Percussion, Program};
+pub use inspection::{ComparisonReport, Monitor, MonitorReport};
+pub use messages::{
+    ActiveSensing, AnyCommand, AnyMessage, Beats, ChannelPressure, Command, Continue,
+    ControlChange, ControlChange14, Message, Note, NoteOff, NoteOn, NrpnSet, ParameterStep,
+    PitchBend, PolyPressure, PrimitiveMessage, ProgramChange, QuarterFrame, Rest, RpnSet,
+    SongPosition, SongSelect, Start, Stop, SysEx, SystemReset, TimingClock, TuneRequest,
+};
+pub use metrics::{Distribution, Histogram};
+pub use midi::{
+    Backend, Error, Input, Output, OutputSource, OutputValue, PlaybackOptions, Port, Protocol,
+    Recording, RecordingOptions, TimestampMode,
+};
+pub use mpe::ZoneConfiguration;
+pub use routing::{Route, Router};
+pub use timecode::FrameRate;
+pub use transport::Packet;
+pub use tuning::{NoteTuning, Pitch, ScaleOffsets, TuningTable, TuningValue};
+pub use ump::{Midi1Packet, SysEx7Packet, SysEx8Packet};
+pub use universal::{
+    IdentityReply, IdentityRequest, MasterCoarseTuning, MasterFineTuning, MasterVolume,
+};

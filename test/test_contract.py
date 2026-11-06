@@ -98,3 +98,29 @@ def test_client_initialization_is_deferred_until_discovery(
     client = client_type(isolated=isolated)
     with pytest.raises(midi.InitError, match="initialization attempted"):
         client.ports()
+
+
+def test_root_exports_all_public_modules_and_only_curated_classes() -> None:
+    from importlib import import_module
+    from pkgutil import iter_modules
+    from types import ModuleType
+
+    import meedee as md
+
+    modules = {m.name for m in iter_modules(md.__path__) if not m.name.startswith("_")}
+    exported_modules = {n for n in md.__all__ if isinstance(getattr(md, n), ModuleType)}
+    assert exported_modules == modules
+    assert md.__all__ == sorted(set(md.__all__))
+    assert {n for n in vars(md) if not n.startswith("_")} == set(md.__all__)
+    for n in set(md.__all__) - modules:
+        value = getattr(md, n)
+        assert isinstance(value, type)
+        assert getattr(import_module(value.__module__), value.__name__) is value
+    assert md.Input is md.midi.Input
+    assert md.Output is md.midi.Output
+    assert md.Note is md.messages.Note
+    assert md.Reader is md.archive.Reader
+    assert md.Route is md.routing.Route
+    assert md.ParameterStep is md.messages.ParameterStep
+    assert not hasattr(md, "decode") and not hasattr(md, "run")
+    assert not hasattr(md, "Tracker") and not hasattr(md, "Session")

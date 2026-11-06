@@ -644,3 +644,12 @@ def test_scalar_note_report_counts_rounded_deadlines(
         report = output.send(messages.Note(1, 60))
         assert report.sent_events == 2
         assert report.rounded_events == 1
+
+
+def test_root_api_sends_a_full_note(transport: NativeConnection) -> None:
+    import meedee as md
+
+    report = md.Output().send(md.Note("500 ms", 60))
+    assert report.sent_events == 2
+    assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
+    assert transport.closed

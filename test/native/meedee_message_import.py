@@ -9,6 +9,7 @@ def main() -> None:
     with patch(
         "atexit.register", side_effect=AssertionError("cleanup was initialized")
     ):
+        import meedee as md
         from meedee import (
             archive,
             ci,
@@ -37,6 +38,15 @@ def main() -> None:
             ump,
             universal,
         )
+
+        assert md.Note is messages.Note and md.Output is md.midi.Output
+        assert "ufor" not in sys.modules
+        assert "meedee._cli" not in sys.modules
+        assert "tyro" not in sys.modules
+        assert "pint" not in sys.modules
+        client = md.Output()
+        assert not client.closed
+        client.close()
 
         histogram = metrics.Histogram()
         histogram.observe(1)
@@ -184,9 +194,9 @@ def main() -> None:
         view = controls.ControlInterpreter()
         assert view.feed((messages.TimingClock()).replace(stream="s")) == []
 
-        assert "meedee.midi" not in sys.modules
-        assert "meedee._native" not in sys.modules
-        assert "meedee._clients" not in sys.modules
+        assert "meedee.midi" in sys.modules
+        assert "meedee._native" in sys.modules
+        assert "meedee._clients" in sys.modules
 
 
 if __name__ == "__main__":

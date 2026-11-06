@@ -33,6 +33,7 @@ impl Input {
         receive_byte_limit: usize,
     ) -> PyResult<Self> {
         check_blocking_thread()?;
+        lifecycle::initialize(py)?;
         let native = py
             .detach(|| {
                 native_call("create input", || {
