@@ -1,26 +1,10 @@
 # Practical Python MIDI examples
 
+A graded series of examples.
+
 For the Rust API, see the [practical Rust examples](rust-examples.md).
 
-Start with one note, then work through timing, live input, files and instrument
-management. Each code block is a separate script. Use Python 3.13 and install
-with `uv sync --locked`; the tuning example also needs `--extra ufor`.
-See [build requirements](https://github.com/rec/meedee/blob/main/README.md#build-and-qualification).
-
-The live examples use the **first available port** and hard-coded settings.
-Connect a suitable keyboard or synth before running them. MIDI carries messages,
-not audio; configure the synth's sound and audio output separately. Channels are
-1..16, notes and velocities are 0..127, and program numbers are 1..128.
-
-Input and Output construction opens nothing. Discovery, connection or actual I/O
-initializes the resource; empty playback opens no ports. Inputs and outputs run
-in-process by default. Use `isolated=True` for worker failure
-containment; neither mode requires a main guard. Native MIDI 1 output tracks notes and selected controls for cleanup
-when explicitly closed or when leaving its context.
-
-## 1. Play one note
-
-Play middle C for half a second on the first output.
+## 1. Play middle C for half a second
 
 ```python
 from meedee.messages import Note
@@ -30,20 +14,15 @@ with Output() as out:
     out.send(Note("500 ms", 60))
 ```
 
-`Note` sends both the attack and release. Velocity defaults to 90; the channel
-comes from the output, which defaults to 1. Use `Output(channel=2)` to change it.
-
-## 2. Play a tune in beats
-
-Set tempo once. Each note or rest advances the tune by its duration.
+## 2. Play a tune in 120 bpm
 
 ```python
 from meedee.messages import Note, Rest
 from meedee.midi import Output
 
-with Output(bpm=120) as out:  # Numeric durations are beats.
+with Output(bpm=120) as out:
     out.send(
-        Note(duration=1, note=60, velocity=90),
+        Note(duration=1, note=60, velocity=90),  # 1 beat
         Note(0.5, 62, 70),
         Note(0.5, 64, 100),
         Rest("1 beat"),
@@ -51,28 +30,7 @@ with Output(bpm=120) as out:  # Numeric durations are beats.
     )
 ```
 
-One beat is a quarter note. Without `bpm`, numeric durations mean seconds.
-Explicit time units keep their meaning at any tempo; explicit beats require
-`bpm`. The clock and scheduling are automatic, without explicit clocks or sleeps.
-
-`Output(port="FLOW 8")` selects a unique name substring; shell patterns support
-`*`, `?`, `[abc]`, `[a-z]` and `[!abc]`. Empty patterns are rejected.
-Input supports the same selection. Two-stage `client.connect(client.ports()[0])`
-returns the same object. Closing is terminal; create a new object to reconnect.
-For overlapping attacks, use `NoteOn` with delays and explicit `NoteOff` releases;
-`Note` instead releases before the next item starts. Numeric delays follow the
-same tempo rule as notes and rests.
-
-Context exit releases outstanding tracked MIDI 1 notes and resets changed pitch
-bend, modulation, sustain, sostenuto, soft pedal and channel/polyphonic pressure.
-Cleanup sends note-offs first, sorted by channel and note, then controller resets
-in the same deterministic order as Rust.
-Volume, pan, expression, programs and tuning are left alone. Reserve the channels
-for these examples; transport failure can prevent cleanup. UMP does not support these full-note values or automatic cleanup.
-
-## 3. See what your keyboard sends
-
-Print messages from the first input. Stop with Ctrl-C.
+## 3. Listen to an input
 
 ```python
 from meedee.midi import Input
@@ -80,13 +38,6 @@ from meedee.midi import Input
 for message in Input():
     print(message)
 ```
-
-Iteration yields individual MIDI messages, never `Note` values. Recoverable input
-errors are printed to stderr and reception continues; a terminal input failure
-is reported and ends iteration. Setup, close and output failures still raise.
-Each message carries optional `timestamp`, `stream` and `span` fields.
-`replace()` and `transpose()` preserve them. Use `Input(raw=True)` for raw
-transport packets.
 
 ## 4. Transpose a keyboard up an octave
 
@@ -98,10 +49,7 @@ from meedee.midi import Input, Output
 
 with Input() as input, Output() as output:
     for m in input:
-        if isinstance(m, (NoteOn, NoteOff)):
-            output.send(m.transpose(12))
-        else:
-            output.send(m)
+        output.send(m.transpose(12))
 ```
 
 `transpose()` returns a new message and clamps the note to 0..127. To handle
@@ -115,17 +63,15 @@ from meedee.midi import Input, Output
 
 with Input() as input, Output() as output:
     for m in input.with_errors():
-        if isinstance(m, (NoteOn, NoteOff)):
+        if isinstance(m, Message):
             output.send(m.transpose(12))
-        elif isinstance(m, Message):
-            output.send(m)
         else:
             print("ERROR", m, file=sys.stderr)
 ```
 
 ## 5. Split a keyboard into bass and lead
 
-Receive channel 1 and split at middle C. Other channel messages, such as sustain
+Receive channel 1. Split at middle C. Other channel messages, such as sustain
 and pitch bend, go to both parts.
 
 ```python
@@ -137,50 +83,36 @@ with Input(channel=1) as input, Output() as out:
     out.send(ProgramChange(81, channel=3))
 
     for m in input:
-        if isinstance(m, (NoteOn, NoteOff)):
-            if m.note < 60:
-                out.send(m.replace(channel=2))
-            else:
-                out.send(m.replace(channel=3))
-        elif getattr(m, "channel", None) is not None:
+        if hasattr(m, 'note'):
+            channel = 2 if m.note < 60 else 3
+            out.send(m.replace(channel=channel))
+        elif hasattr(m, 'channel'):
             out.send(m.replace(channel=2))
             out.send(m.replace(channel=3))
         else:
             out.send(m)
 ```
 
-`Input(channel=1)` selects channel-1 voice messages. A container such as
-`Input(channel=[1, 4])` selects several channels. System messages, including clock
-and SysEx, pass through and are forwarded once. Diagnostics are always retained. `replace()` returns a new message.
-
-Alternatively, give each output a channel. An explicitly configured output
-channel overrides the channel on every MIDI 1 channel message sent through it:
+Or create two outputs:
 
 ```python
 from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
-with Input() as input, Output(channel=2) as out2, Output(channel=3) as out3:
-    out2.send(ProgramChange(34))
-    out3.send(ProgramChange(81))
+with Input() as input, Output(channel=2) as o2, Output(channel=3) as o3:
+    o2.send(ProgramChange(34))
+    o3.send(ProgramChange(81))
 
     for m in input:
-        if isinstance(m, (NoteOn, NoteOff)):
-            if m.note < 60:
-                out2.send(m)
-            else:
-                out3.send(m)
-        elif getattr(m, "channel", None) is not None:
-            out2.send(m)
-            out3.send(m)
+        if hasattr(m, 'note'):
+            out = o2 if m.note < 60 else o3
+            out.send(m)
+        elif hasattr(m, "channel"):
+            o2.send(m)
+            o3.send(m)
         else:
-            out2.send(m)
+            o2.send(m)
 ```
-
-Use `Output()` for multiple channels: it preserves assigned message channels
-and uses channel 1 for unassigned messages. `Output(channel=1)` explicitly forces
-channel 1. The override applies to MIDI 1 message objects, full notes and compound
-commands, including messages sent by `send()`; encoded packets retain their addressing.
 
 ## 6. Record and replay a performance
 
@@ -204,13 +136,6 @@ Input().record(10, output=filename, overwrite=True)
 # Later:
 Output().send(Reader(filename))
 ```
-
-`record()` returns messages with their timing and source information, together
-with archive declarations and any diagnostics. File output
-writes the same capture; existing files are protected unless `overwrite=True`.
-Playback preserves timing between messages and trims initial silence. `record()` closes its input; the temporary output is finalized after playback.
-For an output kept in a variable, use a context or explicit `close()`. `send()`
-closes an archive reader.
 
 ## 7. Transpose a MIDI file
 
