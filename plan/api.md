@@ -990,7 +990,7 @@ sends. MIDI-CI profile negotiation remains slice 11.
 ## Slice 11 management scope
 
 meedee.ci adds frozen management Message values and an explicit decode(SysEx),
-plus a pure caller-driven Session backed by Rust ci/ci_session. Raw receive,
+plus a pure caller-driven Session backed by Rust ci/ci. Raw receive,
 codec, message metadata and archive behavior stay primitive. Callers supply randomized
 MUIDs and explicit routes; channels/groups remain 1–16. Format 1/2 management,
 reserved identifiers, compatible future extensions and bounded management
@@ -1304,7 +1304,7 @@ confirmed. Snapshots remain independent of later session operations. A successfu
 handoff does not establish that bytes reached the wire or that an instrument
 accepted, applied or persisted the dump.
 
-`transfer_output.run(session, output, cancel=None)` is a synchronous Python
+`transfer.send(session, output, cancel=None)` is a synchronous Python
 adapter for an existing MIDI 1 `Output`. It uses monotonic time,
 checks the existing `events.Cancellation` between sends and at most every 50 ms
 while waiting, and does not own/close the output. Native calls cannot be forcibly
@@ -1331,7 +1331,7 @@ No physical device compatibility or native transfer qualification is claimed.
 
 ## MIDI-CI management browser
 
-Rust `ci_browser::Browser`, Python `ci.Browser` and the optional `ci_live` host
+Rust `ci::Browser`, Python `ci.Browser` and the optional `ci` host
 coordinate one bounded discovery scan followed by sequential format-2 endpoint
 inquiries. Frozen `ci.BrowseReport` / `ci.BrowseDiagnostic` values retain bounded
 progress and peer declarations. They reuse the existing CI session and codecs;
@@ -1527,7 +1527,7 @@ caller-owned binary streams remain open and write at their current position.
 Writes flush without fsync. Errors propagate and can leave a partial destination;
 export does not change the capture outcome or claim power-loss durability.
 
-`transfer_input.run(capture, receiver, cancel=None)` starts a fresh capture on the
+`transfer.capture(capture, receiver, cancel=None)` starts a fresh capture on the
 caller thread. Supply an existing queued MIDI 1 typed input for the same stream;
 its already queued events are eligible and are not drained automatically. The
 adapter checks failure/loss counters before and after receives, polls the deadline
@@ -1554,7 +1554,7 @@ export failure. No physical instrument was used to qualify this workflow.
 
 ## One-shot MIDI 1 MTS dump queries
 
-Rust `tuning_query::Query` and Python `tuning.Query` combine the existing MTS
+Rust `tuning::Query` and Python `tuning.Query` combine the existing MTS
 request codecs, ReplyTracker and decoder. Construction requires one typed
 BulkDumpRequest or BankedDumpRequest, an input stream and a positive timeout
 (Python `timeout` in seconds, Rust `timeout_ns`).
@@ -1603,7 +1603,7 @@ reply using the existing SYX writer and flushes. Rust accepts a caller-owned wri
 Python paths use exclusive creation and binary streams remain open. Final write
 errors may leave a partial file; flush is not fsync or power-loss durability.
 
-`meedee.tuning_live.run(query, receiver, output, cancel=None)` drives a fresh query
+`meedee.tuning.query(query, receiver, output, cancel=None)` drives a fresh query
 on the caller thread using existing MIDI 1 queued typed input/output connections.
 The caller supplies the query's selected stream and owns/closes both connections.
 Known loss/failure is checked before sending and before/after receive. Receive
@@ -1995,3 +1995,35 @@ remain lazy. Import-all behavior replaces previous module-presence assumptions;
 pure value/file construction still performs no native MIDI initialization.
 
 Additional work beyond the prompt: None.
+
+
+## Consolidated domain modules
+
+Each group now has one public namespace and production source file per language
+layer. tuning contains codecs, values, the uFor adapter, query tracking and the
+live query driver; ci contains codecs, sessions, browser tracking and live
+browsing; transfer contains plans, sessions, passive capture and both live drivers.
+Rust CI browser/session and tuning-query implementations are colocated with their
+public modules. The native Python tuning query binding is colocated with the
+other tuning bindings.
+
+The canonical workflow functions in both APIs are tuning.query, ci.browse,
+transfer.send and transfer.capture. Their arguments, defaults, clock ownership,
+fresh-session checks, cancellation, known-progress reporting and connection
+ownership are unchanged. Rust keeps the corresponding query_with, browse_with,
+send_with and capture_with drivers for explicit clock/I/O adapters; CI Options
+now lives in ci. The former live/input/output modules are removed, with no
+compatibility aliases or forwarding modules. Root __all__ now contains the 25
+public submodules and the same 96 classes; functions remain module-qualified.
+
+All callers, type declarations, examples and distribution source manifests use
+the consolidated modules. No wire-format or protocol policy changes are included.
+Additional work beyond the prompt: None.
+
+Verification of the consolidation: 577 Python tests and 239 Rust tests passed
+(five opt-in Rust tests ignored). All 36 Rust guide blocks compiled without
+executing guide I/O; all Python guide/README blocks parsed. Strict Clippy, Ruff,
+formatting, Python 3.13 pyupgrade, type checking and the documentation build passed.
+Built wheel/source archives exclude all 12 removed production files. An isolated
+import from the extracted wheel exercised the consolidated namespaces and query
+tracking without opening devices. Public-symbols.txt remains uncommitted.

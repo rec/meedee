@@ -45,7 +45,7 @@ def report_data(report: ci.BrowseReport) -> dict[str, object]:
 
 
 def run_browse(config: CiBrowse) -> int:
-    from . import ci_live, midi
+    from . import ci, midi
     from ._monitor import select_port
 
     identity = ci.Identity(
@@ -101,7 +101,7 @@ def run_browse(config: CiBrowse) -> int:
                 timeout=config.timeout,
                 detail_limit=config.detail_limit,
             )
-            ci_live.run(
+            ci.browse(
                 browser,
                 receiver,
                 output,

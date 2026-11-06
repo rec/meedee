@@ -55,7 +55,7 @@ def run_transfer(config: TransferPreview) -> int:
         )
         return 0
 
-    from . import midi, transfer_output
+    from . import midi
     from ._monitor import select_port
 
     session = transfer.Session(plan)
@@ -70,7 +70,7 @@ def run_transfer(config: TransferPreview) -> int:
         )
         port = select_port(client.ports(), config.port, direction="output")
         with client.connect(port) as output:
-            transfer_output.run(session, output)
+            transfer.send(session, output)
     except KeyboardInterrupt:
         interrupted = True
         session.cancel("interrupted during setup or close")
@@ -111,7 +111,7 @@ def run_transfer(config: TransferPreview) -> int:
 
 
 def run_receive(config: SysexReceive) -> int:
-    from . import midi, transfer_input
+    from . import midi
     from ._monitor import select_port
 
     capture = None
@@ -140,7 +140,7 @@ def run_receive(config: SysexReceive) -> int:
                 byte_limit=config.byte_limit,
                 payload_limit=config.payload_limit,
             )
-            transfer_input.run(capture, receiver)
+            transfer.capture(capture, receiver)
         if capture.snapshot().status == "completed":
             capture.write(config.destination)
             exported = True

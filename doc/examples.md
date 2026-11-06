@@ -179,12 +179,12 @@ one complete SysEx message within 30 seconds and creates `backup.syx` only after
 successful capture, refusing overwrite. Adjust the count for your instrument.
 
 ```python
-from meedee import midi, transfer, transfer_input
+from meedee import midi, transfer
 
 client = midi.Input(isolated=False)
 with client.connect(client.ports()[0]) as receiver:
     capture = transfer.Capture(stream=receiver.stream, expected_messages=1, timeout=30)
-    report = transfer_input.run(capture, receiver)
+    report = transfer.capture(capture, receiver)
 print(report)
 if report.status != "completed":
     raise RuntimeError(report.reason)
@@ -197,13 +197,13 @@ The 100 ms gap is transfer pacing, not musical timing; use the device's document
 requirement. Successful handoff does not prove the device accepted the dump.
 
 ```python
-from meedee import midi, transfer, transfer_output
+from meedee import midi, transfer
 
 plan = transfer.read_file("backup.syx", gap=0.1)
 print(plan)
 client = midi.Output()
 with client.connect(client.ports()[0]) as output:
-    print(transfer_output.run(transfer.Session(plan), output))
+    print(transfer.send(transfer.Session(plan), output))
 ```
 
 ## 9. Export a just-intonation tuning
@@ -297,7 +297,7 @@ not identify a commercial product. A fresh local MUID is generated for each scan
 ```python
 from secrets import randbelow
 
-from meedee import ci, ci_live, midi
+from meedee import ci, midi
 
 identity = ci.Identity(
     manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
@@ -311,7 +311,7 @@ with midi.Input() as receiver, midi.Output() as output:
         endpoint_timeout=1,
         timeout=30,
     )
-    print(ci_live.run(browser, receiver, output))
+    print(ci.browse(browser, receiver, output))
 ```
 
 The browser handles management replies but performs no Profiles, Property

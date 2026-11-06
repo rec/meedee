@@ -1,8 +1,6 @@
 //! Shared Rust MIDI toolkit. No Python interpreter or PyO3 dependency.
 
 pub mod ci;
-mod ci_browser;
-mod ci_session;
 pub mod codecs;
 pub mod controls;
 pub mod gm;
@@ -17,7 +15,6 @@ pub mod topology;
 pub mod transfer;
 pub mod transport;
 pub mod tuning;
-mod tuning_query;
 pub mod ump;
 pub mod universal;
 mod velocity;
@@ -45,11 +42,7 @@ mod output;
 
 #[doc(hidden)]
 pub mod drivers;
-pub mod transfer_input;
-pub mod transfer_output;
-pub mod tuning_live;
 
-pub mod ci_live;
 pub mod discovery;
 
 // Common values and I/O; specialist operations remain in their public modules.

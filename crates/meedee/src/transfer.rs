@@ -1,6 +1,11 @@
-//! Bounded MIDI 1 SysEx transfers. The caller owns time and transport handoff.
-use crate::messages::Message;
-use crate::{messages::SysEx, syx};
+//! Bounded MIDI 1 SysEx planning, delivery and passive capture.
+use crate::{
+    drivers::{self, Receiver, Sender},
+    messages::{Message, SysEx},
+    midi,
+    playback::{Cancellation, MonotonicClock, PlaybackClock},
+    syx,
+};
 use std::io::{self, Read};
 use std::sync::Arc;
 
@@ -416,4 +421,264 @@ pub fn read_file(
         options.byte_limit,
         options.payload_limit,
     )
+}
+
+pub fn send(
+    session: &mut Session,
+    output: &mut midi::Output,
+    cancel: Option<&Cancellation>,
+) -> midi::Result<Report> {
+    send_with(
+        session,
+        output,
+        &mut MonotonicClock::default(),
+        cancel.unwrap_or(&Cancellation::default()),
+    )
+}
+#[doc(hidden)]
+pub fn send_with(
+    session: &mut Session,
+    output: &mut impl Sender,
+    clock: &mut impl PlaybackClock,
+    cancel: &Cancellation,
+) -> midi::Result<Report> {
+    let initial = session.snapshot();
+    if initial.status != "active" || initial.confirmed_messages != 0 || initial.in_flight.is_some()
+    {
+        return Err(drivers::invalid("transfer session must be fresh"));
+    }
+    while session.snapshot().status == "active" {
+        if cancel.cancelled() {
+            session.cancel("cancelled by caller");
+            break;
+        }
+        let Some(step) = session.prepare(clock.now_ns())? else {
+            let deadline = session
+                .snapshot()
+                .next_ready_ns
+                .expect("paced session deadline");
+            if let Err(error) = clock.wait_until(deadline, cancel) {
+                if error.kind() == std::io::ErrorKind::Interrupted {
+                    session.cancel("interrupted");
+                    break;
+                }
+                return Err(error.into());
+            }
+            continue;
+        };
+        match output.send(crate::events::Payload::Midi1(
+            crate::messages::AnyMessage::SysEx(step.message),
+        )) {
+            Ok(()) => {
+                if let Err(error) = session.confirm(step.index, clock.now_ns()) {
+                    session.fail(step.index, "send confirmation failed")?;
+                    return Err(error.into());
+                }
+            }
+            Err(error) if drivers::interrupted(&error) => {
+                session.cancel("interrupted");
+                break;
+            }
+            Err(error) => session.fail(step.index, &error.to_string())?,
+        }
+    }
+    Ok(session.snapshot())
+}
+
+#[cfg(test)]
+mod send_tests {
+    use super::*;
+    use crate::drivers::tests::{Clock, Output};
+    use crate::{messages::SysEx, transfer::Plan};
+    fn session() -> Session {
+        Session::new(
+            Plan::new(
+                [
+                    Ok(SysEx::new(vec![1]).unwrap()),
+                    Ok(SysEx::new(vec![2]).unwrap()),
+                ],
+                10,
+                2,
+                6,
+            )
+            .unwrap(),
+        )
+    }
+    #[test]
+    fn pacing_uses_send_completion_and_failure_preserves_progress() {
+        let mut clock = Clock::default();
+        let mut out = Output {
+            clock: clock.clone(),
+            sent: vec![],
+            fail_at: None,
+        };
+        let report = send_with(
+            &mut session(),
+            &mut out,
+            &mut clock,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert_eq!(out.sent.iter().map(|v| v.0).collect::<Vec<_>>(), [0, 110]);
+        assert_eq!(report.status, "completed");
+        let mut out = Output {
+            clock: clock.clone(),
+            sent: vec![],
+            fail_at: Some(1),
+        };
+        let report = send_with(
+            &mut session(),
+            &mut out,
+            &mut clock,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert_eq!(report.confirmed_messages, 1);
+        assert_eq!(report.uncertain_message, Some(1));
+        assert_eq!(report.status, "failed");
+    }
+    #[test]
+    fn fresh_session_and_cancellation_are_checked_before_send() {
+        let mut clock = Clock::default();
+        let mut out = Output {
+            clock: clock.clone(),
+            sent: vec![],
+            fail_at: None,
+        };
+        let mut started = session();
+        started.prepare(0).unwrap();
+        assert!(send_with(&mut started, &mut out, &mut clock, &Cancellation::default()).is_err());
+        let cancel = Cancellation::default();
+        cancel.cancel();
+        assert_eq!(
+            send_with(&mut session(), &mut out, &mut clock, &cancel)
+                .unwrap()
+                .status,
+            "cancelled"
+        );
+        assert!(out.sent.is_empty());
+    }
+}
+
+pub fn capture(
+    capture: &mut Capture,
+    receiver: &mut midi::Input,
+    cancel: Option<&Cancellation>,
+) -> midi::Result<CaptureReport> {
+    if capture.snapshot().status != "ready" {
+        return Err(drivers::invalid("capture must be fresh"));
+    }
+    receiver.stream()?;
+    capture_with(
+        capture,
+        receiver,
+        &mut MonotonicClock::default(),
+        cancel.unwrap_or(&Cancellation::default()),
+    )
+}
+#[doc(hidden)]
+pub fn capture_with(
+    capture: &mut Capture,
+    receiver: &mut impl Receiver,
+    clock: &mut impl PlaybackClock,
+    cancel: &Cancellation,
+) -> midi::Result<CaptureReport> {
+    capture.start(clock.now_ns())?;
+    while capture.snapshot().status == "active" {
+        if cancel.cancelled() {
+            capture.cancel("cancelled by caller");
+            break;
+        }
+        if let Err(error) = receiver.check() {
+            if drivers::interrupted(&error) {
+                capture.cancel("interrupted");
+            } else {
+                capture.fail(&error.to_string());
+            }
+            break;
+        }
+        capture.poll(clock.now_ns())?;
+        let report = capture.snapshot();
+        if report.status != "active" {
+            break;
+        }
+        let wait = drivers::remaining(clock, report.deadline_ns.expect("active capture deadline"));
+        match receiver.receive(wait) {
+            Ok(item) => {
+                if let Err(error) = receiver.check() {
+                    if drivers::interrupted(&error) {
+                        capture.cancel("interrupted");
+                    } else {
+                        capture.fail(&error.to_string());
+                    }
+                    break;
+                }
+                if cancel.cancelled() {
+                    capture.cancel("cancelled by caller");
+                    break;
+                }
+                if let Some(item) = item {
+                    capture.feed(&item, clock.now_ns())?;
+                }
+            }
+            Err(error) if drivers::interrupted(&error) => capture.cancel("interrupted"),
+            Err(error) => capture.fail(&error.to_string()),
+        }
+    }
+    Ok(capture.snapshot())
+}
+
+#[cfg(test)]
+mod capture_tests {
+    use super::*;
+    use crate::drivers::tests::{sysex, Clock, Input};
+    #[test]
+    fn capture_completes_on_count_and_reports_loss_or_silence() {
+        let mut clock = Clock::default();
+        let mut input = Input {
+            clock: clock.clone(),
+            items: [sysex(&[1]), sysex(&[2])].into(),
+            lost: false,
+        };
+        let mut capture = Capture::new("s".into(), 2, 1000, 6, 1).unwrap();
+        assert_eq!(
+            capture_with(
+                &mut capture,
+                &mut input,
+                &mut clock,
+                &Cancellation::default()
+            )
+            .unwrap()
+            .status,
+            "completed"
+        );
+        let mut wire = vec![];
+        capture.write(&mut wire).unwrap();
+        assert_eq!(wire, [240, 1, 247, 240, 2, 247]);
+        let mut capture = Capture::new("s".into(), 1, 1000, 3, 1).unwrap();
+        assert_eq!(
+            capture_with(
+                &mut capture,
+                &mut input,
+                &mut clock,
+                &Cancellation::default()
+            )
+            .unwrap()
+            .status,
+            "timed_out"
+        );
+        input.lost = true;
+        let mut capture = Capture::new("s".into(), 1, 1000, 3, 1).unwrap();
+        assert_eq!(
+            capture_with(
+                &mut capture,
+                &mut input,
+                &mut clock,
+                &Cancellation::default()
+            )
+            .unwrap()
+            .status,
+            "failed"
+        );
+    }
 }

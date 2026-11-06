@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::IntoPyObjectExt;
 
+use crate::files::{os_error, Stream};
 use crate::messages::{integer, Message};
 
 #[pyclass(frozen, skip_from_py_object, module = "meedee.tuning")]
@@ -407,7 +408,8 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Decoded>()?;
     module.add_class::<RequestStatus>()?;
     module.add_class::<ReplyTracker>()?;
-    crate::tuning_query::register(module)?;
+    module.add_class::<Query>()?;
+    module.add_class::<QueryReport>()?;
     module.add_function(wrap_pyfunction!(decode, module)?)?;
     module.add_function(wrap_pyfunction!(bulk_dump, module)?)?;
     module.add_function(wrap_pyfunction!(bulk_plan, module)?)?;
@@ -725,4 +727,128 @@ pub(crate) fn replacement<'py>(
 
 pub(crate) fn decoded_object(py: Python<'_>, value: model::Decoded) -> PyResult<Py<PyAny>> {
     Ok(Py::new(py, Decoded { value })?.into_any())
+}
+
+#[pyclass(frozen, module = "meedee.tuning")]
+pub(crate) struct QueryReport {
+    pub(crate) value: model::QueryReport,
+}
+#[pymethods]
+impl QueryReport {
+    #[getter]
+    fn status(&self) -> &str {
+        self.value.status
+    }
+    #[getter]
+    fn request_sent(&self) -> bool {
+        self.value.request_sent
+    }
+    #[getter]
+    fn uncertain_send(&self) -> bool {
+        self.value.uncertain_send
+    }
+    #[getter]
+    fn ignored_events(&self) -> u64 {
+        self.value.ignored_events
+    }
+    #[getter]
+    fn deadline_ns(&self) -> Option<u64> {
+        self.value.deadline_ns
+    }
+    #[getter]
+    fn reason(&self) -> Option<&str> {
+        self.value.reason.as_deref()
+    }
+    #[getter]
+    fn reply(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        self.value
+            .reply
+            .as_ref()
+            .map(|v| crate::messages::to_python(py, meedee::messages::AnyMessage::SysEx(v.clone())))
+            .transpose()
+    }
+    #[getter]
+    fn decoded(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
+        self.value
+            .decoded
+            .as_ref()
+            .map(|v| crate::tuning::decoded_object(py, v.clone()))
+            .transpose()
+    }
+}
+#[pyclass(module = "meedee.tuning")]
+pub(crate) struct Query {
+    pub(crate) value: model::Query,
+}
+#[pymethods]
+impl Query {
+    #[new]
+    #[pyo3(signature=(*,request,stream,timeout))]
+    fn new(
+        request: &Bound<'_, PyAny>,
+        stream: String,
+        #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            value: model::Query::new(crate::tuning::extract_message(request)?, stream, timeout)
+                .map_err(value_error)?,
+        })
+    }
+    fn prepare(
+        &mut self,
+        py: Python<'_>,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<Py<PyAny>> {
+        crate::messages::to_python(
+            py,
+            meedee::messages::AnyMessage::SysEx(self.value.prepare(now_ns).map_err(value_error)?),
+        )
+    }
+    fn confirm(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
+        self.value.confirm(now_ns).map_err(value_error)
+    }
+    fn poll(
+        &mut self,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
+        self.value.poll(now_ns).map_err(value_error)
+    }
+    fn feed(
+        &mut self,
+        item: &Bound<'_, PyAny>,
+        #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
+    ) -> PyResult<()> {
+        let item = if let Ok(e) = crate::event_values::extract(&item) {
+            meedee::events::InputItem::Message(Box::new(e))
+        } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
+            meedee::events::InputItem::Diagnostic(d.value.clone())
+        } else {
+            return Err(PyTypeError::new_err("expected Message or StreamDiagnostic"));
+        };
+        self.value.feed(&item, now_ns).map_err(value_error)
+    }
+    fn fail(&mut self, reason: &str) {
+        self.value.fail(reason);
+    }
+    fn cancel(&mut self, reason: &str) {
+        self.value.cancel(reason);
+    }
+    fn snapshot(&self) -> QueryReport {
+        QueryReport {
+            value: self.value.snapshot(),
+        }
+    }
+    fn write(&self, py: Python<'_>, destination: &Bound<'_, PyAny>) -> PyResult<()> {
+        if self.value.snapshot().status != "completed" {
+            return Err(PyValueError::new_err(
+                "only a completed query can be exported",
+            ));
+        }
+        let mut stream = Stream::exclusive_output(destination)?;
+        py.detach(|| self.value.write(&mut stream))
+            .map_err(os_error)
+    }
 }

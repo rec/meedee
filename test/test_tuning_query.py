@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import codecs, events, messages, testing, tuning, tuning_live
+from meedee import codecs, events, messages, testing, tuning
 
 
 def query(bank: int | None = None) -> tuning.Query:
@@ -80,15 +80,15 @@ def test_host_reuses_typed_decoding_and_existing_reply_matcher(
     raw = reply(bank)
     receiver.inject(b"\xf0\x7d\xf7\xf8" + raw[:30], clock=clock)
     receiver.inject(raw[30:], clock=clock)
-    monkeypatch.setattr(tuning_live, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(tuning, "monotonic_ns", lambda: 0)
     q = query(bank)
-    report = tuning_live.run(q, receiver, output)  # ty: ignore[invalid-argument-type]
+    report = tuning.query(q, receiver, output)  # ty: ignore[invalid-argument-type]
     assert report.status == "completed" and report.ignored_events == 2
     assert not receiver.closed and not output.snapshot().closed
     assert output.snapshot().accepted == 1 and output.take_packet() is not None
     assert report.reply is not None and codecs.encode(report.reply) == raw
     with pytest.raises(ValueError, match="fresh"):
-        tuning_live.run(q, receiver, output)  # ty: ignore[invalid-argument-type]
+        tuning.query(q, receiver, output)  # ty: ignore[invalid-argument-type]
     receiver.close()
     output.close()
 
@@ -101,8 +101,8 @@ def test_send_failure_is_uncertain_even_when_test_transport_knows_acceptance(
     receiver = testing.Input(stream="s", protocol="midi1")
     output = testing.Output(protocol="midi1")
     output.fail_next_send(accepted=accepted)
-    monkeypatch.setattr(tuning_live, "monotonic_ns", lambda: 0)
-    report = tuning_live.run(query(), receiver, output)  # ty: ignore[invalid-argument-type]
+    monkeypatch.setattr(tuning, "monotonic_ns", lambda: 0)
+    report = tuning.query(query(), receiver, output)  # ty: ignore[invalid-argument-type]
     assert (
         report.status == "failed" and report.uncertain_send and not report.request_sent
     )
@@ -130,12 +130,12 @@ def test_host_stops_without_export_on_input_faults_and_cancellation(
         token.cancel()
     ticks = iter([0, 0])
     monkeypatch.setattr(
-        tuning_live,
+        tuning,
         "monotonic_ns",
         lambda: next(ticks, 10 if fault == "timeout" else 0),
     )
     q = query()
-    report = tuning_live.run(q, receiver, output, cancel=token)  # ty: ignore[invalid-argument-type]
+    report = tuning.query(q, receiver, output, cancel=token)  # ty: ignore[invalid-argument-type]
     assert report.status == {"timeout": "timed_out", "cancel": "cancelled"}.get(
         fault, "failed"
     )
@@ -170,8 +170,8 @@ def test_fault_at_final_receive_or_during_send_cannot_complete_a_query(
             if fault == "interrupt":
                 raise KeyboardInterrupt
 
-    monkeypatch.setattr(tuning_live, "monotonic_ns", lambda: 0)
-    report = tuning_live.run(query(), Receiver(), Output())  # ty: ignore[invalid-argument-type]
+    monkeypatch.setattr(tuning, "monotonic_ns", lambda: 0)
+    report = tuning.query(query(), Receiver(), Output())  # ty: ignore[invalid-argument-type]
     assert report.status == ("cancelled" if fault == "interrupt" else "failed")
     assert report.reply is None
     assert report.uncertain_send == (fault == "interrupt")

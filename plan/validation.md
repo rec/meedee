@@ -1051,7 +1051,7 @@ The owner selected the pure caller-driven API, explicit local identities/routes,
 bounded transactions and conservative recovery, then deferred Profiles and
 Property Exchange because their full normative documents are unavailable. The
 accessible MIDI-CI 1.2.1 base supports management only: Discovery/Reply, Endpoint
-Inquiry/Reply, Invalidate MUID and ACK/NAK. Rust ci/ci_session and Python meedee.ci
+Inquiry/Reply, Invalidate MUID and ACK/NAK. Rust ci/ci and Python meedee.ci
 share the implementation. Session declarations advertise zero optional-category
 bits. No JSON/compression dependencies or unimplemented property/profile stubs
 are added. See ci.md and specifications.md for the contract and document hash.

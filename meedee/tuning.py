@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import sys
 from math import isfinite
+from time import monotonic_ns
 from typing import TYPE_CHECKING
+
+from . import _core, events, tuning
 
 if TYPE_CHECKING:
     from ufor.tuning import Tuning
 
-from . import _core, tuning
+    from . import midi
 
 _core.populate_tuning(sys.modules[__name__])
 
-del sys, _core
+del sys
 
 
 def convert(source: Tuning, note: int) -> tuning.NoteTuning:
@@ -37,6 +40,27 @@ def convert(source: Tuning, note: int) -> tuning.NoteTuning:
         raise ValueError("frequency is outside meedee's MTS frequency range")
     pitch = tuning.Pitch.from_frequency(frequency_hz=float(frequency)).pitch
     return tuning.NoteTuning(note=note, pitch=pitch)
+
+
+def query(
+    query: tuning.Query,
+    receiver: midi.Input,
+    output: midi.Output,
+    *,
+    cancel: events.Cancellation | None = None,
+) -> tuning.QueryReport:
+    """Send once, then receive until terminal. Never close connections or retry.
+
+    The caller supplies one MIDI 1 queued input and output. Existing queued input
+    is eligible: MTS has no transaction ID to disambiguate an identical old dump.
+    """
+    return _core.run_tuning(
+        query,
+        receiver,
+        output,
+        events.Cancellation() if cancel is None else cancel,
+        monotonic_ns,
+    )
 
 
 def _check_notes(notes: list[int]) -> list[int]:

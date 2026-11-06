@@ -11,10 +11,7 @@ from meedee import (
     messages,
     midi,
     transfer,
-    transfer_input,
-    transfer_output,
     tuning,
-    tuning_live,
 )
 
 
@@ -61,10 +58,8 @@ def exercise(isolated: bool, directory: Path) -> None:
             expected_messages=2,
             timeout="3000000000 ns",
         )
-        delivery = worker.submit(
-            transfer_output.run, transfer.Session(plan), peer_output
-        )
-        report = transfer_input.run(capture, receiver)
+        delivery = worker.submit(transfer.send, transfer.Session(plan), peer_output)
+        report = transfer.capture(capture, receiver)
         assert report.status == "completed", report.reason
         assert delivery.result(timeout=4).status == "completed"
         capture_path = directory / f"capture-{isolated}.syx"
@@ -109,7 +104,7 @@ def exercise(isolated: bool, directory: Path) -> None:
             query = tuning.Query(
                 request=request, stream=receiver.stream, timeout="3000000000 ns"
             )
-            result = tuning_live.run(query, receiver, output)
+            result = tuning.query(query, receiver, output)
             answer.result(timeout=4)
             assert result.status == "completed", result.reason
             assert result.request_sent and not result.uncertain_send
@@ -129,7 +124,7 @@ def exercise(isolated: bool, directory: Path) -> None:
         silent = tuning.Query(
             request=silent_request, stream=receiver.stream, timeout="100000000 ns"
         )
-        result = tuning_live.run(silent, receiver, output)
+        result = tuning.query(silent, receiver, output)
         assert (
             result.status == "timed_out"
             and result.request_sent
@@ -143,7 +138,7 @@ def exercise(isolated: bool, directory: Path) -> None:
         cancelled = tuning.Query(
             request=silent_request, stream=receiver.stream, timeout="1000000000 ns"
         )
-        result = tuning_live.run(cancelled, receiver, output, cancel=token)
+        result = tuning.query(cancelled, receiver, output, cancel=token)
         assert result.status == "cancelled" and not result.request_sent
         assert peer.receive(timeout=0) is None
         assert receiver.dropped_packets == peer.dropped_packets == 0

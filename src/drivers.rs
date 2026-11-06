@@ -197,8 +197,7 @@ pub(crate) fn run_transfer_output(
         cancel,
         last: 0,
     };
-    let result =
-        meedee::transfer_output::run_with(&mut session.value, &mut output, &mut clock, &token);
+    let result = meedee::transfer::send_with(&mut session.value, &mut output, &mut clock, &token);
     calls
         .finish(result, false)
         .map(|value| crate::transfer::Report { value })
@@ -231,7 +230,7 @@ pub(crate) fn run_transfer_input(
         last: 0,
     };
     if let Err(error) =
-        meedee::transfer_input::run_with(&mut capture.value, &mut receiver, &mut clock, &token)
+        meedee::transfer::capture_with(&mut capture.value, &mut receiver, &mut clock, &token)
     {
         capture.value.fail(&error.to_string());
     }
@@ -246,12 +245,12 @@ pub(crate) fn run_transfer_input(
 #[pyfunction]
 pub(crate) fn run_tuning(
     py: Python<'_>,
-    mut query: PyRefMut<'_, crate::tuning_query::Query>,
+    mut query: PyRefMut<'_, crate::tuning::Query>,
     receiver: Bound<'_, PyAny>,
     output: Bound<'_, PyAny>,
     cancel: Bound<'_, PyAny>,
     now: Bound<'_, PyAny>,
-) -> PyResult<crate::tuning_query::QueryReport> {
+) -> PyResult<crate::tuning::QueryReport> {
     if query.value.snapshot().status != "ready" {
         return Err(PyValueError::new_err("query must be fresh"));
     }
@@ -274,7 +273,7 @@ pub(crate) fn run_tuning(
         cancel,
         last: 0,
     };
-    if let Err(error) = meedee::tuning_live::run_with(
+    if let Err(error) = meedee::tuning::query_with(
         &mut query.value,
         &mut receiver,
         &mut output,
@@ -284,7 +283,7 @@ pub(crate) fn run_tuning(
         query.value.fail(&error.to_string());
     }
     calls.finish(
-        Ok(crate::tuning_query::QueryReport {
+        Ok(crate::tuning::QueryReport {
             value: query.value.snapshot(),
         }),
         false,
@@ -330,12 +329,12 @@ pub(crate) fn run_ci(
         cancel,
         last: 0,
     };
-    let options = meedee::ci_live::Options {
+    let options = meedee::ci::Options {
         cancel: token,
         message_limit,
         byte_limit,
     };
-    let result = meedee::ci_live::run_with(
+    let result = meedee::ci::browse_with(
         &mut browser.value,
         &mut receiver,
         &mut output,

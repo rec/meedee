@@ -325,14 +325,14 @@ Initiate a one-message dump on the instrument within ten seconds. The capture
 retains complete messages, then creates a new backup file only after success.
 
 ```rust
-use meedee::{midi::Input, transfer, transfer_input};
+use meedee::{midi::Input, transfer};
 use std::fs::OpenOptions;
 
 let mut input = Input::new();
 let mut capture = transfer::Capture::new(
     input.stream()?.into(), 1, 10_000_000_000, 8_388_608, 1_048_576,
 )?;
-let report = transfer_input::run(&mut capture, &mut input, None)?;
+let report = transfer::capture(&mut capture, &mut input, None)?;
 input.close()?;
 println!("{report:?}");
 if report.status == "completed" {
@@ -345,13 +345,13 @@ instrument, ready to receive it. Sending a dump can replace sounds or settings;
 choose the gap from the device's documentation.
 
 ```rust
-use meedee::{midi::Output, transfer, transfer_output};
+use meedee::{midi::Output, transfer};
 use std::time::Duration;
 
 let plan = transfer::read_file("backup.syx", Duration::from_millis(100), &Default::default())?;
 let mut session = transfer::Session::new(plan);
 let mut output = Output::new();
-println!("{:?}", transfer_output::run(&mut session, &mut output, None)?);
+println!("{:?}", transfer::send(&mut session, &mut output, None)?);
 output.close()?;
 ```
 
@@ -361,14 +361,14 @@ This asks device 0 for tuning program 2 through the first input/output pair.
 The final report includes a matching reply, timeout or failure with known progress.
 
 ```rust
-use meedee::{midi::{Input, Output}, tuning, tuning_live};
+use meedee::{midi::{Input, Output}, tuning};
 
 let mut input = Input::new();
 let mut output = Output::new();
 let mut query = tuning::Query::new(
     tuning::BulkDumpRequest::new(0, 2)?.into(), input.stream()?.into(), 5_000_000_000,
 )?;
-println!("{:?}", tuning_live::run(&mut query, &mut input, &mut output, None)?);
+println!("{:?}", tuning::query(&mut query, &mut input, &mut output, None)?);
 input.close()?;
 output.close()?;
 ```
@@ -404,7 +404,7 @@ MUID. Choose a fresh unused MUID for a real scan. Python's example generates one
 with `secrets`; Rust leaves that choice to the application's random-number source.
 
 ```rust
-use meedee::{ci, ci_live, midi::{Input, Output}};
+use meedee::{ci, midi::{Input, Output}};
 
 let mut input = Input::new();
 let mut output = Output::new();
@@ -412,12 +412,12 @@ let identity = ci::Identity::new(vec![0x7d, 0, 0], 1, 1, vec![0; 4])?;
 let route = ci::Route::new(input.stream()?.into(), "device".into(), None)?;
 let session = ci::Session::new(12345, identity, route, 0, None, 1024, 128, 128, 8_388_608)?;
 let mut browser = ci::Browser::new(session, 3_000_000_000, 1_000_000_000, 30_000_000_000, 128)?;
-println!("{:?}", ci_live::run(&mut browser, &mut input, &mut output, &ci_live::Options::default())?);
+println!("{:?}", ci::browse(&mut browser, &mut input, &mut output, &ci::Options::default())?);
 input.close()?;
 output.close()?;
 ```
 
-`ci_live::Options` sets cancellation and SysEx assembly limits, matching Python's
+`ci::Options` sets cancellation and SysEx assembly limits, matching Python's
 keyword options. Set both transports to UMP and give the route an explicit group
 for SysEx7. This scan sends Discovery and endpoint inquiries only; it performs no
 Profiles, Property Exchange or instrument configuration writes.

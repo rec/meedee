@@ -1,8 +1,15 @@
-//! MIDI Tuning Standard (CA-020/CA-021/RP-020, RP-025/amd1).
-//! No transport, clocks, sleeping, or instrument operations occur here.
+//! MIDI Tuning Standard values, codecs, caller-driven tracking and live queries.
 pub use crate::event_views::Tuning as Decoder;
-use crate::messages::{PrimitiveMessage, SysEx, ValueError};
-pub use crate::tuning_query::{Query, QueryReport};
+use crate::{
+    drivers::{self, Receiver, Sender},
+    events::Payload,
+    live::Item,
+    messages::{AnyMessage, Message, PrimitiveMessage, SysEx, ValueError},
+    midi,
+    playback::{Cancellation, MonotonicClock, PlaybackClock},
+    tuning,
+};
+use std::io::{self, Write};
 
 const STEPS: f64 = 16384.0;
 const MAX_PITCH: u32 = 2_097_150; // 7F 7F 7F is not a frequency.
@@ -846,3 +853,316 @@ crate::messages::value_metadata!(ScaleOctaveChange {
     channels,
     offsets
 });
+
+#[derive(Clone, Debug)]
+pub struct QueryReport {
+    pub status: &'static str,
+    pub request_sent: bool,
+    pub uncertain_send: bool,
+    pub ignored_events: u64,
+    pub deadline_ns: Option<u64>,
+    pub reply: Option<SysEx>,
+    pub decoded: Option<Decoded>,
+    pub reason: Option<String>,
+}
+pub struct Query {
+    request: TuningMessage,
+    stream: String,
+    timeout_ns: u64,
+    tracker: Option<ReplyTracker>,
+    report: QueryReport,
+}
+impl Query {
+    pub fn new(
+        request: TuningMessage,
+        stream: String,
+        timeout_ns: u64,
+    ) -> Result<Self, ValueError> {
+        if stream.is_empty() {
+            return Err(invalid("query requires an input stream"));
+        }
+        ReplyTracker::new(&request, 0, timeout_ns)?;
+        Ok(Self {
+            request,
+            stream,
+            timeout_ns,
+            tracker: None,
+            report: QueryReport {
+                status: "ready",
+                request_sent: false,
+                uncertain_send: false,
+                ignored_events: 0,
+                deadline_ns: None,
+                reply: None,
+                decoded: None,
+                reason: None,
+            },
+        })
+    }
+    pub fn prepare(&mut self, now_ns: u64) -> Result<SysEx, ValueError> {
+        if self.report.status != "ready" {
+            return Err(invalid("query must be fresh"));
+        }
+        let tracker = ReplyTracker::new(&self.request, now_ns, self.timeout_ns)?;
+        self.report.deadline_ns = Some(tracker.deadline_ns());
+        self.tracker = Some(tracker);
+        self.report.status = "sending";
+        let wire = self.request.encode().expect("validated system message");
+        SysEx::new(wire[1..wire.len() - 1].to_vec())
+    }
+    pub fn confirm(&mut self, now_ns: u64) -> Result<(), ValueError> {
+        if self.report.status != "sending" {
+            return Err(invalid("no query send is pending"));
+        }
+        // Validate time before recording the known whole-message handoff.
+        let status = self.tracker.as_mut().expect("started query").poll(now_ns)?;
+        self.report.request_sent = true;
+        self.report.status = "waiting";
+        if status == RequestStatus::TimedOut {
+            self.finish("timed_out", "query deadline expired during send");
+        }
+        Ok(())
+    }
+    pub fn poll(&mut self, now_ns: u64) -> Result<(), ValueError> {
+        if !matches!(self.report.status, "sending" | "waiting") {
+            return Err(invalid("query is not active"));
+        }
+        if self.tracker.as_mut().expect("started query").poll(now_ns)? == RequestStatus::TimedOut {
+            self.finish("timed_out", "query deadline expired");
+        }
+        Ok(())
+    }
+    pub fn feed(&mut self, item: &Item, now_ns: u64) -> Result<(), ValueError> {
+        if self.report.status != "waiting" {
+            return Err(invalid("query must have a confirmed send before receiving"));
+        }
+        self.poll(now_ns)?;
+        if self.report.status != "waiting" {
+            return Ok(());
+        }
+        let event = match item {
+            Item::Diagnostic(d) => {
+                self.fail(&format!("input diagnostic {:?}: {}", d.kind, d.reason));
+                return Ok(());
+            }
+            Item::Message(e) => e,
+        };
+        if event.stream().unwrap_or_default() != self.stream {
+            self.fail("query received an unrelated source");
+            return Ok(());
+        }
+        match event.as_ref() {
+            Payload::Midi1(AnyMessage::SysEx(raw)) => {
+                let decoded = match tuning::decode(raw) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        self.fail(&e.to_string());
+                        return Ok(());
+                    }
+                };
+                if let Some(decoded) = decoded {
+                    if self
+                        .tracker
+                        .as_mut()
+                        .expect("started query")
+                        .observe(&decoded.message, now_ns)?
+                    {
+                        self.report.reply = Some(raw.clone());
+                        self.report.decoded = Some(decoded);
+                        self.report.status = "completed";
+                        return Ok(());
+                    }
+                }
+            }
+            Payload::Midi1(_) => {}
+            _ => {
+                self.fail("query requires MIDI 1 byte events");
+                return Ok(());
+            }
+        }
+        self.report.ignored_events = self
+            .report
+            .ignored_events
+            .checked_add(1)
+            .ok_or_else(|| invalid("query ignored-event count exhausted"))?;
+        Ok(())
+    }
+    pub fn fail(&mut self, reason: &str) {
+        if matches!(self.report.status, "ready" | "sending" | "waiting") {
+            self.finish("failed", reason);
+        }
+    }
+    pub fn cancel(&mut self, reason: &str) {
+        if matches!(self.report.status, "ready" | "sending" | "waiting") {
+            self.finish("cancelled", reason);
+        }
+    }
+    pub fn snapshot(&self) -> QueryReport {
+        self.report.clone()
+    }
+    pub fn write(&self, writer: &mut impl Write) -> io::Result<()> {
+        let reply = self
+            .report
+            .reply
+            .as_ref()
+            .filter(|_| self.report.status == "completed")
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "only a completed query can be exported",
+                )
+            })?;
+        crate::syx::write(writer, reply, reply.data().len())?;
+        writer.flush()
+    }
+    fn finish(&mut self, status: &'static str, reason: &str) {
+        self.report.uncertain_send = self.report.status == "sending";
+        self.report.status = status;
+        self.report.reason = Some(reason.chars().take(1024).collect());
+    }
+}
+fn invalid(reason: &str) -> ValueError {
+    ValueError(reason.into())
+}
+
+pub fn query(
+    query: &mut Query,
+    receiver: &mut midi::Input,
+    output: &mut midi::Output,
+    cancel: Option<&Cancellation>,
+) -> midi::Result<QueryReport> {
+    if query.snapshot().status != "ready" {
+        return Err(drivers::invalid("query must be fresh"));
+    }
+    receiver.stream()?;
+    query_with(
+        query,
+        receiver,
+        output,
+        &mut MonotonicClock::default(),
+        cancel.unwrap_or(&Cancellation::default()),
+    )
+}
+#[doc(hidden)]
+pub fn query_with(
+    query: &mut Query,
+    receiver: &mut impl Receiver,
+    output: &mut impl Sender,
+    clock: &mut impl PlaybackClock,
+    cancel: &Cancellation,
+) -> midi::Result<QueryReport> {
+    if query.snapshot().status != "ready" {
+        return Err(drivers::invalid("query must be fresh"));
+    }
+    while matches!(query.snapshot().status, "ready" | "waiting") {
+        if cancel.cancelled() {
+            query.cancel("cancelled by caller");
+            break;
+        }
+        if let Err(error) = receiver.check() {
+            if drivers::interrupted(&error) {
+                query.cancel("interrupted");
+            } else {
+                query.fail(&error.to_string());
+            }
+            break;
+        }
+        if query.snapshot().status == "ready" {
+            let request = query.prepare(clock.now_ns())?;
+            match output.send(crate::events::Payload::Midi1(
+                crate::messages::AnyMessage::SysEx(request),
+            )) {
+                Ok(()) => query.confirm(clock.now_ns())?,
+                Err(error) if drivers::interrupted(&error) => query.cancel("interrupted"),
+                Err(error) => query.fail(&error.to_string()),
+            }
+            continue;
+        }
+        query.poll(clock.now_ns())?;
+        let report = query.snapshot();
+        if report.status != "waiting" {
+            break;
+        }
+        let wait = drivers::remaining(clock, report.deadline_ns.expect("waiting query deadline"));
+        match receiver.receive(wait) {
+            Ok(item) => {
+                if let Err(error) = receiver.check() {
+                    if drivers::interrupted(&error) {
+                        query.cancel("interrupted");
+                    } else {
+                        query.fail(&error.to_string());
+                    }
+                    break;
+                }
+                if cancel.cancelled() {
+                    query.cancel("cancelled by caller");
+                    break;
+                }
+                if let Some(item) = item {
+                    query.feed(&item, clock.now_ns())?;
+                }
+            }
+            Err(error) if drivers::interrupted(&error) => query.cancel("interrupted"),
+            Err(error) => query.fail(&error.to_string()),
+        }
+    }
+    Ok(query.snapshot())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::drivers::tests::{Clock, Input, Output};
+    use crate::tuning::BulkDumpRequest;
+    fn query() -> Query {
+        Query::new(BulkDumpRequest::new(1, 2).unwrap().into(), "s".into(), 1000).unwrap()
+    }
+    #[test]
+    fn query_sends_once_times_out_and_retains_uncertain_failure() {
+        let mut clock = Clock::default();
+        let mut input = Input {
+            clock: clock.clone(),
+            items: [].into(),
+            lost: false,
+        };
+        let mut output = Output {
+            clock: clock.clone(),
+            sent: vec![],
+            fail_at: None,
+        };
+        let report = query_with(
+            &mut query(),
+            &mut input,
+            &mut output,
+            &mut clock,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert_eq!(report.status, "timed_out");
+        assert!(report.request_sent);
+        assert_eq!(output.sent.len(), 1);
+        output.fail_at = Some(1);
+        let report = query_with(
+            &mut query(),
+            &mut input,
+            &mut output,
+            &mut clock,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert_eq!(report.status, "failed");
+        assert!(report.uncertain_send);
+        assert!(!report.request_sent);
+        input.lost = true;
+        let report = query_with(
+            &mut query(),
+            &mut input,
+            &mut output,
+            &mut clock,
+            &Cancellation::default(),
+        )
+        .unwrap();
+        assert!(!report.uncertain_send);
+        assert_eq!(output.sent.len(), 1);
+    }
+}

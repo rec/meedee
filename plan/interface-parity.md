@@ -22,7 +22,7 @@ Additional work beyond the prompt: None.
 - Output::with_playback configures subsequent Rust play calls; Python uses keywords.
 - Live drivers require fresh sessions and own their monotonic clocks.
 - Channel filters preserve system messages. Split examples forward them once.
-- ci_live::Options carries cancellation and assembly limits with Python's defaults.
+- ci::Options carries cancellation and assembly limits with Python's defaults.
 
 ## Work inventory
 
@@ -51,7 +51,7 @@ Completion requires finishing this inventory, not merely aligning symbol counts.
 | archive.Recorder, RecordingReport | archive::Recorder, RecordingReport | Rust generic readers/writers |
 | ci.Session, Browser, BrowseReport | ci::Session, Browser, BrowseReport | Rust Browser takes an explicitly constructed Session |
 | tuning.Query, QueryReport | tuning::Query, QueryReport | Same request/progress semantics |
-| transfer_input/output, tuning_live, ci_live | Same module names and run drivers | Caller-owned connections and monotonic clocks |
+| transfer/output, tuning, ci | Same module names and run drivers | Caller-owned connections and monotonic clocks |
 | discovery.Poller | discovery::Poller | Caller-driven full snapshots; stop on failed scans |
 | inspection reports/comparison | inspection reports/comparison | Immutable getters use Python property names |
 | metrics.Distribution | metrics::Distribution | Detached snapshot, separate Histogram accumulator |

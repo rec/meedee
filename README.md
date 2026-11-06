@@ -14,6 +14,11 @@ to the archive format, `Decoder` to the MIDI 1 byte codec, `Route` to routing, a
 `Session` and `Report` stay in their submodules. Importing the package does not
 load the optional CLI implementation or uFor adapter dependencies.
 
+The domain workflows are grouped under `md.tuning`, `md.ci` and `md.transfer`:
+`tuning.query` runs a tuning query, `ci.browse` runs a management scan, and
+`transfer.send` / `transfer.capture` deliver or receive SysEx dumps. Their codecs,
+values and caller-driven state trackers live in those same modules.
+
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented but native platform qualification remains incomplete. Immutable
 MIDI 1.0 messages and a bounded incremental byte
@@ -178,7 +183,7 @@ This passively collects MIDI 1 SysEx, closes the input, then creates a new file.
 It refuses overwrite and writes nothing after receive loss, timeout or decoding
 failure. Final disk errors can leave a partial file. The count is caller-supplied;
 success does not establish instrument-specific dump completeness. Shared
-`transfer.Capture` and `transfer_input.run` provide the same workflow to library
+`transfer.Capture` and `transfer.capture` provide the same workflow to library
 users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
 ## Offline uFor tuning
@@ -199,7 +204,7 @@ Add `--bank` for a banked request. Preview opens no ports; query sends one MIDI 
 dump request and saves only a matched reply, after closing both connections.
 Existing files are preserved. Raw checksum bytes remain unchanged; a legacy
 checksum mismatch is saved with a flag and exit status 1. Other failures do not
-retry. Library users can drive `tuning.Query` with `tuning_live.run`. See
+retry. Library users can drive `tuning.Query` with `tuning.query`. See
 [query semantics](plan/api.md#one-shot-midi-1-mts-dump-queries).
 
 ## File inspection and capture validation
@@ -970,7 +975,7 @@ of framed bytes and 1 MiB per payload; CLI options can change these limits.
 Preview samples are bounded by `--detail-limit` and `--preview-bytes`.
 
 The shared Rust/Python `transfer` module supplies immutable plans and caller-driven
-sessions; Python `transfer_output.run` delivers through an existing MIDI 1 typed
+sessions; Python `transfer.send` delivers through an existing MIDI 1 typed
 output and accepts `events.Cancellation`. Successful handoffs and uncertain sends
 are reported separately. Handoff does not prove instrument acceptance; Ctrl-C or
 cancellation cannot interrupt a blocked native call. See the
@@ -1003,7 +1008,7 @@ invalidations. It stops on loss/failure and never restarts or retries automatica
 It performs no Profiles, Property Exchange or instrument configuration writes.
 An empty scan or timeout does not prove a device is offline. Peer identities and
 capability bits are declarations; successful output handoff is not device
-acknowledgement. Rust `ci_browser::Browser`, Python `ci.Browser` and `ci_live.run`
+acknowledgement. Rust `ci::Browser`, Python `ci.Browser` and `ci.browse`
 provide the same reusable workflow. See the [browser contract](plan/ci.md#one-scan-management-browser)
 for bounds, cancellation, reporting, local identity and qualification limits.
 

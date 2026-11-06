@@ -1,132 +1,5 @@
 """MIDI values and I/O, with public submodules for specialist workflows."""
 
-from . import (
-    archive,
-    ci,
-    ci_live,
-    cli,
-    clip,
-    codecs,
-    controls,
-    discovery,
-    events,
-    gm,
-    inspection,
-    messages,
-    metrics,
-    midi,
-    mpe,
-    notes,
-    routing,
-    smf,
-    syx,
-    testing,
-    timecode,
-    topology,
-    transfer,
-    transfer_input,
-    transfer_output,
-    tuning,
-    tuning_live,
-    ump,
-    universal,
-)
-from .archive import Reader, Recorder, RecordingReport, Writer
-from .codecs import Decoder
-from .controls import (
-    ControlInterpreter,
-    Controller,
-    ParameterFamily,
-    StepDirection,
-    VelocityInterpreter,
-)
-from .events import (
-    Cancellation,
-    Clock,
-    ClockMapping,
-    PacketDecoder,
-    PlaybackPlan,
-    PlaybackReport,
-    Rational,
-    ReceivedPacket,
-    SourceSpan,
-    StreamDiagnostic,
-    Timestamp,
-)
-from .gm import (
-    BankProgram,
-    BankProgramSelect,
-    DrumKit,
-    Gm1On,
-    Gm2On,
-    GmOff,
-    Percussion,
-    Program,
-)
-from .inspection import ComparisonReport, Monitor, MonitorReport
-from .messages import (
-    ActiveSensing,
-    ChannelPressure,
-    Continue,
-    ControlChange,
-    ControlChange14,
-    Message,
-    Note,
-    NoteOff,
-    NoteOn,
-    NrpnSet,
-    ParameterStep,
-    PitchBend,
-    PolyPressure,
-    ProgramChange,
-    QuarterFrame,
-    Rest,
-    RpnSet,
-    SongPosition,
-    SongSelect,
-    Start,
-    Stop,
-    SysEx,
-    SystemReset,
-    TimingClock,
-    TuneRequest,
-)
-from .metrics import Distribution, Histogram
-from .midi import (
-    Backend,
-    CallbackThreadError,
-    CapabilityError,
-    CompoundSendError,
-    ConnectError,
-    InitError,
-    Input,
-    MidiError,
-    NativePanicError,
-    Output,
-    Port,
-    PortInfoError,
-    Protocol,
-    ResourceError,
-    SendError,
-    StateError,
-    TimestampMode,
-    UmpPacket,
-    WorkerError,
-    WorkerTimeoutError,
-)
-from .mpe import ZoneConfiguration
-from .routing import Route, Router
-from .timecode import FrameRate
-from .tuning import NoChange, NoteTuning, Pitch, ScaleOffsets, TuningTable
-from .ump import Midi1Packet, SysEx7Packet, SysEx8Packet
-from .universal import (
-    IdentityReply,
-    IdentityRequest,
-    MasterCoarseTuning,
-    MasterFineTuning,
-    MasterVolume,
-)
-
 __all__: list[str] = [
     "ActiveSensing",
     "Backend",
@@ -226,7 +99,6 @@ __all__: list[str] = [
     "ZoneConfiguration",
     "archive",
     "ci",
-    "ci_live",
     "cli",
     "clip",
     "codecs",
@@ -247,10 +119,130 @@ __all__: list[str] = [
     "timecode",
     "topology",
     "transfer",
-    "transfer_input",
-    "transfer_output",
     "tuning",
-    "tuning_live",
     "ump",
     "universal",
 ]
+
+from . import (
+    archive,
+    ci,
+    cli,
+    clip,
+    codecs,
+    controls,
+    discovery,
+    events,
+    gm,
+    inspection,
+    messages,
+    metrics,
+    midi,
+    mpe,
+    notes,
+    routing,
+    smf,
+    syx,
+    testing,
+    timecode,
+    topology,
+    transfer,
+    tuning,
+    ump,
+    universal,
+)
+from .archive import Reader, Recorder, RecordingReport, Writer
+from .codecs import Decoder
+from .controls import (
+    ControlInterpreter,
+    Controller,
+    ParameterFamily,
+    StepDirection,
+    VelocityInterpreter,
+)
+from .events import (
+    Cancellation,
+    Clock,
+    ClockMapping,
+    PacketDecoder,
+    PlaybackPlan,
+    PlaybackReport,
+    Rational,
+    ReceivedPacket,
+    SourceSpan,
+    StreamDiagnostic,
+    Timestamp,
+)
+from .gm import (
+    BankProgram,
+    BankProgramSelect,
+    DrumKit,
+    Gm1On,
+    Gm2On,
+    GmOff,
+    Percussion,
+    Program,
+)
+from .inspection import ComparisonReport, Monitor, MonitorReport
+from .messages import (
+    ActiveSensing,
+    ChannelPressure,
+    Continue,
+    ControlChange,
+    ControlChange14,
+    Message,
+    Note,
+    NoteOff,
+    NoteOn,
+    NrpnSet,
+    ParameterStep,
+    PitchBend,
+    PolyPressure,
+    ProgramChange,
+    QuarterFrame,
+    Rest,
+    RpnSet,
+    SongPosition,
+    SongSelect,
+    Start,
+    Stop,
+    SysEx,
+    SystemReset,
+    TimingClock,
+    TuneRequest,
+)
+from .metrics import Distribution, Histogram
+from .midi import (
+    Backend,
+    CallbackThreadError,
+    CapabilityError,
+    CompoundSendError,
+    ConnectError,
+    InitError,
+    Input,
+    MidiError,
+    NativePanicError,
+    Output,
+    Port,
+    PortInfoError,
+    Protocol,
+    ResourceError,
+    SendError,
+    StateError,
+    TimestampMode,
+    UmpPacket,
+    WorkerError,
+    WorkerTimeoutError,
+)
+from .mpe import ZoneConfiguration
+from .routing import Route, Router
+from .timecode import FrameRate
+from .tuning import NoChange, NoteTuning, Pitch, ScaleOffsets, TuningTable
+from .ump import Midi1Packet, SysEx7Packet, SysEx8Packet
+from .universal import (
+    IdentityReply,
+    IdentityRequest,
+    MasterCoarseTuning,
+    MasterFineTuning,
+    MasterVolume,
+)

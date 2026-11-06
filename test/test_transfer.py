@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from meedee import codecs, events, messages, midi, transfer, transfer_output
+from meedee import codecs, events, messages, midi, transfer
 
 
 def plan(gap_ns: int = 10) -> transfer.Plan:
@@ -94,7 +94,7 @@ def test_output_waits_from_send_completion_and_never_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = [0]
-    monkeypatch.setattr(transfer_output, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: clock[0])
 
     def advance(seconds: float) -> None:
         clock[0] += round(seconds * 1_000_000_000)
@@ -104,7 +104,7 @@ def test_output_waits_from_send_completion_and_never_retries(
     )
     output = Output(clock, midi.SendError("failed"))
     s = transfer.Session(plan())
-    r = transfer_output.run(s, cast(midi.Output, output))
+    r = transfer.send(s, cast(midi.Output, output))
     assert output.sent == [
         (0, bytes.fromhex("f0 01 f7")),
         (110, bytes.fromhex("f0 02 03 f7")),
@@ -113,7 +113,7 @@ def test_output_waits_from_send_completion_and_never_retries(
         r.status == "failed" and r.confirmed_messages == 1 and r.uncertain_message == 1
     )
     with pytest.raises(ValueError, match="fresh"):
-        transfer_output.run(s, cast(midi.Output, output))
+        transfer.send(s, cast(midi.Output, output))
     assert len(output.sent) == 2
 
 
@@ -123,12 +123,10 @@ def test_cancellation_before_or_during_send_keeps_uncertainty_visible(
     token = events.Cancellation()
     token.cancel()
     output = Output([0])
-    r = transfer_output.run(
-        transfer.Session(plan()), cast(midi.Output, output), cancel=token
-    )
+    r = transfer.send(transfer.Session(plan()), cast(midi.Output, output), cancel=token)
     assert r.status == "cancelled" and r.uncertain_message is None and output.sent == []
     clock = [0]
-    monkeypatch.setattr(transfer_output, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: clock[0])
 
     def advance(seconds: float) -> None:
         clock[0] += round(seconds * 1_000_000_000)
@@ -137,7 +135,7 @@ def test_cancellation_before_or_during_send_keeps_uncertainty_visible(
         events.Cancellation, "wait_for", lambda self, seconds: advance(seconds)
     )
     output = Output(clock, KeyboardInterrupt())
-    r = transfer_output.run(transfer.Session(plan()), cast(midi.Output, output))
+    r = transfer.send(transfer.Session(plan()), cast(midi.Output, output))
     assert (
         r.status == "cancelled"
         and r.confirmed_messages == 1
@@ -150,7 +148,7 @@ def test_cancellation_during_gap_does_not_reserve_the_next_message(
 ) -> None:
     token = events.Cancellation()
     clock = [0]
-    monkeypatch.setattr(transfer_output, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: clock[0])
     waits: list[float] = []
 
     def cancel_wait(seconds: float) -> None:
@@ -161,7 +159,7 @@ def test_cancellation_during_gap_does_not_reserve_the_next_message(
         events.Cancellation, "wait_for", lambda self, seconds: cancel_wait(seconds)
     )
     output = Output(clock)
-    r = transfer_output.run(
+    r = transfer.send(
         transfer.Session(plan(1_000_000_000)),
         cast(midi.Output, output),
         cancel=token,
@@ -180,6 +178,6 @@ def test_unexpected_sender_failure_propagates_with_inspectable_uncertainty(
     output = Output([0], LookupError("caller bug"))
     s = transfer.Session(plan(0))
     with pytest.raises(LookupError, match="caller bug"):
-        transfer_output.run(s, cast(midi.Output, output))
+        transfer.send(s, cast(midi.Output, output))
     assert s.snapshot().status == "failed" and s.snapshot().uncertain_message == 1
     assert s.snapshot().confirmed_messages == 1

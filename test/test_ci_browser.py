@@ -7,7 +7,7 @@ from typing import Self, cast
 
 import pytest
 
-from meedee import ci, ci_live, codecs, events, messages, midi, ump
+from meedee import ci, codecs, events, messages, midi, ump
 
 
 def identity() -> ci.Identity:
@@ -183,7 +183,7 @@ def run(
     output: Output,
     cancel: events.Cancellation | None = None,
 ) -> ci.BrowseReport:
-    return ci_live.run(
+    return ci.browse(
         b,
         cast(midi.Input, receiver),
         cast(midi.Output, output),
@@ -196,7 +196,7 @@ def test_live_scan_preserves_both_protocols_and_obtains_endpoint_ids(
     group: int | None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clock = [0]
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
     output = Output(receiver, group)
     report = run(browser(group), receiver, output)
@@ -216,7 +216,7 @@ def test_live_scan_preserves_both_protocols_and_obtains_endpoint_ids(
 def test_partial_ump_send_stops_with_uncertain_action_and_never_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: 0)
     receiver = Receiver([0])
     output = Output(receiver, 1, fail=True)
     b = browser(1)
@@ -230,7 +230,7 @@ def test_partial_ump_send_stops_with_uncertain_action_and_never_retries(
 def test_input_loss_and_pre_cancel_send_nothing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: 0)
     receiver = Receiver([0])
     output = Output(receiver, None)
     receiver.dropped_packets = 1
@@ -247,7 +247,7 @@ def test_no_peers_is_a_complete_scan_without_an_offline_claim(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = [0]
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
     output = Output(receiver, None, answer=False)
     report = run(browser(), receiver, output)
@@ -302,7 +302,7 @@ def test_cli_uses_fresh_muid_and_closes_both_connections(
     from meedee import _ci_cli, cli
 
     clock = [0]
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     monkeypatch.setattr(_ci_cli, "randbelow", lambda bound: 123)
     receiver = Receiver(clock)
     output = Output(receiver, None)
@@ -353,7 +353,7 @@ def test_ump_assembly_diagnostics_stop_the_scan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = [0]
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
     receiver.items.append(
         (ump.SysEx7Packet(group=1, format=2, data=b"\x01")).replace(stream="in")
@@ -369,7 +369,7 @@ def test_stream_diagnostic_stops_without_interpreting_later_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = [0]
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: clock[0])
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
     decoder = events.PacketDecoder(stream="in", protocol=midi.Protocol.Midi1)
     receiver.items.append(decoder.loss(lost=1, reason="known framing loss"))
@@ -382,7 +382,7 @@ def test_stream_diagnostic_stops_without_interpreting_later_input(
 def test_cancel_before_first_packet_does_not_claim_uncertain_delivery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(ci_live, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(ci, "monotonic_ns", lambda: 0)
     receiver = Receiver([0])
     token = events.Cancellation()
     checks = 0

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import events, messages, testing, transfer, transfer_input, ump
+from meedee import events, messages, testing, transfer, ump
 
 
 def event(message: messages.Message, stream: str = "s") -> messages.Message:
@@ -80,9 +80,9 @@ def test_receive_adapter_reuses_fragment_assembly_without_closing_input(
     clock = events.Clock(identity="source")
     for p in (b"\xf0\x7d", b"\xf8\x01\xf7\xf0\x02\xf7"):
         receiver.inject(p, clock=clock)
-    monkeypatch.setattr(transfer_input, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: 0)
     c = capture()
-    report = transfer_input.run(c, receiver)  # ty: ignore[invalid-argument-type]
+    report = transfer.capture(c, receiver)  # ty: ignore[invalid-argument-type]
     assert report.status == "completed" and report.ignored_events == 1
     assert c.message(0).data == b"\x7d\x01" and c.message(1).data == b"\x02"
     assert not receiver.closed
@@ -109,11 +109,9 @@ def test_receive_stops_on_faults_cancellation_and_silence(
     else:
         time.advance(100)
     ticks = iter([0])
-    monkeypatch.setattr(
-        transfer_input, "monotonic_ns", lambda: next(ticks, time.now_ns)
-    )
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: next(ticks, time.now_ns))
     c = capture(1)
-    report = transfer_input.run(c, receiver, cancel=token)  # ty: ignore[invalid-argument-type]
+    report = transfer.capture(c, receiver, cancel=token)  # ty: ignore[invalid-argument-type]
     assert report.status == {"cancel": "cancelled", "timeout": "timed_out"}.get(
         fault, "failed"
     )
@@ -141,8 +139,8 @@ def test_final_receive_cannot_hide_input_failure(
                 self.failure = midi.WorkerError("failed during receive")
             return event(messages.SysEx(data=b"\x01"))
 
-    monkeypatch.setattr(transfer_input, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: 0)
     c = capture(1)
-    report = transfer_input.run(c, Receiver())  # ty: ignore[invalid-argument-type]
+    report = transfer.capture(c, Receiver())  # ty: ignore[invalid-argument-type]
     assert report.status == ("cancelled" if fault == "interrupt" else "failed")
     assert report.received_messages == 0

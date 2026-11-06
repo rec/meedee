@@ -13,7 +13,6 @@ from meedee import (
     routing,
     testing,
     transfer,
-    transfer_output,
     ump,
 )
 
@@ -188,7 +187,7 @@ def test_transfer_conformance_retains_known_handoffs_and_uncertain_sink_effects(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     time = testing.ManualClock()
-    monkeypatch.setattr(transfer_output, "monotonic_ns", lambda: time.now_ns)
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: time.now_ns)
     monkeypatch.setattr(
         events.Cancellation,
         "wait_for",
@@ -207,7 +206,7 @@ def test_transfer_conformance_retains_known_handoffs_and_uncertain_sink_effects(
     session.confirm(first.index, time.now_ns)
     o.fail_next_send(accepted=True)
     with pytest.raises(ValueError, match="fresh"):
-        transfer_output.run(session, cast(midi.Output, o))
+        transfer.send(session, cast(midi.Output, o))
     time.advance(10)
     second = session.prepare(time.now_ns)
     assert second is not None

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, BinaryIO
 if TYPE_CHECKING:
     from ufor.tuning import Tuning
 
-from . import events, messages, transfer
+from . import events, messages, midi, transfer
 
 class Pitch:
     def __init__(self, *, semitone: int, fraction: int) -> None: ...
@@ -446,3 +446,10 @@ def note_changes(
     bank: int | None = None,
     preserve_unmapped: bool = False,
 ) -> list[SingleNoteChange | BankedNoteChange]: ...
+def query(
+    query: Query,
+    receiver: midi.Input,
+    output: midi.Output,
+    *,
+    cancel: events.Cancellation | None = None,
+) -> QueryReport: ...

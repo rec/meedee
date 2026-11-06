@@ -1,7 +1,7 @@
 from os import PathLike
 from typing import BinaryIO
 
-from . import events, messages
+from . import events, messages, midi
 from .messages import SysEx
 
 class Plan:
@@ -102,3 +102,16 @@ class Capture:
     def snapshot(self) -> CaptureReport: ...
     def message(self, index: int) -> SysEx: ...
     def write(self, destination: str | PathLike[str] | BinaryIO) -> None: ...
+
+def send(
+    session: Session,
+    output: midi.Output,
+    *,
+    cancel: events.Cancellation | None = None,
+) -> Report: ...
+def capture(
+    capture: Capture,
+    receiver: midi.Input,
+    *,
+    cancel: events.Cancellation | None = None,
+) -> CaptureReport: ...

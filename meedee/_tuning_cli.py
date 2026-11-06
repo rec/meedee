@@ -49,7 +49,7 @@ def run_query(config: TuningPreview) -> int:
         )
         return 0
 
-    from . import midi, tuning_live
+    from . import midi
     from ._monitor import select_port
 
     query: tuning.Query | None = None
@@ -84,7 +84,7 @@ def run_query(config: TuningPreview) -> int:
                 stream=receiver.stream,
                 timeout=config.timeout,
             )
-            tuning_live.run(query, receiver, output)
+            tuning.query(query, receiver, output)
         if query.snapshot().status == "completed":
             query.write(config.destination)
             exported = True

@@ -13,7 +13,6 @@ def main() -> None:
         from meedee import (
             archive,
             ci,
-            ci_live,
             clip,
             codecs,
             controls,
@@ -31,10 +30,7 @@ def main() -> None:
             timecode,
             topology,
             transfer,
-            transfer_input,
-            transfer_output,
             tuning,
-            tuning_live,
             ump,
             universal,
         )
@@ -86,7 +82,7 @@ def main() -> None:
             ),
             route=ci.Route(input="pure", output="none"),
         )
-        assert browser.snapshot().status == "ready" and callable(ci_live.run)
+        assert browser.snapshot().status == "ready" and callable(ci.browse)
         assert events.ReceivedPacket.__module__ == "meedee.events"
         assert (
             codecs.encode(messages.ProgramChange(channel=16, program=128))
@@ -123,7 +119,7 @@ def main() -> None:
         )
         query.prepare(0)
         query.confirm(1)
-        assert query.snapshot().request_sent and callable(tuning_live.run)
+        assert query.snapshot().request_sent and callable(tuning.query)
 
         assert messages.NoteOn(channel=1, note=60, velocity=100).note == 60
         assert messages.SysEx(data=memoryview(bytearray([0, 127]))).data == bytes(
@@ -180,11 +176,11 @@ def main() -> None:
         assert tracker.observe([]).generation == 1
         plan = transfer.read_file(BytesIO(b"\xf0\x7d\xf7"), gap="0 ns")
         assert transfer.Session(plan).snapshot().total_messages == 1
-        assert callable(transfer_output.run)
+        assert callable(transfer.send)
         capture = transfer.Capture(stream="pure", expected_messages=1, timeout="10 ns")
         capture.start(0)
         capture.feed((messages.SysEx(data=b"\x7d")).replace(stream="pure"), 1)
-        assert capture.snapshot().status == "completed" and callable(transfer_input.run)
+        assert capture.snapshot().status == "completed" and callable(transfer.capture)
         from meedee import discovery
 
         poller = discovery.Poller(protocol="midi1")

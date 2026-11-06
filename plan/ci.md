@@ -83,7 +83,7 @@ there are no new archive record IDs or implicit semantic promotion.
 
 ## Caller-driven session
 
-Rust ci_session and Python ci.Session use the same implementation. A session
+Rust ci and Python ci.Session use the same implementation. A session
 holds one explicit input/output Route, optional UMP group, local MUID/identity,
 output path and optional Function Block. It opens no ports, owns no transport,
 spawns no thread, has no background timer and performs no I/O or user callbacks.
@@ -169,7 +169,7 @@ physical UMP qualification remain open; see validation.md for the actual outcome
 
 ## One-scan management browser
 
-Rust `ci_browser::Browser` owns a fresh `ci_session::Session`; Python `ci.Browser`
+Rust `ci::Browser` owns a fresh `ci::Session`; Python `ci.Browser`
 constructs the same shared core from the existing identity, route and resource
 settings. Neither construction nor imports perform I/O. The local identity and
 MUID are explicit library inputs. Optional capability-category bits remain zero.
@@ -217,7 +217,7 @@ reports preserve the last peer snapshot, which may have become stale or invalid;
 no identity, capability or Product Instance ID is authenticated. Caller-owned
 copies and transient session updates remain outside retained report budgets.
 
-`ci_live.run(browser, receiver, output, cancel=None, ...)` starts a fresh browser
+`ci.browse(browser, receiver, output, cancel=None, ...)` starts a fresh browser
 on existing typed connections. A route without a group means MIDI 1; an explicit
 group means UMP SysEx7. Connections must use that protocol and the receiver must
 match the route's stream. The host reuses the existing UMP assembler, ignores

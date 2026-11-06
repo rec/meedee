@@ -105,7 +105,7 @@ limits and the point at which validation occurs.
 
 | ID | Rust path | Python counterpart and required check |
 | --- | --- | --- |
-| K01 | `ci_live::Options` | ci_live.run keywords. Match cancellation, SysEx limits and fresh-session driver behavior. |
+| K01 | `ci::Options` | ci.browse keywords. Match cancellation, SysEx limits and fresh-session driver behavior. |
 | K02 | `inspection::ComparisonOptions` | compare_files keywords. Match exact/tolerant/ignored timing, explicit source/clock mappings, limits and bounded differences. |
 | K03 | `inspection::MonitorOptions` | Monitor/run keywords. Match filtering, detail limits, note-state collection and opt-in metrics; filters must preserve diagnostics. |
 | K04 | `inspection::Options` | inspect_file keywords. Match payload_limit, preserve_unknown and detail_limit, including default values. |
@@ -248,7 +248,7 @@ language-specific behavior.
 | R01 | Adaptation | archive.rs / src/archive.rs; archive.rs and test_archive.py cover independent v1 bytes, unknown records, occurrence metadata and trailers. |
 | R02 | Adaptation | ci.rs / src/ci.rs; ci.rs and test_ci.py cover management bodies, versions, extensions, malformed input and shared vectors. |
 | R03 | Adaptation | ci.rs / src/ci.rs and message_metadata.rs; envelope validation and explicit message transformations retain metadata; bare SysEx decoding interprets payload. |
-| R04 | Adaptation | ci_session.rs / src/ci.rs; ci.rs and test_ci.py cover actions/observations, pending sends, early replies and loss. |
+| R04 | Adaptation | ci.rs / src/ci.rs; ci.rs and test_ci.py cover actions/observations, pending sends, early replies and loss. |
 | R05 | Adaptation | codecs.rs / src/messages.rs; byte_codec.rs and test_codecs.py exercise incremental framing and diagnostic ordering. |
 | R06 | Adaptation | controls.rs, event_views.rs / src/controls.rs; event_views.rs, test_controls.py and test_event_views.py cover observations and boundaries. |
 | R07 | Adaptation | live.rs, input_api.rs / src/live.rs and _clients.py; live.rs, coremidi_boundary.rs and test_live.py cover packets, filters and accepted-prefix diagnostics. |
@@ -280,7 +280,7 @@ language-specific behavior.
 | R33 | Adaptation | ump decoder / src/ump*.rs; ump.rs and test_ump.py cover word framing, diagnostic values and unknown packets. |
 | R34 | Adaptation | ump message enum / src/messages.rs and ump*.rs; ump.rs, byte_codec.rs and test_ump.py cover native widths and explicit conversion/encoding failure. |
 | R35 | Adaptation | universal.rs / src/profiles.rs; profiles.rs and test_profiles.py verify explicit interpretation, supported values and shared wire vectors. |
-| K01 | Adaptation | ci_live.rs / ci_live.py and src/drivers.rs; ci_live.rs core tests and test_ci_browser.py exercise fresh sessions, cancellation, UMP assembly and loss. |
+| K01 | Adaptation | ci.rs / ci.py and src/drivers.rs; ci.rs core tests and test_ci_browser.py exercise fresh sessions, cancellation, UMP assembly and loss. |
 | K02 | Fixed | comparison.rs / src/comparison.rs; renamed Rust sources/clocks to source_map/clock_map. comparison.rs and test_comparison.py cover mapping, tolerances, limits and file completion. |
 | K03 | Adaptation | inspection.rs / src/inspection.rs and inspection.py; inspection.rs core tests, test_inspection.py and test_monitor.py cover filters, typed callbacks, snapshots and opt-in metrics. |
 | K04 | Adaptation | inspection.rs / src/inspection.rs; inspection.rs and test_inspection.py cover positive limits, prefix reports and preservation. |

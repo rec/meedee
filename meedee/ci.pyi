@@ -2,6 +2,7 @@
 
 from typing import ClassVar
 
+from . import events, midi
 from .messages import Message, SysEx
 
 BROADCAST_MUID: int
@@ -376,3 +377,13 @@ class BrowseDiagnostic:
     def token(self) -> int | None: ...
     @property
     def reason(self) -> str: ...
+
+def browse(
+    browser: Browser,
+    receiver: midi.Input,
+    output: midi.Output,
+    *,
+    cancel: events.Cancellation | None = None,
+    message_limit: int = 1_048_576,
+    byte_limit: int = 8_388_608,
+) -> BrowseReport: ...

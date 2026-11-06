@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("tyro", reason="install meedee[cli]")
 pytest.importorskip("pydantic", reason="install meedee[cli]")
 
-from meedee import cli, events, midi, testing, transfer_input
+from meedee import cli, events, midi, testing, transfer
 
 
 def invoke(path: Path, *args: str) -> int:
@@ -53,7 +53,7 @@ def install(
             return receiver
 
     monkeypatch.setattr(midi, "Input", Client)
-    monkeypatch.setattr(transfer_input, "monotonic_ns", lambda: 0)
+    monkeypatch.setattr(transfer, "monotonic_ns", lambda: 0)
     return actions
 
 
@@ -93,9 +93,7 @@ def test_receive_failures_never_create_output(
         receiver.inject(b"\xf0\x01\x90\x40\x01", clock=events.Clock(identity="c"))
     else:
         ticks = iter([0])
-        monkeypatch.setattr(
-            transfer_input, "monotonic_ns", lambda: next(ticks, 100_000_000)
-        )
+        monkeypatch.setattr(transfer, "monotonic_ns", lambda: next(ticks, 100_000_000))
     path = tmp_path / "failed.syx"
     assert invoke(path) == (1 if fault == "timeout" else 2)
     report = json.loads(capsys.readouterr().out)

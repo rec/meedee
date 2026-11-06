@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("tyro", reason="install meedee[cli]")
 pytest.importorskip("pydantic", reason="install meedee[cli]")
 
-from meedee import cli, codecs, events, messages, midi, testing, tuning, tuning_live
+from meedee import cli, codecs, events, messages, midi, testing, tuning
 
 
 def invoke(args: list[str]) -> int:
@@ -95,7 +95,7 @@ def install(
     monkeypatch.setattr(midi, "Output", OutputClient)
     ticks = iter([0, 0])
     monkeypatch.setattr(
-        tuning_live,
+        tuning,
         "monotonic_ns",
         lambda: next(ticks, 100_000_000 if fault == "timeout" else 0),
     )

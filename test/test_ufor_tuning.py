@@ -203,7 +203,7 @@ def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast
     bank: int | None,
     gap: float | str,
 ) -> None:
-    from meedee import transfer, transfer_output
+    from meedee import transfer
     from meedee.testing import Output
 
     result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
@@ -221,6 +221,6 @@ def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast
     decoded = tuning.decode(plan.message(0))
     assert decoded is not None and decoded.message.device_id == 127
     output = Output(protocol="midi1")
-    report = transfer_output.run(transfer.Session(plan), output)  # ty: ignore[invalid-argument-type]
+    report = transfer.send(transfer.Session(plan), output)  # ty: ignore[invalid-argument-type]
     assert report.status == "completed" and output.take_packet() == wire
     output.close()
