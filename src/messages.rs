@@ -41,6 +41,15 @@ impl Message {
 
 #[pymethods]
 impl Message {
+    /// Return this message unchanged; note-addressed subclasses shift their note number.
+    fn transpose(
+        slf: PyRef<'_, Self>,
+        #[pyo3(from_py_with = strict_integer)] semitones: i64,
+    ) -> PyResult<Py<PyAny>> {
+        let _ = semitones;
+        let py = slf.py();
+        Ok(slf.into_pyobject(py)?.into_any().unbind())
+    }
     #[getter]
     fn timestamp(&self) -> Option<crate::event_values::Timestamp> {
         self.metadata()
@@ -250,20 +259,37 @@ macro_rules! versioned_message {
         }
     };
 }
+pub(crate) fn transpose_note<'py>(
+    value: &Bound<'py, PyAny>,
+    semitones: i64,
+) -> PyResult<Py<PyAny>> {
+    let changes = PyDict::new(value.py());
+    let note: u8 = value.getattr("note")?.extract()?;
+    changes.set_item(
+        "note",
+        i64::from(note).saturating_add(semitones).clamp(0, 127),
+    )?;
+    Ok(value.call_method("replace", (), Some(&changes))?.unbind())
+}
+
 macro_rules! versioned_note {
     ($name:ident) => {
         versioned_message! { $name (note, velocity=None, channel=None, *, version=1, group=None, attribute_type=None, attribute_data=None) {note} {velocity => with_velocity} {attribute_type => with_attribute_type, attribute_data => with_attribute_data};
             fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=strict_integer)] semitones:i64) -> PyResult<Py<PyAny>> {
-                let py=slf.py(); let changes=PyDict::new(py);
-                changes.set_item("note", i64::from(slf.value.note()).saturating_add(semitones).clamp(0,127))?;
-                Ok(Self::replace(slf,Some(&changes))?.unbind())
+                let py=slf.py();
+                transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
             }
         }
     };
 }
 versioned_note!(NoteOn);
 versioned_note!(NoteOff);
-versioned_message! { PolyPressure (note, pressure=None, channel=None, *, version=1, group=None) {note} {pressure => with_pressure} {} }
+versioned_message! { PolyPressure (note, pressure=None, channel=None, *, version=1, group=None) {note} {pressure => with_pressure} {};
+    fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=strict_integer)] semitones:i64) -> PyResult<Py<PyAny>> {
+        let py=slf.py();
+        transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
+    }
+}
 versioned_message! { ControlChange (controller, value, channel=None, *, version=1, group=None) {controller,value} {} {} }
 versioned_message! { ProgramChange (program, channel=None, *, version=1, group=None, options=None, bank_msb=None, bank_lsb=None) {program} {} {options => with_options, bank_msb => with_bank_msb, bank_lsb => with_bank_lsb} }
 versioned_message! { ChannelPressure (pressure=None, channel=None, *, version=1, group=None) {} {pressure => with_pressure} {} }
@@ -740,6 +766,6 @@ fn python_representation_contract_and_measurements() {
     });
 }
 
-fn strict_integer(value: &Bound<'_, PyAny>) -> PyResult<i64> {
+pub(crate) fn strict_integer(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     integer(value, "value")
 }

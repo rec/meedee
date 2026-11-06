@@ -142,3 +142,86 @@ fn metadata_rejects_inconsistent_clocks_spans_and_empty_sources() {
     disabled.clock = disabled.clock.with_transport(1, false);
     assert!(note.with_timestamp(disabled).is_err());
 }
+
+#[test]
+fn generic_transpose_preserves_default_values_and_dispatches_note_addresses() {
+    fn shift<M: Message>(value: M, semitones: i64) -> M {
+        value.transpose(semitones)
+    }
+    let control = meedee::messages::ControlChange::new(7, 90)
+        .unwrap()
+        .with_metadata(metadata())
+        .unwrap();
+    let unchanged = shift(control.clone(), 12);
+    assert_eq!(unchanged, control);
+    assert_eq!(unchanged.metadata(), control.metadata());
+    let pressure = meedee::messages::PolyPressure::new_midi2(60)
+        .unwrap()
+        .with_pressure(0xFEDCBA98)
+        .unwrap()
+        .with_channel(2)
+        .unwrap()
+        .with_group(3)
+        .unwrap()
+        .with_metadata(metadata())
+        .unwrap();
+    let shifted = shift(pressure.clone(), 12);
+    assert_eq!(shifted.note(), 72);
+    assert_eq!(shifted.pressure(), pressure.pressure());
+    assert_eq!(shifted.channel(), pressure.channel());
+    assert_eq!(shifted.group(), pressure.group());
+    assert_eq!(shifted.metadata(), pressure.metadata());
+    assert_eq!(shift(pressure.clone(), i64::MAX).note(), 127);
+    assert_eq!(shift(pressure.clone(), i64::MIN).note(), 0);
+    let payload = meedee::events::Payload::Ump(ump::UmpMessage::PolyPressure(pressure));
+    let shifted = shift(payload, 12);
+    let meedee::events::Payload::Ump(ump::UmpMessage::PolyPressure(shifted)) = shifted else {
+        panic!("changed message kind")
+    };
+    assert_eq!(shifted.note(), 72);
+    assert_eq!(shifted.metadata(), Some(&metadata()));
+}
+
+#[test]
+fn transpose_keeps_per_note_controls_and_ump_wrappers_addressed_to_the_shifted_key() {
+    let controls = [
+        ump::UmpMessage::Midi2RegisteredPerNoteController(
+            ump::Midi2RegisteredPerNoteController::new(3, 2, 60, 1, 1234).unwrap(),
+        ),
+        ump::UmpMessage::Midi2AssignablePerNoteController(
+            ump::Midi2AssignablePerNoteController::new(3, 2, 60, 2, 5678).unwrap(),
+        ),
+        ump::UmpMessage::Midi2PerNotePitchBend(
+            ump::Midi2PerNotePitchBend::new(3, 2, 60, -1234).unwrap(),
+        ),
+        ump::UmpMessage::Midi2PerNoteManagement(
+            ump::Midi2PerNoteManagement::new(3, 2, 60, 3).unwrap(),
+        ),
+    ];
+    for value in controls {
+        let before = ump::encode(&value).unwrap();
+        let shifted = value.with_metadata(metadata()).unwrap().transpose(12);
+        let after = ump::encode(&shifted).unwrap();
+        assert_eq!(after[0], (before[0] & !0x7F00) | (72 << 8));
+        assert_eq!(after[1], before[1]);
+        assert_eq!(shifted.metadata(), Some(&metadata()));
+    }
+    let packet = ump::Midi1Packet::new(
+        3,
+        AnyMessage::PolyPressure(
+            meedee::messages::PolyPressure::new(60)
+                .unwrap()
+                .with_pressure(50)
+                .unwrap()
+                .with_channel(2)
+                .unwrap(),
+        ),
+    )
+    .unwrap()
+    .with_metadata(metadata())
+    .unwrap();
+    let shifted = packet.transpose(12);
+    assert_eq!(shifted.group(), 3);
+    assert_eq!(shifted.message().encode().unwrap(), [0xA1, 72, 50]);
+    assert_eq!(shifted.metadata(), Some(&metadata()));
+}

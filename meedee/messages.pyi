@@ -30,6 +30,9 @@ class Rest:
 
 class Message:
     """Abstract native base. Direct construction is rejected."""
+    def transpose(self, semitones: int) -> Self:
+        """Shift note addresses with clamping; otherwise return self."""
+        ...
     @property
     def timestamp(self) -> events.Timestamp | None: ...
     @property

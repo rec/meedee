@@ -57,6 +57,14 @@ pub trait Message: fmt::Debug {
     where
         Self: Sized;
 
+    /// Shift note-number addresses, clamping to 0..=127. Other messages are unchanged.
+    fn transpose(self, _semitones: i64) -> Self
+    where
+        Self: Sized,
+    {
+        self
+    }
+
     fn timestamp(&self) -> Option<&crate::events::Timestamp> {
         self.metadata().and_then(|m| m.timestamp.as_ref())
     }
@@ -92,9 +100,39 @@ pub trait Message: fmt::Debug {
     }
 }
 
+macro_rules! transpose_methods {
+    (@inherent; note $(, $rest:ident)*) => {
+        pub fn transpose(mut self, semitones: i64) -> Self {
+            self.note = i64::from(self.note).saturating_add(semitones).clamp(0, 127) as u8;
+            self
+        }
+    };
+    (@inherent; message $(, $rest:ident)*) => {
+        pub fn transpose(mut self, semitones: i64) -> Self {
+            self.message = crate::messages::Message::transpose(self.message, semitones);
+            self
+        }
+    };
+    (@trait; note $(, $rest:ident)*) => {
+        fn transpose(self, semitones: i64) -> Self { Self::transpose(self, semitones) }
+    };
+    (@trait; message $(, $rest:ident)*) => {
+        fn transpose(self, semitones: i64) -> Self { Self::transpose(self, semitones) }
+    };
+    (@$kind:ident; $field:ident $(, $rest:ident)*) => {
+        crate::messages::transpose_methods!(@$kind; $($rest),*);
+    };
+    (@$kind:ident;) => {};
+}
+pub(crate) use transpose_methods;
+
 macro_rules! value_metadata {
     ($name:ident { $($field:ident),* $(,)? }) => {
+        impl $name {
+            crate::messages::transpose_methods!(@inherent; $($field),*);
+        }
         impl crate::messages::Message for $name {
+            crate::messages::transpose_methods!(@trait; $($field),*);
             fn metadata(&self) -> Option<&crate::messages::Metadata> { self.metadata.as_deref() }
             fn with_metadata(mut self, metadata: crate::messages::Metadata) -> Result<Self, crate::messages::ValueError> {
                 metadata.validate()?;
@@ -119,6 +157,9 @@ pub(crate) use value_metadata;
 macro_rules! enum_metadata {
     ($name:ident { $($variant:ident),* $(,)? }) => {
         impl crate::messages::Message for $name {
+            fn transpose(self, semitones: i64) -> Self {
+                match self { $(Self::$variant(v) => Self::$variant(crate::messages::Message::transpose(v, semitones))),* }
+            }
             fn metadata(&self) -> Option<&crate::messages::Metadata> {
                 match self { $(Self::$variant(v) => crate::messages::Message::metadata(v)),* }
             }
@@ -367,16 +408,6 @@ impl ParameterStep {
             .ok_or_else(|| ValueError("message channel is unassigned".into()))
     }
 }
-
-macro_rules! transpose_note {
-    ($($name:ident),*) => {$(impl $name {
-        pub fn transpose(mut self, semitones: i64) -> Self {
-            self.note = i64::from(self.note).saturating_add(semitones).clamp(0,127) as u8;
-            self
-        }
-    })*};
-}
-transpose_note!(NoteOn, NoteOff);
 
 macro_rules! system_messages {
     ($($name:ident { $($field:ident: $ty:ty = $low:literal ..= $high:literal),* };)*) => {

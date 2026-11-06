@@ -10,7 +10,29 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 include!("../crates/meedee/src/ump_values.rs");
 
+macro_rules! note_methods {
+    ($name:ident; [$($all:ident),*]; [note $(, $rest:ident)*]; {$($methods:item)*}) => {
+        value_methods_impl!($name; $($all),*; {
+            $($methods)*
+            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with = messages::strict_integer)] semitones: i64) -> PyResult<Py<PyAny>> {
+                let py = slf.py();
+                messages::transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
+            }
+        });
+    };
+    ($name:ident; [$($all:ident),*]; [$field:ident $(, $rest:ident)*]; {$($methods:item)*}) => {
+        note_methods!($name; [$($all),*]; [$($rest),*]; {$($methods)*});
+    };
+    ($name:ident; [$($all:ident),*]; []; {$($methods:item)*}) => {
+        value_methods_impl!($name; $($all),*; {$($methods)*});
+    };
+}
 macro_rules! value_methods {
+    ($name:ident; $($field:ident),*; {$($methods:item)*}) => {
+        note_methods!($name; [$($field),*]; [$($field),*]; {$($methods)*});
+    };
+}
+macro_rules! value_methods_impl {
     ($name:ident; $($field:ident),*; {$($methods:item)*})=>{
         #[pymethods]
         impl $name {
@@ -74,6 +96,15 @@ struct Midi1Packet {
 value_methods!(Midi1Packet;group,message;{
     #[new]#[pyo3(signature=(*,group,message))]
     fn new(group:&Bound<'_,PyAny>,message:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::Midi1Packet::new(int(group)?,messages::extract_primitive(message)?).map_err(error)?}))}
+    fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=messages::strict_integer)] semitones:i64)->PyResult<Py<PyAny>> {
+        let py=slf.py();
+        let changes=PyDict::new(py);
+        let original=slf.message(py)?;
+        let shifted=original.bind(py).call_method1("transpose", (semitones,))?;
+        if shifted.is(original.bind(py)) { return Ok(slf.into_pyobject(py)?.into_any().unbind()); }
+        changes.set_item("message", shifted)?;
+        Ok(Self::replace(slf,Some(&changes))?.unbind())
+    }
     #[getter]fn group(&self)->u8{self.value.group()}
     #[getter]fn message(&self,py:Python<'_>)->PyResult<Py<PyAny>>{messages::to_python(py,self.value.message().clone())}
 });

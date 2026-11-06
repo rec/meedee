@@ -196,3 +196,68 @@ def test_metadata_rejects_empty_source_and_inconsistent_span() -> None:
         messages.NoteOn(60).replace(
             span=span, timestamp=events.Timestamp(ticks=2, clock=other)
         )
+
+
+def test_transpose_defaults_to_the_same_message_object() -> None:
+    from meedee import events, ump
+
+    timestamp = events.Timestamp(ticks=12, clock=events.Clock(identity="source"))
+    for m in [
+        messages.ControlChange(7, 90),
+        messages.ChannelPressure(90),
+        messages.PitchBend(100),
+        messages.TimingClock(),
+        messages.SysEx(b"\x7d\x01"),
+        ump.Noop(),
+        ump.Midi1Packet(group=2, message=messages.TimingClock()),
+    ]:
+        tagged = m.replace(timestamp=timestamp, stream="keyboard")
+        assert tagged.transpose(semitones=12) is tagged
+        assert tagged.transpose(-12) is tagged
+
+
+def test_transpose_shifts_all_note_addresses_and_preserves_other_fields() -> None:
+    from meedee import events, ump
+
+    timestamp = events.Timestamp(ticks=12, clock=events.Clock(identity="source"))
+    span = events.SourceSpan(first_packet=1, last_packet=2)
+    for m in [
+        messages.NoteOn(60, 100, 2),
+        messages.NoteOff(60, 50, 2),
+        messages.PolyPressure(60, 50, 2),
+        messages.NoteOn(
+            60, 40_000, 2, version=2, group=3, attribute_type=1, attribute_data=123
+        ),
+        messages.NoteOff(60, 30_000, 2, version=2, group=3),
+        messages.PolyPressure(60, 0xFEDCBA98, 2, version=2, group=3),
+        ump.Midi2RegisteredPerNoteController(
+            group=3, channel=2, note=60, controller=1, value=1234
+        ),
+        ump.Midi2AssignablePerNoteController(
+            group=3, channel=2, note=60, controller=2, value=5678
+        ),
+        ump.Midi2PerNotePitchBend(group=3, channel=2, note=60, value=-1234),
+        ump.Midi2PerNoteManagement(group=3, channel=2, note=60, flags=3),
+    ]:
+        tagged = m.replace(timestamp=timestamp, stream="keyboard", span=span)
+        assert tagged.transpose(12) == tagged.replace(note=72)
+        assert tagged.transpose(-(2**63)).note == 0
+        assert tagged.transpose(2**63 - 1).note == 127
+        shifted = tagged.transpose(12)
+        assert type(shifted) is type(tagged)
+        assert (shifted.timestamp, shifted.stream, shifted.span) == (
+            timestamp,
+            "keyboard",
+            span,
+        )
+        assert tagged.note == 60
+    wrapped = ump.Midi1Packet(
+        group=3, message=messages.PolyPressure(60, 50, 2)
+    ).replace(timestamp=timestamp, stream="keyboard", span=span)
+    shifted = wrapped.transpose(12)
+    assert shifted.group == 3 and shifted.message == messages.PolyPressure(72, 50, 2)
+    assert (shifted.timestamp, shifted.stream, shifted.span) == (
+        timestamp,
+        "keyboard",
+        span,
+    )
