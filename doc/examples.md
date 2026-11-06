@@ -10,8 +10,7 @@ For the Rust API, see the [practical Rust examples](rust-examples.md).
 from meedee.messages import Note
 from meedee.midi import Output
 
-with Output() as out:
-    out.send(Note("500 ms", 60))
+Output().send(Note("500 ms", 60))
 ```
 
 ## 2. Play a tune in 120 bpm
@@ -20,14 +19,13 @@ with Output() as out:
 from meedee.messages import Note, Rest
 from meedee.midi import Output
 
-with Output(bpm=120) as out:
-    out.send(
-        Note(duration=1, note=60, velocity=90),  # 1 beat
-        Note(0.5, 62, 70),
-        Note(0.5, 64, 100),
-        Rest("1 beat"),
-        Note(2, 64, 100),
-    )
+Output(bpm=120).send(
+    Note(duration=1, note=60, velocity=90),  # 1 beat
+    Note(0.5, 62, 70),
+    Note(0.5, 64, 100),
+    Rest("1 beat"),
+    Note(2, 64, 100),
+)
 ```
 
 ## 3. Listen to an input
@@ -41,8 +39,6 @@ for message in Input():
 
 ## 4. Transpose a keyboard up an octave
 
-Use separate input and output devices to avoid a feedback loop.
-
 ```python
 from meedee.messages import NoteOff, NoteOn
 from meedee.midi import Input, Output
@@ -52,8 +48,7 @@ with Input() as input, Output() as output:
         output.send(m.transpose(12))
 ```
 
-`transpose()` returns a new message and clamps the note to 0..127. To handle
-input diagnostics yourself, use `with_errors()`:
+Errors are printed on the console. To handle them yourself, use `Input.with_errors()`:
 
 ```python
 import sys
@@ -71,8 +66,13 @@ with Input() as input, Output() as output:
 
 ## 5. Split a keyboard into bass and lead
 
-Receive channel 1. Split at middle C. Other channel messages, such as sustain
-and pitch bend, go to both parts.
+Receive channel 1.
+
+Notes below middle C are sent to channel 2; above that, to channel 3.
+
+Other channel messages, such as sustain and pitch bend, go to both channels.
+
+MIDI messages without channels, like sysexes, are passed through
 
 ```python
 from meedee.messages import NoteOff, NoteOn, ProgramChange
@@ -93,7 +93,7 @@ with Input(channel=1) as input, Output() as out:
             out.send(m)
 ```
 
-Or create two outputs:
+Another way.
 
 ```python
 from meedee.messages import NoteOff, NoteOn, ProgramChange
@@ -116,7 +116,7 @@ with Input() as input, Output(channel=2) as o2, Output(channel=3) as o3:
 
 ## 6. Record and replay a performance
 
-Record ten seconds in memory, then replay it through the first output.
+Record ten seconds in memory, then replay it.
 
 ```python
 from meedee.midi import Input, Output
