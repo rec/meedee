@@ -21,7 +21,7 @@ def exercise(isolated: bool, destination: Path) -> None:
                 messages.NoteOff(channel=1, note=60, velocity=0),
             ]
             for n in notes:
-                output(n)
+                output.send(n)
             received = [receiver.receive(timeout=3) for _ in notes]
             assert all(isinstance(e, messages.Message) for e in received), received
             assert [e for e in received if isinstance(e, messages.Message)] == notes
@@ -38,7 +38,7 @@ def exercise(isolated: bool, destination: Path) -> None:
             reader.close()
             captured = [e for e in records if isinstance(e, messages.Message)]
             assert len(captured) == 2 and captured[0].timestamp is not None
-            replay = output.play(captured, origin=captured[0].timestamp, metrics=True)
+            replay = output.send(captured, origin=captured[0].timestamp, metrics=True)
             assert replay.sent_events == 2 and not replay.cancelled
             lateness = replay.lateness
             assert lateness is not None and lateness.count == 2

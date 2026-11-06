@@ -19,11 +19,11 @@ use std::time::Duration;
 /// use meedee::messages::{Beats, Note, Rest};
 /// use meedee::midi::{Output};
 /// use std::time::Duration;
-/// # fn main() -> std::io::Result<()> {
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Output::new().send(Note::new(Duration::from_millis(500), 60)?)?;
 /// let mut output = Output::new().with_bpm(120)?;
-/// output.send_all([
-///     Note::new(Beats::from(1), 60)?.into(),
+/// output.send([
+///     meedee::midi::OutputValue::from(Note::new(Beats::from(1), 60)?),
 ///     Note::new(Beats::new(1, 2)?, 62)?.with_velocity(70)?.into(),
 ///     Rest::new(Beats::from(1)).into(),
 /// ])?;
@@ -53,9 +53,86 @@ pub enum OutputValue {
     Note(Note),
     Rest(Rest),
     Wait(NoteDuration),
+    Record(crate::archive::Record),
 }
 
-/// Persistent options for subsequent Output::play calls.
+type OutputSegment<'a> = (bool, Box<dyn Iterator<Item = io::Result<OutputValue>> + 'a>);
+
+/// Material accepted by Output::send: one value, an iterable of values/records,
+/// or a tuple of independent sources sent successively.
+pub trait OutputSource<Kind> {
+    #[doc(hidden)]
+    fn into_output<'a>(self) -> impl Iterator<Item = OutputSegment<'a>>
+    where
+        Self: 'a;
+}
+#[doc(hidden)]
+pub struct Single;
+#[doc(hidden)]
+pub struct Sequence;
+#[doc(hidden)]
+pub struct Sources<K>(std::marker::PhantomData<K>);
+impl<T: Into<OutputValue>> OutputSource<Single> for T {
+    fn into_output<'a>(self) -> impl Iterator<Item = OutputSegment<'a>>
+    where
+        Self: 'a,
+    {
+        std::iter::once((
+            false,
+            Box::new(std::iter::once(Ok(self.into())))
+                as Box<dyn Iterator<Item = io::Result<OutputValue>> + 'a>,
+        ))
+    }
+}
+trait OutputItem {
+    fn output_item(self) -> io::Result<OutputValue>;
+}
+impl<T: Into<OutputValue>> OutputItem for T {
+    fn output_item(self) -> io::Result<OutputValue> {
+        Ok(self.into())
+    }
+}
+impl OutputItem for io::Result<crate::archive::Record> {
+    fn output_item(self) -> io::Result<OutputValue> {
+        self.map(OutputValue::Record)
+    }
+}
+impl<I: IntoIterator> OutputSource<Sequence> for I
+where
+    I::Item: OutputItem,
+{
+    fn into_output<'a>(self) -> impl Iterator<Item = OutputSegment<'a>>
+    where
+        Self: 'a,
+    {
+        std::iter::once((
+            true,
+            Box::new(self.into_iter().map(OutputItem::output_item))
+                as Box<dyn Iterator<Item = io::Result<OutputValue>> + 'a>,
+        ))
+    }
+}
+impl From<crate::archive::Record> for OutputValue {
+    fn from(value: crate::archive::Record) -> Self {
+        Self::Record(value)
+    }
+}
+macro_rules! tuple_sources {
+    ($($value:ident: $kind:ident),+) => {
+        impl<$($value: OutputSource<$kind>, $kind),+> OutputSource<Sources<($($kind,)+)>> for ($($value,)+) {
+            #[allow(non_snake_case)]
+            fn into_output<'a>(self) -> impl Iterator<Item = OutputSegment<'a>> where Self: 'a {
+                let ($($value,)+) = self;
+                std::iter::empty()$(.chain($value.into_output()))+
+            }
+        }
+    };
+}
+tuple_sources!(A: KA, B: KB);
+tuple_sources!(A: KA, B: KB, C: KC);
+tuple_sources!(A: KA, B: KB, C: KC, D: KD);
+
+/// Persistent options for subsequent Output::send calls.
 #[derive(Clone, Default)]
 pub struct PlaybackOptions {
     pub origin: Option<crate::events::Timestamp>,
@@ -159,99 +236,152 @@ impl Output {
         ));
         Ok(self)
     }
-    pub fn send(&mut self, value: impl Into<OutputValue>) -> crate::midi::Result<()> {
-        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
-        let plan = self.prepare(std::iter::once(value.into()))?;
-        self.execute(plan).map_err(crate::midi::Error::from)
-    }
-    /// Validate the complete sequence before opening a port or sending anything.
-    /// Durations accumulate exactly; only cumulative deadlines are rounded.
-    pub fn send_all(
+    /// Send a value or source, preserving relative timestamps within each source.
+    /// Ordinary sequences use note/rest durations and delays. Mixing timestamped
+    /// and untimestamped values inside one source is rejected. Tuples concatenate
+    /// independent sources. Empty sends open no ports. Always returns a report.
+    pub fn send<K>(
         &mut self,
-        values: impl IntoIterator<Item = OutputValue>,
-    ) -> crate::midi::Result<()> {
-        transport::ensure_control_thread().map_err(crate::midi::Error::Transport)?;
-        let plan = self.prepare(values)?;
-        self.execute(plan).map_err(crate::midi::Error::from)
-    }
-    /// Replay a recording or archive reader using the first message as time zero.
-    /// Clock/stream declarations and metadata do not send traffic. Loss markers,
-    /// unknown records, timestamp regressions and unrelated clocks stop replay.
-    /// The failure report counts successfully sent messages before the failure.
-    /// This output stays open; its normal close/Drop cleanup policy applies.
-    /// Configure origin, clock mappings, rounding, cancellation and metrics with
-    /// `with_playback` before calling this method.
-    ///
-    /// ```no_run
-    /// use meedee::midi::{Output};
-    /// use meedee::archive::Reader;
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let report = Output::new().play(Reader::open("rec.meedee")?)?;
-    /// println!("{report:?}");
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn play(
-        &mut self,
-        source: impl IntoIterator<Item = io::Result<crate::archive::Record>>,
+        source: impl OutputSource<K>,
     ) -> Result<crate::playback::Report, crate::playback::Failure<crate::midi::Error>> {
         use crate::playback::{Cause, Failure, Planner, Report};
-        let input_error = |error| Failure {
-            report: Report::default(),
-            cause: Cause::Input(error),
-        };
-        transport::ensure_control_thread()
-            .map_err(transport_error)
-            .map_err(input_error)?;
-        if self.closed {
-            return Err(input_error(io::Error::new(
-                io::ErrorKind::NotConnected,
-                "output is closed",
-            )));
-        }
-        let mut messages = source.into_iter().filter_map(replay_message);
-        let Some(first) = messages.next() else {
-            return Ok(Report::default());
-        };
-        let first = first.map_err(input_error)?;
-        let origin = self
+        let mut histogram = self
             .playback
-            .origin
-            .clone()
-            .or_else(|| first.timestamp().cloned())
-            .ok_or_else(|| input_error(invalid("playback requires a timestamp")))?;
-        let planner = Planner::new(
-            origin,
-            self.playback.mappings.clone(),
-            self.playback.allow_rounding,
-        )
-        .map_err(input_error)?;
-        self.prepare_message(first.clone()).map_err(input_error)?;
-        self.open().map_err(|error| Failure {
-            report: Report::default(),
-            cause: Cause::Send(error.into()),
-        })?;
-        // The scheduler uses deadlines relative to replay start, independent of
-        // earlier sends on this output and time spent opening the native port.
-        let mut clock = std::mem::replace(&mut self.clock, Box::new(MonotonicClock::default()));
-        let origin = clock.now_ns();
-        let options = self.playback.clone();
-        let result = crate::playback::play(
-            std::iter::once(Ok(first)).chain(messages),
-            planner,
-            &mut ReplayClock {
-                clock: clock.as_mut(),
-                origin,
-            },
-            &options.cancel,
-            |message| {
-                self.transmit(self.prepare_message(message.clone())?)
-                    .map_err(crate::midi::Error::from)
-            },
-            options.metrics,
-        );
-        self.clock = clock;
-        result
+            .metrics
+            .then(crate::metrics::Histogram::default);
+        let mut report = Report {
+            lateness: histogram.as_ref().map(|h| Box::new(h.snapshot())),
+            ..Report::default()
+        };
+        let mut origin_ns = None;
+        let mut elapsed = 0u64;
+        let result = (|| {
+            transport::ensure_control_thread()
+                .map_err(|e| Cause::Send(crate::midi::Error::Transport(e)))?;
+            if self.closed {
+                return Err(Cause::Input(invalid("output is closed")));
+            }
+            for (timestamps, segment) in source.into_output() {
+                if self.playback.cancel.cancelled() {
+                    report.cancelled = true;
+                    break;
+                }
+                let mut values = segment.filter_map(|v| match v {
+                    Ok(OutputValue::Record(record)) => {
+                        replay_message(Ok(record)).map(|v| v.map(OutputValue::Message))
+                    }
+                    v => Some(v),
+                });
+                let Some(first) = values.next() else {
+                    continue;
+                };
+                let first = first.map_err(Cause::Input)?;
+                let timed = timestamps
+                    && matches!(&first, OutputValue::Message(m) if m.timestamp().is_some());
+                if timed {
+                    let OutputValue::Message(first) = first else {
+                        unreachable!()
+                    };
+                    let origin = self
+                        .playback
+                        .origin
+                        .clone()
+                        .or_else(|| first.timestamp().cloned())
+                        .expect("timestamped message");
+                    let mut planner = Planner::new(
+                        origin,
+                        self.playback.mappings.clone(),
+                        self.playback.allow_rounding,
+                    )
+                    .map_err(Cause::Input)?;
+                    self.prepare_message(first.clone()).map_err(Cause::Input)?;
+                    self.open().map_err(|e| Cause::Send(e.into()))?;
+                    let start = *origin_ns.get_or_insert_with(|| self.clock.now_ns());
+                    let mut duration = 0;
+                    for value in std::iter::once(Ok(OutputValue::Message(first))).chain(values) {
+                        if self.playback.cancel.cancelled() {
+                            report.cancelled = true;
+                            break;
+                        }
+                        let OutputValue::Message(message) = value.map_err(Cause::Input)? else {
+                            return Err(Cause::Input(invalid(
+                                "cannot mix timestamped and untimestamped values within one source",
+                            )));
+                        };
+                        if message.timestamp().is_none() {
+                            return Err(Cause::Input(invalid(
+                                "cannot mix timestamped and untimestamped values within one source",
+                            )));
+                        }
+                        let planned = planner.deadline(&message).map_err(Cause::Input)?;
+                        duration = planned.delay_ns;
+                        let offset = elapsed
+                            .checked_add(duration)
+                            .ok_or_else(|| Cause::Input(invalid("sequence deadline overflow")))?;
+                        let prepared = self.prepare_message(message).map_err(Cause::Input)?;
+                        if !self.emit(
+                            start,
+                            offset,
+                            Some(prepared),
+                            planned.rounding_error_ns.numerator() != 0,
+                            &mut report,
+                            &mut histogram,
+                        )? {
+                            break;
+                        }
+                    }
+                    elapsed = elapsed
+                        .checked_add(duration)
+                        .ok_or_else(|| Cause::Input(invalid("sequence deadline overflow")))?;
+                } else {
+                    let mut ordinary = vec![first];
+                    for value in values {
+                        let value = value.map_err(Cause::Input)?;
+                        if timestamps
+                            && matches!(&value, OutputValue::Message(m) if m.timestamp().is_some())
+                        {
+                            return Err(Cause::Input(invalid(
+                                "cannot mix timestamped and untimestamped values within one source",
+                            )));
+                        }
+                        ordinary.push(value);
+                    }
+                    let plan = self.prepare(ordinary).map_err(Cause::Input)?;
+                    if plan.iter().any(|(_, p, _)| p.is_some()) {
+                        self.open().map_err(|e| Cause::Send(e.into()))?;
+                    }
+                    let start = *origin_ns.get_or_insert_with(|| self.clock.now_ns());
+                    let duration = plan.last().expect("final sequence deadline").0;
+                    // Validate the final absolute deadline before this sequence sends.
+                    start
+                        .checked_add(elapsed)
+                        .and_then(|v| v.checked_add(duration))
+                        .ok_or_else(|| Cause::Input(invalid("sequence deadline overflow")))?;
+                    for (offset, packet, rounded) in plan {
+                        let offset = elapsed + offset;
+                        if !self.emit(
+                            start,
+                            offset,
+                            packet,
+                            rounded,
+                            &mut report,
+                            &mut histogram,
+                        )? {
+                            break;
+                        }
+                    }
+                    elapsed += duration;
+                }
+                if report.cancelled {
+                    break;
+                }
+            }
+            Ok(())
+        })();
+        match result {
+            Ok(()) => Ok(report),
+            Err(cause) => Err(Failure { report, cause }),
+        }
     }
     pub fn closed(&self) -> bool {
         self.closed
@@ -320,7 +450,7 @@ impl Output {
     fn prepare(
         &self,
         values: impl IntoIterator<Item = OutputValue>,
-    ) -> io::Result<Vec<(u64, Option<Prepared>)>> {
+    ) -> io::Result<Vec<(u64, Option<Prepared>, bool)>> {
         if self.closed {
             return Err(io::Error::new(
                 io::ErrorKind::NotConnected,
@@ -331,7 +461,11 @@ impl Output {
         let mut plan = Vec::new();
         for value in values {
             let start = nanoseconds(elapsed)?;
+            let rounded = elapsed.multiply(1_000_000_000, 1)?.denominator() != 1;
             match value {
+                OutputValue::Record(_) => {
+                    return Err(invalid("archive record requires source normalization"))
+                }
                 OutputValue::Note(note) => {
                     elapsed = elapsed.checked_add(note.duration().seconds(self.bpm)?)?;
                     let end = nanoseconds(elapsed)?;
@@ -344,10 +478,12 @@ impl Output {
                     plan.push((
                         start,
                         Some(self.prepare_message(Payload::Midi1(AnyMessage::NoteOn(attack)))?),
+                        rounded,
                     ));
                     plan.push((
                         end,
                         Some(self.prepare_message(Payload::Midi1(AnyMessage::NoteOff(release)))?),
+                        elapsed.multiply(1_000_000_000, 1)?.denominator() != 1,
                     ));
                 }
                 OutputValue::Rest(rest) => {
@@ -357,16 +493,16 @@ impl Output {
                     elapsed = elapsed.checked_add(duration.seconds(self.bpm)?)?
                 }
                 OutputValue::Message(message) => {
-                    plan.push((start, Some(self.prepare_message(message)?)))
+                    plan.push((start, Some(self.prepare_message(message)?), rounded))
                 }
                 OutputValue::Packet(packet) => {
                     transport::validate_packet(self.options.protocol, &packet)
                         .map_err(transport_error)?;
-                    plan.push((start, Some(Prepared::Packet(packet))));
+                    plan.push((start, Some(Prepared::Packet(packet)), rounded));
                 }
             }
         }
-        plan.push((nanoseconds(elapsed)?, None));
+        plan.push((nanoseconds(elapsed)?, None, false));
         Ok(plan)
     }
     fn prepare_message(&self, message: Payload) -> io::Result<Prepared> {
@@ -439,28 +575,44 @@ impl Output {
             )),
         }
     }
-    fn execute(&mut self, plan: Vec<(u64, Option<Prepared>)>) -> io::Result<()> {
-        if plan.iter().any(|(_, p)| p.is_some()) {
-            self.open()?;
+    fn emit(
+        &mut self,
+        start: u64,
+        offset: u64,
+        packet: Option<Prepared>,
+        rounded: bool,
+        report: &mut crate::playback::Report,
+        histogram: &mut Option<crate::metrics::Histogram>,
+    ) -> Result<bool, crate::playback::Cause<crate::midi::Error>> {
+        use crate::playback::Cause;
+        if self.playback.cancel.cancelled() {
+            report.cancelled = true;
+            return Ok(false);
         }
-        let start = self.clock.now_ns();
-        // Check the final absolute deadline before the first send.
-        start
-            .checked_add(plan.last().expect("final sequence deadline").0)
-            .ok_or_else(|| invalid("sequence deadline overflow"))?;
-        let cancel = Cancellation::default();
-        for (offset, packet) in plan {
-            if !self.clock.wait_until(start + offset, &cancel)? {
-                return Err(io::Error::new(
-                    io::ErrorKind::Interrupted,
-                    "sequence cancelled",
-                ));
-            }
-            if let Some(packet) = packet {
-                self.transmit(packet)?;
+        let deadline = start
+            .checked_add(offset)
+            .ok_or_else(|| Cause::Input(invalid("sequence deadline overflow")))?;
+        if !self
+            .clock
+            .wait_until(deadline, &self.playback.cancel)
+            .map_err(Cause::Input)?
+            || self.playback.cancel.cancelled()
+        {
+            report.cancelled = true;
+            return Ok(false);
+        }
+        if let Some(packet) = packet {
+            let lateness = self.clock.now_ns().saturating_sub(deadline);
+            self.transmit(packet).map_err(|e| Cause::Send(e.into()))?;
+            report.sent_events += 1;
+            report.rounded_events += u64::from(rounded);
+            report.max_lateness_ns = report.max_lateness_ns.max(lateness);
+            if let Some(histogram) = histogram {
+                histogram.observe(lateness).map_err(Cause::Input)?;
+                report.lateness = Some(Box::new(histogram.snapshot()));
             }
         }
-        Ok(())
+        Ok(true)
     }
     fn transmit(&mut self, prepared: Prepared) -> io::Result<()> {
         let connection = self.connection.as_mut().expect("connected output");
@@ -508,22 +660,6 @@ enum Prepared {
         command: AnyCommand,
         packets: Vec<Vec<u8>>,
     },
-}
-struct ReplayClock<'a> {
-    clock: &'a mut dyn PlaybackClock,
-    origin: u64,
-}
-impl PlaybackClock for ReplayClock<'_> {
-    fn now_ns(&mut self) -> u64 {
-        self.clock.now_ns().saturating_sub(self.origin)
-    }
-    fn wait_until(&mut self, deadline: u64, cancel: &Cancellation) -> io::Result<bool> {
-        let absolute = self
-            .origin
-            .checked_add(deadline)
-            .ok_or_else(|| invalid("playback deadline overflow"))?;
-        self.clock.wait_until(absolute, cancel)
-    }
 }
 fn replay_message(record: io::Result<crate::archive::Record>) -> Option<io::Result<Payload>> {
     use crate::archive::Record;
@@ -981,7 +1117,7 @@ mod tests {
         f.output.send(Duration::from_secs(2)).unwrap();
         let report = f
             .output
-            .play([
+            .send([
                 Ok(recorded(9_000_000_000, 60)),
                 Ok(recorded(9_500_000_000, 62)),
             ])
@@ -1012,12 +1148,12 @@ mod tests {
             ..Default::default()
         });
         for _ in 0..2 {
-            let report = f.output.play([Ok(recorded(200, 60))]).unwrap();
+            let report = f.output.send([Ok(recorded(200, 60))]).unwrap();
             assert_eq!(report.lateness.unwrap().count(), 1);
         }
         assert_eq!(*f.deadlines.borrow(), [100, 200]);
         cancel.cancel();
-        let report = f.output.play([Ok(recorded(300, 60))]).unwrap();
+        let report = f.output.send([Ok(recorded(300, 60))]).unwrap();
         assert!(report.cancelled);
         assert_eq!(report.sent_events, 0);
         assert_eq!(f.packets().len(), 2);
@@ -1028,7 +1164,7 @@ mod tests {
         let mut f = Fixture::new();
         let failure = f
             .output
-            .play([
+            .send([
                 Ok(recorded(100, 60)),
                 Ok(crate::archive::Record::Gap {
                     stream: "input".into(),
@@ -1043,7 +1179,7 @@ mod tests {
         assert_eq!(f.packets(), bytes(&[&[0x90, 60, 90]]));
         let failure = f
             .output
-            .play([Ok(recorded(200, 64)), Ok(recorded(100, 65))])
+            .send([Ok(recorded(200, 64)), Ok(recorded(100, 65))])
             .unwrap_err();
         assert_eq!(failure.report.sent_events, 1);
         assert_eq!(f.packets(), bytes(&[&[0x90, 64, 90]]));
@@ -1074,7 +1210,7 @@ mod tests {
         let mut f = Fixture::new();
         assert_eq!(
             f.output
-                .play(Reader::new(data.as_slice(), 1024, false, false).unwrap())
+                .send(Reader::new(data.as_slice(), 1024, false, false).unwrap())
                 .unwrap()
                 .sent_events,
             1
@@ -1082,7 +1218,7 @@ mod tests {
         data.pop();
         let failure = f
             .output
-            .play(Reader::new(data.as_slice(), 1024, false, false).unwrap())
+            .send(Reader::new(data.as_slice(), 1024, false, false).unwrap())
             .unwrap_err();
         assert_eq!(failure.report.sent_events, 1);
         assert!(matches!(failure.cause, crate::playback::Cause::Input(_)));
@@ -1091,8 +1227,8 @@ mod tests {
     #[test]
     fn empty_replay_and_invalid_first_record_do_not_open_ports() {
         let mut output = Output::new();
-        assert_eq!(output.play([]).unwrap().sent_events, 0);
-        assert!(output.play([Err(invalid("bad capture"))]).is_err());
+        assert_eq!(output.send([] as [OutputValue; 0]).unwrap().sent_events, 0);
+        assert!(output.send([Err(invalid("bad capture"))]).is_err());
         assert!(output.client.is_none());
         assert!(output.connection.is_none());
     }
@@ -1132,8 +1268,8 @@ mod tests {
         let mut f = Fixture::new();
         f.output = f.output.with_bpm(120).unwrap();
         f.output
-            .send_all([
-                Note::new(Beats::new(1, 3).unwrap(), 60).unwrap().into(),
+            .send([
+                OutputValue::from(Note::new(Beats::new(1, 3).unwrap(), 60).unwrap()),
                 Note::new(Beats::new(1, 3).unwrap(), 62)
                     .unwrap()
                     .with_velocity(70)
@@ -1173,8 +1309,8 @@ mod tests {
     fn drop_releases_overlapping_counts_and_only_changed_resettable_state() {
         let mut f = Fixture::new();
         f.output
-            .send_all([
-                messages::NoteOn::new(60).unwrap().into(),
+            .send([
+                OutputValue::from(messages::NoteOn::new(60).unwrap()),
                 messages::NoteOn::new(60).unwrap().into(),
                 messages::NoteOn::new(62).unwrap().into(),
                 messages::NoteOff::new(62).unwrap().into(),
@@ -1220,8 +1356,8 @@ mod tests {
         let mut f = Fixture::new();
         assert!(f
             .output
-            .send_all([
-                messages::NoteOn::new(60).unwrap().into(),
+            .send([
+                OutputValue::from(messages::NoteOn::new(60).unwrap()),
                 Beats::from(1).into(),
             ])
             .is_err());
@@ -1229,8 +1365,8 @@ mod tests {
         assert!(f.deadlines.borrow().is_empty());
         assert!(f
             .output
-            .send_all([
-                messages::NoteOn::new(60).unwrap().into(),
+            .send([
+                OutputValue::from(messages::NoteOn::new(60).unwrap()),
                 Duration::MAX.into(),
             ])
             .is_err());
@@ -1270,11 +1406,13 @@ mod tests {
             .send(messages::ControlChange14::new(1, 128).unwrap())
             .unwrap_err();
         assert!(matches!(
-            error,
-            crate::midi::Error::Send(transport::Error::CompoundSend {
-                completed_messages: Some(1),
-                ..
-            })
+            error.cause,
+            crate::playback::Cause::Send(crate::midi::Error::Send(
+                transport::Error::CompoundSend {
+                    completed_messages: Some(1),
+                    ..
+                }
+            ))
         ));
         assert_eq!(f.packets(), bytes(&[&[0xb0, 1, 1]]));
         f.output.close().unwrap();
@@ -1324,6 +1462,92 @@ mod tests {
         assert_eq!(*deadlines.borrow(), [500_000_000]);
         assert!(output.client.is_none());
         assert!(output.connection.is_none());
+    }
+    #[test]
+    fn unified_send_concatenates_sources_and_reports_every_handoff() {
+        let mut f = Fixture::new();
+        f.output = f.output.with_playback(PlaybackOptions {
+            metrics: true,
+            ..Default::default()
+        });
+        let report = f
+            .output
+            .send((
+                Note::new(Duration::from_millis(1), 60).unwrap(),
+                [Ok(recorded(10_000_000, 62)), Ok(recorded(11_000_000, 64))]
+                    .into_iter()
+                    .take(2),
+                messages::NoteOff::new(62).unwrap(),
+            ))
+            .unwrap();
+        assert_eq!(report.sent_events, 5);
+        assert_eq!(report.lateness.unwrap().count(), 5);
+        assert_eq!(
+            f.packets(),
+            bytes(&[
+                &[0x90, 60, 90],
+                &[0x80, 60, 0],
+                &[0x90, 62, 90],
+                &[0x90, 64, 90],
+                &[0x80, 62, 0]
+            ])
+        );
+        assert!(!f.output.closed());
+    }
+    #[test]
+    fn unified_send_rejects_mixed_timing_and_preserves_confirmed_prefix() {
+        for timed_first in [false, true] {
+            let mut f = Fixture::new();
+            let crate::archive::Record::Event(timed) = recorded(100, 60) else {
+                unreachable!()
+            };
+            let plain = Payload::Midi1(AnyMessage::NoteOn(messages::NoteOn::new(62).unwrap()));
+            let source = if timed_first {
+                vec![*timed, plain]
+            } else {
+                vec![plain, *timed]
+            };
+            let failure = f.output.send(source).unwrap_err();
+            assert_eq!(failure.report.sent_events, u64::from(timed_first));
+            assert!(failure.to_string().contains("mix"));
+            assert_eq!(f.packets().len(), usize::from(timed_first));
+        }
+    }
+    #[test]
+    fn direct_messages_ignore_timestamp_metadata_and_cancelled_sources_are_not_consumed() {
+        let mut f = Fixture::new();
+        let crate::archive::Record::Event(message) = recorded(100, 60) else {
+            unreachable!()
+        };
+        f.output.send(*message).unwrap();
+        assert_eq!(*f.deadlines.borrow(), [0, 0]);
+        let cancel = Cancellation::default();
+        cancel.cancel();
+        let mut output = Output::new().with_playback(PlaybackOptions {
+            cancel,
+            ..Default::default()
+        });
+        let source = std::iter::from_fn(|| -> Option<io::Result<crate::archive::Record>> {
+            panic!("consumed cancelled source")
+        });
+        let report = output.send(source).unwrap();
+        assert!(report.cancelled);
+        assert_eq!(report.sent_events, 0);
+        assert!(output.client.is_none());
+    }
+    #[test]
+    fn scalar_note_report_counts_rounded_deadlines() {
+        let mut f = Fixture::new();
+        f.output = f
+            .output
+            .with_bpm(Rational::new(120_000_000_000, 1).unwrap())
+            .unwrap();
+        let report = f
+            .output
+            .send(Note::new(Beats::from(1), 60).unwrap())
+            .unwrap();
+        assert_eq!(report.sent_events, 2);
+        assert_eq!(report.rounded_events, 1);
     }
 }
 

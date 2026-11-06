@@ -76,14 +76,14 @@ Additional work beyond the prompt: None.
   extension rebuild. Two native-device tests remain ignored.
 - Added root-level Output with lazy first-port discovery, unique name matching,
   explicit channel override, direct message/command/packet sending and heterogeneous
-  send_all sequences. Duration remains elapsed time; Beats requires output tempo.
+  send sequences. Duration remains elapsed time; Beats requires output tempo.
   Cumulative rational deadlines use the existing cancellable monotonic clock.
   Complete sequence validation precedes sending. Drop releases confirmed MIDI 1
   note counts and the agreed changed-state set; explicit close reports failures
   and closes even when cleanup fails. Device-free tests cover timing, channels,
   partial compound sends, cleanup failures and UMP protocol boundaries. The output
   doctest compiles without opening devices.
-- Output::play now accepts archive record iterators, including Reader directly,
+- Output::send now accepts archive record iterators, including Reader directly,
   infers the first message's time origin, and reuses the playback scheduler.
   Replay rejects loss/discontinuity/unknown records, unrelated clocks, regressions
   and implicit rounding; failures retain confirmed progress. Reader::open supplies
@@ -101,7 +101,7 @@ Additional work beyond the prompt: None.
   cover MIDI 1/UMP filtering, queue overflow, partial-message loss, callback-thread
   delivery, terminal decoding errors and ownership release.
 - Input::record(Duration) now consumes/closes the input and returns a Recording
-  that feeds Output::play directly. It retains declarations, message provenance,
+  that feeds Output::send directly. It retains declarations, message provenance,
   gaps and discontinuities, including errors and finalization diagnostics.
   Input::record_to captures the same records, then writes a strict archive with an
   explicit overwrite boolean. Memory grows with the retained capture, matching

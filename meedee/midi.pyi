@@ -224,10 +224,19 @@ class Output:
         isolated: bool = False,
         timeout: float | str = 5.0,
     ) -> None: ...
-    def play(
+    def send(
         self,
-        source: Iterable[object],
-        *,
+        *values: messages.Note
+        | messages.Rest
+        | messages.Message
+        | bytes
+        | bytearray
+        | memoryview
+        | UmpPacket
+        | int
+        | float
+        | str
+        | Iterable[object],
         origin: events.Timestamp | None = None,
         mappings: list[events.ClockMapping]
         | tuple[events.ClockMapping, ...]
@@ -251,16 +260,3 @@ class Output:
     @property
     def closed(self) -> bool: ...
     def close(self) -> None: ...
-    def __call__(
-        self,
-        *values: messages.Note
-        | messages.Rest
-        | messages.Message
-        | bytes
-        | bytearray
-        | memoryview
-        | UmpPacket
-        | int
-        | float
-        | str,
-    ) -> None: ...

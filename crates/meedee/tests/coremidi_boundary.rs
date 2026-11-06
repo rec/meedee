@@ -121,8 +121,8 @@ fn high_level_callbacks_are_serial_guard_blocking_io_and_drain_on_close() {
                 .send(meedee::messages::NoteOn::new(60).unwrap())
                 .unwrap_err();
             assert!(matches!(
-                error,
-                midi::Error::Transport(Error::CallbackThread)
+                error.cause,
+                meedee::events::PlaybackCause::Send(midi::Error::Transport(Error::CallbackThread))
             ));
             sender.send((count, std::thread::current().id())).unwrap();
         })

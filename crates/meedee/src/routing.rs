@@ -24,6 +24,11 @@ pub fn run(
                 .get_mut(&delivery.destination)
                 .ok_or_else(|| crate::drivers::invalid("routing destination has no output"))?
                 .send(delivery.event.clone())
+                .map(|_| ())
+                .map_err(|e| match e.cause {
+                    crate::playback::Cause::Send(e) => e,
+                    crate::playback::Cause::Input(e) => e.into(),
+                })
         },
         &mut events::MonotonicClock::default(),
         duration,

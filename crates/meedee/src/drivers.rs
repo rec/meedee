@@ -42,7 +42,10 @@ pub trait Sender {
 }
 impl Sender for midi::Output {
     fn send(&mut self, message: Payload) -> midi::Result<()> {
-        self.send(message)
+        self.send(message).map(|_| ()).map_err(|e| match e.cause {
+            crate::playback::Cause::Send(e) => e,
+            crate::playback::Cause::Input(e) => e.into(),
+        })
     }
 }
 pub(crate) fn remaining(clock: &mut impl PlaybackClock, deadline: u64) -> Duration {

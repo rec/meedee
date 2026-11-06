@@ -1,9 +1,9 @@
 //! Clock planning and caller-thread replay, sharing the Rust scheduler.
-use crate::event_values::{to_python, Rational, Timestamp};
+use crate::event_values::{Rational, Timestamp};
 use crate::files::{frozen, os_error};
 use crate::packets::Clock;
 use meedee::events as model;
-use pyo3::exceptions::{PyException, PyStopIteration, PyTypeError};
+use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 pyo3::create_exception!(_core, PlaybackError, PyException);
@@ -134,93 +134,6 @@ fn mappings(values: Option<&Bound<'_, PyAny>>) -> PyResult<Vec<model::ClockMappi
     }
     Ok(out)
 }
-struct Source {
-    iterator: Py<PyAny>,
-}
-impl Iterator for Source {
-    type Item = std::io::Result<meedee::events::Payload>;
-    fn next(&mut self) -> Option<Self::Item> {
-        Python::attach(|py| loop {
-            let item = match self.iterator.bind(py).call_method0("__next__") {
-                Ok(v) => v,
-                Err(e) if e.is_instance_of::<PyStopIteration>(py) => return None,
-                Err(e) => return Some(Err(std::io::Error::other(e.to_string()))),
-            };
-            if let Ok(event) = crate::event_values::extract(&item) {
-                return Some(Ok(event));
-            }
-            match crate::archive::extract(&item){Ok(meedee::archive::Record::Clock(_)|meedee::archive::Record::Stream{..}|meedee::archive::Record::Metadata{..})=>continue,Ok(_)=>return Some(Err(std::io::Error::other("gap, discontinuity or opaque data requires an explicit replay policy; no automatic skipping"))),Err(e)=>return Some(Err(std::io::Error::other(e.to_string())))}
-        })
-    }
-}
-#[pyfunction]
-#[pyo3(signature=(output,source,*,origin,mappings=None,cancel=None,allow_rounding=false,metrics=false))]
-#[allow(clippy::too_many_arguments)]
-fn play(
-    py: Python<'_>,
-    output: &Bound<'_, PyAny>,
-    source: &Bound<'_, PyAny>,
-    origin: PyRef<'_, Timestamp>,
-    mappings: Option<&Bound<'_, PyAny>>,
-    cancel: Option<PyRef<'_, Cancellation>>,
-    #[pyo3(from_py_with=crate::ump::boolean)] allow_rounding: bool,
-    #[pyo3(from_py_with=crate::ump::boolean)] metrics: bool,
-) -> PyResult<PlaybackReport> {
-    crate::callback::check_thread()?;
-    let planner = model::PlaybackPlan::new(
-        origin.value.clone(),
-        self::mappings(mappings)?,
-        allow_rounding,
-    )
-    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-    let cancel = cancel.map_or_else(model::Cancellation::default, |v| v.value.clone());
-    let source = Source {
-        iterator: source.try_iter()?.into_any().unbind(),
-    };
-    let send = output.clone().unbind();
-    if !send.bind(py).is_callable() {
-        return Err(PyTypeError::new_err("MIDI output must be callable"));
-    }
-    let result = py.detach(move || {
-        model::play(
-            source,
-            planner,
-            &mut model::MonotonicClock::default(),
-            &cancel,
-            |message| {
-                Python::attach(|py| {
-                    send.bind(py).call1((to_python(py, message.clone())?,))?;
-                    Ok::<(), PyErr>(())
-                })
-            },
-            metrics,
-        )
-        .map_err(Box::new)
-    });
-    match result {
-        Ok(value) => Ok(PlaybackReport { value }),
-        Err(failure) => {
-            let err = PlaybackError::new_err(failure.to_string());
-            err.value(py)
-                .setattr("completed_events", failure.report.sent_events)?;
-            err.value(py).setattr(
-                "report",
-                Py::new(
-                    py,
-                    PlaybackReport {
-                        value: failure.report,
-                    },
-                )?,
-            )?;
-            let cause = match failure.cause {
-                model::PlaybackCause::Input(e) => os_error(e),
-                model::PlaybackCause::Send(e) => e,
-            };
-            err.set_cause(py, Some(cause));
-            Err(err)
-        }
-    }
-}
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ClockMapping>()?;
     m.add_class::<PlannedEvent>()?;
@@ -231,33 +144,79 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     error.setattr("__module__", "meedee.events")?;
     m.add("PlaybackError", error)
 }
-/// Execute a validated call against one origin, including its trailing delay.
+/// Execute scalar and recorded segments on one caller-thread clock.
 #[pyfunction]
+#[pyo3(signature=(send,timeline,*,cancel=None,metrics=false))]
 fn output_sequence(
     py: Python<'_>,
     send: &Bound<'_, PyAny>,
-    timeline: Vec<(u64, Py<PyAny>)>,
-) -> PyResult<()> {
+    timeline: &Bound<'_, PyAny>,
+    cancel: Option<PyRef<'_, Cancellation>>,
+    #[pyo3(from_py_with=crate::ump::boolean)] metrics: bool,
+) -> PyResult<PlaybackReport> {
     use model::PlaybackClock;
     crate::callback::check_thread()?;
+    let cancel = cancel.map_or_else(model::Cancellation::default, |v| v.value.clone());
     let mut clock = model::MonotonicClock::default();
-    let cancel = model::Cancellation::default();
-    for (deadline, value) in timeline {
-        while clock.now_ns() < deadline {
-            let next = deadline.min(clock.now_ns().saturating_add(50_000_000));
-            py.detach(|| clock.wait_until(next, &cancel))
-                .map_err(os_error)?;
-            py.check_signals()?;
+    let mut histogram = metrics.then(meedee::metrics::Histogram::default);
+    let mut report = model::PlaybackReport {
+        lateness: histogram.as_ref().map(|h| Box::new(h.snapshot())),
+        ..model::PlaybackReport::default()
+    };
+    let result: PyResult<()> = (|| {
+        let mut iterator = timeline.try_iter()?;
+        loop {
+            if cancel.cancelled() {
+                report.cancelled = true;
+                return Ok(());
+            }
+            let Some(item) = iterator.next() else {
+                return Ok(());
+            };
+            let (deadline, value, rounded): (u64, Py<PyAny>, bool) = item?.extract()?;
+            while clock.now_ns() < deadline {
+                let next = deadline.min(clock.now_ns().saturating_add(50_000_000));
+                if !py
+                    .detach(|| clock.wait_until(next, &cancel))
+                    .map_err(os_error)?
+                {
+                    report.cancelled = true;
+                    return Ok(());
+                }
+                py.check_signals()?;
+            }
+            if cancel.cancelled() {
+                report.cancelled = true;
+                return Ok(());
+            }
+            if !value.bind(py).is_none() {
+                let lateness = clock.now_ns().saturating_sub(deadline);
+                send.call1((value,))?;
+                report.sent_events += 1;
+                report.rounded_events += u64::from(rounded);
+                report.max_lateness_ns = report.max_lateness_ns.max(lateness);
+                if let Some(histogram) = &mut histogram {
+                    histogram.observe(lateness).map_err(os_error)?;
+                    report.lateness = Some(Box::new(histogram.snapshot()));
+                }
+            }
         }
-        if !value.bind(py).is_none() {
-            send.call1((value,))?;
+    })();
+    match result {
+        Ok(()) => Ok(PlaybackReport { value: report }),
+        Err(error) => {
+            error
+                .value(py)
+                .setattr("completed_events", report.sent_events)?;
+            error
+                .value(py)
+                .setattr("report", Py::new(py, PlaybackReport { value: report })?)?;
+            Err(error)
         }
     }
-    Ok(())
 }
 
 pub fn register_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(play, m)?)?;
     m.add_function(wrap_pyfunction!(output_sequence, m)?)?;
     Ok(())
 }

@@ -17,7 +17,7 @@ UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
 tracked in [the plan](plan/meedee.md).
-`out(...)` accepts message objects, compound control/bank/MPE
+`out.send(...)` accepts message objects, compound control/bank/MPE
 commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
 
@@ -26,7 +26,7 @@ from meedee.messages import Note, Rest
 from meedee.midi import Output
 
 with Output(bpm=120) as out:
-    out(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
+    out.send(Note(1, 60), Note(0.5, 62, 70), Rest("1 beat"), Note(2, 64, 100))
 ```
 
 `Note(duration, note, velocity=90, channel=None)` plays an attack and release;
@@ -50,9 +50,9 @@ full-note values or automatic cleanup.
 Rust users can start with the [practical Rust examples](doc/rust-examples.md).
 The crate exports `midi::{Input, Output, Recording}`,
 `messages::{Note, Rest, Beats}` and `archive::Reader`. Use `Duration` for elapsed time and `Beats` with output tempo for music.
-`Input::new()` iterates messages; `Output::send` accepts individual values and
-`send_all` schedules heterogeneous sequences. `Input::record(Duration)` returns
-a capture accepted directly by `Output::play`; `Reader::open(path)` reads the
+`Input::new()` iterates messages; `Output::send` accepts individual values,
+heterogeneous sequences and timestamped recordings. `Input::record(Duration)` returns
+a capture accepted directly by `Output::send`; `Reader::open(path)` reads the
 same archive records. Connections close on drop, with checked explicit `close()`
 available for cleanup errors. The `transport` module retains advanced native I/O.
 
@@ -74,7 +74,7 @@ reader.close()
 score = smf.TimedReader("song.mid", stream="score")
 origin = score.origin  # Explicit zero preserves any leading silence.
 # With an opened Output:
-# output.play(score, origin=origin)
+# output.send(score, origin=origin)
 score.close()
 ```
 
@@ -95,8 +95,8 @@ representations. Version 1 remains unpublished, with format freeze and future
 compatibility guarantees still owner decisions.
 
 `midi.Input()` decodes received packets into events; `midi.Input(raw=True)`
-returns unchanged transport packets. `midi.Output` owns discovery and one connection, supporting `out(...)` for messages, compound operations and
-encoded bytes/UMP packets, and `play()` for timestamped events. Both use the same
+returns unchanged transport packets. `midi.Output` owns discovery and one connection, supporting `out.send(...)` for messages, compound operations and
+encoded bytes/UMP packets and timestamped sources. All use the same
 native transport. Inputs and outputs default to in-process
 transport, with `isolated=True` available. Inputs
 provide either a callback or `receive(timeout=..., cancel=...)`, returning an
@@ -127,9 +127,11 @@ after input close; recording_report retains the last finalized report.
 Direct receive returns None only on timeout. Normal closure and cancellation
 are distinct errors; cancellation leaves queued input and the connection usable.
 
-`output.play(source, origin=..., mappings=..., cancel=...)` runs on the caller's
-thread. It requires timestamped events and explicit mappings between unrelated
-clocks, reports lateness and stops on failure without retry. Cancellation sends
+`output.send(source, origin=..., mappings=..., cancel=...)` runs on the caller's
+thread. Individual messages send immediately; notes/rests supply durations and
+timestamped sources preserve relative timing. A source cannot mix timed and
+untimed values. Unrelated clocks require explicit mappings. Every call returns
+a report, with optional lateness metrics, and stops on failure without retry. Cancellation sends
 no immediate NoteOff/reset. Closing the MIDI 1 connection releases tracked notes
 and resets selected changed controls. Archive records are checked while
 streaming: reading and verifying an entire capture before playback is necessary
@@ -466,7 +468,7 @@ selection = gm.BankProgramSelect(
 packets = [codecs.encode(p) for p in codecs.expand(selection)]
 volume = controls.Controller.ChannelVolume.message(channel=1, value=100)
 zone = mpe.ZoneConfiguration(manager_channel=1, members=7)
-# An open MIDI 1.0 output can explicitly send selection or zone with out(...).
+# An open MIDI 1.0 output can explicitly send selection or zone with out.send(...).
 ```
 
 Rust owns the GM1 instrument/family and percussion maps, all 256 GM2 melodic
@@ -523,14 +525,14 @@ primitives = expand(command)
 interpreter = ControlInterpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
 # An open MIDI 1.0 output can send the whole command:
-# connection(command)
+# connection.send(command)
 ```
 
 `ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
-identifier. Use `out(...)` for messages, compound commands or encoded packets.
+identifier. Use `out.send(...)` for messages, compound commands or encoded packets.
 Use primitive `encode()` for byte encoding and `expand()` to inspect commands.
 UMP outputs reject these MIDI 1.0 commands rather than translating silently.
 
@@ -592,7 +594,7 @@ sequences require source context and are not guessed. Returned primitive lists
 are not atomic live sends; output requires an explicit send operation.
 Declared Capabilities can reject incompatible protocol/stream use; None means
 those declarations do not establish support. No capability discovery or profile
-negotiation runs automatically. `Output.__call__()` takes `midi.UmpPacket`;
+negotiation runs automatically. `Output.send()` takes `midi.UmpPacket`;
 construct it explicitly from the encoded words. CoreMIDI UMP SysEx7 discovery/reply
 has passed between test-owned virtual peers. Other native backends and physical
 MIDI 2.0 device compatibility remain unqualified.
@@ -606,8 +608,8 @@ output = Output()
 ports = output.ports()
 # Select an endpoint deliberately from this snapshot, for example ports[index].
 # with output.connect(ports[index]) as connection:
-#     connection(bytes([0x90, 60, 100]))
-#     connection(bytes([0x80, 60, 0]))
+#     connection.send(bytes([0x90, 60, 100]))
+#     connection.send(bytes([0x80, 60, 0]))
 ```
 
 `Input` and `Output` constructors validate settings without creating native clients
@@ -649,7 +651,7 @@ In raw mode, received packets are transport chunks, including partial SysEx or
 multiple UMPs. Raw mode does not assemble messages or apply `Ignore` filters.
 Use `Input()` for decoded events or `Input(raw=True)` for unchanged transport
 packets. Both modes support callbacks or bounded `receive()` queues.
-`Output.__call__()` accepts unsigned-byte buffers,
+`Output.send()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
 validation checks protocol, size and UMP framing, not full MIDI semantics.

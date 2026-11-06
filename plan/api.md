@@ -274,8 +274,8 @@ reject an unassigned channel. MIDI 1 constructors leave channels unassigned;
 expansion and `AnyCommand` stores the compound command families inline, separate
 from primitive-stream `AnyMessage`. Pure Rust users need no Python interpreter.
 
-`out(command)` accepts these commands on MIDI 1.0
-outputs, rejecting UMP before sending. Encoded packets also use `out(packet)`. One native
+`out.send(command)` accepts these commands on MIDI 1.0
+outputs, rejecting UMP before sending. Encoded packets also use `out.send(packet)`. One native
 owner-thread operation and the existing connection serialization cover the whole
 sequence, including release; raw sends, other commands and close cannot run
 between its steps on that connection. This is not atomicity against other
@@ -384,10 +384,11 @@ Input defaults to lazy first-port selection and message iteration. Its borrowed
 default iteration prints diagnostics and stops on terminal errors. Channel filters
 accept a single channel or an iterator of channels and retain system messages.
 
-Output `send` accepts one value; `send_all` accepts heterogeneous OutputValues.
+Output `send` accepts one value, a sequence of OutputValues, a recording or a reader.
 Duration is elapsed time and Beats requires explicit output tempo. Sequence
-deadlines accumulate exactly before nanosecond rounding; validation precedes any
-send. Explicit output channels override shared MIDI 1 and MIDI 2 message channels;
+deadlines accumulate exactly before nanosecond rounding. Scalar arguments and
+untimed collections are validated before their first send; timed sources retain
+the confirmed prefix if a later record is invalid. Explicit output channels override shared MIDI 1 and MIDI 2 message channels;
 otherwise the message channel survives, with channel 1 filling an unset channel.
 MIDI 2 group defaults to 1. Other UMP types retain explicit addressing.
 No protocol conversion is implicit.
@@ -402,7 +403,7 @@ including receive diagnostics as archive gaps/discontinuities. `record_to` write
 the same records after capture, with explicit overwrite permission. Retained
 capture memory grows with traffic; native and application receive queues remain
 bounded. Reader::open uses strict archive validation and a 1 MiB payload limit.
-Output::play accepts recordings/readers and infers its origin from the first
+Output::send accepts recordings/readers and infers its origin from the first
 message. It stops on loss, discontinuity, malformed records, timestamp regression
 or unmapped clocks, retaining confirmed send progress. The events playback
 API supplies explicit mappings, rounding, cancellation and metrics.
@@ -507,7 +508,7 @@ Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
 
 All these messages implement Rust PrimitiveMessage and Python Message, and work
-with `codecs.encode`. Raw output uses `connection(codecs.encode(message))`;
+with `codecs.encode`. Raw output uses `connection.send(codecs.encode(message))`;
 there is no implicit transmission or tuning reset. `codecs.Decoder` still emits
 ordinary SysEx. `tuning.decode(sysex)` explicitly returns a frozen `Decoded`
 containing `message` and `checksum`, or None for unrelated/unsupported forms;
@@ -884,7 +885,7 @@ completion; recovery is explicit and returns only verified complete records.
 Native clock values and absent timestamps remain exact, with rational units and
 stable record IDs. Unknown records may be retained opaquely without execution.
 
-Input combines decoded and raw reception over the existing input transport. Python Output owns discovery and one connection, with callable sending for message objects, compound operations and encoded
+Input combines decoded and raw reception over the existing input transport. Python Output owns discovery and one connection, with send() for message objects, compound operations and encoded
 packets, and play for timestamped events.
 Message and packet operations share connection ownership and process isolation;
 protocol conversion remains explicit. Input selects callbacks or a bounded
@@ -1446,7 +1447,7 @@ Snapshots do not advance the accumulator. Rate is events/elapsed time and is
 undefined for zero elapsed time. These accumulators initialize no native client,
 worker, timer or background sampler.
 
-Python `output.play(..., metrics=True)` and Rust `playback::play`'s collect_metrics
+Python `output.send(..., metrics=True)` and Rust `playback::play`'s collect_metrics
 argument populate Report.lateness. The default is None. It measures dispatch
 lateness at the existing pre-send host-clock sample, relative to the planned
 deadline, and includes zero values. A sample is retained only after a successful
@@ -1641,14 +1642,14 @@ or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
 No or ambiguous matches raise before connecting. `isolated=True` remains supported
 and launches a separate worker module, without importing the calling script.
 
-The output is callable; there is no separate public connection class.
-`out(*values)` accepts full notes, rests, messages, raw packets and nonnegative
+The output exposes send(); there is no separate public connection class.
+`out.send(*values)` accepts full notes, rests, messages, raw packets and nonnegative
 finite delays. Numeric values and dimensionless numeric strings mean quarter-note
 beats with `bpm` set, seconds otherwise. Explicit time quantities retain their
 meaning; explicit beats require a tempo. Other dimensions are rejected. Arguments
 are validated before sending. One call uses cumulative monotonic deadlines,
 including a trailing delay, with signal checks while waiting and no `time.sleep`.
-The existing timestamped `play()` calls the same connection.
+The existing timestamped sources use the same connection.
 
 MIDI 1 channel-message and compound-command constructors take positional payload
 fields, then `channel=None`. NoteOn velocity defaults to 90; NoteOff velocity,
@@ -1742,7 +1743,7 @@ callbacks, iteration and attached recordings. Raw mode rejects channel selection
 Output(channel=None), the default, preserves assigned channels and supplies
 channel 1 when unassigned. An explicit Output(channel=N) overrides MIDI 1 message,
 full-note and compound-command channels without modifying the original values.
-The override also applies to messages replayed by play(). Encoded packets retain
+The override also applies to messages replayed by send(). Encoded packets retain
 their explicit addressing.
 
 
@@ -1757,7 +1758,7 @@ final partial-message and loss diagnostics retained. Raw mode is rejected.
 When output is specified, the in-memory result is written to an archive after
 capture, using exclusive creation unless overwrite=True. File errors raise.
 
-`Output.play(source)` examines the source first; an empty or declaration-only
+`Output.send(source)` examines the source first; an empty or declaration-only
 source creates no native client. Playback with messages opens the selected output
 and leaves it open for later sends
 until explicit close, context exit or finalization. A passed archive Reader is
@@ -1765,7 +1766,7 @@ consumed and closed. Origin is optional, inferred from the first Message timesta
 silence is trimmed; inter-event timing is retained. Empty captures send no events.
 Existing checked replay rejects gaps and discontinuities rather than silently
 skipping them. Explicit origin/mapping, cancellation, rounding and metrics options are available
-on Python play() and the Rust Output::with_playback builder.
+on Python send() and the Rust Output::with_playback builder.
 
 Input and Output destructors close an active convenience context and dispose an
 isolated worker when Python finalizes the client. Native callback references are
@@ -1950,3 +1951,21 @@ adaptations. This does not assert whole-API or platform runtime equivalence.
   callbacks that fail before connection setup returns. Receive and iteration
   remain unavailable in callback mode. Callback references and retained errors
   remain visible to Python cyclic GC.
+
+
+## Unified output sending
+
+Output.send replaces Python __call__/play and Rust play/send_all. Python accepts
+variadic values; Rust OutputSource accepts individual values, iterables and tuples
+of independent sources. Both retain existing scalar sequence timing and streaming
+archive replay. Direct messages ignore timing metadata for scheduling; iterables
+must be uniformly timed or untimed, ignoring archive declarations. Clock mappings,
+regression checks, rounding policy, cancellation and metrics remain available.
+Every successful call returns the existing playback report. Failures retain the
+confirmed report and original cause. Python execution failures preserve their
+original exception type, with report/completed_events attached; validation before
+execution may raise without progress attributes. Rust returns Failure with its
+report and typed cause. Sending does not close the output. No legacy
+aliases remain. See both guides for equivalent scalar and recorded-source usage.
+
+Additional work beyond the prompt: None.

@@ -134,7 +134,8 @@ impl Sender for Output<'_, '_> {
         let message = self
             .calls
             .convert(crate::ci::to_python(self.calls.py, message))?;
-        self.calls.convert(self.object.call1((message,)))?;
+        self.calls
+            .convert(self.object.call_method1("send", (message,)))?;
         Ok(())
     }
     fn send(&mut self, message: Payload) -> midi::Result<()> {
@@ -142,7 +143,8 @@ impl Sender for Output<'_, '_> {
         let message = self
             .calls
             .convert(crate::event_values::to_python(self.calls.py, message))?;
-        self.calls.convert(self.object.call1((message,)))?;
+        self.calls
+            .convert(self.object.call_method1("send", (message,)))?;
         Ok(())
     }
 }

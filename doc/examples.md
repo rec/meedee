@@ -27,7 +27,7 @@ from meedee.messages import Note
 from meedee.midi import Output
 
 with Output() as out:
-    out(Note("500 ms", 60))
+    out.send(Note("500 ms", 60))
 ```
 
 `Note` sends both the attack and release. Velocity defaults to 90; the channel
@@ -42,7 +42,7 @@ from meedee.messages import Note, Rest
 from meedee.midi import Output
 
 with Output(bpm=120) as out:  # Numeric durations are beats.
-    out(
+    out.send(
         Note(duration=1, note=60, velocity=90),
         Note(0.5, 62, 70),
         Note(0.5, 64, 100),
@@ -99,9 +99,9 @@ from meedee.midi import Input, Output
 with Input() as input, Output() as output:
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
-            output(m.transpose(12))
+            output.send(m.transpose(12))
         else:
-            output(m)
+            output.send(m)
 ```
 
 `transpose()` returns a new message and clamps the note to 0..127. To handle
@@ -116,9 +116,9 @@ from meedee.midi import Input, Output
 with Input() as input, Output() as output:
     for m in input.with_errors():
         if isinstance(m, (NoteOn, NoteOff)):
-            output(m.transpose(12))
+            output.send(m.transpose(12))
         elif isinstance(m, Message):
-            output(m)
+            output.send(m)
         else:
             print("ERROR", m, file=sys.stderr)
 ```
@@ -133,20 +133,20 @@ from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
 with Input(channel=1) as input, Output() as out:
-    out(ProgramChange(34, channel=2))
-    out(ProgramChange(81, channel=3))
+    out.send(ProgramChange(34, channel=2))
+    out.send(ProgramChange(81, channel=3))
 
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out(m.replace(channel=2))
+                out.send(m.replace(channel=2))
             else:
-                out(m.replace(channel=3))
+                out.send(m.replace(channel=3))
         elif getattr(m, "channel", None) is not None:
-            out(m.replace(channel=2))
-            out(m.replace(channel=3))
+            out.send(m.replace(channel=2))
+            out.send(m.replace(channel=3))
         else:
-            out(m)
+            out.send(m)
 ```
 
 `Input(channel=1)` selects channel-1 voice messages. A container such as
@@ -161,26 +161,26 @@ from meedee.messages import NoteOff, NoteOn, ProgramChange
 from meedee.midi import Input, Output
 
 with Input() as input, Output(channel=2) as out2, Output(channel=3) as out3:
-    out2(ProgramChange(34))
-    out3(ProgramChange(81))
+    out2.send(ProgramChange(34))
+    out3.send(ProgramChange(81))
 
     for m in input:
         if isinstance(m, (NoteOn, NoteOff)):
             if m.note < 60:
-                out2(m)
+                out2.send(m)
             else:
-                out3(m)
+                out3.send(m)
         elif getattr(m, "channel", None) is not None:
-            out2(m)
-            out3(m)
+            out2.send(m)
+            out3.send(m)
         else:
-            out2(m)
+            out2.send(m)
 ```
 
 Use `Output()` for multiple channels: it preserves assigned message channels
 and uses channel 1 for unassigned messages. `Output(channel=1)` explicitly forces
 channel 1. The override applies to MIDI 1 message objects, full notes and compound
-commands, including messages sent by `play()`; encoded packets retain their addressing.
+commands, including messages sent by `send()`; encoded packets retain their addressing.
 
 ## 6. Record and replay a performance
 
@@ -189,7 +189,7 @@ Record ten seconds in memory, then replay it through the first output.
 ```python
 from meedee.midi import Input, Output
 
-Output().play(Input().record(10))
+Output().send(Input().record(10))
 ```
 
 Or save the recording and play it later:
@@ -202,14 +202,14 @@ filename = "rec.meedee"
 Input().record(10, output=filename, overwrite=True)
 
 # Later:
-Output().play(Reader(filename))
+Output().send(Reader(filename))
 ```
 
 `record()` returns messages with their timing and source information, together
 with archive declarations and any diagnostics. File output
 writes the same capture; existing files are protected unless `overwrite=True`.
 Playback preserves timing between messages and trims initial silence. `record()` closes its input; the temporary output is finalized after playback.
-For an output kept in a variable, use a context or explicit `close()`. `play()`
+For an output kept in a variable, use a context or explicit `close()`. `send()`
 closes an archive reader.
 
 ## 7. Transpose a MIDI file
@@ -310,7 +310,7 @@ with Path("just-three.syx").open("xb") as stream:
 ```
 
 After the instrument has loaded it, select the tuning with
-`output(controls.tuning_program(channel=1, program=2))`, importing `controls`
+`output.send(controls.tuning_program(channel=1, program=2))`, importing `controls`
 from `meedee`. Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
@@ -348,15 +348,15 @@ sequence = [
 ]
 client = midi.Output()
 with client.connect(client.ports()[0]) as output:
-    output(zone)
+    output.send(zone)
     for voice in [root, moving]:
-        output(
+        output.send(
             controls.pitch_bend_sensitivity(
                 channel=voice.channel, semitones=48, cents=0
             )
         )
-        output(messages.PitchBend(channel=voice.channel, value=0))
-    print(output.play(sequence, origin=origin))
+        output.send(messages.PitchBend(channel=voice.channel, value=0))
+    print(output.send(sequence, origin=origin))
 ```
 
 The allocator supplies separate member channels and the corresponding releases.
@@ -460,8 +460,8 @@ once. Choose parameter numbers supported by your instrument.
 from meedee import messages, midi
 
 with midi.Output() as out:
-    out(messages.ParameterStep(7))
-    out(messages.ParameterStep(7, -1, family="nrpn"))
+    out.send(messages.ParameterStep(7))
+    out.send(messages.ParameterStep(7, -1, family="nrpn"))
 ```
 
 `direction` is `1` or `-1`; it is not a step count. Family defaults to `"rpn"`.
@@ -478,7 +478,7 @@ from meedee.messages import NoteOn, NoteOff
 from meedee.midi import Output, Protocol
 
 with Output(protocol=Protocol.Ump) as out:
-    out(NoteOn(60, 40_000, version=2), "500 ms", NoteOff(60, version=2))
+    out.send(NoteOn(60, 40_000, version=2), "500 ms", NoteOff(60, version=2))
 ```
 
 This requires a native UMP endpoint. Protocol conversion is always explicit.
@@ -646,9 +646,9 @@ from meedee.midi import Input, Output
 
 with Output().create_virtual("meedee-example") as out:
     with Input(port="meedee-example") as source:
-        out(NoteOn(60))
+        out.send(NoteOn(60))
         print(source.receive(timeout=1))
-        out(NoteOff(60))
+        out.send(NoteOff(60))
 ```
 
 `Input().create_virtual(name)` creates a software destination that other
@@ -752,7 +752,7 @@ structs correspond to Python keyword arguments; they do not require extra Python
 objects. Rust with_playback settings persist across play calls, while Python's
 play keywords apply to the current call. Both create their playback clock
 automatically.
-play() leaves a retained output open for subsequent playback or sending; context
+send() leaves a retained output open for subsequent playback or sending; context
 exit, close() or destruction performs its usual cleanup. CompoundSendError keeps
 the underlying typed failure in __cause__, alongside its confirmed progress.
 
@@ -810,3 +810,35 @@ A user callback exception stops further delivery and starts safe cleanup. failur
 retains that exact exception, while sys.unraisablehook reports it to stderr.
 An attached recording is marked incomplete. Do blocking MIDI work on the
 controlling thread; receive and iteration remain unavailable in callback mode.
+
+
+## One send operation
+
+Use send for individual messages, notes, sequences and recordings. Output objects
+are not callable. Every successful call returns a PlaybackReport; simple examples
+can ignore it.
+
+```python
+from meedee.archive import Reader
+from meedee.messages import Note
+from meedee.midi import Output
+
+with Output() as out:
+    print(out.send(Note("500 ms", 60), Reader("rec.meedee"), Note("500 ms", 67)))
+```
+
+Each argument follows the previous argument. A direct message sends immediately,
+including one carrying receive metadata. Notes, rests and delays supply sequence
+timing. An iterable of timestamped messages uses relative recorded timing,
+starting when that argument is reached. An untimed iterable uses note/rest/delay
+timing. Mixing timed and untimed values inside one iterable raises an error;
+no missing timing is inferred. For a streamed source, a later error can follow
+an already-sent prefix. The error's report retains that confirmed progress.
+Execution failures preserve their original exception type, such as SendError or
+CompoundSendError, with report and completed_events attached. Validation before
+execution can raise without those progress attributes.
+
+send accepts the former playback options: origin, mappings, cancel,
+allow_rounding and metrics. A cancelled call returns a report with cancelled=True
+and leaves the output open. Empty input opens no ports. Cancellation can leave a
+note active until explicit release or normal output cleanup.

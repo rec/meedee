@@ -27,7 +27,7 @@ Additional work beyond the prompt: None.
 ## Work inventory
 
 - [x] Canonical module paths and names; migrate Rust callers and Python bindings.
-- [x] Unified Python Input/Output lifecycle, callable output and port selection.
+- [x] Unified Python Input/Output lifecycle, named output sending and port selection.
 - [x] Consistent read-only report snapshots and metadata terminology.
 - [x] Rust file conveniences and advanced playback options.
 - [x] Rust CI, tuning, SysEx capture/send and discovery drivers.
@@ -44,7 +44,7 @@ Completion requires finishing this inventory, not merely aligning symbol counts.
 
 | Python | Rust | Language adaptation |
 | --- | --- | --- |
-| midi.Input, midi.Output | midi::Input, midi::Output | Python callable output; Rust send/send_all and consuming connect |
+| midi.Input, midi.Output | midi::Input, midi::Output | Python send; Rust send and consuming connect |
 | messages.Note, Rest | messages::Note, Rest, Beats | Python unit strings; Rust Duration and Beats |
 | Message.stream, span | Message::stream(), SourceSpan | Metadata survives transformations and is ignored in payload equality |
 | events packet decoding/playback | events packet decoding/playback | Rust enums and typed Results |
@@ -72,7 +72,7 @@ mutable timing accumulator no longer needs a public module.
 - Python Ruff, formatting, pyupgrade for 3.13 and ty check meedee passed.
 - Full final Python suite: 526 tests passed.
 
-Native qualification scripts were migrated to callable output and new resources
+Native qualification scripts were migrated to named output sending and new resources
 per open/close cycle, but were not executed. No macOS, Windows or Linux hardware
 qualification is claimed by these device-free checks. public-symbols.txt remains
 untracked and excluded from the commit.

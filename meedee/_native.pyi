@@ -1,6 +1,6 @@
 """Private Python adapter to Rust transport and lifecycle controls."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from . import events, messages, midi
 
@@ -91,16 +91,10 @@ def prepare_output(
     protocol: midi.Protocol, message: object
 ) -> bytes | midi.UmpPacket | tuple[str, dict[str, int | str], int]: ...
 def live_size(item: messages.Message | events.StreamDiagnostic) -> int: ...
-def play(
-    output: Callable[[messages.Message], None],
-    source: object,
+def output_sequence(
+    send: Callable[[object], None],
+    timeline: Iterable[tuple[int, object, bool]],
     *,
-    origin: events.Timestamp,
-    mappings: list[events.ClockMapping] | tuple[events.ClockMapping, ...] | None = None,
     cancel: events.Cancellation | None = None,
-    allow_rounding: bool = False,
     metrics: bool = False,
 ) -> events.PlaybackReport: ...
-def output_sequence(
-    send: Callable[[object], None], timeline: list[tuple[int, object]]
-) -> None: ...

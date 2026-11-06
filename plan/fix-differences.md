@@ -78,7 +78,7 @@ code, tests and examples; do not retain the superseded public decoder as an alia
 | R21 | `messages::ValueError` | Python TypeError/ValueError. Verify malformed values fail before encoding or sending and retain useful field/reason information. Do not add one Rust exception type per Python exception. |
 | R22 | `midi::Error` | Python MIDI exception classes. Audit operation category and underlying cause, including Shared retained errors from the diagnostics change. Preserve the approved Result/exception adaptation. |
 | R23 | `midi::InputErrors` | Python Input.with_errors() iterator. Verify accepted-prefix draining, diagnostic delivery and terminal-error behavior. Keep a named Rust iterator and Python generator. |
-| R24 | `midi::OutputValue` | Python callable output's heterogeneous arguments. Keep the enum; verify message/note/rest/delay/packet support and validation before sending. |
+| R24 | `midi::OutputValue` | Python send's heterogeneous arguments. Keep the enum; verify message/note/rest/delay/packet support and validation before sending. |
 | R25 | `midi::Recording` | Python Input.record() list. Keep the Rust iterable container; verify record order, declarations, errors, timing, final diagnostics and direct playback. |
 | R26 | `routing::RouteReport` | Python Report.routes currently contains dictionaries. Subject to D2, expose the existing Rust snapshot as a Python RouteReport and migrate dictionary consumers. |
 | R27 | `smf::Record` | Python Message, Meta, SysExFragment or UnknownChunk. Keep the enum; preserve track/delta context, fragmented SysEx, unknown data and file ordering. Retain low-level smf.Event as previously agreed. |
@@ -109,7 +109,7 @@ limits and the point at which validation occurs.
 | K02 | `inspection::ComparisonOptions` | compare_files keywords. Match exact/tolerant/ignored timing, explicit source/clock mappings, limits and bounded differences. |
 | K03 | `inspection::MonitorOptions` | Monitor/run keywords. Match filtering, detail limits, note-state collection and opt-in metrics; filters must preserve diagnostics. |
 | K04 | `inspection::Options` | inspect_file keywords. Match payload_limit, preserve_unknown and detail_limit, including default values. |
-| K05 | `midi::PlaybackOptions` | Output.play keywords. Match origin, mappings, cancellation, rounding and metrics. Retain the approved persistent Rust with_playback builder versus per-call Python keywords, and explain that lifetime difference. |
+| K05 | `midi::PlaybackOptions` | Output.send keywords. Match origin, mappings, cancellation, rounding and metrics. Retain the approved persistent Rust with_playback builder versus per-call Python keywords, and explain that lifetime difference. |
 | K06 | `routing::PreviewOptions` | preview_file keywords. Match queue/event/byte/payload/detail budgets and incomplete-input handling. |
 | K07 | `transfer::ReadOptions` | read_file keywords. Match explicit pacing, bounds and malformed-file handling. Preserve whole-message sends and no automatic retries. |
 | K08 | `transport::InputOptions` | Input constructor/builders. Compare controls reachable through high-level Rust midi::Input, including raw/callback mode and receive budgets. Low-level transport options are not a replacement high-level API. Keep Python isolation explicit. |
@@ -134,7 +134,7 @@ superseded public free function. Do not retain both public spellings.
 | ID | Rust path | Python counterpart and planned resolution |
 | --- | --- | --- |
 | E01 | `events::MonotonicClock` | Python's internal playback clock. Retain Rust's clock implementation for advanced PlaybackClock users; ordinary users get automatic clocks in both languages. time.monotonic_ns() alone is not a full replacement for its waiting/cancellation contract. |
-| E02 | `events::play` | Output.play(). Keep the low-level Rust clock/sink engine; verify Output delegates to the same scheduling semantics. Document the advanced boundary, without adding a second Python playback API. |
+| E02 | `events::play` | Output.send(). Keep the low-level Rust clock/sink engine; Output shares its planner, clock, cancellation and report semantics. Document the advanced boundary, without adding a second Python playback API. |
 | E03 | `events::send_message` | Output(message). Keep the lower-level Rust connection helper; verify expansion, validation and send-progress behavior agree with high-level sending. |
 | E04 | `events::timestamp_seconds` | Timestamp.seconds. Replace the public Rust function with Timestamp::seconds() as described above, retaining exact Rational arithmetic and checked overflow. |
 | E05 | `file_io::Source` | Python path/binary-reader handling. Keep the advanced Rust bounded-reader implementation; verify resource limits and offsets through the public file operations. Do not introduce a Python Source wrapper. |
@@ -385,3 +385,33 @@ Final verification:
 
 Physical-device and cross-platform runtime qualification remain separate; no old
 Rust toolchain was run locally. Additional work beyond the prompt: None.
+
+
+## Unified output operation follow-up
+
+The user approved removing Python Output.__call__ and consolidating play/send into
+send in both languages. They also approved rejecting mixed timed/untimed sources,
+always returning a report, and adapting Rust source forms through OutputSource
+while removing send_all. Python uses variadic arguments; Rust accepts values,
+iterables and tuples of independent sources. Readers remain streamed and empty
+sends remain device-free. Direct messages ignore timing metadata for scheduling.
+Notes, rests and delays retain exact cumulative timing, with scalar rounding
+included in the shared report. Both guides and workflow callers were migrated.
+Python testing.Output uses send in place of __call__, matching its Rust sink.
+
+Approved: Python preserves the original typed exception and attaches
+report/completed_events after execution begins. Failures are not wrapped in
+PlaybackError. Rust retains its report-bearing Failure with the typed cause.
+
+Additional work beyond the prompt: None.
+
+Verification of the working implementation:
+
+- Full Python suite: 573 passed, with no thread warnings.
+- Rust workspace: 236 passed, 5 opt-in tests ignored.
+- All 36 Rust guide blocks compile without executing guide I/O; all 36 Python
+  guide blocks parse.
+- Strict core Clippy, cargo fmt, Python Ruff, ty and Python 3.13 pyupgrade pass.
+- Strict documentation build passes. No physical device traffic was used.
+- public-symbols.txt remains untracked and is excluded from the implementation
+  commit.

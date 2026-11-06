@@ -81,7 +81,7 @@ class Output:
         packet_limit: int = 128,
         byte_limit: int | str = 8_388_608,
     ) -> None: ...
-    def __call__(
+    def send(
         self, value: messages.Message | bytes | bytearray | memoryview | midi.UmpPacket
     ) -> None: ...
     def fail_next_send(

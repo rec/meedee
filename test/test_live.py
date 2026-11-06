@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
 from threading import Thread
+from typing import Self
 
 import pytest
 
@@ -127,31 +128,34 @@ def test_clock_mapping_and_rounding_require_explicit_policy() -> None:
     assert planner.deadline(b).delay_ns == 333_333_333
 
 
-class Sink:
+class Sink(midi.Output):
     def __init__(self, fail_at: int | None = None) -> None:
+        super().__init__()
         self.sent: list[messages.Message] = []
         self.fail_at = fail_at
 
-    def __call__(self, message: messages.Message) -> None:
+    def _send(self, message: messages.Message) -> None:
         if len(self.sent) == self.fail_at:
             raise midi.SendError("device failed")
         self.sent.append(message)
 
+    def __enter__(self) -> Self:
+        return self
+
 
 def test_playback_cancellation_and_partial_failure_do_not_send_cleanup() -> None:
     sink = Sink(fail_at=1)
-    with pytest.raises(events.PlaybackError) as error:
-        _native.play(
-            sink,
+    with pytest.raises(midi.SendError) as error:
+        sink.send(
             [event(0), event(0), event(0)],
             origin=events.Timestamp(ticks=0, clock=clock()),
         )
     assert error.value.completed_events == 1 and len(sink.sent) == 1
-    assert isinstance(error.value.__cause__, midi.SendError)
+    assert isinstance(error.value, midi.SendError)
     cancel = events.Cancellation()
     cancel.cancel()
-    report = _native.play(
-        sink, [event(0)], origin=events.Timestamp(ticks=0, clock=clock()), cancel=cancel
+    report = sink.send(
+        [event(0)], origin=events.Timestamp(ticks=0, clock=clock()), cancel=cancel
     )
     assert report.cancelled and report.sent_events == 0
     sink = Sink()
@@ -159,8 +163,7 @@ def test_playback_cancellation_and_partial_failure_do_not_send_cleanup() -> None
     reports: list[events.PlaybackReport] = []
     worker = Thread(
         target=lambda: reports.append(
-            _native.play(
-                sink,
+            sink.send(
                 [event(0), event(60_000_000_000)],
                 origin=events.Timestamp(ticks=0, clock=clock()),
                 cancel=cancel,
@@ -198,10 +201,9 @@ def test_recording_preserves_verified_events_and_reports_observed_loss(
 
 def test_replay_rejects_loss_records_and_missing_times() -> None:
     sink = Sink()
-    with pytest.raises(events.PlaybackError, match="timestamp"):
-        _native.play(
-            sink,
-            [event(0).replace(timestamp=None)],
+    with pytest.raises(ValueError, match="mix"):
+        sink.send(
+            [event(0), event(0).replace(timestamp=None)],
             origin=events.Timestamp(ticks=0, clock=clock()),
         )
     stream = BytesIO()
@@ -210,9 +212,8 @@ def test_replay_rejects_loss_records_and_missing_times() -> None:
     writer.write(archive.Stream(id="s", label=""))
     writer.write(archive.Gap(stream="s", lost=1, reason="loss"))
     writer.finish()
-    with pytest.raises(events.PlaybackError, match="gap"):
-        _native.play(
-            sink,
+    with pytest.raises(ValueError, match="gap"):
+        sink.send(
             archive.Reader(BytesIO(stream.getvalue())),
             origin=events.Timestamp(ticks=0, clock=clock()),
         )

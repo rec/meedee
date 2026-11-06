@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 /// A capture, including clock/source declarations and any receive diagnostics.
 /// Retained records grow with capture size; receive-queue limits do not bound this
-/// application-owned memory. Pass the capture directly to `Output::play`.
+/// application-owned memory. Pass the capture directly to `Output::send`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Recording {
     pub records: Vec<Record>,
@@ -33,7 +33,7 @@ impl Input {
     /// use meedee::midi::{Input, Output};
     /// use std::time::Duration;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// Output::new().play(Input::new().record(Duration::from_secs(10))?)?;
+    /// Output::new().send(Input::new().record(Duration::from_secs(10))?)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -114,7 +114,7 @@ impl Input {
     /// use std::time::Duration;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// Input::new().record_to(Duration::from_secs(10), "rec.meedee", true)?;
-    /// Output::new().play(Reader::open("rec.meedee")?)?;
+    /// Output::new().send(Reader::open("rec.meedee")?)?;
     /// # Ok(())
     /// # }
     /// ```

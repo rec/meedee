@@ -1,6 +1,7 @@
 """Exact bounded statistics and opt-in record/playback integration."""
 
 from pathlib import Path
+from typing import Self
 
 import pytest
 
@@ -55,36 +56,38 @@ def test_delivery_uses_host_window_time_and_rejects_regressing_observations() ->
     assert report.events == 3 and d.snapshot(50).events == 4
 
 
-class Sink:
+class Sink(midi.Output):
     def __init__(self, fail: bool = False) -> None:
+        super().__init__()
         self.sent = 0
         self.fail = fail
 
-    def __call__(self, message: messages.Message) -> None:
+    def _send(self, message: messages.Message) -> None:
         if self.fail and self.sent == 1:
             raise midi.SendError("simulated send failure")
         self.sent += 1
 
+    def __enter__(self) -> Self:
+        return self
+
 
 def test_playback_metrics_are_opt_in_and_cover_only_successful_handoffs() -> None:
-    from meedee import _native
-
     origin = events.Timestamp(ticks=0, clock=events.Clock(identity="source"))
-    report = _native.play(Sink(), [event()], origin=origin)
+    report = Sink().send([event()], origin=origin)
     assert report.lateness is None
     sink = Sink()
-    report = _native.play(sink, [event(), event()], origin=origin, metrics=True)
+    report = sink.send([event(), event()], origin=origin, metrics=True)
     assert report.lateness is not None and report.lateness.count == 2
     assert report.lateness.maximum_ns == report.max_lateness_ns
     assert sum(report.lateness.buckets) == report.sent_events
-    with pytest.raises(events.PlaybackError) as result:
-        _native.play(Sink(fail=True), [event(), event()], origin=origin, metrics=True)
+    with pytest.raises(midi.SendError) as result:
+        Sink(fail=True).send([event(), event()], origin=origin, metrics=True)
     retained = result.value.report
     assert retained.sent_events == 1 and retained.lateness is not None
     assert retained.lateness.count == 1
     cancel = events.Cancellation()
     cancel.cancel()
-    report = _native.play(Sink(), [event()], origin=origin, cancel=cancel, metrics=True)
+    report = Sink().send([event()], origin=origin, cancel=cancel, metrics=True)
     assert (
         report.cancelled and report.lateness is not None and report.lateness.count == 0
     )

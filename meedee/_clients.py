@@ -534,10 +534,19 @@ class Output:
         self._connection = connection
         return self
 
-    def play(
+    def send(
         self,
-        source: Iterable[object],
-        *,
+        *values: messages.Note
+        | messages.Rest
+        | messages.Message
+        | bytes
+        | bytearray
+        | memoryview
+        | midi.UmpPacket
+        | int
+        | float
+        | str
+        | Iterable[object],
         origin: events.Timestamp | None = None,
         mappings: list[events.ClockMapping]
         | tuple[events.ClockMapping, ...]
@@ -546,38 +555,179 @@ class Output:
         allow_rounding: bool = False,
         metrics: bool = False,
     ) -> events.PlaybackReport:
+        """Send values in sequence, preserving timing within recorded sources."""
+        _native.check_thread()
         if self._closed:
             raise midi.StateError("output is closed")
         try:
-            iterator = iter(source)
-            prefix: list[object] = []
-            for item in iterator:
-                prefix.append(item)
-                if isinstance(item, messages.Message):
-                    if origin is None:
-                        if item.timestamp is None:
-                            raise ValueError("playback requires timestamped events")
-                        origin = item.timestamp
-                    self.__enter__()
-                    break
-                if not isinstance(
-                    item, (events.Clock, archive.Stream, archive.Metadata)
-                ):
-                    break
-            if origin is None:
-                origin = events.Timestamp(ticks=0, clock=events.Clock(identity="empty"))
-            return _native.play(
-                self,
-                chain(prefix, iterator),
-                origin=origin,
-                mappings=mappings,
+            timeline = self._timeline(values, origin, mappings, allow_rounding)
+            if cancel is None or not cancel.cancelled:
+                first = next(timeline, None)
+                if first is not None:
+                    if first[1] is not None:
+                        self.__enter__()
+                    timeline = chain([first], timeline)
+            return _native.output_sequence(
+                self._send,
+                timeline,
                 cancel=cancel,
-                allow_rounding=allow_rounding,
                 metrics=metrics,
             )
         finally:
-            if isinstance(source, archive.Reader):
-                source.close()
+            for v in values:
+                if isinstance(v, archive.Reader):
+                    v.close()
+
+    def _send(self, value: object) -> None:
+        self.__enter__()
+        assert self._connection is not None
+        self._connection._send(value)
+
+    def _timeline(
+        self,
+        values: Iterable[object],
+        origin: events.Timestamp | None,
+        mappings: list[events.ClockMapping] | tuple[events.ClockMapping, ...] | None,
+        allow_rounding: bool,
+    ) -> Iterator[tuple[int, object, bool]]:
+        elapsed = Fraction(0)
+        pending: list[object] = []
+        for v in values:
+            if isinstance(
+                v,
+                (
+                    messages.Message,
+                    messages.Note,
+                    messages.Rest,
+                    bytes,
+                    bytearray,
+                    memoryview,
+                    midi.UmpPacket,
+                    int,
+                    float,
+                    str,
+                ),
+            ):
+                pending.append(v)
+                continue
+            if pending:
+                plan, elapsed = self._prepare_sequence(pending, elapsed)
+                yield from plan
+                pending.clear()
+            base = elapsed
+            mode: bool | None = None
+            planner: events.PlaybackPlan | None = None
+            ordinary: list[object] = []
+            for m in cast(Iterable[object], v):
+                if isinstance(m, (events.Clock, archive.Stream, archive.Metadata)):
+                    continue
+                timed = isinstance(m, messages.Message) and m.timestamp is not None
+                if mode is None:
+                    mode = timed
+                elif mode != timed:
+                    raise ValueError(
+                        "cannot mix timestamped and untimestamped values "
+                        "within one source"
+                    )
+                if timed:
+                    assert isinstance(m, messages.Message)
+                    assert m.timestamp is not None
+                    if planner is None:
+                        planner = events.PlaybackPlan(
+                            origin=origin or m.timestamp,
+                            mappings=mappings,
+                            allow_rounding=allow_rounding,
+                        )
+                    planned = planner.deadline(m)
+                    elapsed = base + Fraction(planned.delay_ns, 1_000_000_000)
+                    plan, _ = self._prepare_sequence([m], elapsed)
+                    for deadline, value, _ in plan:
+                        if value is not None:
+                            yield (
+                                deadline,
+                                value,
+                                planned.rounding_error_ns.numerator != 0,
+                            )
+                else:
+                    if isinstance(
+                        m,
+                        (
+                            events.StreamDiagnostic,
+                            archive.Gap,
+                            archive.Discontinuity,
+                            archive.Opaque,
+                        ),
+                    ):
+                        raise ValueError(
+                            "gap, discontinuity or opaque data requires "
+                            "an explicit send policy"
+                        )
+                    ordinary.append(m)
+            if ordinary:
+                plan, elapsed = self._prepare_sequence(ordinary, elapsed)
+                yield from plan
+        if pending:
+            plan, elapsed = self._prepare_sequence(pending, elapsed)
+            yield from plan
+
+    def _prepare_sequence(
+        self, values: Iterable[object], elapsed: Fraction
+    ) -> tuple[list[tuple[int, object, bool]], Fraction]:
+        timeline: list[tuple[int, object, bool]] = []
+        for v in values:
+            deadline = round(elapsed * 1_000_000_000)
+            rounded = (elapsed * 1_000_000_000).denominator != 1
+            if isinstance(v, (messages.Note, messages.Rest, int, float, str)):
+                duration = (
+                    v.duration if isinstance(v, (messages.Note, messages.Rest)) else v
+                )
+                elapsed += _units.sequence_duration(duration, self._beat_period)
+                end = round(elapsed * 1_000_000_000)
+                if end > 2**64 - 1:
+                    raise ValueError("delay exceeds scheduler range")
+                if isinstance(v, messages.Note):
+                    channel = self._channel or v.channel or 1
+                    attack = messages.NoteOn(v.note, v.velocity, channel)
+                    release = messages.NoteOff(v.note, channel=channel)
+                    timeline.append(
+                        (
+                            deadline,
+                            _native.prepare_output(self._protocol, attack),
+                            rounded,
+                        )
+                    )
+                    timeline.append(
+                        (
+                            end,
+                            _native.prepare_output(self._protocol, release),
+                            (elapsed * 1_000_000_000).denominator != 1,
+                        )
+                    )
+            else:
+                if isinstance(
+                    v,
+                    (
+                        gm.BankProgramSelect,
+                        messages.NoteOn,
+                        messages.NoteOff,
+                        messages.PolyPressure,
+                        messages.ControlChange,
+                        messages.ProgramChange,
+                        messages.ChannelPressure,
+                        messages.PitchBend,
+                        messages.ControlChange14,
+                        messages.RpnSet,
+                        messages.NrpnSet,
+                        messages.ParameterStep,
+                    ),
+                ) and (self._channel is not None or v.channel is None):
+                    v = v.replace(channel=self._channel or 1)
+                prepared = _native.prepare_output(self._protocol, v)
+                timeline.append(
+                    (deadline, v if isinstance(prepared, tuple) else prepared, rounded)
+                )
+        timeline.append((round(elapsed * 1_000_000_000), None, False))
+        return timeline, elapsed
 
     def __enter__(self) -> Output:
         if self._closed:
@@ -613,23 +763,6 @@ class Output:
                 self._native = None
                 if self._context is not None:
                     self._context.dispose()
-
-    def __call__(
-        self,
-        *values: messages.Note
-        | messages.Rest
-        | messages.Message
-        | bytes
-        | bytearray
-        | memoryview
-        | midi.UmpPacket
-        | int
-        | float
-        | str,
-    ) -> None:
-        self.__enter__()
-        assert self._connection is not None
-        self._connection.send(*values)
 
     def __del__(self) -> None:
         try:
@@ -776,74 +909,6 @@ class _OutputState:
             0 if client._context is None else client._context.generation
         )
         return connection
-
-    def send(
-        self,
-        *values: messages.Note
-        | messages.Rest
-        | messages.Message
-        | bytes
-        | bytearray
-        | memoryview
-        | midi.UmpPacket
-        | int
-        | float
-        | str,
-    ) -> None:
-        """Schedule notes, rests, messages and delays against one monotonic origin."""
-        _native.check_thread()
-        if self.closed:
-            raise _native.StateError("MIDI connection is closed or failed")
-        elapsed = Fraction(0)
-        timeline: list[tuple[int, object]] = []
-        for v in values:
-            deadline = round(elapsed * 1_000_000_000)
-            if isinstance(v, (messages.Note, messages.Rest, int, float, str)):
-                duration = (
-                    v.duration if isinstance(v, (messages.Note, messages.Rest)) else v
-                )
-                elapsed += _units.sequence_duration(duration, self._beat_period)
-                end = round(elapsed * 1_000_000_000)
-                if end > 2**64 - 1:
-                    raise ValueError("delay exceeds scheduler range")
-                if isinstance(v, messages.Note):
-                    channel = self._channel or v.channel or 1
-                    attack = messages.NoteOn(v.note, v.velocity, channel)
-                    release = messages.NoteOff(v.note, channel=channel)
-                    timeline.append(
-                        (
-                            deadline,
-                            _native.prepare_output(self._protocol, attack),
-                        )
-                    )
-                    timeline.append(
-                        (end, _native.prepare_output(self._protocol, release))
-                    )
-            else:
-                if isinstance(
-                    v,
-                    (
-                        gm.BankProgramSelect,
-                        messages.NoteOn,
-                        messages.NoteOff,
-                        messages.PolyPressure,
-                        messages.ControlChange,
-                        messages.ProgramChange,
-                        messages.ChannelPressure,
-                        messages.PitchBend,
-                        messages.ControlChange14,
-                        messages.RpnSet,
-                        messages.NrpnSet,
-                        messages.ParameterStep,
-                    ),
-                ) and (self._channel is not None or v.channel is None):
-                    v = v.replace(channel=self._channel or 1)
-                prepared = _native.prepare_output(self._protocol, v)
-                timeline.append(
-                    (deadline, v if isinstance(prepared, tuple) else prepared)
-                )
-        timeline.append((round(elapsed * 1_000_000_000), None))
-        _native.output_sequence(self._send, timeline)
 
     def _send(self, value: object) -> None:
         """Send a message, compound command or encoded packet immediately.

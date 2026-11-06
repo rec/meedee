@@ -31,8 +31,8 @@ use meedee::messages::{Beats, Note, Rest};
 use meedee::midi::Output;
 
 let mut out = Output::new().with_bpm(120)?;
-out.send_all([
-    Note::new(Beats::from(1), 60)?.into(),
+out.send([
+    meedee::midi::OutputValue::from(Note::new(Beats::from(1), 60)?),
     Note::new(Beats::new(1, 2)?, 62)?.with_velocity(70)?.into(),
     Note::new(Beats::new(1, 2)?, 64)?.with_velocity(100)?.into(),
     Rest::new(Beats::from(1)).into(),
@@ -94,7 +94,7 @@ for message in Input::new() {
         Payload::Midi1(AnyMessage::NoteOn(note)) => out.send(note.transpose(12))?,
         Payload::Midi1(AnyMessage::NoteOff(note)) => out.send(note.transpose(12))?,
         other => out.send(other)?,
-    }
+    };
 }
 out.close()?;
 ```
@@ -131,10 +131,10 @@ for message in Input::new().with_channel(1)? {
             AnyMessage::PitchBend(_)
         )) => {
             low.send(message.clone())?;
-            high.send(message)?;
+            high.send(message)?
         }
         None => low.send(message)?,
-    }
+    };
 }
 low.close()?;
 high.close()?;
@@ -152,7 +152,7 @@ leave its channel unset and use message builders such as `.with_channel(2)?`.
 use meedee::midi::{Input, Output};
 use std::time::Duration;
 
-Output::new().play(Input::new().record(Duration::from_secs(10))?)?;
+Output::new().send(Input::new().record(Duration::from_secs(10))?)?;
 ```
 
 Recording closes the input and returns a `Recording` containing declarations,
@@ -167,7 +167,7 @@ use meedee::archive::Reader;
 use std::time::Duration;
 
 Input::new().record_to(Duration::from_secs(10), "rec.meedee", true)?;
-let report = Output::new().play(Reader::open("rec.meedee")?)?;
+let report = Output::new().send(Reader::open("rec.meedee")?)?;
 println!("{report:?}");
 ```
 
@@ -211,8 +211,8 @@ use std::time::Duration;
 
 let mut out = Output::new();
 out.send(RpnSet::new(0, 2 << 7)?)?; // Pitch-bend sensitivity: two semitones.
-out.send_all([
-    NoteOn::new(60)?.into(),
+out.send([
+    meedee::midi::OutputValue::from(NoteOn::new(60)?),
     Duration::from_millis(300).into(),
     NoteOn::new(64)?.into(),
     Duration::from_millis(300).into(),
@@ -272,8 +272,8 @@ let mut out = Output::new().with_transport(OutputOptions {
     protocol: Protocol::Ump,
     ..OutputOptions::default()
 })?;
-out.send_all([
-    NoteOn::new_midi2(60)?.with_velocity(40_000)?.into(),
+out.send([
+    meedee::midi::OutputValue::from(NoteOn::new_midi2(60)?.with_velocity(40_000)?),
     Duration::from_millis(500).into(),
     NoteOff::new_midi2(60)?.into(),
 ])?;
@@ -301,7 +301,7 @@ println!("{:?}", inspection::compare_files(
 ```
 
 For playback diagnostics, configure the output once. The options apply to each
-subsequent `play()` call; ordinary playback needs no options.
+subsequent `send()` call; ordinary playback needs no options.
 
 ```rust
 use meedee::archive::Reader;
@@ -311,7 +311,7 @@ let mut out = Output::new().with_playback(PlaybackOptions {
     metrics: true,
     ..Default::default()
 });
-println!("{:?}", out.play(Reader::open("rec.meedee")?)?);
+println!("{:?}", out.send(Reader::open("rec.meedee")?)?);
 out.close()?;
 ```
 
@@ -862,3 +862,35 @@ A callback panic stops further calls, retains its failure and closes the transpo
 outside callback scope. Attached recording becomes incomplete. Python follows
 the same policy for callback exceptions, preserving the original exception in
 failure and reporting it to stderr.
+
+
+## One send operation
+
+send accepts a single value, an iterable of values or archive records, a Recording,
+or a Reader. OutputSource adapts these forms to the same operation. Every call
+returns a playback Report, including immediate sends and empty sequences.
+
+A tuple concatenates independent sources without collecting a reader in memory:
+
+```rust
+use meedee::{archive::Reader, messages::Note, midi::Output};
+use std::time::Duration;
+
+let report = Output::new().send((
+    Note::new(Duration::from_millis(500), 60)?,
+    Reader::open("rec.meedee")?,
+    Note::new(Duration::from_millis(500), 67)?,
+))?;
+println!("{report:?}");
+```
+
+A direct message sends immediately regardless of its optional timestamp. Within
+an iterable, all timed messages preserve relative timestamps, starting when that
+source is reached. Untimed collections use note/rest/delay timing. Mixing timed
+and untimed values within one source is rejected. Streamed failures retain the
+confirmed prefix in Failure.report and the underlying cause in Failure.cause.
+Python preserves its original typed exception, attaching report and completed_events
+after execution begins; it does not wrap the exception in PlaybackError.
+with_playback configures origin, clock mappings, cancellation, rounding and metrics
+for send. Cancellation returns a report and leaves the output open; empty sources
+open no ports. A cancelled note may remain active until release or normal cleanup.
