@@ -105,7 +105,7 @@ def run_monitor(config: Monitor) -> int:
         client = midi.Input(
             protocol=protocol,
             backend=backend,
-            isolated=config.isolated,
+            run_in_subprocess=config.run_in_subprocess,
             receive_byte_limit=config.receive_byte_limit,
             event_limit=config.event_limit,
             sysex_limit=config.sysex_limit,

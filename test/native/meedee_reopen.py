@@ -7,12 +7,19 @@ from meedee import messages, midi
 
 def main() -> None:
     for protocol in (midi.Protocol.Midi1, midi.Protocol.Ump):
-        for isolated in (True, False):
+        for run_in_subprocess in (True, False):
             for cycle in range(1, 4):
-                source = midi.Input(protocol=protocol, isolated=isolated)
-                sender = midi.Output(protocol=protocol, isolated=isolated)
+                source = midi.Input(
+                    protocol=protocol, run_in_subprocess=run_in_subprocess
+                )
+                sender = midi.Output(
+                    protocol=protocol, run_in_subprocess=run_in_subprocess
+                )
                 name = f"meedee-reopen-{uuid4().hex}"
-                context = f"{protocol}, isolated={isolated}, cycle={cycle}, name={name}"
+                context = (
+                    f"{protocol}, run_in_subprocess={run_in_subprocess}, "
+                    f"cycle={cycle}, name={name}"
+                )
                 print(f"creating virtual input: {context}", flush=True)
                 with source.create_virtual(name) as receiver:
                     print(f"discovering output ports: {context}", flush=True)
@@ -43,7 +50,8 @@ def main() -> None:
                 assert receiver.closed and output.closed
                 print(f"connections closed: {context}", flush=True)
             print(
-                f"three open/send/close cycles passed: {protocol}, isolated={isolated}"
+                f"three open/send/close cycles passed: {protocol}, "
+                f"run_in_subprocess={run_in_subprocess}"
             )
 
 

@@ -72,7 +72,7 @@ class Monitor(BaseModel, frozen=True):
         | None
     ) = None
     output: Literal["text", "json"] = "text"
-    isolated: bool = True
+    run_in_subprocess: bool = True
     metrics: bool = False
     duration: (
         Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
@@ -159,7 +159,7 @@ class Patch(RouteOptions, frozen=True):
         ]
         | None
     ) = None
-    isolated: bool = True
+    run_in_subprocess: bool = True
     duration: (
         Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
         | None
@@ -189,7 +189,7 @@ class Ports(BaseModel, frozen=True):
         ]
         | None
     ) = None
-    isolated: bool = True
+    run_in_subprocess: bool = True
     port_limit: int = Field(default=256, gt=0)
     detail_limit: int = Field(default=128, gt=0)
     output: Literal["text", "json"] = "text"
@@ -234,7 +234,7 @@ class TransferSend(TransferPreview, frozen=True):
 
     port: str = Field(min_length=1)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
-    isolated: bool = True
+    run_in_subprocess: bool = True
 
 
 class SysexReceive(BaseModel, frozen=True):
@@ -256,7 +256,7 @@ class SysexReceive(BaseModel, frozen=True):
         int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
     ] = Field(default=8_388_608, gt=0)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
-    isolated: bool = True
+    run_in_subprocess: bool = True
     output: Literal["text", "json"] = "text"
 
     @model_validator(mode="after")
@@ -292,7 +292,7 @@ class TuningQuery(TuningPreview, frozen=True):
     input_port: str = Field(min_length=1)
     output_port: str = Field(min_length=1)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
-    isolated: bool = True
+    run_in_subprocess: bool = True
     receive_byte_limit: Annotated[
         int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
     ] = Field(default=8_388_608, gt=0)
@@ -357,7 +357,7 @@ class CiBrowse(BaseModel, frozen=True):
         ]
         | None
     ) = None
-    isolated: bool = True
+    run_in_subprocess: bool = True
     discovery_timeout: Annotated[
         float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
     ] = Field(default=3.0, ge=3.0, le=18_446_744_073.709)

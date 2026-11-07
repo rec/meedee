@@ -1635,12 +1635,13 @@ this workflow's device-free tests.
 
 ## MIDI 1 output sequencing
 
-Python `Output(channel=None, port=None, bpm=None, isolated=False)` owns discovery and its connection
-with `ports()` and `connect(port)`. Connecting returns the same object. A second
+Python `Output(channel=None, port=None, bpm=None, run_in_subprocess=False)` owns
+discovery and its connection with `ports()` and `connect(port)`.
+Connecting returns the same object. A second
 connection is rejected, and close is terminal, including for discovery-only objects. As a context manager it opens the first port,
 or the unique port matching a case-sensitive name substring/glob (`*`, `?`).
-No or ambiguous matches raise before connecting. `isolated=True` remains supported
-and launches a separate worker module, without importing the calling script.
+No or ambiguous matches raise before connecting. `run_in_subprocess=True`
+launches a separate worker module, without importing the calling script.
 
 The output exposes send(); there is no separate public connection class.
 `out.send(*values)` accepts full notes, rests, messages, raw packets and nonnegative
@@ -1709,8 +1710,8 @@ unchanged `events.ReceivedPacket` values, including partial SysEx and UMP chunks
 The former TypedInput and TypedInputConnection classes are removed without aliases.
 Both modes connect and return the same Input object, sharing discovery, isolation,
 port lifetime, callback guards and terminal close behavior. Input defaults to
-in-process operation, with explicit isolated=True available. Input(port=pattern)
-uses the same unique substring/glob selection as Output.
+in-process operation, with explicit `run_in_subprocess=True` available.
+Input(port=pattern) uses the same unique substring/glob selection as Output.
 
 Both modes accept an optional callback at connect/create_virtual, or support
 `receive(timeout=..., cancel=...)` when no callback is supplied. Queue admission

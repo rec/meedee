@@ -117,7 +117,7 @@ compatibility guarantees still owner decisions.
 returns unchanged transport packets. `midi.Output` owns discovery and one connection, supporting `out.send(...)` for messages, compound operations and
 encoded bytes/UMP packets and timestamped sources. All use the same
 native transport. Inputs and outputs default to in-process
-transport, with `isolated=True` available. Inputs
+transport, with `run_in_subprocess=True` available. Inputs
 provide either a callback or `receive(timeout=..., cancel=...)`, returning an
 immutable `messages.Message` or `events.StreamDiagnostic`. Messages carry optional
 `timestamp`, `stream` and `span` fields directly. `replace()` and `transpose()`
@@ -637,8 +637,8 @@ resource on first use. Empty or declaration-only playback opens no MIDI ports.
 Initialization errors therefore occur at first use. Constructors accept
 keyword-only settings. Defaults are
 `protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
-`isolated=False` and `raw=False`; outputs default to `isolated=False`, `channel=None`, `port=None`,
-and `bpm=None`.
+`run_in_subprocess=False` and `raw=False`; outputs default to
+`run_in_subprocess=False`, `channel=None`, `port=None`, and `bpm=None`.
 Input additionally accepts `timestamps=TimestampMode.Absolute` and
 `receive_byte_limit=8_388_608`. Choose `Protocol.Ump` explicitly for UMP, and
 send an immutable `UmpPacket(words=[...])`. There is no automatic protocol
@@ -696,12 +696,15 @@ clock after opening also discards that worker.
 Input silence does not identify unplugging, rebooting, unresponsiveness or an
 idle device. A failed send can already have changed physical state.
 
-With `isolated=True`, each client has a separate Python child process owning its
-native transport. Inputs and outputs default to `isolated=False`. Input callbacks run in the parent. Native operation deadlines
+With `run_in_subprocess=True`, each client has a separate Python child process
+owning its native transport. Inputs and outputs default to
+`run_in_subprocess=False`. Input callbacks run in the parent. Native operation deadlines
 terminate a failed child; native errors, crashes and timeouts invalidate that
 client without automatically reopening it. `worker_failure` reports a known
-worker failure, not endpoint health. `isolated=False` uses the same Rust
+worker failure, not endpoint health. `run_in_subprocess=False` uses the same Rust
 transport in-process with fewer resources and no native-operation deadline.
+Live CLI commands expose `--run-in-subprocess` and `--no-run-in-subprocess`;
+their existing subprocess defaults are unchanged.
 Both modes use a dedicated native owner thread per client for creation,
 operations and teardown; Windows COM initialization stays on that thread.
 

@@ -100,6 +100,31 @@ def test_initial_client_failure_has_no_baseline(
     assert report.reason == "unavailable" and poller.closed
 
 
+@pytest.mark.parametrize(
+    "flags,expected",
+    [([], True), (["--run-in-subprocess"], True), (["--no-run-in-subprocess"], False)],
+)
+def test_ports_cli_passes_subprocess_choice_to_both_clients(
+    flags: list[str], expected: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("tyro", reason="install meedee[cli]")
+    pytest.importorskip("pydantic", reason="install meedee[cli]")
+    from meedee import cli
+
+    choices: list[object] = []
+
+    def client(**kwargs: object) -> Client:
+        choices.append(kwargs["run_in_subprocess"])
+        return Client([[]])
+
+    monkeypatch.setattr(midi, "Input", client)
+    monkeypatch.setattr(midi, "Output", client)
+    with pytest.raises(SystemExit) as result:
+        cli.main(["ports", "--protocol", "midi1", *flags])
+    assert result.value.code == 0
+    assert choices == [expected, expected]
+
+
 def test_watch_cli_is_quiet_for_unchanged_scans_and_stops_at_duration(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

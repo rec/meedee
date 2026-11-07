@@ -21,14 +21,16 @@ def run_patch(config: Patch) -> int:
             outputs: dict[str, midi.Output] = {}
             for name in config.destinations:
                 client = midi.Output(
-                    protocol=protocol, backend=backend, isolated=config.isolated
+                    protocol=protocol,
+                    backend=backend,
+                    run_in_subprocess=config.run_in_subprocess,
                 )
                 port = select_port(client.ports(), name, direction="output")
                 outputs[name] = stack.enter_context(client.connect(port))
             client_input = midi.Input(
                 protocol=protocol,
                 backend=backend,
-                isolated=config.isolated,
+                run_in_subprocess=config.run_in_subprocess,
                 event_limit=config.event_limit,
                 receive_byte_limit=config.receive_byte_limit,
                 sysex_limit=config.sysex_limit,

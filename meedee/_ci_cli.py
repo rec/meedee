@@ -67,12 +67,14 @@ def run_browse(config: CiBrowse) -> int:
         )
         with ExitStack() as stack:
             output_client = midi.Output(
-                protocol=protocol, backend=backend, isolated=config.isolated
+                protocol=protocol,
+                backend=backend,
+                run_in_subprocess=config.run_in_subprocess,
             )
             input_client = midi.Input(
                 protocol=protocol,
                 backend=backend,
-                isolated=config.isolated,
+                run_in_subprocess=config.run_in_subprocess,
                 event_limit=config.event_limit,
                 receive_byte_limit=config.byte_limit,
                 sysex_limit=config.max_sysex,

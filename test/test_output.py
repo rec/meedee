@@ -529,10 +529,10 @@ def test_playback_accepts_timing_without_source_metadata(
     assert transport.packets() == [b"\x90\x3c\x5a", b"\x80\x3c\x00"]
 
 
-@pytest.mark.parametrize("isolated", [False, True])
+@pytest.mark.parametrize("run_in_subprocess", [False, True])
 @pytest.mark.parametrize("declarations", [False, True])
 def test_empty_playback_does_not_initialize_transport(
-    monkeypatch: pytest.MonkeyPatch, isolated: bool, declarations: bool
+    monkeypatch: pytest.MonkeyPatch, run_in_subprocess: bool, declarations: bool
 ) -> None:
     from meedee import _clients, _native, archive, events
 
@@ -546,7 +546,7 @@ def test_empty_playback_does_not_initialize_transport(
         if declarations
         else []
     )
-    output = midi.Output(isolated=isolated)
+    output = midi.Output(run_in_subprocess=run_in_subprocess)
     report = output.send(iter(source))
     assert report.sent_events == 0
     assert not output.closed

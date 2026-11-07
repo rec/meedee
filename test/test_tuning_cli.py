@@ -71,7 +71,10 @@ def install(
 
     class InputClient:
         def __init__(self, **kwargs: object) -> None:
-            assert kwargs["protocol"] == midi.Protocol.Midi1 and kwargs["isolated"]
+            assert (
+                kwargs["protocol"] == midi.Protocol.Midi1
+                and kwargs["run_in_subprocess"]
+            )
 
         def ports(self) -> list[SimpleNamespace]:
             return [SimpleNamespace(name="in")]
@@ -82,7 +85,10 @@ def install(
 
     class OutputClient:
         def __init__(self, **kwargs: object) -> None:
-            assert kwargs["protocol"] == midi.Protocol.Midi1 and kwargs["isolated"]
+            assert (
+                kwargs["protocol"] == midi.Protocol.Midi1
+                and kwargs["run_in_subprocess"]
+            )
 
         def ports(self) -> list[SimpleNamespace]:
             return [SimpleNamespace(name="out")]

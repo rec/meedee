@@ -43,7 +43,7 @@ ports were connected.
 ## Default process isolation, 2026-10-08
 
 The public constructors now default to one fresh child per client with a
-five-second configurable native-operation deadline. `isolated=False` retains the
+five-second configurable native-operation deadline. `run_in_subprocess=False` retains the
 original native path. Controlled subprocess checks exercise hung initialization,
 send/close, child crash, native returned errors, fresh-client recovery, stale
 connection generations, local callbacks/error hooks, two-stage overflow counts,
@@ -103,7 +103,7 @@ The GitHub workflow was verified to contain only `release: types: [published]`.
 No push, pull-request, or manual-dispatch trigger remains.
 
 Native ALSA input and output clients now use a discard-on-failed-open policy,
-including `isolated=False`. Any native returned opening error disables the client
+including `run_in_subprocess=False`. Any native returned opening error disables the client
 before disposing it outside the state lock. Opening retains its `ConnectError`;
 subsequent operations require a fresh client. CoreMIDI/WinMM ordinary returned
 errors keep their existing in-process restoration behavior. Successful close

@@ -252,7 +252,7 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
             return connection
 
     monkeypatch.setattr(_native, "Input", Input)
-    receiver = midi.Input(isolated=False).create_virtual("test-only")
+    receiver = midi.Input(run_in_subprocess=False).create_virtual("test-only")
     path = tmp_path / "typed.meedee"
     receiver.start_recording(path)
     callback = callbacks[0]
@@ -311,7 +311,7 @@ def test_unified_input_delivers_decoded_messages_or_unchanged_packets(
             return Connection()
 
     monkeypatch.setattr(_native, "Input", Client)
-    client = midi.Input(raw=raw, isolated=False)
+    client = midi.Input(raw=raw, run_in_subprocess=False)
     with client.create_virtual(
         "fixture", observed.append if callback_mode else None
     ) as receiver:
@@ -370,7 +370,7 @@ def test_raw_receive_queue_is_bounded_and_drains_before_reporting_overflow(
             return Connection()
 
     monkeypatch.setattr(_native, "Input", Client)
-    with midi.Input(raw=True, isolated=False, event_limit=1).create_virtual(
+    with midi.Input(raw=True, run_in_subprocess=False, event_limit=1).create_virtual(
         "fixture"
     ) as receiver:
         first = packet(b"\xf8", 0, 100)
@@ -427,7 +427,7 @@ def iterable_input(
 def test_direct_input_iteration_opens_first_port_and_closes_on_generator_close(
     iterable_input: list[Callable[[events.ReceivedPacket], object]],
 ) -> None:
-    client = midi.Input(isolated=False)
+    client = midi.Input(run_in_subprocess=False)
     iterator = client.with_errors()
     assert next(iterator) == messages.NoteOn(60, 100, 1)
     iterator.close()
@@ -479,7 +479,7 @@ def test_input_channel_selection_filters_messages_but_keeps_diagnostics(
     iterable_input: list[Callable[[events.ReceivedPacket], object]],
     channels: int | list[int] | tuple[int, ...] | set[int],
 ) -> None:
-    with midi.Input(channel=channels, isolated=False) as receiver:
+    with midi.Input(channel=channels, run_in_subprocess=False) as receiver:
         iterable_input[0](packet(b"\x91\x3d\x64\x92\x3e\x64\xf8", 1, 2))
         iterable_input[0](packet(b"\x90\x3f\x64", 3, 3))
         receiver.close()
@@ -509,7 +509,7 @@ def test_input_iteration_reports_diagnostics_and_continues(
     capsys: pytest.CaptureFixture[str],
     include_errors: bool,
 ) -> None:
-    with midi.Input(isolated=False) as receiver:
+    with midi.Input(run_in_subprocess=False) as receiver:
         iterable_input[0](packet(b"\x90\x3d\x64", 2, 2))
         receiver.close()
         items = list(receiver.with_errors() if include_errors else receiver)
@@ -522,7 +522,7 @@ def test_input_iteration_drains_then_reports_terminal_overflow(
     iterable_input: list[Callable[[events.ReceivedPacket], object]],
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    with midi.Input(isolated=False, event_limit=1) as receiver:
+    with midi.Input(run_in_subprocess=False, event_limit=1) as receiver:
         iterable_input[0](packet(b"\x90\x3d\x64", 1, 2))
         assert list(receiver) == [messages.NoteOn(60, 100, 1)]
     assert "overflowed" in capsys.readouterr().err
@@ -531,19 +531,19 @@ def test_input_iteration_drains_then_reports_terminal_overflow(
 @pytest.mark.parametrize("channel", [0, 17, [1, 17]])
 def test_input_rejects_invalid_channel_selection(channel: int | list[int]) -> None:
     with pytest.raises(ValueError, match="1..16"):
-        midi.Input(channel=channel, isolated=False)
+        midi.Input(channel=channel, run_in_subprocess=False)
 
 
 def test_raw_input_rejects_channel_selection() -> None:
     with pytest.raises(ValueError, match="decoded"):
-        midi.Input(raw=True, channel=1, isolated=False)
+        midi.Input(raw=True, channel=1, run_in_subprocess=False)
 
 
 def test_channel_selection_applies_to_callbacks_and_recordings(
     iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
 ) -> None:
     observed: list[messages.Message | events.StreamDiagnostic] = []
-    client = midi.Input(channel=[1], isolated=False)
+    client = midi.Input(channel=[1], run_in_subprocess=False)
     path = tmp_path / "selected.meedee"
     with client.connect(client.ports()[0], observed.append) as receiver:
         receiver.start_recording(path)
@@ -569,7 +569,7 @@ def test_record_returns_memory_capture_and_file_round_trip(
     iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
 ) -> None:
     path = tmp_path / "rec.meedee"
-    client = midi.Input(isolated=False)
+    client = midi.Input(run_in_subprocess=False)
     records = client.record(0, output=path)
     assert [r for r in records if isinstance(r, messages.Message)] == [
         messages.NoteOn(60, 100, 1)
@@ -598,7 +598,7 @@ def test_input_is_automatically_collected_after_scope_exit(
         pass
 
     def open_input() -> weakref.ReferenceType[ObservedInput]:
-        client = ObservedInput(isolated=False)
+        client = ObservedInput(run_in_subprocess=False)
         if connected:
             client.__enter__()
         return weakref.ref(client)
@@ -614,7 +614,7 @@ def test_record_rejects_invalid_duration_before_opening(
     iterable_input: list[Callable[[events.ReceivedPacket], object]], duration: float
 ) -> None:
     with pytest.raises(ValueError, match="duration"):
-        midi.Input(isolated=False).record(duration)
+        midi.Input(run_in_subprocess=False).record(duration)
     assert not iterable_input
 
 
@@ -626,7 +626,7 @@ def test_record_uses_duration_deadline_and_retains_terminal_failure(
 
     ticks = iter([100.0, 100.0, 100.0, 110.0])
     monkeypatch.setattr(_clients, "monotonic", lambda: next(ticks, 110.0))
-    records = midi.Input(isolated=False).record(10)
+    records = midi.Input(run_in_subprocess=False).record(10)
     assert len([r for r in records if isinstance(r, messages.Message)]) == 1
 
     def failed_receive(self: midi.Input, *, timeout: float) -> None:
@@ -634,7 +634,7 @@ def test_record_uses_duration_deadline_and_retains_terminal_failure(
 
     ticks = iter([100.0, 100.0, 100.0])
     monkeypatch.setattr(midi.Input, "receive", failed_receive)
-    records = midi.Input(isolated=False).record(10)
+    records = midi.Input(run_in_subprocess=False).record(10)
     failures = [r for r in records if isinstance(r, archive.Discontinuity)]
     assert len(failures) == 1
     assert failures[0].reason == "capture overflow"

@@ -132,7 +132,8 @@ def test_worker_cap_reserves_in_progress_starts_without_blocking_admission(
 def test_defaults_select_in_process_transport_and_five_second_deadlines() -> None:
     for c in (midi.Input, midi.Output):
         parameters = inspect.signature(c).parameters
-        assert parameters["isolated"].default is False
+        assert parameters["run_in_subprocess"].default is False
+        assert "isolated" not in parameters
         assert parameters["timeout"].default == 5.0
     assert (
         inspect.signature(midi.Input).parameters["receive_byte_limit"].default
@@ -208,7 +209,7 @@ def test_in_process_mode_does_not_start_child_processes(
         patch("meedee._native.Input", LocalClient),
         patch("meedee._native.Output", LocalClient),
     ):
-        local = client(isolated=False)
+        local = client(run_in_subprocess=False)
         assert local.ports() == []
     assert not workers
 
@@ -250,10 +251,10 @@ def test_native_failure_invalidates_only_its_worker_and_requires_a_fresh_client(
         connection.send(b"\xf8")
 
 
-@pytest.mark.parametrize("isolated", [True, False])
+@pytest.mark.parametrize("run_in_subprocess", [True, False])
 @pytest.mark.parametrize("form", ["bytearray", "view", "strided_view"])
 def test_send_snapshots_mutable_and_strided_buffers(
-    isolated: bool, form: str, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, form: str, workers: list[Popen[bytes]]
 ) -> None:
     expected = b"\xf0}\x00\xff\xf7"
     buffer = bytearray(
@@ -293,7 +294,7 @@ def test_send_snapshots_mutable_and_strided_buffers(
             return LocalConnection()
 
     with patch("meedee._native.Output", LocalClient):
-        output = output_client("check_bytes", isolated=isolated)
+        output = output_client("check_bytes", run_in_subprocess=run_in_subprocess)
         connection = output.connect(output.ports()[0])
         connection.send(message)
         connection.close()
@@ -312,11 +313,14 @@ def test_native_close_timeout_consumes_parent_ownership_without_restoring_a_clie
         output.ports()
 
 
-@pytest.mark.parametrize("isolated", [True, False])
+@pytest.mark.parametrize("run_in_subprocess", [True, False])
 @pytest.mark.parametrize("direction", ["input", "output"])
 @pytest.mark.parametrize("interrupt", [True, False])
 def test_context_exit_preserves_body_and_close_failures(
-    isolated: bool, direction: str, interrupt: bool, workers: list[Popen[bytes]]
+    run_in_subprocess: bool,
+    direction: str,
+    interrupt: bool,
+    workers: list[Popen[bytes]],
 ) -> None:
 
     class LocalConnection:
@@ -352,10 +356,14 @@ def test_context_exit_preserves_body_and_close_failures(
         patch("meedee._native.Output", LocalClient),
     ):
         if direction == "input":
-            source = input_client("hang_close", isolated=isolated, timeout=0.5)
+            source = input_client(
+                "hang_close", run_in_subprocess=run_in_subprocess, timeout=0.5
+            )
             connection = source.connect(source.ports()[0], lambda packet: None)
         else:
-            output = output_client("hang_close", isolated=isolated, timeout=0.5)
+            output = output_client(
+                "hang_close", run_in_subprocess=run_in_subprocess, timeout=0.5
+            )
             connection = output.connect(output.ports()[0])
         body_error = (
             KeyboardInterrupt("body interrupted")
@@ -367,7 +375,8 @@ def test_context_exit_preserves_body_and_close_failures(
                 raise body_error
         assert caught.value.exceptions[0] is body_error
         assert isinstance(
-            caught.value.exceptions[1], TimeoutError if isolated else RuntimeError
+            caught.value.exceptions[1],
+            TimeoutError if run_in_subprocess else RuntimeError,
         )
         assert isinstance(
             caught.value, BaseExceptionGroup if interrupt else ExceptionGroup
@@ -420,10 +429,10 @@ def test_input_callback_can_receive_during_open_without_being_pickled(
         assert connection.last_message_time is not None
 
 
-@pytest.mark.parametrize("isolated", [True, False])
+@pytest.mark.parametrize("run_in_subprocess", [True, False])
 @pytest.mark.parametrize("delivered", [True, False])
 def test_last_message_time_uses_monotonic_clock_and_survives_close(
-    isolated: bool, delivered: bool, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, delivered: bool, workers: list[Popen[bytes]]
 ) -> None:
     received = Event()
 
@@ -463,7 +472,9 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
             return LocalConnection(bridge)
 
     with patch("meedee._native.Input", LocalClient):
-        source = input_client("early" if delivered else "quiet", isolated=isolated)
+        source = input_client(
+            "early" if delivered else "quiet", run_in_subprocess=run_in_subprocess
+        )
         start = monotonic()
         connection = source.connect(source.ports()[0], lambda packet: received.set())
         if delivered:
@@ -478,9 +489,9 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
         assert connection.worker_failure is None
 
 
-@pytest.mark.parametrize("isolated", [True, False])
+@pytest.mark.parametrize("run_in_subprocess", [True, False])
 def test_incompatible_callback_signatures_do_not_consume_the_client(
-    isolated: bool, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, workers: list[Popen[bytes]]
 ) -> None:
 
     def one_argument(timestamp: int, message: bytes) -> None:
@@ -500,7 +511,7 @@ def test_incompatible_callback_signatures_do_not_consume_the_client(
             return [local_port()]
 
     with patch("meedee._native.Input", LocalClient):
-        source = input_client("early", isolated=isolated)
+        source = input_client("early", run_in_subprocess=run_in_subprocess)
         for c in (one_argument, extra_argument, keyword_only):
             with pytest.raises(TypeError, match="one positional ReceivedPacket"):
                 source.connect(source.ports()[0], c)  # ty: ignore[invalid-argument-type]
@@ -509,11 +520,11 @@ def test_incompatible_callback_signatures_do_not_consume_the_client(
             assert source.ports()
 
 
-@pytest.mark.parametrize("isolated", [True, False])
+@pytest.mark.parametrize("run_in_subprocess", [True, False])
 @pytest.mark.parametrize("operation", ["connect", "create_virtual"])
 @pytest.mark.parametrize("kind", ["coroutine", "generator", "async_generator"])
 def test_deferred_callbacks_are_rejected_without_consuming_the_client(
-    isolated: bool, operation: str, kind: str, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, operation: str, kind: str, workers: list[Popen[bytes]]
 ) -> None:
 
     async def coroutine(packet: ReceivedPacket) -> None:
@@ -542,7 +553,7 @@ def test_deferred_callbacks_are_rejected_without_consuming_the_client(
             return [local_port()]
 
     with patch("meedee._native.Input", LocalClient):
-        source = input_client("early", isolated=isolated)
+        source = input_client("early", run_in_subprocess=run_in_subprocess)
         for c in (callback, partial(callback), Receiver(), partial(Receiver())):
             with pytest.raises(TypeError, match="synchronous and not a generator"):
                 if operation == "connect":
@@ -649,12 +660,12 @@ def test_initialization_timeout_reaps_the_new_worker(
     workers[0].wait(timeout=3)
 
 
-@pytest.mark.parametrize("isolated", [False, True])
+@pytest.mark.parametrize("run_in_subprocess", [False, True])
 @pytest.mark.parametrize(
     "kind", ["coroutine", "generator", "async_generator", "awaitable"]
 )
 def test_deferred_results_stop_delivery_without_execution(
-    isolated: bool, kind: str, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, kind: str, workers: list[Popen[bytes]]
 ) -> None:
     executed = Event()
     delivered = Event()
@@ -742,7 +753,7 @@ def test_deferred_results_stop_delivery_without_execution(
         warnings.catch_warnings(record=True) as warning_records,
     ):
         warnings.simplefilter("always")
-        source = input_client("twice", isolated=isolated)
+        source = input_client("twice", run_in_subprocess=run_in_subprocess)
         connection = source.connect(source.ports()[0], receive)
         assert reported.wait(3)
         assert not delivered.is_set()
@@ -876,7 +887,7 @@ def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPac
     """Discover while the child fixture's selected mode is in the environment."""
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
         client = cast(Callable[..., midi.Input[events.ReceivedPacket]], midi.Input)(
-            **({"raw": True, "isolated": True} | settings)
+            **({"raw": True, "run_in_subprocess": True} | settings)
         )
         client.ports()
         return client
@@ -886,7 +897,7 @@ def output_client(mode: str, **settings: object) -> midi.Output:
     """Discover while the child fixture's selected mode is in the environment."""
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
         client = cast(Callable[..., midi.Output], midi.Output)(
-            **({"isolated": True} | settings)
+            **({"run_in_subprocess": True} | settings)
         )
         client.ports()
         return client
@@ -928,9 +939,9 @@ def test_discovery_metadata_failure_preserves_coremidi_worker_for_explicit_retry
 ) -> None:
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": "discovery_error_once"}):
         client = (
-            midi.Input(isolated=True)
+            midi.Input(run_in_subprocess=True)
             if direction == "input"
-            else midi.Output(isolated=True)
+            else midi.Output(run_in_subprocess=True)
         )
         with pytest.raises(midi.PortInfoError, match="endpoint disappeared"):
             client.ports()
@@ -1247,7 +1258,7 @@ def test_typed_input_exposes_receive_drops_without_another_packet(
     workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("MEEDEE_TEST_MODE", "native_drop_idle")
-    source = midi.Input(isolated=True, timeout=1)
+    source = midi.Input(run_in_subprocess=True, timeout=1)
     with source.connect(source.ports()[0]) as connection:
         deadline = monotonic() + 3
         while connection.dropped_packets != 7 and monotonic() < deadline:
@@ -1265,7 +1276,7 @@ def test_typed_queue_reports_overflow_and_retains_primitive_events(
 ) -> None:
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "twice")
-    source = midi.Input(isolated=True, timeout=1, event_limit=1)
+    source = midi.Input(run_in_subprocess=True, timeout=1, event_limit=1)
     with source.connect(source.ports()[0]) as connection:
         deadline = monotonic() + 2
         while connection.failure is None and monotonic() < deadline:
@@ -1284,7 +1295,7 @@ def test_typed_receive_wakes_on_cancellation_and_close(
     from meedee.events import Cancellation
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "input")
-    source = midi.Input(isolated=True, timeout=1)
+    source = midi.Input(run_in_subprocess=True, timeout=1)
     connection = source.connect(source.ports()[0])
     cancel = Cancellation()
     errors: Queue[BaseException] = Queue()
@@ -1317,10 +1328,10 @@ def test_typed_callback_retains_the_blocking_operation_guard(
 
     def callback(value: messages.Message | events.StreamDiagnostic) -> None:
         with pytest.raises(midi.CallbackThreadError):
-            midi.Output(isolated=True, timeout=1)
+            midi.Output(run_in_subprocess=True, timeout=1)
         called.set()
 
-    source = midi.Input(isolated=True, timeout=1)
+    source = midi.Input(run_in_subprocess=True, timeout=1)
     with source.connect(source.ports()[0], callback):
         assert called.wait(2)
 
@@ -1372,9 +1383,9 @@ def test_clients_leaving_scope_are_collectible_and_workers_exit(
             os.environ, {"MEEDEE_TEST_MODE": "quiet" if input_mode else "output"}
         ):
             client = (
-                ObservedInput(isolated=True)
+                ObservedInput(run_in_subprocess=True)
                 if input_mode
-                else ObservedOutput(isolated=True)
+                else ObservedOutput(run_in_subprocess=True)
             )
         if connected:
             client.__enter__()

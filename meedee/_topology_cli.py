@@ -12,7 +12,7 @@ def run_discovery(config: Ports) -> int:
     with discovery.Poller(
         protocol=config.protocol,
         backend=config.backend,
-        isolated=config.isolated,
+        run_in_subprocess=config.run_in_subprocess,
         port_limit=config.port_limit,
         detail_limit=config.detail_limit,
         history_limit=config.history_limit if isinstance(config, WatchPorts) else 1,

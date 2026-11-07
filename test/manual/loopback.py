@@ -21,8 +21,8 @@ from meedee.events import ReceivedPacket
 @pytest.fixture(params=[True, False], autouse=True)
 def isolation(request: pytest.FixtureRequest) -> Iterator[bool]:
     with (
-        patch.object(midi, "Input", partial(Input, isolated=request.param)),
-        patch.object(midi, "Output", partial(Output, isolated=request.param)),
+        patch.object(midi, "Input", partial(Input, run_in_subprocess=request.param)),
+        patch.object(midi, "Output", partial(Output, run_in_subprocess=request.param)),
     ):
         yield request.param
 

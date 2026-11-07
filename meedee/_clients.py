@@ -31,7 +31,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         "_context",
         "_settings",
         "_initialization",
-        "_isolated",
+        "_run_in_subprocess",
         "_timeout",
         "_protocol",
         "_raw_mode",
@@ -56,12 +56,12 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
         timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
-        isolated: bool = False,
+        run_in_subprocess: bool = False,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = DEFAULT_RECEIVE_BYTE_LIMIT,
     ) -> None:
         timeout = _units.real(timeout, "second")
-        validate_settings(protocol, backend, isolated, timeout)
+        validate_settings(protocol, backend, run_in_subprocess, timeout)
         if not isinstance(timestamps, midi.TimestampMode):
             raise TypeError("timestamps must be TimestampMode")
         receive_byte_limit = _units.integer(receive_byte_limit, "byte")
@@ -112,7 +112,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             "receive_byte_limit": receive_byte_limit,
         }
         self._settings = settings
-        self._isolated = isolated
+        self._run_in_subprocess = run_in_subprocess
         self._timeout = timeout
         self._native = None
 
@@ -123,7 +123,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
                 raise midi.StateError("client is closed")
             if self._native is not None or self._context is not None:
                 return
-            if self._isolated:
+            if self._run_in_subprocess:
                 self._context = Context(self._timeout, self._byte_limit)
                 self._context.request("init", [True, wire_settings(self._settings)])
             else:
@@ -419,7 +419,7 @@ class Output:
         "_context",
         "_settings",
         "_initialization",
-        "_isolated",
+        "_run_in_subprocess",
         "_timeout",
         "_protocol",
         "_channel",
@@ -438,11 +438,11 @@ class Output:
         port: str | None = None,
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
-        isolated: bool = False,
+        run_in_subprocess: bool = False,
         timeout: float | str = 5.0,
     ) -> None:
         timeout = _units.real(timeout, "second")
-        validate_settings(protocol, backend, isolated, timeout)
+        validate_settings(protocol, backend, run_in_subprocess, timeout)
         messages.NoteOn(0, channel=channel)
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
@@ -467,7 +467,7 @@ class Output:
             "backend": backend,
         }
         self._settings = settings
-        self._isolated = isolated
+        self._run_in_subprocess = run_in_subprocess
         self._timeout = timeout
         self._native = None
 
@@ -478,7 +478,7 @@ class Output:
                 raise midi.StateError("client is closed")
             if self._native is not None or self._context is not None:
                 return
-            if self._isolated:
+            if self._run_in_subprocess:
                 self._context = Context(self._timeout)
                 self._context.request("init", [False, wire_settings(self._settings)])
             else:
@@ -1502,7 +1502,7 @@ def close_context(close: Callable[[], None], body_error: BaseException | None) -
 def validate_settings(
     protocol: midi.Protocol,
     backend: midi.Backend | None,
-    isolated: bool,
+    run_in_subprocess: bool,
     timeout: float,
 ) -> None:
     _native.check_thread()
@@ -1510,8 +1510,8 @@ def validate_settings(
         raise TypeError("protocol must be Protocol")
     if backend is not None and not isinstance(backend, midi.Backend):
         raise TypeError("backend must be Backend or None")
-    if type(isolated) is not bool:
-        raise TypeError("isolated must be a boolean")
+    if type(run_in_subprocess) is not bool:
+        raise TypeError("run_in_subprocess must be a boolean")
     if not isinstance(timeout, (int, float)) or isinstance(timeout, bool):
         raise TypeError("timeout must be a number")
     if not math.isfinite(timeout) or timeout <= 0:

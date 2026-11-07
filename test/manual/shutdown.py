@@ -20,10 +20,10 @@ def receive(packet: ReceivedPacket) -> None:
 
 def open_connections() -> tuple[midi.Input[ReceivedPacket], midi.Output]:
     token = f"meedee-shutdown-{uuid4().hex}"
-    isolated = environ.get("MEEDEE_TEST_ISOLATED", "1") == "1"
-    source = midi.Input(raw=True, isolated=isolated)
+    run_in_subprocess = environ.get("MEEDEE_TEST_ISOLATED", "1") == "1"
+    source = midi.Input(raw=True, run_in_subprocess=run_in_subprocess)
     incoming = source.create_virtual(token, receive)
-    target = midi.Output(isolated=isolated)
+    target = midi.Output(run_in_subprocess=run_in_subprocess)
     (port,) = (p for p in target.ports() if token in p.name)
     outgoing = target.connect(port)
     outgoing(b"\x90\x3c\x7f")

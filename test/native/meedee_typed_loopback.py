@@ -8,10 +8,12 @@ from uuid import uuid4
 from meedee import archive, events, messages, midi
 
 
-def exercise(isolated: bool, destination: Path) -> None:
+def exercise(run_in_subprocess: bool, destination: Path) -> None:
     name = f"meedee-typed-test-{uuid4().hex}"
-    with midi.Input(isolated=isolated).create_virtual(name) as receiver:
-        sender = midi.Output(isolated=isolated)
+    with midi.Input(run_in_subprocess=run_in_subprocess).create_virtual(
+        name
+    ) as receiver:
+        sender = midi.Output(run_in_subprocess=run_in_subprocess)
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
         with sender.connect(matches[0]) as output:
@@ -63,13 +65,19 @@ def exercise(isolated: bool, destination: Path) -> None:
             cancel.cancel()
             waiter.join(2)
             assert not waiter.is_alive() and len(failures) == 1
-    print(f"typed capture/replay metrics and cancellation passed: isolated={isolated}")
+    print(
+        "typed capture/replay metrics and cancellation passed: "
+        f"run_in_subprocess={run_in_subprocess}"
+    )
 
 
 def main() -> None:
     with TemporaryDirectory(prefix="meedee-typed-loopback-") as directory:
-        for isolated in (True, False):
-            exercise(isolated, Path(directory) / f"capture-{isolated}.meedee")
+        for run_in_subprocess in (True, False):
+            exercise(
+                run_in_subprocess,
+                Path(directory) / f"capture-{run_in_subprocess}.meedee",
+            )
 
 
 if __name__ == "__main__":

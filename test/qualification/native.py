@@ -11,12 +11,16 @@ from measure import emit
 from meedee import archive, messages, midi
 
 
-@pytest.mark.parametrize("isolated", [False, True], ids=["in_process", "isolated"])
-def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "run_in_subprocess", [False, True], ids=["in_process", "isolated"]
+)
+def test_roundtrip(run_in_subprocess: bool, tmp_path: Path) -> None:
     name = f"meedee-qualification-{uuid4().hex}"
     start = perf_counter_ns()
-    with midi.Input(isolated=isolated).create_virtual(name) as receiver:
-        sender = midi.Output(isolated=isolated)
+    with midi.Input(run_in_subprocess=run_in_subprocess).create_virtual(
+        name
+    ) as receiver:
+        sender = midi.Output(run_in_subprocess=run_in_subprocess)
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
         with sender.connect(matches[0]) as output:
@@ -26,7 +30,7 @@ def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
             sleep(0.5)
             emit(
                 "native_idle",
-                isolated=isolated,
+                run_in_subprocess=run_in_subprocess,
                 open_wall_ns=opened_ns,
                 wall_ns=perf_counter_ns() - idle,
                 parent_cpu_ns=process_time_ns() - cpu,
@@ -52,7 +56,7 @@ def test_roundtrip(isolated: bool, tmp_path: Path) -> None:
                 reader.close()
             emit(
                 "native_roundtrip",
-                isolated=isolated,
+                run_in_subprocess=run_in_subprocess,
                 count=256,
                 median_ns=median(samples),
                 p95_ns=quantiles(samples, n=100)[94],

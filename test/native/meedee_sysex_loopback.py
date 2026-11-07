@@ -15,8 +15,8 @@ from meedee import (
 )
 
 
-def connect(name: str, isolated: bool) -> midi.Output:
-    client = midi.Output(isolated=isolated)
+def connect(name: str, run_in_subprocess: bool) -> midi.Output:
+    client = midi.Output(run_in_subprocess=run_in_subprocess)
     matches = [p for p in client.ports() if p.name == name]
     assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
     return client.connect(matches[0])
@@ -38,14 +38,18 @@ def respond(
     assert receiver.dropped_packets == 0 and receiver.failure is None
 
 
-def exercise(isolated: bool, directory: Path) -> None:
+def exercise(run_in_subprocess: bool, directory: Path) -> None:
     suffix = uuid4().hex
     names = [f"meedee-syx-{suffix}-{n}" for n in (1, 2)]
     with (
-        midi.Input(isolated=isolated).create_virtual(names[0]) as receiver,
-        midi.Input(isolated=isolated).create_virtual(names[1]) as peer,
-        connect(names[1], isolated) as output,
-        connect(names[0], isolated) as peer_output,
+        midi.Input(run_in_subprocess=run_in_subprocess).create_virtual(
+            names[0]
+        ) as receiver,
+        midi.Input(run_in_subprocess=run_in_subprocess).create_virtual(
+            names[1]
+        ) as peer,
+        connect(names[1], run_in_subprocess) as output,
+        connect(names[0], run_in_subprocess) as peer_output,
         ThreadPoolExecutor(max_workers=1) as worker,
     ):
         messages_to_capture = [
@@ -62,7 +66,7 @@ def exercise(isolated: bool, directory: Path) -> None:
         report = transfer.capture(capture, receiver)
         assert report.status == "completed", report.reason
         assert delivery.result(timeout=4).status == "completed"
-        capture_path = directory / f"capture-{isolated}.syx"
+        capture_path = directory / f"capture-{run_in_subprocess}.syx"
         capture.write(capture_path)
         expected = b"".join(codecs.encode(m) for m in messages_to_capture)
         assert capture_path.read_bytes() == expected
@@ -116,7 +120,7 @@ def exercise(isolated: bool, directory: Path) -> None:
                 if index == 0
                 else tuning.ChecksumStatus.Matches
             )
-            path = directory / f"query-{isolated}-{index}.syx"
+            path = directory / f"query-{run_in_subprocess}-{index}.syx"
             query.write(path)
             assert path.read_bytes() == wire
 
@@ -145,15 +149,16 @@ def exercise(isolated: bool, directory: Path) -> None:
         assert receiver.failure is peer.failure is None
     assert receiver.closed and peer.closed and output.closed and peer_output.closed
     print(
-        f"native SysEx capture and three MTS query formats passed: isolated={isolated}",
+        "native SysEx capture and three MTS query formats passed: "
+        f"run_in_subprocess={run_in_subprocess}",
         flush=True,
     )
 
 
 def main() -> None:
     with TemporaryDirectory(prefix="meedee-sysex-loopback-") as directory:
-        for isolated in (True, False):
-            exercise(isolated, Path(directory))
+        for run_in_subprocess in (True, False):
+            exercise(run_in_subprocess, Path(directory))
 
 
 if __name__ == "__main__":

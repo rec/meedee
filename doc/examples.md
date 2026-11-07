@@ -161,7 +161,7 @@ successful capture, refusing overwrite. Adjust the count for your instrument.
 ```python
 import meedee as md
 
-client = md.Input(isolated=False)
+client = md.Input(run_in_subprocess=False)
 with client.connect(client.ports()[0]) as receiver:
     capture = md.transfer.Capture(stream=receiver.stream, expected_messages=1, timeout=30)
     report = md.transfer.capture(capture, receiver)

@@ -74,28 +74,30 @@ def test_client_rejects_positional_arguments_before_native_initialization(
 
 
 @pytest.mark.parametrize("client_type", [midi.Input, midi.Output])
-@pytest.mark.parametrize("isolated", [False, True])
+@pytest.mark.parametrize("run_in_subprocess", [False, True])
 def test_client_initialization_is_deferred_until_discovery(
     monkeypatch: pytest.MonkeyPatch,
     client_type: type[midi.Input] | type[midi.Output],
-    isolated: bool,
+    run_in_subprocess: bool,
 ) -> None:
     def fail_initialization(*args: object, **kwargs: object) -> None:
         raise midi.InitError("initialization attempted")
 
     from meedee import _clients, _native
 
-    target = _clients if isolated else _native
+    target = _clients if run_in_subprocess else _native
     monkeypatch.setattr(
-        target, "Context" if isolated else client_type.__name__, fail_initialization
+        target,
+        "Context" if run_in_subprocess else client_type.__name__,
+        fail_initialization,
     )
-    unopened = client_type(isolated=isolated)
+    unopened = client_type(run_in_subprocess=run_in_subprocess)
     assert unopened.worker_failure is None
     unopened.close()
     assert unopened.closed
     with pytest.raises(midi.StateError):
         unopened.ports()
-    client = client_type(isolated=isolated)
+    client = client_type(run_in_subprocess=run_in_subprocess)
     with pytest.raises(midi.InitError, match="initialization attempted"):
         client.ports()
 

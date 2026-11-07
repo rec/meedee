@@ -16,7 +16,7 @@ class Poller:
         *,
         protocol: Literal["midi1", "ump"],
         backend: str | None = None,
-        isolated: bool = True,
+        run_in_subprocess: bool = True,
         port_limit: int = 256,
         detail_limit: int = 128,
         history_limit: int = 128,
@@ -25,14 +25,14 @@ class Poller:
             raise ValueError("protocol must be midi1 or ump")
         if backend is not None and backend not in _BACKENDS:
             raise ValueError("unknown discovery backend")
-        if type(isolated) is not bool:
-            raise TypeError("isolated must be a boolean")
+        if type(run_in_subprocess) is not bool:
+            raise TypeError("run_in_subprocess must be a boolean")
         self._state = _core.DiscoveryPollState(
             protocol, port_limit, detail_limit, history_limit
         )
         self._protocol = protocol
         self._backend = backend
-        self._isolated = isolated
+        self._run_in_subprocess = run_in_subprocess
         self._input: midi.Input | None = None
         self._output: midi.Output | None = None
 
@@ -76,12 +76,16 @@ class Poller:
         if direction == "input":
             if self._input is None:
                 self._input = midi.Input(
-                    protocol=protocol, backend=backend, isolated=self._isolated
+                    protocol=protocol,
+                    backend=backend,
+                    run_in_subprocess=self._run_in_subprocess,
                 )
             return self._input.ports()
         if self._output is None:
             self._output = midi.Output(
-                protocol=protocol, backend=backend, isolated=self._isolated
+                protocol=protocol,
+                backend=backend,
+                run_in_subprocess=self._run_in_subprocess,
             )
         return self._output.ports()
 
