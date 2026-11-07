@@ -73,6 +73,8 @@ class Monitor(BaseModel, frozen=True):
     ) = None
     output: Literal["text", "json"] = "text"
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
     metrics: bool = False
     duration: (
         Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
@@ -160,6 +162,8 @@ class Patch(RouteOptions, frozen=True):
         | None
     ) = None
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
     duration: (
         Annotated[float, units.unit_validator("second"), tyro.conf.arg(constructor=str)]
         | None
@@ -190,6 +194,8 @@ class Ports(BaseModel, frozen=True):
         | None
     ) = None
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
     port_limit: int = Field(default=256, gt=0)
     detail_limit: int = Field(default=128, gt=0)
     output: Literal["text", "json"] = "text"
@@ -235,6 +241,8 @@ class TransferSend(TransferPreview, frozen=True):
     port: str = Field(min_length=1)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
 
 
 class SysexReceive(BaseModel, frozen=True):
@@ -257,6 +265,8 @@ class SysexReceive(BaseModel, frozen=True):
     ] = Field(default=8_388_608, gt=0)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
     output: Literal["text", "json"] = "text"
 
     @model_validator(mode="after")
@@ -293,6 +303,8 @@ class TuningQuery(TuningPreview, frozen=True):
     output_port: str = Field(min_length=1)
     backend: Literal["CoreMidi", "AlsaSeq", "AlsaRaw", "WinMm"] | None = None
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
     receive_byte_limit: Annotated[
         int, units.unit_validator("byte"), tyro.conf.arg(constructor=str)
     ] = Field(default=8_388_608, gt=0)
@@ -358,6 +370,8 @@ class CiBrowse(BaseModel, frozen=True):
         | None
     ) = None
     run_in_subprocess: bool = True
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: Path | None = None
     discovery_timeout: Annotated[
         float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
     ] = Field(default=3.0, ge=3.0, le=18_446_744_073.709)

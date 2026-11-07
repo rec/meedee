@@ -106,6 +106,8 @@ def run_monitor(config: Monitor) -> int:
             protocol=protocol,
             backend=backend,
             run_in_subprocess=config.run_in_subprocess,
+            subprocess_worker=config.subprocess_worker,
+            subprocess_executable=config.subprocess_executable,
             receive_byte_limit=config.receive_byte_limit,
             event_limit=config.event_limit,
             sysex_limit=config.sysex_limit,

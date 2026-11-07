@@ -4,6 +4,7 @@ pub use crate::input::{Input, InputErrors, Recording, RecordingOptions};
 #[doc(hidden)]
 pub use crate::output::{select_port_index, OutputState};
 pub use crate::output::{Output, OutputSource, OutputValue, PlaybackOptions};
+pub use crate::transport::subprocess::SubprocessOptions;
 pub use crate::transport::{compiled_backends, Backend, Port, Protocol, TimestampMode};
 
 /// A high-level operation failure, retaining the native category and cause.
@@ -109,7 +110,7 @@ mod tests {
         let error = Error::Send(crate::transport::Error::CompoundSend {
             completed_messages: Some(1),
             total_messages: 3,
-            cause: Box::new(crate::transport::Error::Resource("queue full")),
+            cause: Box::new(crate::transport::Error::Resource("queue full".into())),
         });
         let restored = Error::from(std::io::Error::from(error));
         assert!(matches!(

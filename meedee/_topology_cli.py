@@ -13,6 +13,8 @@ def run_discovery(config: Ports) -> int:
         protocol=config.protocol,
         backend=config.backend,
         run_in_subprocess=config.run_in_subprocess,
+        subprocess_worker=config.subprocess_worker,
+        subprocess_executable=config.subprocess_executable,
         port_limit=config.port_limit,
         detail_limit=config.detail_limit,
         history_limit=config.history_limit if isinstance(config, WatchPorts) else 1,

@@ -69,6 +69,8 @@ def run_transfer(config: TransferPreview) -> int:
             protocol=midi.Protocol.Midi1,
             backend=backend,
             run_in_subprocess=config.run_in_subprocess,
+            subprocess_worker=config.subprocess_worker,
+            subprocess_executable=config.subprocess_executable,
         )
         port = select_port(client.ports(), config.port, direction="output")
         with client.connect(port) as output:
@@ -130,6 +132,8 @@ def run_receive(config: SysexReceive) -> int:
             protocol=midi.Protocol.Midi1,
             backend=backend,
             run_in_subprocess=config.run_in_subprocess,
+            subprocess_worker=config.subprocess_worker,
+            subprocess_executable=config.subprocess_executable,
             receive_byte_limit=config.receive_byte_limit,
             sysex_limit=config.payload_limit,
         )

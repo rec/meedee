@@ -56,6 +56,7 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
         Error::CallbackThread => CallbackThreadError::new_err(error.to_string()),
         Error::Resource(message) => ResourceError::new_err(message),
         Error::Worker(message) => WorkerError::new_err(message),
+        Error::Timeout(message) => WorkerTimeoutError::new_err(message),
         Error::CompoundSend {
             completed_messages,
             total_messages,
@@ -78,7 +79,7 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
             "init" => InitError::new_err(message),
             "ports" => PortInfoError::new_err(message),
             "open" => ConnectError::new_err(message),
-            "send" => SendError::new_err(message),
+            "send" | "send_command" => SendError::new_err(message),
             _ => MidiError::new_err(message),
         },
     }

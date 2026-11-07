@@ -238,7 +238,7 @@ fn worker_and_capacity_failures_keep_distinct_python_categories() {
         );
         assert!(worker.is_instance_of::<crate::errors::WorkerError>(py));
         let resource = crate::errors::transport_error(
-            meedee::transport::Error::Resource("client capacity exhausted"),
+            meedee::transport::Error::Resource("client capacity exhausted".into()),
             "init",
         );
         assert!(resource.is_instance_of::<crate::errors::ResourceError>(py));

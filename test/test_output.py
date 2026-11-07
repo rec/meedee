@@ -534,13 +534,12 @@ def test_playback_accepts_timing_without_source_metadata(
 def test_empty_playback_does_not_initialize_transport(
     monkeypatch: pytest.MonkeyPatch, run_in_subprocess: bool, declarations: bool
 ) -> None:
-    from meedee import _clients, _native, archive, events
+    from meedee import _native, archive, events
 
     def fail_initialization(*args: object, **kwargs: object) -> None:
         raise AssertionError("empty playback opened a MIDI client")
 
     monkeypatch.setattr(_native, "Output", fail_initialization)
-    monkeypatch.setattr(_clients, "Context", fail_initialization)
     source = (
         [events.Clock(identity="empty"), archive.Stream(id="s", label="")]
         if declarations

@@ -38,36 +38,67 @@ impl OutputState {
 pub struct Output {
     state: Arc<Client<transport::Output>>,
     identity: String,
+    diagnostics: transport::WorkerDiagnostics,
     snapshot: AtomicU64,
     protocol: Protocol,
 }
 #[pymethods]
 impl Output {
     #[new]
-    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None))]
+    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None, worker_program=None, worker_args=None, worker_timeout=5.0))]
     fn new(
         py: Python<'_>,
         identity: String,
         protocol: Protocol,
         backend: Option<Backend>,
+        worker_program: Option<std::path::PathBuf>,
+        worker_args: Option<Vec<std::ffi::OsString>>,
+        worker_timeout: f64,
     ) -> PyResult<Self> {
         check_blocking_thread()?;
         lifecycle::initialize(py)?;
         let native = py
             .detach(|| {
                 native_call("create output", || {
-                    transport::Output::new(transport::OutputOptions {
+                    let options = transport::OutputOptions {
                         protocol: protocol.native(),
                         backend: backend.map(Backend::native),
-                    })
+                    };
+                    if let Some(program) = worker_program {
+                        transport::Output::new_subprocess(
+                            options,
+                            transport::subprocess::SubprocessOptions {
+                                program,
+                                args: worker_args.unwrap_or_default(),
+                                timeout: std::time::Duration::try_from_secs_f64(worker_timeout)
+                                    .map_err(|_| {
+                                        transport::Error::Invalid(
+                                            "worker timeout must be finite and nonnegative".into(),
+                                        )
+                                    })?,
+                            },
+                        )
+                    } else {
+                        transport::Output::new(options)
+                    }
                 })
             })?
             .map_err(|e| transport_error(e, "init"))?;
+        let diagnostics = native.worker_diagnostics();
         Ok(Self {
+            diagnostics,
             state: Arc::new(Client::new(native)),
             identity,
             snapshot: AtomicU64::new(0),
             protocol,
+        })
+    }
+    #[getter]
+    fn worker_failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.diagnostics.failure().map(|e| {
+            transport_error(e, &self.diagnostics.operation())
+                .into_value(py)
+                .into_any()
         })
     }
     fn ports(&self, py: Python<'_>) -> PyResult<Vec<Port>> {
@@ -90,7 +121,7 @@ impl Output {
         OutputConnection::open(py, slf, move |native| match port {
             Some(port) => native.connect(&port),
             None => Err(transport::Error::Invalid(
-                "port is not a native snapshot from this client",
+                "port is not a native snapshot from this client".into(),
             )),
         })
     }
@@ -110,6 +141,15 @@ pub struct OutputConnection {
 }
 #[pymethods]
 impl OutputConnection {
+    #[getter]
+    fn worker_failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.client.get().diagnostics.failure().map(|e| {
+            transport_error(e, &self.client.get().diagnostics.operation())
+                .into_value(py)
+                .into_any()
+        })
+    }
+
     fn send_command(&self, py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<()> {
         check_blocking_thread()?;
         let command = crate::messages::extract_command(command)?;
@@ -153,7 +193,7 @@ impl OutputConnection {
     }
     #[getter]
     fn closed(&self) -> bool {
-        self.resource.native.closed()
+        self.resource.native.closed() || self.client.get().diagnostics.failure().is_some()
     }
     fn __enter__(slf: Py<Self>) -> PyResult<Py<Self>> {
         slf.get().resource.native.check_failed()?;

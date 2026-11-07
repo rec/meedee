@@ -19,7 +19,7 @@ impl ManualClock {
         self.now_ns = self
             .now_ns
             .checked_add(nanoseconds)
-            .ok_or(Error::Invalid("manual clock overflow"))?;
+            .ok_or(Error::Invalid("manual clock overflow".into()))?;
         Ok(())
     }
 }
@@ -75,7 +75,7 @@ impl Input {
             || sysex_limit == 0
         {
             return Err(Error::Invalid(
-                "testing input requires a nonempty stream and positive limits",
+                "testing input requires a nonempty stream and positive limits".into(),
             ));
         }
         let decoder = Decoder::new(stream.clone(), protocol, sysex_limit)
@@ -114,20 +114,20 @@ impl Input {
             (self.protocol, &packet),
             (Protocol::Midi1, Packet::Bytes(_)) | (Protocol::Ump, Packet::Ump(_))
         ) {
-            return Err(Error::Invalid("injected packet protocol mismatch"));
+            return Err(Error::Invalid("injected packet protocol mismatch".into()));
         }
         if clock.numerator() != 1
             || clock.denominator() != 1_000_000_000
             || clock.mode() == Some(false) && timestamp_ns.is_some()
         {
             return Err(Error::Invalid(
-                "injection requires a nanosecond clock and consistent timestamp mode",
+                "injection requires a nanosecond clock and consistent timestamp mode".into(),
             ));
         }
         let next = self
             .sequence
             .checked_add(1)
-            .ok_or(Error::Invalid("packet sequence exhausted"))?;
+            .ok_or(Error::Invalid("packet sequence exhausted".into()))?;
         let sequence = self.sequence;
         self.sequence = next;
         let size = packet_size(&packet);
@@ -149,16 +149,16 @@ impl Input {
     pub fn lose(&mut self, count: u64) -> Result<()> {
         self.available()?;
         if count == 0 {
-            return Err(Error::Invalid("loss count must be positive"));
+            return Err(Error::Invalid("loss count must be positive".into()));
         }
         let next = self
             .sequence
             .checked_add(count)
-            .ok_or(Error::Invalid("packet sequence exhausted"))?;
+            .ok_or(Error::Invalid("packet sequence exhausted".into()))?;
         self.dropped = self
             .dropped
             .checked_add(count)
-            .ok_or(Error::Invalid("loss counter exhausted"))?;
+            .ok_or(Error::Invalid("loss counter exhausted".into()))?;
         self.sequence = next;
         Ok(())
     }
@@ -279,7 +279,9 @@ pub struct Output {
 impl Output {
     pub fn new(protocol: Protocol, packet_limit: usize, byte_limit: usize) -> Result<Self> {
         if packet_limit == 0 || byte_limit == 0 {
-            return Err(Error::Invalid("testing output limits must be positive"));
+            return Err(Error::Invalid(
+                "testing output limits must be positive".into(),
+            ));
         }
         Ok(Self {
             protocol,
@@ -305,11 +307,11 @@ impl Output {
         self.attempts = self
             .attempts
             .checked_add(1)
-            .ok_or(Error::Invalid("send attempt counter exhausted"))?;
+            .ok_or(Error::Invalid("send attempt counter exhausted".into()))?;
         let size = packet_size(&packet);
         if self.packets.len() == self.packet_limit || size > self.byte_limit - self.bytes {
             return Err(Error::Resource(
-                "simulated output recording capacity exhausted; packet not accepted",
+                "simulated output recording capacity exhausted; packet not accepted".into(),
             ));
         }
         let fault = self.fault.take();
@@ -330,7 +332,7 @@ impl Output {
         }
         if self.failure.is_some() || self.fault.is_some() {
             return Err(Error::Invalid(
-                "output already failed or has an armed fault",
+                "output already failed or has an armed fault".into(),
             ));
         }
         self.fault = Some((accepted, reason.chars().take(1024).collect()));

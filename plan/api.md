@@ -2049,3 +2049,21 @@ Neither abandonment nor object destruction certifies completion. Errors may leav
 partial output, and never overwrite an existing destination. Reader archive
 recovery/preserve_unknown options are rejected for MIDI files. Archive completion
 and problem information remain readable after Python close.
+
+
+## Shared Rust subprocess transport
+
+Process isolation is no longer Python-only. Rust midi::Input and midi::Output use
+with_run_in_subprocess(bool), defaulting to false, and with_subprocess_options
+for a SubprocessOptions { program, args, timeout } value. Defaults select
+meedee-worker on PATH and a five-second Duration. Low-level transport clients
+expose new_subprocess for explicit transport ownership. Worker diagnostics retain
+terminal errors independently of the child and native handles.
+
+Python Input/Output retain run_in_subprocess=False and timeout=5.0. They add
+subprocess_worker="python"|"rust" and optional subprocess_executable. Python's
+worker module is a bootstrap into the Rust service; the Rust choice starts the
+standalone executable. Both use the same Rust IPC and failure/queue/deadline code.
+CLI and discovery clients forward the same choices. The worker never imports the
+calling application. Rust library consumers and the standalone binary need no
+Python interpreter. See isolation.md for the complete shared ownership contract.

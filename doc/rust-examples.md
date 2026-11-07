@@ -417,7 +417,7 @@ println!("{:?}", poller.poll()?);
 poller.close();
 ```
 
-Python additionally provides process isolation, CLI commands, unit strings and
+Python additionally provides CLI commands, unit strings and
 uFor integration. Rust uses typed durations, builders, enums and `Result` values;
 its `transport` and `file_io` modules expose lower-level native and streaming
 primitives. Corresponding workflows otherwise use the same public module names.
@@ -919,3 +919,44 @@ after execution begins; it does not wrap the exception in PlaybackError.
 with_playback configures origin, clock mappings, cancellation, rounding and metrics
 for send. Cancellation returns a report and leaves the output open; empty sources
 open no ports. A cancelled note may remain active until release or normal cleanup.
+
+
+## Run MIDI in a subprocess
+
+Install `meedee-worker` on PATH, for example with
+`cargo install --path crates/meedee --bin meedee-worker` from this checkout.
+Rust applications use the worker without Python:
+
+```rust
+use meedee::{Note, Output};
+use std::time::Duration;
+
+let mut out = Output::new().with_run_in_subprocess(true)?;
+out.send(Note::new(Duration::from_millis(500), 60)?)?;
+out.close()?;
+```
+
+To select another executable, arguments or native-operation deadline, configure
+`SubprocessOptions` before discovery or connection:
+
+```rust
+use meedee::{Output, SubprocessOptions};
+use std::time::Duration;
+
+let mut out = Output::new()
+    .with_run_in_subprocess(true)?
+    .with_subprocess_options(SubprocessOptions {
+        timeout: Duration::from_secs(2),
+        ..SubprocessOptions::default()
+    })?;
+println!("{:?}", out.ports()?);
+out.close()?;
+```
+
+`Input` supports the same builders, including raw input, callbacks and recording.
+Worker startup remains lazy. Each client owns one child; discovery snapshots are
+validated against their originating client and generation, without rediscovery on
+connect. Callbacks stay in the parent. Native-operation timeouts, child exits and
+terminal errors invalidate the worker; operations are never retried automatically.
+The default deadline is five seconds. Parent callbacks must return on their own.
+Python's interpreter bootstrap and direct Rust launcher use this same engine.

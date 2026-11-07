@@ -33,6 +33,8 @@ use std::time::Duration;
 /// ```
 pub struct Output {
     options: transport::OutputOptions,
+    run_in_subprocess: bool,
+    subprocess_options: transport::subprocess::SubprocessOptions,
     port: Option<String>,
     channel: Option<u8>,
     bpm: Option<Rational>,
@@ -163,6 +165,8 @@ impl Output {
     pub fn new() -> Self {
         Self {
             options: transport::OutputOptions::default(),
+            run_in_subprocess: false,
+            subprocess_options: Default::default(),
             port: None,
             channel: None,
             bpm: None,
@@ -204,6 +208,30 @@ impl Output {
             return Err(invalid("port pattern must not be empty").into());
         }
         self.port = Some(pattern);
+        Ok(self)
+    }
+    pub fn with_run_in_subprocess(mut self, enabled: bool) -> crate::midi::Result<Self> {
+        if self.client.is_some() || self.connection.is_some() || self.closed {
+            return Err(invalid("configure subprocess before discovery or connection").into());
+        }
+        self.run_in_subprocess = enabled;
+        Ok(self)
+    }
+    pub fn with_subprocess_options(
+        mut self,
+        options: transport::subprocess::SubprocessOptions,
+    ) -> crate::midi::Result<Self> {
+        if self.client.is_some() || self.connection.is_some() || self.closed {
+            return Err(invalid("configure subprocess before discovery or connection").into());
+        }
+        if options.timeout.is_zero()
+            || std::time::Instant::now()
+                .checked_add(options.timeout)
+                .is_none()
+        {
+            return Err(invalid("worker timeout must be positive and representable").into());
+        }
+        self.subprocess_options = options;
         Ok(self)
     }
     /// Select advanced backend/protocol options before discovery or connection.
@@ -396,6 +424,11 @@ impl Output {
     }
     pub fn closed(&self) -> bool {
         self.closed
+            || self
+                .client
+                .as_ref()
+                .is_some_and(|c| c.worker_failure().is_some())
+            || matches!(&self.connection, Some(Connection::Native(c)) if c.worker_failure().is_some())
     }
     /// Cleanup covers held note counts, pitch bend, CC1/64/66/67 and channel/poly
     /// pressure changed by confirmed sends. Other controller/program state is
@@ -434,8 +467,12 @@ impl Output {
         }
         if self.client.is_none() {
             self.client = Some(
-                transport::Output::new(self.options)
-                    .map_err(|e| io::Error::from(crate::midi::Error::Init(e)))?,
+                if self.run_in_subprocess {
+                    transport::Output::new_subprocess(self.options, self.subprocess_options.clone())
+                } else {
+                    transport::Output::new(self.options)
+                }
+                .map_err(|e| io::Error::from(crate::midi::Error::Init(e)))?,
             );
         }
         Ok(self.client.as_ref().expect("initialized output client"))
@@ -1239,7 +1276,9 @@ mod tests {
     fn empty_replay_and_invalid_first_record_do_not_open_ports() {
         let mut output = Output::new();
         assert_eq!(output.send([] as [OutputValue; 0]).unwrap().sent_events, 0);
-        assert!(output.send([Err(invalid("bad capture"))]).is_err());
+        assert!(output
+            .send([Err::<crate::archive::Record, _>(invalid("bad capture"))])
+            .is_err());
         assert!(output.client.is_none());
         assert!(output.connection.is_none());
     }

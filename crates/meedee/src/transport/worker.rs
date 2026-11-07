@@ -17,14 +17,29 @@ impl<T: 'static> Worker<T> {
         make: impl FnOnce() -> T + Send + 'static,
         initialize: impl FnOnce(&mut T) -> Result<()> + Send + 'static,
     ) -> Result<Self> {
+        Self::spawn_counted(make, initialize, true)
+    }
+    pub fn spawn_subprocess(
+        make: impl FnOnce() -> T + Send + 'static,
+        initialize: impl FnOnce(&mut T) -> Result<()> + Send + 'static,
+    ) -> Result<Self> {
+        Self::spawn_counted(make, initialize, false)
+    }
+    fn spawn_counted(
+        make: impl FnOnce() -> T + Send + 'static,
+        initialize: impl FnOnce(&mut T) -> Result<()> + Send + 'static,
+        counted: bool,
+    ) -> Result<Self> {
         if IN_CALLBACK.get() {
             return Err(Error::CallbackThread);
         }
-        if CLIENTS.fetch_add(1, Ordering::AcqRel) >= CLIENT_LIMIT {
+        if counted && CLIENTS.fetch_add(1, Ordering::AcqRel) >= CLIENT_LIMIT {
             CLIENTS.fetch_sub(1, Ordering::AcqRel);
-            return Err(Error::Resource("native client capacity exhausted (32)"));
+            return Err(Error::Resource(
+                "native client capacity exhausted (32)".into(),
+            ));
         }
-        let permit = Permit;
+        let permit = Permit(counted);
         let (sender, receiver) = mpsc::sync_channel::<Command<T>>(1);
         let (ready, startup) = mpsc::sync_channel(1);
         let thread = thread::Builder::new()
@@ -92,11 +107,13 @@ impl Drop for CallbackScope {
     }
 }
 
-struct Permit;
+struct Permit(bool);
 
 impl Drop for Permit {
     fn drop(&mut self) {
-        CLIENTS.fetch_sub(1, Ordering::AcqRel);
+        if self.0 {
+            CLIENTS.fetch_sub(1, Ordering::AcqRel);
+        }
     }
 }
 
@@ -166,11 +183,11 @@ mod tests {
                 owner: thread::current().id(),
                 destroyed,
             },
-            |_| Err(Error::Capability("test initialization failed")),
+            |_| Err(Error::Capability("test initialization failed".into())),
         );
         assert!(matches!(
             result,
-            Err(Error::Capability("test initialization failed"))
+            Err(Error::Capability(message)) if message == "test initialization failed"
         ));
         assert_ne!(
             dropped.recv_timeout(Duration::from_secs(2)).unwrap(),

@@ -248,6 +248,19 @@ impl<T: Send + 'static> Input<T> {
         self.core = Arc::new(Mutex::new(core));
         Ok(self)
     }
+    pub fn with_run_in_subprocess(mut self, enabled: bool) -> midi::Result<Self> {
+        let core = self.take_core()?.with_run_in_subprocess(enabled)?;
+        self.core = Arc::new(Mutex::new(core));
+        Ok(self)
+    }
+    pub fn with_subprocess_options(
+        mut self,
+        options: transport::subprocess::SubprocessOptions,
+    ) -> midi::Result<Self> {
+        let core = self.take_core()?.with_subprocess_options(options)?;
+        self.core = Arc::new(Mutex::new(core));
+        Ok(self)
+    }
     pub fn with_transport(mut self, options: transport::InputOptions) -> midi::Result<Self> {
         let core = self.take_core()?.with_transport(options)?;
         self.core = Arc::new(Mutex::new(core));
@@ -638,7 +651,7 @@ impl<T: Send + 'static> Input<T> {
                             {
                                 state.closed = true;
                                 state.failure = Some(Arc::new(midi::Error::Transport(transport::Error::Resource(
-                                    "input receive queue overflowed; recording has independent admission"))));
+                                    "input receive queue overflowed; recording has independent admission".into()))));
                             } else {
                                 state.bytes += size;
                                 state.pending.push_back((item, size));

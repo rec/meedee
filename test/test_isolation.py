@@ -1,10 +1,11 @@
-"""Production ownership and IPC exercised against controlled child faults."""
+"""Shared Rust IPC exercised with a device-free worker and parent callbacks."""
 
 from __future__ import annotations
 
 import gc
 import inspect
 import os
+import subprocess
 import sys
 import warnings
 import weakref
@@ -12,121 +13,58 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from functools import partial
 from pathlib import Path
 from queue import Full, Queue
-from subprocess import Popen
 from threading import Event, Thread
 from time import monotonic, sleep
-from typing import Protocol, Self, cast
+from typing import Protocol, cast
 from unittest.mock import patch
 
 import pytest
 
 from meedee import events, gm, messages, midi, mpe, ump
+from meedee._clients import Input, Output
 from meedee._native import CallbackBridge
-from meedee._transport import (
-    RECEIVE_CAPACITY,
-    Context,
-    Delivery,
-    ReceiveQueue,
-    shutdown,
-)
-from meedee._wire import encode
+from meedee._transport import ReceiveQueue
 from meedee.events import Clock, ReceivedPacket
 
 
-@pytest.fixture
-def workers(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[Popen[bytes]]]:
-    children: list[Popen[bytes]] = []
-    fixture = Path(__file__).parent / "native" / "meedee_worker.py"
+@pytest.fixture(scope="session")
+def worker_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    project = Path(__file__).resolve().parents[1]
+    path = tmp_path_factory.mktemp("rust-worker") / (
+        "worker.exe" if sys.platform == "win32" else "worker"
+    )
+    subprocess.run(
+        [
+            "rustc",
+            "--edition=2021",
+            "-O",
+            str(project / "crates/meedee/tests/support/subprocess_worker.rs"),
+            "-o",
+            str(path),
+        ],
+        check=True,
+    )
+    return path
 
-    def launch(command: list[str], stdin: int, stdout: int) -> Popen[bytes]:
-        assert command == [sys.executable, "-m", "meedee._worker"]
-        child = Popen([sys.executable, str(fixture)], stdin=stdin, stdout=stdout)
-        children.append(child)
-        return child
 
-    monkeypatch.setattr("meedee._transport.subprocess.Popen", launch)
-    yield children
-    for c in children:
-        if c.poll() is None:
-            c.kill()
-        c.wait(timeout=3)
-
-
-def test_worker_cap_counts_discovery_clients_until_exit_is_confirmed(
-    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("meedee._transport.MAX_WORKERS", 2)
-    first = input_client("input", timeout=1)
-    second = output_client("healthy", timeout=1)
-    assert first.ports() and second.ports()
-    with pytest.raises(midi.ResourceError, match="worker limit"):
-        input_client("input", timeout=1)
-    assert len(workers) == 2
-
-    child = workers[0]
-    poll = child.poll
-    confirmed = Event()
-    monkeypatch.setattr(child, "poll", lambda: poll() if confirmed.is_set() else None)
-    del first
+@pytest.fixture(autouse=True)
+def workers(monkeypatch: pytest.MonkeyPatch, worker_binary: Path) -> Iterator[None]:
+    monkeypatch.setattr(
+        midi,
+        "Input",
+        partial(
+            midi.Input, subprocess_worker="rust", subprocess_executable=worker_binary
+        ),
+    )
+    monkeypatch.setattr(
+        midi,
+        "Output",
+        partial(
+            midi.Output, subprocess_worker="rust", subprocess_executable=worker_binary
+        ),
+    )
+    yield None
     gc.collect()
-    child.wait(timeout=3)
-    # Even after the client disappears, admission needs confirmed process exit.
-    with pytest.raises(midi.ResourceError, match="worker limit"):
-        input_client("input", timeout=1)
-    confirmed.set()
-    replacement = input_client("input", timeout=1)
-    assert replacement.ports() and second.ports()
-    assert len(workers) == 3
-    monkeypatch.setattr(child, "poll", poll)
-
-
-@pytest.mark.parametrize("kind", [OSError, MemoryError, KeyboardInterrupt])
-def test_failed_worker_start_releases_its_reservation(
-    kind: type[BaseException],
-    workers: list[Popen[bytes]],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("meedee._transport.MAX_WORKERS", 1)
-    with patch("meedee._transport.subprocess.Popen", side_effect=kind("start failed")):
-        with pytest.raises(kind):
-            input_client("input", timeout=1)
-    recovered = input_client("input", timeout=1)
-    assert recovered.ports() and len(workers) == 1
-
-
-def test_worker_cap_reserves_in_progress_starts_without_blocking_admission(
-    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from meedee import _transport
-
-    monkeypatch.setattr(_transport, "MAX_WORKERS", 1)
-    entered = Event()
-    release = Event()
-    created: Queue[midi.Input[events.ReceivedPacket]] = Queue()
-    launch = _transport.subprocess.Popen
-
-    def delayed(command: list[str], stdin: int, stdout: int) -> Popen[bytes]:
-        entered.set()
-        assert release.wait(3)
-        return launch(command, stdin=stdin, stdout=stdout)
-
-    def create() -> None:
-        created.put(input_client("input", timeout=1))
-
-    monkeypatch.setattr(_transport.subprocess, "Popen", delayed)
-    thread = Thread(target=create)
-    thread.start()
-    try:
-        assert entered.wait(3)
-        with pytest.raises(midi.ResourceError, match="worker limit"):
-            output_client("healthy", timeout=1)
-        assert not workers
-    finally:
-        release.set()
-        thread.join(3)
-    assert not thread.is_alive()
-    assert created.get(timeout=1).ports()
-    assert len(workers) == 1
 
 
 def test_defaults_select_in_process_transport_and_five_second_deadlines() -> None:
@@ -142,7 +80,7 @@ def test_defaults_select_in_process_transport_and_five_second_deadlines() -> Non
 
 
 def test_receive_budget_recovers_after_dequeue_and_rejects_oversized_messages() -> None:
-    messages = ReceiveQueue(8)
+    messages = ReceiveQueue(8, size_of=lambda v: len(v[-1]))
     messages.put_nowait((0, b"12345"))
     with pytest.raises(Full):
         messages.put_nowait((1, b"1234"))
@@ -159,102 +97,10 @@ def test_invalid_receive_limits_are_rejected_before_startup(limit: object) -> No
         input_client("test", receive_byte_limit=limit)
 
 
-@pytest.mark.parametrize("limit", [2, 3])
-def test_receive_byte_limit_is_applied_in_the_child_and_exposes_drops(
-    limit: int, workers: list[Popen[bytes]]
-) -> None:
-    received = Event()
-    source = input_client("early", receive_byte_limit=limit)
-    with source.connect(source.ports()[0], lambda packet: received.set()) as connection:
-        if limit == 3:
-            assert received.wait(3)
-        assert connection.dropped_packets == (1 if limit == 2 else 0)
-        if limit == 2:
-            assert not received.is_set()
-
-
-def test_partial_thread_startup_failure_terminates_and_reaps_its_child(
-    workers: list[Popen[bytes]],
-) -> None:
-    start = Thread.start
-    attempts = 0
-
-    def limited_start(thread: Thread) -> None:
-        nonlocal attempts
-        attempts += 1
-        if attempts == 2:
-            raise RuntimeError("thread quota reached")
-        start(thread)
-
-    with patch.object(Thread, "start", limited_start):
-        with pytest.raises(midi.ResourceError, match="thread quota"):
-            output_client("output")
-    assert len(workers) == 1
-    assert workers[0].poll() is not None
-
-
-@pytest.mark.parametrize("client", [midi.Input, midi.Output])
-def test_in_process_mode_does_not_start_child_processes(
-    client: type[midi.Input] | type[midi.Output], workers: list[Popen[bytes]]
-) -> None:
-
-    class LocalClient:
-        def __init__(self, **settings: object) -> None:
-            pass
-
-        def ports(self) -> list[object]:
-            return []
-
-    with (
-        patch("meedee._native.Input", LocalClient),
-        patch("meedee._native.Output", LocalClient),
-    ):
-        local = client(run_in_subprocess=False)
-        assert local.ports() == []
-    assert not workers
-
-
-@pytest.mark.parametrize("mode", ["hang_send", "crash_send", "native_error"])
-def test_native_failure_invalidates_only_its_worker_and_requires_a_fresh_client(
-    mode: str, workers: list[Popen[bytes]]
-) -> None:
-    broken = output_client(mode, timeout=1)
-    healthy = output_client("healthy")
-    bad_connection = broken.connect(broken.ports()[0])
-    good_connection = healthy.connect(healthy.ports()[0])
-    error = (
-        midi.WorkerTimeoutError
-        if mode == "hang_send"
-        else midi.SendError
-        if mode == "native_error"
-        else midi.WorkerError
-    )
-    started = monotonic()
-    with pytest.raises(error):
-        bad_connection.send(b"\xf8")
-    assert monotonic() - started < 3
-    assert bad_connection.closed
-    assert isinstance(broken.worker_failure, error)
-    assert isinstance(bad_connection.worker_failure, error)
-    assert broken.worker_failure.__traceback__ is None
-    assert good_connection.worker_failure is None
-    with pytest.raises(RuntimeError, match="closed"):
-        broken.ports()
-    with pytest.raises(RuntimeError, match="new client"):
-        bad_connection.close()
-    good_connection.send(b"\xf8")
-    good_connection.close()
-    workers[0].wait(timeout=3)
-    workers[1].wait(timeout=3)
-    fresh = output_client("fresh")
-    with fresh.connect(fresh.ports()[0]) as connection:
-        connection.send(b"\xf8")
-
-
 @pytest.mark.parametrize("run_in_subprocess", [True, False])
 @pytest.mark.parametrize("form", ["bytearray", "view", "strided_view"])
 def test_send_snapshots_mutable_and_strided_buffers(
-    run_in_subprocess: bool, form: str, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, form: str, workers: None
 ) -> None:
     expected = b"\xf0}\x00\xff\xf7"
     buffer = bytearray(
@@ -284,6 +130,8 @@ def test_send_snapshots_mutable_and_strided_buffers(
             pass
 
     class LocalClient:
+        worker_failure = None
+
         def __init__(self, **settings: object) -> None:
             pass
 
@@ -300,104 +148,9 @@ def test_send_snapshots_mutable_and_strided_buffers(
         connection.close()
 
 
-def test_native_close_timeout_consumes_parent_ownership_without_restoring_a_client(
-    workers: list[Popen[bytes]],
-) -> None:
-    output = output_client("hang_close", timeout=1)
-    connection = output.connect(output.ports()[0])
-    with pytest.raises(TimeoutError):
-        connection.close()
-    assert connection.closed
-    workers[0].wait(timeout=3)
-    with pytest.raises(RuntimeError, match="closed"):
-        output.ports()
-
-
-@pytest.mark.parametrize("run_in_subprocess", [True, False])
-@pytest.mark.parametrize("direction", ["input", "output"])
-@pytest.mark.parametrize("interrupt", [True, False])
-def test_context_exit_preserves_body_and_close_failures(
-    run_in_subprocess: bool,
-    direction: str,
-    interrupt: bool,
-    workers: list[Popen[bytes]],
-) -> None:
-
-    class LocalConnection:
-        worker_failure = None
-        clock = Clock(identity="test")
-        dropped_packets = 0
-        last_message_time = None
-        closed = False
-
-        def __enter__(self) -> Self:
-            return self
-
-        def close(self) -> None:
-            raise RuntimeError("close failed")
-
-    class LocalClient:
-        def __init__(self, **settings: object) -> None:
-            pass
-
-        def ports(self) -> list[object]:
-            return [local_port()]
-
-        def connect(
-            self,
-            port: object,
-            callback: Callable[[ReceivedPacket], object] | None = None,
-            clock_identity: str = "",
-        ) -> LocalConnection:
-            return LocalConnection()
-
-    with (
-        patch("meedee._native.Input", LocalClient),
-        patch("meedee._native.Output", LocalClient),
-    ):
-        if direction == "input":
-            source = input_client(
-                "hang_close", run_in_subprocess=run_in_subprocess, timeout=0.5
-            )
-            connection = source.connect(source.ports()[0], lambda packet: None)
-        else:
-            output = output_client(
-                "hang_close", run_in_subprocess=run_in_subprocess, timeout=0.5
-            )
-            connection = output.connect(output.ports()[0])
-        body_error = (
-            KeyboardInterrupt("body interrupted")
-            if interrupt
-            else ValueError("body failed")
-        )
-        with pytest.raises(BaseExceptionGroup) as caught:
-            with connection:
-                raise body_error
-        assert caught.value.exceptions[0] is body_error
-        assert isinstance(
-            caught.value.exceptions[1],
-            TimeoutError if run_in_subprocess else RuntimeError,
-        )
-        assert isinstance(
-            caught.value, BaseExceptionGroup if interrupt else ExceptionGroup
-        )
-
-
-def test_failed_open_discards_the_worker_instead_of_restoring_a_suspect_native_client(
-    workers: list[Popen[bytes]],
-) -> None:
-    output = output_client("failed_open")
-    with pytest.raises(midi.ConnectError, match="vanished"):
-        output.connect(output.ports()[0])
-    assert isinstance(output.worker_failure, midi.ConnectError)
-    workers[0].wait(timeout=3)
-    with pytest.raises(RuntimeError, match="new client"):
-        output.ports()
-
-
 @pytest.mark.parametrize("form", ["function", "partial", "object", "uninspectable"])
 def test_input_callback_can_receive_during_open_without_being_pickled(
-    form: str, workers: list[Popen[bytes]]
+    form: str, workers: None
 ) -> None:
     messages: Queue[tuple[int, bytes]] = Queue()
 
@@ -432,7 +185,7 @@ def test_input_callback_can_receive_during_open_without_being_pickled(
 @pytest.mark.parametrize("run_in_subprocess", [True, False])
 @pytest.mark.parametrize("delivered", [True, False])
 def test_last_message_time_uses_monotonic_clock_and_survives_close(
-    run_in_subprocess: bool, delivered: bool, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, delivered: bool, workers: None
 ) -> None:
     received = Event()
 
@@ -454,6 +207,8 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
             self.bridge.drain()
 
     class LocalClient:
+        worker_failure = None
+
         def __init__(self, **settings: object) -> None:
             pass
 
@@ -491,7 +246,7 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
 
 @pytest.mark.parametrize("run_in_subprocess", [True, False])
 def test_incompatible_callback_signatures_do_not_consume_the_client(
-    run_in_subprocess: bool, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, workers: None
 ) -> None:
 
     def one_argument(timestamp: int, message: bytes) -> None:
@@ -504,6 +259,8 @@ def test_incompatible_callback_signatures_do_not_consume_the_client(
         pass
 
     class LocalClient:
+        worker_failure = None
+
         def __init__(self, **settings: object) -> None:
             pass
 
@@ -524,7 +281,7 @@ def test_incompatible_callback_signatures_do_not_consume_the_client(
 @pytest.mark.parametrize("operation", ["connect", "create_virtual"])
 @pytest.mark.parametrize("kind", ["coroutine", "generator", "async_generator"])
 def test_deferred_callbacks_are_rejected_without_consuming_the_client(
-    run_in_subprocess: bool, operation: str, kind: str, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, operation: str, kind: str, workers: None
 ) -> None:
 
     async def coroutine(packet: ReceivedPacket) -> None:
@@ -546,6 +303,8 @@ def test_deferred_callbacks_are_rejected_without_consuming_the_client(
         __call__ = staticmethod(callback)
 
     class LocalClient:
+        worker_failure = None
+
         def __init__(self, **settings: object) -> None:
             pass
 
@@ -563,48 +322,8 @@ def test_deferred_callbacks_are_rejected_without_consuming_the_client(
             assert source.ports()
 
 
-def test_parent_queue_drops_new_messages_and_counts_both_queue_stages() -> None:
-    started = Event()
-    release = Event()
-    finished = Event()
-    messages: list[int] = []
-
-    def receive(packet: ReceivedPacket) -> None:
-        timestamp = packet.timestamp_ns
-        assert timestamp is not None
-        messages.append(timestamp)
-        started.set()
-        assert release.wait(3)
-        finished.set()
-
-    delivery = Delivery(receive)
-    delivery.enqueue(encode(packet_value(0, b"\xf8")), 7)
-    assert started.wait(3)
-    for i in range(1, RECEIVE_CAPACITY + 4):
-        delivery.enqueue(encode(packet_value(i, b"\xf8")), 7)
-    assert delivery.dropped == 3
-    assert delivery.worker_dropped == 7
-    delivery.enqueue(encode(packet_value(RECEIVE_CAPACITY + 4, b"\xf8")), 3)
-    assert delivery.worker_dropped == 7
-    assert delivery.dropped == 4
-    delivery.retire()
-    release.set()
-    delivery.bridge.drain()
-    assert finished.wait(3)
-    assert messages == [0]
-
-
-def test_child_queue_overflow_is_exposed_after_native_close(
-    workers: list[Popen[bytes]],
-) -> None:
-    source = input_client("burst")
-    connection = source.connect(source.ports()[0], lambda packet: None)
-    connection.close()
-    assert connection.dropped_packets > 0
-
-
 def test_explicit_close_waits_for_parent_callback_without_cancelling_it(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     started = Event()
     release = Event()
@@ -637,35 +356,12 @@ def test_explicit_close_waits_for_parent_callback_without_cancelling_it(
     assert connection.closed
 
 
-def test_shutdown_terminates_and_reaps_a_child_stuck_in_native_close(
-    workers: list[Popen[bytes]],
-) -> None:
-    output = output_client("hang_close", timeout=1)
-    connection = output.connect(output.ports()[0])
-    started = monotonic()
-    with patch("meedee._transport.SHUTTING_DOWN", False):
-        shutdown()
-        with pytest.raises(RuntimeError, match="shutdown"):
-            output_client("late client")
-    assert monotonic() - started < 3
-    assert connection.closed
-    assert workers[0].poll() is not None
-
-
-def test_initialization_timeout_reaps_the_new_worker(
-    workers: list[Popen[bytes]],
-) -> None:
-    with pytest.raises(TimeoutError):
-        output_client("hang_init", timeout=1)
-    workers[0].wait(timeout=3)
-
-
 @pytest.mark.parametrize("run_in_subprocess", [False, True])
 @pytest.mark.parametrize(
     "kind", ["coroutine", "generator", "async_generator", "awaitable"]
 )
 def test_deferred_results_stop_delivery_without_execution(
-    run_in_subprocess: bool, kind: str, workers: list[Popen[bytes]]
+    run_in_subprocess: bool, kind: str, workers: None
 ) -> None:
     executed = Event()
     delivered = Event()
@@ -730,6 +426,8 @@ def test_deferred_results_stop_delivery_without_execution(
             self.bridge.drain()
 
     class LocalClient:
+        worker_failure = None
+
         def __init__(self, **settings: object) -> None:
             pass
 
@@ -804,63 +502,8 @@ def test_reporting_a_suspended_coroutine_does_not_cancel_it() -> None:
         bridge.drain()
 
 
-def test_callback_and_error_hook_cannot_start_or_send_native_work(
-    workers: list[Popen[bytes]],
-) -> None:
-    reported = Event()
-    errors: list[str] = []
-    output = output_client("output")
-    target = output.connect(output.ports()[0])
-
-    def receive(packet: ReceivedPacket) -> None:
-        message = packet.packet
-        assert isinstance(message, bytes)
-        target.send(message)
-
-    def error_hook(event: UnraisableEvent) -> None:
-        assert event.object is receive
-        try:
-            input_client("forbidden")
-        except midi.CallbackThreadError as error:
-            errors.append(str(error))
-        reported.set()
-
-    source = input_client("early")
-    with patch("sys.unraisablehook", error_hook):
-        connection = source.connect(source.ports()[0], receive)
-        assert reported.wait(3)
-        assert connection.last_message_time is not None
-        connection.close()
-    assert len(errors) == 1
-    assert "callback" in errors[0]
-    assert len(workers) == 2
-    target.send(b"\xf8")
-    target.close()
-
-
-def test_cyclic_collection_releases_the_client_and_child(
-    workers: list[Popen[bytes]],
-) -> None:
-    source = input_client("quiet")
-
-    class Receiver:
-        connection: midi.Input[events.ReceivedPacket]
-
-        def __call__(self, packet: ReceivedPacket) -> None:
-            pass
-
-    receiver = Receiver()
-    connection = source.connect(source.ports()[0], receiver)
-    receiver.connection = connection
-    reference = weakref.ref(connection)
-    del receiver, connection, source
-    gc.collect()
-    assert reference() is None
-    workers[0].wait(timeout=3)
-
-
 def test_connection_is_the_resource_and_close_is_terminal(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     output = output_client("output")
     connection = output.connect(output.ports()[0])
@@ -871,12 +514,11 @@ def test_connection_is_the_resource_and_close_is_terminal(
     assert output.closed
     with pytest.raises(midi.StateError):
         output.ports()
-    workers[0].wait(timeout=3)
 
 
 @pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf")])
 def test_invalid_deadlines_are_rejected_before_starting_a_worker(
-    timeout: float, workers: list[Popen[bytes]]
+    timeout: float, workers: None
 ) -> None:
     with pytest.raises(ValueError, match="positive and finite"):
         output_client("invalid", timeout=timeout)
@@ -886,8 +528,17 @@ def test_invalid_deadlines_are_rejected_before_starting_a_worker(
 def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPacket]:
     """Discover while the child fixture's selected mode is in the environment."""
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
-        client = cast(Callable[..., midi.Input[events.ReceivedPacket]], midi.Input)(
-            **({"raw": True, "run_in_subprocess": True} | settings)
+        client = cast(Callable[..., Input[events.ReceivedPacket]], midi.Input)(
+            **(
+                {
+                    "raw": True,
+                    "run_in_subprocess": True,
+                    "backend": midi.Backend.CoreMidiUmp
+                    if settings.get("protocol") == midi.Protocol.Ump
+                    else midi.Backend.CoreMidi,
+                }
+                | settings
+            )
         )
         client.ports()
         return client
@@ -896,8 +547,16 @@ def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPac
 def output_client(mode: str, **settings: object) -> midi.Output:
     """Discover while the child fixture's selected mode is in the environment."""
     with patch.dict(os.environ, {"MEEDEE_TEST_MODE": mode}):
-        client = cast(Callable[..., midi.Output], midi.Output)(
-            **({"run_in_subprocess": True} | settings)
+        client = cast(Callable[..., Output], midi.Output)(
+            **(
+                {
+                    "run_in_subprocess": True,
+                    "backend": midi.Backend.CoreMidiUmp
+                    if settings.get("protocol") == midi.Protocol.Ump
+                    else midi.Backend.CoreMidi,
+                }
+                | settings
+            )
         )
         client.ports()
         return client
@@ -920,7 +579,7 @@ def packet_value(timestamp: int, payload: bytes) -> ReceivedPacket:
 
 
 def test_isolated_snapshots_disambiguate_duplicate_ids_and_do_not_rediscover_on_connect(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     output = output_client("ambiguous")
     first, second = output.ports()
@@ -933,49 +592,11 @@ def test_isolated_snapshots_disambiguate_duplicate_ids_and_do_not_rediscover_on_
         output.connect(first)
 
 
-@pytest.mark.parametrize("direction", ["input", "output"])
-def test_discovery_metadata_failure_preserves_coremidi_worker_for_explicit_retry(
-    workers: list[Popen[bytes]], direction: str
-) -> None:
-    with patch.dict(os.environ, {"MEEDEE_TEST_MODE": "discovery_error_once"}):
-        client = (
-            midi.Input(run_in_subprocess=True)
-            if direction == "input"
-            else midi.Output(run_in_subprocess=True)
-        )
-        with pytest.raises(midi.PortInfoError, match="endpoint disappeared"):
-            client.ports()
-    if sys.platform == "darwin":
-        assert client.ports()
-        assert client.worker_failure is None
-        assert len(workers) == 1
-    else:
-        with pytest.raises((midi.StateError, midi.WorkerError)):
-            client.ports()
-
-
-@pytest.mark.parametrize("foreign", [True, False])
-def test_foreign_or_refreshed_snapshots_fail_open_and_invalidate_the_worker(
-    foreign: bool, workers: list[Popen[bytes]]
-) -> None:
-    output = output_client("output")
-    port = output.ports()[0]
-    if foreign:
-        other = output_client("other")
-        port = other.ports()[0]
-    else:
-        output.ports()
-    with pytest.raises(midi.ConnectError, match="expired discovery snapshot"):
-        output.connect(port)
-    with pytest.raises(midi.StateError):
-        output.ports()
-
-
 @pytest.mark.parametrize(
     "timestamps", [midi.TimestampMode.Absolute, midi.TimestampMode.Off]
 )
 def test_isolated_ump_preserves_words_clock_identity_and_disabled_time(
-    timestamps: midi.TimestampMode, workers: list[Popen[bytes]]
+    timestamps: midi.TimestampMode, workers: None
 ) -> None:
     packets: Queue[ReceivedPacket] = Queue()
     source = input_client("early", protocol=midi.Protocol.Ump, timestamps=timestamps)
@@ -1002,7 +623,7 @@ class UnraisableEvent(Protocol):
 
 
 def test_independent_children_have_distinct_clock_identities(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     first = input_client("early")
     second = input_client("early")
@@ -1012,72 +633,10 @@ def test_independent_children_have_distinct_clock_identities(
     ):
         assert one.clock != two.clock
         assert one.clock.identity != two.clock.identity
-    assert len(workers) == 2
-
-
-@pytest.mark.parametrize("operation", ["open", "send", "close"])
-def test_interrupted_worker_request_discards_uncertain_ownership(
-    operation: str, workers: list[Popen[bytes]]
-) -> None:
-    output = output_client("output")
-    port = output.ports()[0]
-    connection = None if operation == "open" else output.connect(port)
-    context = cast(Context, output._context)  # ty: ignore[unresolved-attribute]
-    with patch.object(
-        context.replies, "get", side_effect=KeyboardInterrupt("interrupted")
-    ):
-        with pytest.raises(KeyboardInterrupt, match="interrupted"):
-            if operation == "open":
-                output.connect(port)
-            elif operation == "send":
-                assert connection is not None
-                connection.send(b"\xf8")
-            else:
-                assert connection is not None
-                connection.close()
-    assert isinstance(output.worker_failure, midi.WorkerError)
-    if connection is not None:
-        assert connection.closed
-    with pytest.raises(midi.StateError):
-        output.ports()
-    workers[0].wait(timeout=3)
-
-
-@pytest.mark.parametrize("input_port", [True, False])
-def test_connection_allocation_failure_precedes_remote_open(
-    input_port: bool, workers: list[Popen[bytes]]
-) -> None:
-    if input_port:
-        source = input_client("quiet")
-        from meedee._clients import _InputState
-
-        handle = _InputState
-    else:
-        source = output_client("quiet")
-        from meedee._clients import _OutputState
-
-        handle = _OutputState
-    port = source.ports()[0]
-    with patch.object(
-        handle, "_create", side_effect=MemoryError("connection allocation")
-    ):
-        with pytest.raises(MemoryError, match="connection allocation"):
-            if isinstance(source, midi.Input):
-                source.connect(port, lambda packet: None)
-            else:
-                source.connect(port)
-    assert source.worker_failure is None
-    port = source.ports()[0]
-    connection = (
-        source.connect(port, lambda packet: None)
-        if isinstance(source, midi.Input)
-        else source.connect(port)
-    )
-    connection.close()
 
 
 def test_native_drop_count_arrives_with_packets_without_an_extra_request(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     received = Event()
     source = input_client("native_drop")
@@ -1089,7 +648,7 @@ def test_native_drop_count_arrives_with_packets_without_an_extra_request(
 
 
 def test_native_drop_count_arrives_while_input_stays_silent(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     received = Event()
     source = input_client("native_drop_idle")
@@ -1107,7 +666,7 @@ def test_native_drop_count_arrives_while_input_stays_silent(
 
 @pytest.mark.parametrize("accepted", range(6))
 def test_compound_failure_preserves_progress_through_the_worker_pipe(
-    accepted: int, workers: list[Popen[bytes]]
+    accepted: int, workers: None
 ) -> None:
     source = output_client(f"partial_command_{accepted}")
     connection = source.connect(source.ports()[0])
@@ -1122,12 +681,11 @@ def test_compound_failure_preserves_progress_through_the_worker_pipe(
     assert isinstance(failure, midi.CompoundSendError)
     assert (failure.completed_messages, failure.total_messages) == (accepted, 6)
     assert failure.__traceback__ is None
-    workers[0].wait(timeout=3)
 
 
 @pytest.mark.parametrize("mode", ["hang_send", "crash_send"])
 def test_compound_worker_loss_reports_unknown_progress(
-    mode: str, workers: list[Popen[bytes]]
+    mode: str, workers: None
 ) -> None:
     source = output_client(mode, timeout=1)
     connection = source.connect(source.ports()[0])
@@ -1136,11 +694,10 @@ def test_compound_worker_loss_reports_unknown_progress(
     assert error.value.completed_messages is None
     assert error.value.total_messages == 2
     assert connection.closed
-    workers[0].wait(timeout=3)
 
 
 def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     source = output_client("check_command")
     connection = source.connect(source.ports()[0])
@@ -1160,81 +717,9 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
         assert not connection.closed
 
 
-def test_worker_failure_after_command_acknowledgment_preserves_complete_progress(
-    workers: list[Popen[bytes]],
-) -> None:
-    source = output_client("healthy")
-    connection = source.connect(source.ports()[0])
-    context = cast(Context, source._context)  # ty: ignore[unresolved-attribute]
-
-    def acknowledged(*args: object, **kwargs: object) -> tuple[str, tuple[None, int]]:
-        context.fail("worker exited after acknowledging command")
-        return "ok", (None, 0)
-
-    with patch.object(context.replies, "get", side_effect=acknowledged):
-        with pytest.raises(midi.CompoundSendError) as error:
-            connection.send(
-                messages.ControlChange14(channel=1, controller=7, value=10000)
-            )
-    assert error.value.completed_messages == error.value.total_messages == 2
-    assert connection.closed
-    workers[0].wait(timeout=3)
-
-
-def test_failed_clock_allocation_discards_the_open_worker(
-    workers: list[Popen[bytes]],
-) -> None:
-    source = input_client("quiet")
-    port = source.ports()[0]
-    with patch(
-        "meedee._transport.decode_clock", side_effect=MemoryError("clock allocation")
-    ):
-        with pytest.raises(MemoryError, match="clock allocation"):
-            source.connect(port, lambda packet: None)
-    assert isinstance(source.worker_failure, midi.WorkerError)
-    with pytest.raises(midi.StateError):
-        source.ports()
-    workers[0].wait(timeout=3)
-
-
-def test_shutdown_drains_callbacks_even_without_a_live_client() -> None:
-    entered = Event()
-    release = Event()
-    finished = Event()
-
-    def callback(packet: ReceivedPacket) -> None:
-        entered.set()
-        release.wait(3)
-
-    delivery = Delivery(callback)
-    clock = Clock(
-        identity="detached",
-        backend=midi.Backend.CoreMidi,
-        mode=midi.TimestampMode.Absolute,
-    )
-    delivery.enqueue(
-        encode(ReceivedPacket(timestamp_ns=0, clock=clock, packet=b"\xf8")), 0
-    )
-    assert entered.wait(3)
-
-    def stop() -> None:
-        shutdown()
-        finished.set()
-
-    with patch("meedee._transport.SHUTTING_DOWN", False):
-        closer = Thread(target=stop)
-        closer.start()
-        try:
-            assert not finished.wait(0.05)
-        finally:
-            release.set()
-            closer.join(3)
-    assert finished.is_set()
-
-
 @pytest.mark.parametrize("mode", ["check_bank", "check_mpe", "partial_command_2"])
 def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pipe(
-    mode: str, workers: list[Popen[bytes]]
+    mode: str, workers: None
 ) -> None:
     source = output_client(mode)
     connection = source.connect(source.ports()[0])
@@ -1255,7 +740,7 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
 
 
 def test_typed_input_exposes_receive_drops_without_another_packet(
-    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+    workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("MEEDEE_TEST_MODE", "native_drop_idle")
     source = midi.Input(run_in_subprocess=True, timeout=1)
@@ -1272,7 +757,7 @@ def test_typed_input_exposes_receive_drops_without_another_packet(
 
 
 def test_typed_queue_reports_overflow_and_retains_primitive_events(
-    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+    workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "twice")
@@ -1290,7 +775,7 @@ def test_typed_queue_reports_overflow_and_retains_primitive_events(
 
 
 def test_typed_receive_wakes_on_cancellation_and_close(
-    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+    workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from meedee.events import Cancellation
 
@@ -1320,7 +805,7 @@ def test_typed_receive_wakes_on_cancellation_and_close(
 
 
 def test_typed_callback_retains_the_blocking_operation_guard(
-    workers: list[Popen[bytes]], monkeypatch: pytest.MonkeyPatch
+    workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
     monkeypatch.setenv("MEEDEE_TEST_MODE", "early")
@@ -1337,7 +822,7 @@ def test_typed_callback_retains_the_blocking_operation_guard(
 
 
 def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
-    workers: list[Popen[bytes]],
+    workers: None,
 ) -> None:
     client = output_client("check_note", timeout="5 s")
     note = messages.NoteOn(channel=1, note=60, velocity=100)
@@ -1365,36 +850,176 @@ def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
     assert output.closed
 
 
-@pytest.mark.parametrize("input_mode", [False, True])
-@pytest.mark.parametrize("connected", [False, True])
-def test_clients_leaving_scope_are_collectible_and_workers_exit(
-    workers: list[Popen[bytes]],
-    input_mode: bool,
-    connected: bool,
+def test_python_bootstrap_runs_the_rust_worker_without_native_initialization() -> None:
+    def string(value: str) -> bytes:
+        data = value.encode()
+        return b"\x03" + len(data).to_bytes(8) + data
+
+    magic = b"MDWORK\x00\x01"
+    request = b"\x06" + (2).to_bytes(8) + string("shutdown") + b"\x05" + bytes(8)
+    with subprocess.Popen(
+        [sys.executable, "-m", "meedee._worker"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as process:
+        assert process.stdin is not None
+        request_pipe = process.stdin
+        request_pipe.write(magic + request)
+        request_pipe.flush()
+        process.stdin = None
+        try:
+            output, errors = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise
+        finally:
+            request_pipe.close()
+        assert process.returncode == 0, errors
+    expected = (
+        magic
+        + b"\x06"
+        + (2).to_bytes(8)
+        + string("shutdown")
+        + b"\x06"
+        + (2).to_bytes(8)
+        + b"\x00\x02"
+        + bytes(16)
+    )
+    assert output == expected
+
+
+@pytest.mark.parametrize("worker", ["python", "rust"])
+@pytest.mark.parametrize("direction", ["Input", "Output"])
+def test_launcher_selection_is_lazy_and_reaches_the_shared_rust_binding(
+    worker: str, direction: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class ObservedInput(midi.Input):
-        pass
+    from meedee import _native
 
-    class ObservedOutput(midi.Output):
-        pass
+    seen: dict[str, object] = {}
 
-    def open_client() -> weakref.ReferenceType[ObservedInput | ObservedOutput]:
-        with patch.dict(
-            os.environ, {"MEEDEE_TEST_MODE": "quiet" if input_mode else "output"}
-        ):
-            client = (
-                ObservedInput(run_in_subprocess=True)
-                if input_mode
-                else ObservedOutput(run_in_subprocess=True)
-            )
-        if connected:
-            client.__enter__()
-        return weakref.ref(client)
+    class NativeClient:
+        worker_failure = None
 
-    reference = open_client()
-    gc.collect()
-    assert reference() is None
-    if connected:
-        workers[0].wait(timeout=3)
+        def __init__(self, **settings: object) -> None:
+            seen.update(settings)
+
+        def ports(self) -> list[midi.Port]:
+            return []
+
+    monkeypatch.setattr(_native, direction, NativeClient)
+    client = getattr(midi, direction)(
+        run_in_subprocess=True,
+        subprocess_worker=worker,
+        subprocess_executable="chosen-worker",
+    )
+    assert not seen
+    assert client.ports() == []
+    assert seen["worker_program"] == "chosen-worker"
+    assert seen["worker_args"] == (
+        ["-m", "meedee._worker"] if worker == "python" else []
+    )
+    assert seen["worker_timeout"] == 5
+    client.close()
+
+
+@pytest.mark.parametrize(
+    "mode,operation,error",
+    [
+        ("hang_init", "ports", midi.WorkerTimeoutError),
+        ("hang_send", "send", midi.WorkerTimeoutError),
+        ("crash_send", "send", midi.WorkerError),
+        ("native_error", "send", midi.SendError),
+        ("hang_close", "close", midi.WorkerTimeoutError),
+    ],
+)
+def test_terminal_subprocess_failures_preserve_categories_and_prevent_reuse(
+    mode: str, operation: str, error: type[Exception], workers: None
+) -> None:
+    started = monotonic()
+    if operation == "ports":
+        with pytest.raises(error):
+            output_client(mode, timeout=1)
     else:
-        assert not workers
+        client = output_client(mode, timeout=1)
+        client.connect(client.ports()[0])
+        with pytest.raises(error):
+            client.send(b"\xf8") if operation == "send" else client.close()
+        assert client.closed
+        assert isinstance(client.worker_failure, error)
+        with pytest.raises(midi.StateError):
+            client.ports()
+    assert monotonic() - started < 5
+
+
+@pytest.mark.parametrize(
+    "mode,timestamp", [("early_negative", -(2**63)), ("early_absent", None)]
+)
+def test_subprocess_preserves_negative_and_missing_timestamps(
+    mode: str, timestamp: int | None, workers: None
+) -> None:
+    received: Queue[ReceivedPacket] = Queue()
+    source = input_client(mode)
+    with source.connect(source.ports()[0], received.put):
+        assert received.get(timeout=2).timestamp_ns == timestamp
+
+
+@pytest.mark.parametrize("input_mode", [True, False])
+@pytest.mark.parametrize("connected", [True, False])
+def test_subprocess_clients_leaving_scope_remain_collectible(
+    input_mode: bool, connected: bool, workers: None
+) -> None:
+    source = input_client("quiet") if input_mode else output_client("healthy")
+    if connected:
+        if input_mode:
+            source.connect(source.ports()[0], lambda packet: None)
+        else:
+            source.connect(source.ports()[0])
+    reference = weakref.ref(source)
+    del source
+    for _ in range(10):
+        gc.collect()
+        if reference() is None:
+            break
+        sleep(0.01)
+    assert reference() is None
+
+
+@pytest.mark.parametrize("foreign", [True, False])
+def test_expired_or_foreign_port_snapshots_fail_terminally_before_remote_open(
+    foreign: bool, workers: None
+) -> None:
+    first = output_client("healthy")
+    port = first.ports()[0]
+    second = output_client("healthy") if foreign else first
+    if not foreign:
+        second.ports()
+    with pytest.raises(midi.ConnectError, match="snapshot"):
+        second.connect(port)
+    assert second.closed
+    assert isinstance(second.worker_failure, midi.ConnectError)
+    with pytest.raises(midi.StateError):
+        second.ports()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"\xf0}\x00\xff\xf7",
+        bytearray(b"\xf0}\x00\xff\xf7"),
+        memoryview(b"\xf0a}b\x00c\xffd\xf7e")[::2],
+    ],
+)
+def test_worker_preserves_bytes_and_strided_buffers(
+    payload: object, workers: None
+) -> None:
+    source = output_client("check_bytes")
+    with source.connect(source.ports()[0]):
+        source.send(payload)
+
+
+def test_worker_preserves_all_ump_word_bits_on_send(workers: None) -> None:
+    source = output_client("check_ump", protocol=midi.Protocol.Ump)
+    with source.connect(source.ports()[0]):
+        source.send(midi.UmpPacket(words=[0x40903C00, 0xFFFFFFFF]))

@@ -7,7 +7,7 @@ Additional work beyond the prompt: None.
 - Use Python's public module organization and corresponding names as the canonical
   interface. Replace old paths instead of retaining compatibility aliases.
 - Add Rust live workflow drivers, file conveniences and advanced playback controls.
-  Python CLI, process isolation and uFor integration remain language-specific.
+  Python CLI and uFor integration remain language-specific.
 - Default Python input to in-process operation, retaining explicit isolation.
 - Unify Python's high-level clients and connections. Connection selection returns
   the same object; closure is terminal and reconnection requires a new object.
@@ -57,7 +57,7 @@ Completion requires finishing this inventory, not merely aligning symbol counts.
 | metrics.Distribution | metrics::Distribution | Detached snapshot, separate Histogram accumulator |
 | smf/clip timed readers | smf/clip TimedReader and Timeline | Rust enums retain file-specific records |
 
-Python-only surfaces remain the CLI, process isolation, unit-string parsing and
+Python-only surfaces remain the CLI, unit-string parsing and
 uFor integration. Rust's transport and file_io modules remain advanced native and
 streaming primitives. Private implementation modules are not alternate public paths.
 The old inspection timing integration test moved into the core unit tests so the

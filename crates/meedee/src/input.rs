@@ -26,6 +26,8 @@ pub use api::{Input, InputErrors, RecordingOptions};
 /// ```
 pub(super) struct Core {
     options: transport::InputOptions,
+    run_in_subprocess: bool,
+    subprocess_options: transport::subprocess::SubprocessOptions,
     port: Option<String>,
     channels: Option<u16>,
     sysex_limit: usize,
@@ -61,6 +63,8 @@ impl Core {
     pub fn new() -> Self {
         Self {
             options: transport::InputOptions::default(),
+            run_in_subprocess: false,
+            subprocess_options: Default::default(),
             port: None,
             channels: None,
             sysex_limit: crate::codecs::Decoder::DEFAULT_SYSEX_LIMIT,
@@ -111,6 +115,30 @@ impl Core {
             return Err(invalid("port pattern must not be empty").into());
         }
         self.port = Some(pattern);
+        Ok(self)
+    }
+    pub fn with_run_in_subprocess(mut self, enabled: bool) -> crate::midi::Result<Self> {
+        if self.client.is_some() || self.connection.is_some() || self.closed {
+            return Err(invalid("configure subprocess before discovery or connection").into());
+        }
+        self.run_in_subprocess = enabled;
+        Ok(self)
+    }
+    pub fn with_subprocess_options(
+        mut self,
+        options: transport::subprocess::SubprocessOptions,
+    ) -> crate::midi::Result<Self> {
+        if self.client.is_some() || self.connection.is_some() || self.closed {
+            return Err(invalid("configure subprocess before discovery or connection").into());
+        }
+        if options.timeout.is_zero()
+            || std::time::Instant::now()
+                .checked_add(options.timeout)
+                .is_none()
+        {
+            return Err(invalid("worker timeout must be positive and representable").into());
+        }
+        self.subprocess_options = options;
         Ok(self)
     }
     pub fn with_transport(mut self, options: transport::InputOptions) -> crate::midi::Result<Self> {
@@ -244,8 +272,12 @@ impl Core {
         }
         if self.client.is_none() {
             self.client = Some(
-                transport::Input::new(self.options)
-                    .map_err(|e| io::Error::from(crate::midi::Error::Init(e)))?,
+                if self.run_in_subprocess {
+                    transport::Input::new_subprocess(self.options, self.subprocess_options.clone())
+                } else {
+                    transport::Input::new(self.options)
+                }
+                .map_err(|e| io::Error::from(crate::midi::Error::Init(e)))?,
             );
         }
         Ok(self.client.as_ref().expect("initialized input"))

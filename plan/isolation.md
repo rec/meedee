@@ -1,87 +1,56 @@
 # Optional native MIDI process isolation
 
-## Agreed behavior
+## Current shared implementation
 
-`Input(*, run_in_subprocess=False, timeout=5.0)` and the corresponding `Output`
-constructor default to in-process operation. Explicit `run_in_subprocess=True`
-uses one child process per initialized resource. Construction is lazy; discovery/connect or
-actual I/O starts the worker. Closing is terminal and retires any worker. The ownership
-model allows one live connection per client; input and output ports of the same
-physical device therefore use separate processes. `run_in_subprocess=False` keeps native
-MIDI in the caller's process. No automatic physical-device grouping is inferred.
+Rust owns the worker protocol, process launch, operation deadlines, bounded
+forwarding, terminal failure retention and child reaping. Python uses this same
+transport through its native bindings; the former Python pickle pipe engine and
+worker service are removed.
 
-Each isolated native operation has a configurable positive finite deadline.
-Timeout, child exit, or a native error invalidates the affected client and
-connection and terminates the child. Reopening requires a new client/worker.
-Neither reconnection nor uncertain sends are retried automatically. Expected
-argument, busy-client, and unsupported-platform errors do not invalidate it.
-Silence does not establish that a device disconnected; no health guarantee or
-hotplug detection is invented.
+Python Input/Output keep run_in_subprocess=False and timeout=5 seconds by default.
+subprocess_worker="python" starts the current interpreter with -m meedee._worker;
+that module only enters the Rust service. subprocess_worker="rust" launches the
+meedee-worker executable. subprocess_executable optionally selects the interpreter
+or binary, with no implicit fallback. CLI commands expose the corresponding flags.
+The existing CLI/discovery subprocess defaults remain unchanged.
 
-Callbacks remain in the parent process on a dispatch thread. Both child and
-parent receive queues each hold 128 messages and have fixed capacities and drop new messages on overflow.
-The input connection exposes `dropped_packets`, including both queue stages.
-Capacity counts messages, not bytes; exceptionally large messages still use
-memory. Native timestamps and bytes are forwarded unchanged. The existing Rust
-callback gate supplies exception reporting, callback-thread restrictions,
-callable retirement, and draining in the parent. User callbacks are not pickled.
+Rust Input and Output expose with_run_in_subprocess(bool) and
+with_subprocess_options(SubprocessOptions). The typed options contain program,
+args and a Duration timeout; defaults are meedee-worker on PATH, no arguments and
+five seconds. Configuration is validated before discovery or connection. The
+standalone binary is part of the Rust crate and needs no Python runtime. Python
+wheels need only their ordinary extension and the interpreter bootstrap.
 
-Explicit close retires incoming delivery and waits for admitted parent callbacks
-as well as native teardown. The native-operation timeout cannot cancel arbitrary
-parent Python code. Destruction schedules cleanup without waiting for a driver. Client disposal
-requests graceful child shutdown before forced termination on its deadline.
-Interpreter exit stops isolated children even when their drivers cannot close;
-process termination does not reset hardware notes or repair an OS driver.
+Construction remains lazy. Each client uses its own child and immutable,
+generation-bound port snapshots. Opening uses the retained child snapshot rather
+than rediscovering endpoints. Closing is terminal in both high-level APIs.
+Timeouts, unexpected child exit and terminal native failures invalidate ownership;
+there are no retries or automatic reconnects. Error categories, exact owned
+messages, nested causes and known compound-send progress survive the pipe.
+Rust Capability, Invalid and Resource transport errors now own String values.
+A compound operation has one deadline across its entire expanded message list.
 
-The worker is started with a fresh Python interpreter and a module entry point,
-so applications do not need multiprocessing's guarded-main convention. Parent
-and child use private local pipes, not network I/O. Communication uses only the
-standard library and sends messages, identifiers, and error descriptions, never
-native handles or user callables. No new dependencies or version changes.
+Receive traffic preserves signed timestamps, disabled timestamps, MIDI bytes,
+UMP words and source sequence numbers. Both forwarding stages have a 128-packet
+and configured byte budget, including in-flight delivery. Overflow drops newest
+traffic and reports counters even if input then becomes silent. User callbacks
+remain in the parent and are not serialized. Callback guards, failure reporting,
+retirement and draining use the existing shared native mechanisms.
 
-## API and identity
+The parent admits at most 32 live subprocess workers, independently of the native
+client budget. Startup reservations count against this limit; failed starts and
+confirmed exits release them. Destruction schedules cleanup on the owner thread,
+without joining a blocked driver from the application thread. A child seeing EOF
+on the parent pipe exits even if its native operation is blocked. Worker deadlines
+cannot cancel arbitrary parent callback code or reset physical instrument state.
 
-Keep the public compiled `meedee.midi` module, error classes, and `Ignore` values.
-Register the original native client/port/connection classes in an internal native
-module; install one public Python ownership facade supporting both modes.
-Keep `__init__.py` empty and retain the existing native implementation.
-
-Isolated port handles contain direction and opaque ID snapshots; their equality
-compares these values. Native-mode handles use native equality. Opening an
-isolated connection resolves the ID against current discovery and rejects absent
-or ambiguous matches. IDs are not authenticated physical-device identities and
-may change or be reused; users must deliberately rediscover after failure.
-
-## Implementation and verification
-
-1. Expose the internal native module and reusable parent callback gate without
-   changing native ownership behavior.
-2. Add deadline-bounded worker communication, bounded receive delivery, child
-   invalidation/reaping, and interpreter-exit cleanup.
-3. Install the unified public facade, constructor settings, dropped-message
-   counter, and typed API. Preserve native-mode behavior and validate arguments
-   before initializing native resources.
-4. Exercise transport failures, timeout, overflow accounting, callback gating,
-   ownership, and resource cleanup using controlled subprocess fixtures that do
-   not open OS MIDI devices. Run required Python/Rust checks and packaging checks.
-5. Run the previously authorized CoreMIDI software-only loopback checks in both
-   modes. Cross-platform CI verifies builds, portable logic, and wheel contents;
-   physical hotplug and native ALSA/WinMM I/O remain separate validation gaps.
-6. Update usage and outstanding issues in the last implementation commit. Remove
-   only resolved issue text; retain parent-callback, driver, interpreter, and
-   device-health limitations.
+Validation uses the actual Rust client against a compiled, device-free worker
+fixture. Python tests retain callback, buffer, loss, UMP, lifecycle and compound
+progress coverage. Rust tests cover the public builders, direct worker binary,
+timeouts, crashes, spawn failure, admission and reaping without loading Python or
+opening MIDI endpoints. Native hardware and OS-backend qualification remain
+separate from these device-free checks.
 
 ## Additional work beyond the prompt
 
 None.
-
-
-## libremidi cutover, 2026-10-14
-
-Both modes now call the same Rust toolkit. Input/output naming arguments, ID
-lookup and filters were removed. Discovery serializes immutable owner/generation
-snapshots and retains their original native handles in the worker; opening never
-rediscovers by backend ID. Callbacks carry raw ReceivedPacket values. The private
-pipe encodes signed timestamps, clock identity/mode/backend and byte/word data
-explicitly. Parent-assigned clock identities distinguish children and reopenings.
-All failed opens invalidate the client, including expired or foreign snapshots.

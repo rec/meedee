@@ -26,7 +26,7 @@ impl Receiver for midi::Input {
         self.check_health()?;
         if self.dropped_packets() != 0 {
             return Err(midi::Error::Transport(crate::transport::Error::Resource(
-                "input packet loss reported by transport counter",
+                "input packet loss reported by transport counter".into(),
             )));
         }
         Ok(())
@@ -61,9 +61,8 @@ pub(crate) fn interrupted(error: &midi::Error) -> bool {
 pub(crate) fn input_loss(error: &midi::Error) -> bool {
     matches!(
         error,
-        midi::Error::Transport(crate::transport::Error::Resource(
-            "input packet loss reported by transport counter"
-        ))
+        midi::Error::Transport(crate::transport::Error::Resource(reason))
+            if reason == "input packet loss reported by transport counter"
     )
 }
 
@@ -107,7 +106,7 @@ pub(crate) mod tests {
         fn check(&self) -> midi::Result<()> {
             if self.lost {
                 Err(midi::Error::Transport(crate::transport::Error::Resource(
-                    "known loss",
+                    "known loss".into(),
                 )))
             } else {
                 Ok(())

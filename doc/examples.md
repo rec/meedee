@@ -745,3 +745,31 @@ send accepts the former playback options: origin, mappings, cancel,
 allow_rounding and metrics. A cancelled call returns a report with cancelled=True
 and leaves the output open. Empty input opens no ports. Cancellation can leave a
 note active until explicit release or normal output cleanup.
+
+
+## Run MIDI in a subprocess
+
+The default runs MIDI in your Python process. To put the native MIDI connection
+in a child process, use:
+
+```python
+import meedee as md
+
+md.Output(run_in_subprocess=True).send(md.Note("500 ms", 60))
+```
+
+The default child is a Python interpreter bootstrapping the shared Rust worker.
+With `meedee-worker` installed on PATH, launch the Rust executable directly:
+
+```python
+import meedee as md
+
+md.Output(run_in_subprocess=True, subprocess_worker="rust").send(md.Note("500 ms", 60))
+```
+
+`subprocess_executable` can select a particular interpreter or Rust executable.
+Both launchers use the same Rust IPC, deadlines and bounded input forwarding.
+Native operations default to a five-second deadline, configured by `timeout`;
+this is separate from an input's receive timeout. Child failure invalidates that
+client, without retries or automatic reconnection. A subprocess cannot isolate
+an instrument's state from other applications, or cancel a running parent callback.

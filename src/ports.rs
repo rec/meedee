@@ -61,18 +61,6 @@ impl Port {
             input,
         }
     }
-    #[getter]
-    fn _wire(&self) -> (String, u64, usize, String, String, u64, bool) {
-        (
-            self.owner.clone(),
-            self.snapshot,
-            self.index,
-            self.name.clone(),
-            format!("{:?}", self.backend),
-            self.backend_id,
-            self.input,
-        )
-    }
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
         other.extract::<PyRef<'_, Self>>().is_ok_and(|other| {
             self.owner == other.owner

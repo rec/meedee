@@ -43,6 +43,7 @@ mod transport_tests;
 /// One private binary. Public loaders select which definitions to register.
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
     module.add_function(wrap_pyfunction!(drivers::run_transfer_output, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_transfer_input, module)?)?;
@@ -269,4 +270,10 @@ fn populate_metrics(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_file_io(module: &Bound<'_, PyModule>) -> PyResult<()> {
     file_io::register(module)
+}
+
+#[pyfunction]
+fn run_subprocess_worker(py: Python<'_>) -> PyResult<()> {
+    py.detach(meedee::transport::subprocess::serve)
+        .map_err(|e| errors::transport_error(e, "worker"))
 }

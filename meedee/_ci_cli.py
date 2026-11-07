@@ -70,11 +70,15 @@ def run_browse(config: CiBrowse) -> int:
                 protocol=protocol,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
+                subprocess_worker=config.subprocess_worker,
+                subprocess_executable=config.subprocess_executable,
             )
             input_client = midi.Input(
                 protocol=protocol,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
+                subprocess_worker=config.subprocess_worker,
+                subprocess_executable=config.subprocess_executable,
                 event_limit=config.event_limit,
                 receive_byte_limit=config.byte_limit,
                 sysex_limit=config.max_sysex,

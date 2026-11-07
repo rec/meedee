@@ -24,6 +24,8 @@ def run_patch(config: Patch) -> int:
                     protocol=protocol,
                     backend=backend,
                     run_in_subprocess=config.run_in_subprocess,
+                    subprocess_worker=config.subprocess_worker,
+                    subprocess_executable=config.subprocess_executable,
                 )
                 port = select_port(client.ports(), name, direction="output")
                 outputs[name] = stack.enter_context(client.connect(port))
@@ -31,6 +33,8 @@ def run_patch(config: Patch) -> int:
                 protocol=protocol,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
+                subprocess_worker=config.subprocess_worker,
+                subprocess_executable=config.subprocess_executable,
                 event_limit=config.event_limit,
                 receive_byte_limit=config.receive_byte_limit,
                 sysex_limit=config.sysex_limit,

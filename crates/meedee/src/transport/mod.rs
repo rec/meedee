@@ -1,19 +1,20 @@
 //! Low-level native byte/UMP transport. Rust use never initializes Python.
 //!
 //! Each client owns a native thread, including destruction. Native calls can
-//! block indefinitely: this in-process Rust API does not provide process
-//! isolation. Callbacks must return promptly and must not call transport APIs.
+//! block indefinitely in-process. new_subprocess selects a shared deadline-bounded
+//! worker instead. Callbacks must return promptly and must not call transport APIs.
 //! Input is raw transport data; byte packets can contain partial SysEx and need
 //! a bounded stream decoder before being treated as complete musical messages.
 
 mod ffi;
 mod native;
+pub mod subprocess;
 mod worker;
 
 use std::error::Error as StdError;
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, Mutex, Weak};
 
 use native::{Native, Receiver};
 use worker::Worker;
@@ -23,14 +24,15 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
-    Capability(&'static str),
-    Invalid(&'static str),
+    Capability(String),
+    Invalid(String),
     Native(String),
     Busy,
     Closed,
     CallbackThread,
     Worker(String),
-    Resource(&'static str),
+    Timeout(String),
+    Resource(String),
     CompoundSend {
         completed_messages: Option<usize>,
         total_messages: usize,
@@ -44,7 +46,7 @@ impl fmt::Display for Error {
             Self::Capability(text) | Self::Invalid(text) | Self::Resource(text) => {
                 f.write_str(text)
             }
-            Self::Native(text) | Self::Worker(text) => f.write_str(text),
+            Self::Native(text) | Self::Worker(text) | Self::Timeout(text) => f.write_str(text),
             Self::Busy => f.write_str("native client command queue is full"),
             Self::Closed => f.write_str("native client thread has stopped"),
             Self::CallbackThread => {
@@ -148,11 +150,13 @@ pub struct OutputOptions {
 fn resolve_backend(protocol: Protocol, selected: Option<Backend>) -> Result<Backend> {
     let backend = selected.unwrap_or_else(|| default_backend(protocol));
     if backend.protocol() != protocol {
-        return Err(Error::Capability("backend and protocol do not match"));
+        return Err(Error::Capability(
+            "backend and protocol do not match".into(),
+        ));
     }
     if !compiled_backends()?.contains(&backend) {
         return Err(Error::Capability(
-            "requested native backend is not compiled; no fallback was selected",
+            "requested native backend is not compiled; no fallback was selected".into(),
         ));
     }
     Ok(backend)
@@ -215,12 +219,19 @@ pub struct Clock {
     pub mode: TimestampMode,
 }
 
+#[derive(Default)]
+pub(super) struct FailureState {
+    pub error: Mutex<Option<Error>>,
+    pub operation: Mutex<String>,
+}
 pub struct Input {
+    failure: Arc<FailureState>,
     worker: Worker<Native>,
     clock: Clock,
     limit: usize,
 }
 pub struct Output {
+    failure: Arc<FailureState>,
     worker: Worker<Native>,
     protocol: Protocol,
 }
@@ -228,24 +239,54 @@ pub struct Output {
 /// Owns the client until close returns it. Drop retires delivery immediately;
 /// native teardown is performed by the client thread without joining it here.
 pub struct InputConnection {
+    failure: Arc<FailureState>,
     worker: Option<Worker<Native>>,
     receiver: Arc<Receiver>,
     clock: Clock,
     limit: usize,
 }
 pub struct OutputConnection {
+    failure: Arc<FailureState>,
     worker: Worker<Native>,
     protocol: Protocol,
 }
 
+/// Read-only worker failure information, retained independently of native handles.
+#[derive(Clone)]
+pub struct WorkerDiagnostics {
+    failure: Arc<FailureState>,
+}
+impl WorkerDiagnostics {
+    pub fn operation(&self) -> String {
+        self.failure
+            .operation
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+    pub fn failure(&self) -> Option<Error> {
+        self.failure
+            .error
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+}
 /// Receive diagnostics remain readable after a connection is closed.
 #[derive(Clone)]
 pub struct InputDiagnostics {
+    failure: WorkerDiagnostics,
     receiver: Arc<Receiver>,
 }
 impl InputDiagnostics {
+    pub fn worker_failure(&self) -> Option<Error> {
+        self.failure.failure()
+    }
     pub fn dropped_packets(&self) -> u64 {
-        self.receiver.dropped.load(Ordering::Relaxed)
+        self.receiver
+            .dropped
+            .load(Ordering::Relaxed)
+            .saturating_add(self.receiver.transport_dropped.load(Ordering::Relaxed))
     }
     pub fn callback_panicked(&self) -> bool {
         self.receiver.panicked.load(Ordering::Acquire)
@@ -253,9 +294,23 @@ impl InputDiagnostics {
 }
 
 impl Input {
+    pub fn worker_diagnostics(&self) -> WorkerDiagnostics {
+        WorkerDiagnostics {
+            failure: Arc::clone(&self.failure),
+        }
+    }
+
+    pub fn worker_failure(&self) -> Option<Error> {
+        self.failure
+            .error
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+
     pub fn new(options: InputOptions) -> Result<Self> {
         if options.receive_byte_limit == 0 {
-            return Err(Error::Invalid("receive_byte_limit must be positive"));
+            return Err(Error::Invalid("receive_byte_limit must be positive".into()));
         }
         let backend = resolve_backend(options.protocol, options.backend)?;
         let clock = Clock {
@@ -265,12 +320,54 @@ impl Input {
         };
         let worker = Worker::spawn(move || Native::new(true, backend), Native::initialize)?;
         Ok(Self {
+            failure: Arc::new(FailureState::default()),
             worker,
             clock,
             limit: options.receive_byte_limit,
         })
     }
 
+    pub fn new_subprocess(
+        options: InputOptions,
+        subprocess: subprocess::SubprocessOptions,
+    ) -> Result<Self> {
+        if options.receive_byte_limit == 0 {
+            return Err(Error::Invalid("receive_byte_limit must be positive".into()));
+        }
+        let backend = options
+            .backend
+            .unwrap_or_else(|| default_backend(options.protocol));
+        if backend.protocol() != options.protocol {
+            return Err(Error::Capability(
+                "backend and protocol do not match".into(),
+            ));
+        }
+        let failure = Arc::new(FailureState::default());
+        let shared = Arc::clone(&failure);
+        let worker = Worker::spawn_subprocess(
+            move || {
+                Native::subprocess(
+                    true,
+                    backend,
+                    options.timestamps,
+                    options.receive_byte_limit,
+                    subprocess,
+                    shared,
+                )
+            },
+            Native::initialize,
+        )?;
+        Ok(Self {
+            failure,
+            worker,
+            clock: Clock {
+                id: 0,
+                backend,
+                mode: options.timestamps,
+            },
+            limit: options.receive_byte_limit,
+        })
+    }
     /// Refreshing discovery invalidates older port snapshots for this client.
     pub fn ports(&self) -> Result<Vec<Port>> {
         self.worker.call(Native::ports)
@@ -321,12 +418,12 @@ impl Input {
         let mut decoder =
             crate::live::Decoder::new(stream.clone(), self.clock.backend.protocol(), limit)
                 .map_err(|_| {
-                    Error::Invalid("source must be nonempty and decoder limit positive")
+                    Error::Invalid("source must be nonempty and decoder limit positive".into())
                 })?;
         let enabled = self.clock.mode == TimestampMode::Absolute;
         let clock = crate::events::Clock::new(
             crate::events::fresh_identity("native")
-                .map_err(|_| Error::Resource("clock identity space exhausted"))?,
+                .map_err(|_| Error::Resource("clock identity space exhausted".into()))?,
             1,
             1_000_000_000,
             if enabled {
@@ -378,6 +475,7 @@ impl Input {
         self.worker
             .call(move |native| native.open_input(port.as_ref(), &name, context))?;
         Ok(InputConnection {
+            failure: self.failure,
             worker: Some(self.worker),
             receiver,
             clock,
@@ -387,10 +485,58 @@ impl Input {
 }
 
 impl Output {
+    pub fn worker_diagnostics(&self) -> WorkerDiagnostics {
+        WorkerDiagnostics {
+            failure: Arc::clone(&self.failure),
+        }
+    }
+
+    pub fn worker_failure(&self) -> Option<Error> {
+        self.failure
+            .error
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+
     pub fn new(options: OutputOptions) -> Result<Self> {
         let backend = resolve_backend(options.protocol, options.backend)?;
         let worker = Worker::spawn(move || Native::new(false, backend), Native::initialize)?;
         Ok(Self {
+            failure: Arc::new(FailureState::default()),
+            worker,
+            protocol: options.protocol,
+        })
+    }
+    pub fn new_subprocess(
+        options: OutputOptions,
+        subprocess: subprocess::SubprocessOptions,
+    ) -> Result<Self> {
+        let backend = options
+            .backend
+            .unwrap_or_else(|| default_backend(options.protocol));
+        if backend.protocol() != options.protocol {
+            return Err(Error::Capability(
+                "backend and protocol do not match".into(),
+            ));
+        }
+        let failure = Arc::new(FailureState::default());
+        let shared = Arc::clone(&failure);
+        let worker = Worker::spawn_subprocess(
+            move || {
+                Native::subprocess(
+                    false,
+                    backend,
+                    TimestampMode::Off,
+                    8_388_608,
+                    subprocess,
+                    shared,
+                )
+            },
+            Native::initialize,
+        )?;
+        Ok(Self {
+            failure,
             worker,
             protocol: options.protocol,
         })
@@ -409,6 +555,7 @@ impl Output {
         self.worker
             .call(move |native| native.open_output(port.as_ref(), &name))?;
         Ok(OutputConnection {
+            failure: self.failure,
             worker: self.worker,
             protocol: self.protocol,
         })
@@ -416,6 +563,20 @@ impl Output {
 }
 
 impl InputConnection {
+    pub fn worker_diagnostics(&self) -> WorkerDiagnostics {
+        WorkerDiagnostics {
+            failure: Arc::clone(&self.failure),
+        }
+    }
+
+    pub fn worker_failure(&self) -> Option<Error> {
+        self.failure
+            .error
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+
     pub(crate) fn check_health(&self) -> Result<()> {
         self.worker
             .as_ref()
@@ -424,6 +585,9 @@ impl InputConnection {
     }
     pub fn diagnostics(&self) -> InputDiagnostics {
         InputDiagnostics {
+            failure: WorkerDiagnostics {
+                failure: Arc::clone(&self.failure),
+            },
             receiver: Arc::clone(&self.receiver),
         }
     }
@@ -431,7 +595,10 @@ impl InputConnection {
         self.clock
     }
     pub fn dropped_packets(&self) -> u64 {
-        self.receiver.dropped.load(Ordering::Relaxed)
+        self.receiver
+            .dropped
+            .load(Ordering::Relaxed)
+            .saturating_add(self.receiver.transport_dropped.load(Ordering::Relaxed))
     }
     pub fn callback_panicked(&self) -> bool {
         self.receiver.panicked.load(Ordering::Acquire)
@@ -444,6 +611,7 @@ impl InputConnection {
             native.check_health()
         })?;
         Ok(Input {
+            failure: Arc::clone(&self.failure),
             worker,
             clock: self.clock,
             limit: self.limit,
@@ -458,33 +626,38 @@ impl Drop for InputConnection {
 }
 
 impl OutputConnection {
+    pub fn worker_diagnostics(&self) -> WorkerDiagnostics {
+        WorkerDiagnostics {
+            failure: Arc::clone(&self.failure),
+        }
+    }
+
+    pub fn worker_failure(&self) -> Option<Error> {
+        self.failure
+            .error
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
+    }
+
     /// Send a complete command in one owner-thread operation. No other send or
     /// close on this connection can run between its primitive messages. The
     /// failed message may have effects even when its backend returns an error.
     pub fn send_command(&self, command: &(impl crate::messages::Command + ?Sized)) -> Result<()> {
         if self.protocol != Protocol::Midi1 {
             return Err(Error::Capability(
-                "compound commands require MIDI 1.0 byte transport",
+                "compound commands require MIDI 1.0 byte transport".into(),
             ));
         }
         let packets: Vec<Packet> = crate::codecs::expand(command)
-            .map_err(|_| Error::Invalid("command channel is unassigned"))?
+            .map_err(|_| Error::Invalid("command channel is unassigned".into()))?
             .iter()
             .map(|message| crate::codecs::encode(message).map(Packet::Bytes))
             .collect::<std::result::Result<_, _>>()
-            .map_err(|_| Error::Invalid("message channel is unassigned"))?;
+            .map_err(|_| Error::Invalid("message channel is unassigned".into()))?;
         let total_messages = packets.len();
         self.worker
-            .call(move |native| {
-                for (completed_messages, packet) in packets.iter().enumerate() {
-                    native.send(packet).map_err(|cause| Error::CompoundSend {
-                        completed_messages: Some(completed_messages),
-                        total_messages,
-                        cause: Box::new(cause),
-                    })?;
-                }
-                Ok(())
-            })
+            .call(move |native| native.send_packets(&packets))
             .map_err(|cause| {
                 if matches!(cause, Error::CompoundSend { .. }) {
                     return cause;
@@ -515,6 +688,7 @@ impl OutputConnection {
             native.check_health()
         })?;
         Ok(Output {
+            failure: self.failure,
             worker: self.worker,
             protocol: self.protocol,
         })
@@ -531,7 +705,7 @@ pub fn validate_packet(protocol: Protocol, packet: &Packet) -> Result<()> {
         }
         (Protocol::Ump, Packet::Ump(words)) => validate_ump(words),
         _ => Err(Error::Invalid(
-            "packet encoding does not match this connection, or the packet is empty",
+            "packet encoding does not match this connection, or the packet is empty".into(),
         )),
     }
 }
@@ -567,16 +741,18 @@ fn default_backend(protocol: Protocol) -> Backend {
 // their UMP-assigned widths so a stream cannot end halfway through a packet.
 fn validate_ump(words: &[u32]) -> Result<()> {
     if words.len() > i32::MAX as usize {
-        return Err(Error::Invalid("UMP word count exceeds the native limit"));
+        return Err(Error::Invalid(
+            "UMP word count exceeds the native limit".into(),
+        ));
     }
     if words.is_empty() {
-        return Err(Error::Invalid("UMP stream must not be empty"));
+        return Err(Error::Invalid("UMP stream must not be empty".into()));
     }
     let mut offset = 0;
     while offset < words.len() {
         offset += UMP_WORDS[(words[offset] >> 28) as usize];
         if offset > words.len() {
-            return Err(Error::Invalid("UMP stream ends inside a packet"));
+            return Err(Error::Invalid("UMP stream ends inside a packet".into()));
         }
     }
     Ok(())

@@ -67,11 +67,15 @@ def run_query(config: TuningPreview) -> int:
                 protocol=midi.Protocol.Midi1,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
+                subprocess_worker=config.subprocess_worker,
+                subprocess_executable=config.subprocess_executable,
             )
             input_client = midi.Input(
                 protocol=midi.Protocol.Midi1,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
+                subprocess_worker=config.subprocess_worker,
+                subprocess_executable=config.subprocess_executable,
                 receive_byte_limit=config.receive_byte_limit,
                 sysex_limit=config.payload_limit,
             )

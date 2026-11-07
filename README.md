@@ -696,22 +696,41 @@ clock after opening also discards that worker.
 Input silence does not identify unplugging, rebooting, unresponsiveness or an
 idle device. A failed send can already have changed physical state.
 
-With `run_in_subprocess=True`, each client has a separate Python child process
-owning its native transport. Inputs and outputs default to
+With `run_in_subprocess=True`, each client has a separate child process
+owning its native transport. The worker protocol, deadlines, loss accounting
+and process cleanup are implemented in Rust and shared by both APIs. Inputs and outputs default to
 `run_in_subprocess=False`. Input callbacks run in the parent. Native operation deadlines
 terminate a failed child; native errors, crashes and timeouts invalidate that
 client without automatically reopening it. `worker_failure` reports a known
 worker failure, not endpoint health. `run_in_subprocess=False` uses the same Rust
 transport in-process with fewer resources and no native-operation deadline.
-Live CLI commands expose `--run-in-subprocess` and `--no-run-in-subprocess`;
-their existing subprocess defaults are unchanged.
+Python defaults to `subprocess_worker="python"`, which launches a fresh Python
+interpreter whose worker module enters the Rust service. Set
+`subprocess_worker="rust"` to launch `meedee-worker` directly. The optional
+`subprocess_executable` selects the interpreter or worker executable; otherwise
+Python uses its current interpreter or searches PATH for `meedee-worker`.
+No application main guard is needed, and neither launcher maintains a second
+transport implementation.
+
+Rust clients enable the same transport with `with_run_in_subprocess(true)?`.
+`with_subprocess_options(SubprocessOptions { ... })?` configures the worker
+program, arguments and operation timeout (five seconds by default). These settings
+must be selected before discovery or connection. In-process remains the default;
+empty sends never start a worker. Rust applications do not require Python.
+From this checkout, install the standalone worker with
+`cargo install --path crates/meedee --bin meedee-worker`, or provide its executable
+path explicitly.
+
+Live CLI commands expose `--run-in-subprocess` and `--no-run-in-subprocess`, plus
+`--subprocess-worker python|rust` and `--subprocess-executable PATH`.
+Their existing subprocess defaults are unchanged.
 Both modes use a dedicated native owner thread per client for creation,
 operations and teardown; Windows COM initialization stays on that thread.
 
-A parent Python process admits at most 32 live isolated workers. Each Input or
+A parent process admits at most 32 live subprocess workers in either API. Each Input or
 Output resource uses one slot once initialized, including discovery-only use;
 an input/output pair uses two. Starts in progress and retiring children count until process exit
-is confirmed. At the limit first use raises ResourceError before starting
+is confirmed. At the limit first use reports a resource error before starting
 another child. Startup failures release their reservation. These counts are
 separate from native-client/connection limits and are not a machine-wide memory
 budget or a guarantee that 32 workers fit on any particular host.

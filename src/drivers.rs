@@ -104,7 +104,7 @@ impl Receiver for Input<'_, '_> {
         )?;
         if dropped != 0 {
             return Err(midi::Error::Transport(meedee::transport::Error::Resource(
-                "input packet loss reported by transport counter",
+                "input packet loss reported by transport counter".into(),
             )));
         }
         self.check_monitor()

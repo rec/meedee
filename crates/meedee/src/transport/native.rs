@@ -20,6 +20,7 @@ pub(super) struct Receiver {
     pub retired: AtomicBool,
     pub panicked: AtomicBool,
     pub dropped: AtomicU64,
+    pub transport_dropped: AtomicU64,
     sequence: AtomicU64,
     limit: usize,
     used: AtomicUsize,
@@ -39,6 +40,7 @@ impl Receiver {
             retired: AtomicBool::new(false),
             panicked: AtomicBool::new(false),
             dropped: AtomicU64::new(0),
+            transport_dropped: AtomicU64::new(0),
             sequence: AtomicU64::new(0),
             limit,
             used: AtomicUsize::new(0),
@@ -85,7 +87,7 @@ impl Receiver {
         }
     }
 
-    fn deliver(&self, sequence: u64, timestamp: i64, packet: Packet) {
+    pub(super) fn deliver(&self, sequence: u64, timestamp: Option<i64>, packet: Packet) {
         if self.retired.load(Ordering::SeqCst) {
             self.dropped.fetch_add(1, Ordering::Relaxed);
             return;
@@ -108,7 +110,11 @@ impl Receiver {
         let result = catch_unwind(AssertUnwindSafe(|| {
             handler(ReceivedPacket {
                 sequence,
-                timestamp_ns: (self.clock.mode == TimestampMode::Absolute).then_some(timestamp),
+                timestamp_ns: if self.clock.mode == TimestampMode::Absolute {
+                    timestamp
+                } else {
+                    None
+                },
                 clock: self.clock,
                 packet,
             })
@@ -204,6 +210,9 @@ pub(super) struct Native {
     observer_diagnostics: Box<Diagnostics>,
     runtime: bool,
     retained: bool,
+    remote_options: Option<(super::subprocess::SubprocessOptions, TimestampMode, usize)>,
+    remote: Option<super::subprocess::Session>,
+    failure: Arc<super::FailureState>,
 }
 
 impl Native {
@@ -222,10 +231,38 @@ impl Native {
             observer_diagnostics: Box::default(),
             runtime: false,
             retained: false,
+            remote_options: None,
+            remote: None,
+            failure: Arc::new(super::FailureState::default()),
         }
     }
 
+    pub fn subprocess(
+        input: bool,
+        backend: Backend,
+        mode: TimestampMode,
+        limit: usize,
+        options: super::subprocess::SubprocessOptions,
+        failure: Arc<super::FailureState>,
+    ) -> Self {
+        let mut native = Self::new(input, backend);
+        native.remote_options = Some((options, mode, limit));
+        native.failure = failure;
+        native
+    }
+
     pub fn initialize(&mut self) -> Result<()> {
+        if let Some((options, mode, limit)) = self.remote_options.take() {
+            self.remote = Some(super::subprocess::Session::start(
+                options,
+                self.input_direction,
+                self.backend,
+                mode,
+                limit,
+                Arc::clone(&self.failure),
+            )?);
+            return Ok(());
+        }
         // SAFETY: called only by the owning thread; shutdown is balanced there.
         status(unsafe { ffi::md_thread_init() })?;
         self.runtime = true;
@@ -244,6 +281,22 @@ impl Native {
     }
 
     pub fn ports(&mut self) -> Result<Vec<Port>> {
+        if let Some(remote) = &self.remote {
+            let descriptors = remote.ports()?;
+            self.generation += 1;
+            return Ok(descriptors
+                .into_iter()
+                .enumerate()
+                .map(|(index, (name, backend_id))| Port {
+                    owner: Arc::downgrade(&self.identity),
+                    generation: self.generation,
+                    index,
+                    backend: self.backend,
+                    backend_id,
+                    name,
+                })
+                .collect());
+        }
         self.check(0)?;
         let mut collector = Collector {
             input: self.input_direction,
@@ -270,7 +323,7 @@ impl Native {
         let mut ports = Vec::new();
         ports
             .try_reserve_exact(collector.ports.len())
-            .map_err(|_| Error::Resource("port metadata allocation failed"))?;
+            .map_err(|_| Error::Resource("port metadata allocation failed".into()))?;
         for (index, port) in collector.ports.iter().enumerate() {
             let (mut id, mut name, mut size) = (0, ptr::null(), 0);
             // SAFETY: the cloned port remains alive for the length of this call
@@ -291,7 +344,7 @@ impl Native {
                 unsafe { std::slice::from_raw_parts(name.cast::<u8>(), size) }
             };
             let name = String::from_utf8(copy(bytes)?)
-                .map_err(|_| Error::Invalid("native port name is not UTF-8"))?;
+                .map_err(|_| Error::Invalid("native port name is not UTF-8".into()))?;
             ports.push(Port {
                 owner: Arc::downgrade(&self.identity),
                 generation: self.generation,
@@ -313,13 +366,15 @@ impl Native {
         if !port.owner.ptr_eq(&Arc::downgrade(&self.identity)) || port.generation != self.generation
         {
             return Err(Error::Invalid(
-                "port belongs to another client or an expired discovery snapshot",
+                "port belongs to another client or an expired discovery snapshot".into(),
             ));
         }
         self.ports
             .get(port.index)
             .map(|port| port.raw.cast_const())
-            .ok_or(Error::Invalid("port is not in this discovery snapshot"))
+            .ok_or(Error::Invalid(
+                "port is not in this discovery snapshot".into(),
+            ))
     }
 
     pub fn open_input(
@@ -328,6 +383,28 @@ impl Native {
         name: &CString,
         receiver: Arc<Receiver>,
     ) -> Result<()> {
+        if self.remote.is_some() {
+            let index = match self.remote_index(port) {
+                Ok(index) => index,
+                Err(error) => {
+                    let error = Error::Native(error.to_string());
+                    self.remote
+                        .as_ref()
+                        .unwrap()
+                        .invalidate("open", error.clone());
+                    return Err(error);
+                }
+            };
+            let limit = receiver.limit;
+            self.receiver = Some(Arc::clone(&receiver));
+            return self.remote.as_mut().unwrap().open(
+                index,
+                name.to_str()
+                    .map_err(|_| Error::Invalid("port name is not UTF-8".into()))?,
+                Some(receiver),
+                limit,
+            );
+        }
         let port = self.port(port)?;
         self.receiver = Some(receiver);
         let receiver = self.receiver.as_mut().unwrap();
@@ -360,7 +437,41 @@ impl Native {
         result
     }
 
+    fn remote_index(&self, port: Option<&Port>) -> Result<Option<usize>> {
+        port.map(|port| {
+            if !port.owner.ptr_eq(&Arc::downgrade(&self.identity))
+                || port.generation != self.generation
+            {
+                Err(Error::Invalid(
+                    "port belongs to another client or an expired discovery snapshot".into(),
+                ))
+            } else {
+                Ok(port.index)
+            }
+        })
+        .transpose()
+    }
     pub fn open_output(&mut self, port: Option<&Port>, name: &CString) -> Result<()> {
+        if self.remote.is_some() {
+            let index = match self.remote_index(port) {
+                Ok(index) => index,
+                Err(error) => {
+                    let error = Error::Native(error.to_string());
+                    self.remote
+                        .as_ref()
+                        .unwrap()
+                        .invalidate("open", error.clone());
+                    return Err(error);
+                }
+            };
+            return self.remote.as_mut().unwrap().open(
+                index,
+                name.to_str()
+                    .map_err(|_| Error::Invalid("port name is not UTF-8".into()))?,
+                None,
+                0,
+            );
+        }
         let port = self.port(port)?;
         // SAFETY: arguments are live for creation; diagnostics lives with self.
         let result = unsafe {
@@ -381,6 +492,17 @@ impl Native {
     }
 
     pub fn close_input(&mut self) -> Result<()> {
+        if self.remote.is_some() && self.receiver.is_some() {
+            self.receiver
+                .as_ref()
+                .unwrap()
+                .retired
+                .store(true, Ordering::SeqCst);
+            let result = self.remote.as_ref().unwrap().close();
+            self.receiver.as_ref().unwrap().drain();
+            self.receiver = None;
+            return result;
+        }
         if let Some(receiver) = &self.receiver {
             receiver.drain();
         }
@@ -399,6 +521,9 @@ impl Native {
     }
 
     pub fn close_output(&mut self) -> Result<()> {
+        if let Some(remote) = &self.remote {
+            return remote.close();
+        }
         if !self.output.is_null() {
             // SAFETY: exclusive owner; bridge deletion does not retain arguments.
             let result = unsafe { ffi::md_output_free(self.output) };
@@ -411,7 +536,23 @@ impl Native {
         Ok(())
     }
 
+    pub fn send_packets(&mut self, packets: &[Packet]) -> Result<()> {
+        if let Some(remote) = &self.remote {
+            return remote.send(packets, true);
+        }
+        for (completed_messages, packet) in packets.iter().enumerate() {
+            self.send(packet).map_err(|cause| Error::CompoundSend {
+                completed_messages: Some(completed_messages),
+                total_messages: packets.len(),
+                cause: Box::new(cause),
+            })?;
+        }
+        Ok(())
+    }
     pub fn send(&mut self, packet: &Packet) -> Result<()> {
+        if let Some(remote) = &self.remote {
+            return remote.send(std::slice::from_ref(packet), false);
+        }
         self.check(0)?;
         if self.output.is_null() {
             return Err(Error::Closed);
@@ -456,6 +597,9 @@ impl Native {
     }
 
     fn check(&self, code: i32) -> Result<()> {
+        if let Some(remote) = &self.remote {
+            return remote.check();
+        }
         self.diagnostics.check(code, false)?;
         if !self.is_coremidi() {
             self.observer_diagnostics.check(0, false)?;
@@ -470,6 +614,13 @@ impl Native {
 
 impl Drop for Native {
     fn drop(&mut self) {
+        if self.remote.is_some() {
+            if let Some(receiver) = &self.receiver {
+                receiver.retired.store(true, Ordering::SeqCst);
+            }
+            self.remote = None;
+            return;
+        }
         if let Some(receiver) = &self.receiver {
             receiver.retired.store(true, Ordering::SeqCst);
         }
@@ -503,14 +654,14 @@ pub(super) fn status(code: i32) -> Result<()> {
 }
 
 pub(super) fn port_name(name: &str) -> Result<CString> {
-    CString::new(name).map_err(|_| Error::Invalid("port name must not contain NUL"))
+    CString::new(name).map_err(|_| Error::Invalid("port name must not contain NUL".into()))
 }
 
 pub(super) fn copy<T: Copy>(data: &[T]) -> Result<Vec<T>> {
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(data.len())
-        .map_err(|_| Error::Resource("MIDI payload allocation failed"))?;
+        .map_err(|_| Error::Resource("MIDI payload allocation failed".into()))?;
     owned.extend_from_slice(data);
     Ok(owned)
 }
@@ -541,7 +692,7 @@ unsafe extern "C" fn visit(ctx: *mut c_void, port: *const c_void) {
         collector
             .ports
             .try_reserve(1)
-            .map_err(|_| Error::Resource("port snapshot allocation failed"))?;
+            .map_err(|_| Error::Resource("port snapshot allocation failed".into()))?;
         let mut raw = ptr::null_mut();
         // SAFETY: port is valid only for this callback; the returned clone is owned.
         status(unsafe { ffi::md_port_clone(u32::from(collector.input), port, &mut raw) })?;
@@ -554,7 +705,7 @@ unsafe extern "C" fn visit(ctx: *mut c_void, port: *const c_void) {
     collector.error = match result {
         Ok(Ok(())) => None,
         Ok(Err(error)) => Some(error),
-        Err(_) => Some(Error::Resource("port discovery panicked")),
+        Err(_) => Some(Error::Resource("port discovery panicked".into())),
     };
 }
 
@@ -618,7 +769,7 @@ unsafe extern "C" fn on_bytes(ctx: *mut c_void, timestamp: i64, bytes: *const u8
         return;
     };
     match copy(data) {
-        Ok(data) => receiver.deliver(sequence, timestamp, Packet::Bytes(data)),
+        Ok(data) => receiver.deliver(sequence, Some(timestamp), Packet::Bytes(data)),
         Err(_) => {
             receiver.dropped.fetch_add(1, Ordering::Relaxed);
         }
@@ -650,7 +801,7 @@ unsafe extern "C" fn on_words(ctx: *mut c_void, timestamp: i64, words: *const u3
         return;
     };
     match copy(data) {
-        Ok(data) => receiver.deliver(sequence, timestamp, Packet::Ump(data)),
+        Ok(data) => receiver.deliver(sequence, Some(timestamp), Packet::Ump(data)),
         Err(_) => {
             receiver.dropped.fetch_add(1, Ordering::Relaxed);
         }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from os import PathLike
 from typing import TYPE_CHECKING, Literal, Self
 
 from . import _core, topology
@@ -17,6 +18,8 @@ class Poller:
         protocol: Literal["midi1", "ump"],
         backend: str | None = None,
         run_in_subprocess: bool = True,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         port_limit: int = 256,
         detail_limit: int = 128,
         history_limit: int = 128,
@@ -32,6 +35,10 @@ class Poller:
         )
         self._protocol = protocol
         self._backend = backend
+        if subprocess_worker not in ("python", "rust"):
+            raise ValueError("subprocess_worker must be python or rust")
+        self._subprocess_worker = subprocess_worker
+        self._subprocess_executable = subprocess_executable
         self._run_in_subprocess = run_in_subprocess
         self._input: midi.Input | None = None
         self._output: midi.Output | None = None
@@ -79,6 +86,8 @@ class Poller:
                     protocol=protocol,
                     backend=backend,
                     run_in_subprocess=self._run_in_subprocess,
+                    subprocess_worker=self._subprocess_worker,
+                    subprocess_executable=self._subprocess_executable,
                 )
             return self._input.ports()
         if self._output is None:
@@ -86,6 +95,8 @@ class Poller:
                 protocol=protocol,
                 backend=backend,
                 run_in_subprocess=self._run_in_subprocess,
+                subprocess_worker=self._subprocess_worker,
+                subprocess_executable=self._subprocess_executable,
             )
         return self._output.ports()
 

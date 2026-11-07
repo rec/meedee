@@ -16,6 +16,7 @@ use crate::state::Client;
 pub struct Input {
     state: Arc<Client<transport::Input>>,
     identity: String,
+    diagnostics: transport::WorkerDiagnostics,
     snapshot: AtomicU64,
     mode: TimestampMode,
 }
@@ -23,7 +24,7 @@ pub struct Input {
 #[pymethods]
 impl Input {
     #[new]
-    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None, timestamps=TimestampMode::Absolute, receive_byte_limit=8_388_608))]
+    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None, timestamps=TimestampMode::Absolute, receive_byte_limit=8_388_608, worker_program=None, worker_args=None, worker_timeout=5.0))]
     fn new(
         py: Python<'_>,
         identity: String,
@@ -31,26 +32,56 @@ impl Input {
         backend: Option<Backend>,
         timestamps: TimestampMode,
         receive_byte_limit: usize,
+        worker_program: Option<std::path::PathBuf>,
+        worker_args: Option<Vec<std::ffi::OsString>>,
+        worker_timeout: f64,
     ) -> PyResult<Self> {
         check_blocking_thread()?;
         lifecycle::initialize(py)?;
         let native = py
             .detach(|| {
                 native_call("create input", || {
-                    transport::Input::new(transport::InputOptions {
+                    let options = transport::InputOptions {
                         protocol: protocol.native(),
                         backend: backend.map(Backend::native),
                         timestamps: timestamps.native(),
                         receive_byte_limit,
-                    })
+                    };
+                    if let Some(program) = worker_program {
+                        transport::Input::new_subprocess(
+                            options,
+                            transport::subprocess::SubprocessOptions {
+                                program,
+                                args: worker_args.unwrap_or_default(),
+                                timeout: std::time::Duration::try_from_secs_f64(worker_timeout)
+                                    .map_err(|_| {
+                                        transport::Error::Invalid(
+                                            "worker timeout must be finite and nonnegative".into(),
+                                        )
+                                    })?,
+                            },
+                        )
+                    } else {
+                        transport::Input::new(options)
+                    }
                 })
             })?
             .map_err(|e| transport_error(e, "init"))?;
+        let diagnostics = native.worker_diagnostics();
         Ok(Self {
+            diagnostics,
             state: Arc::new(Client::new(native)),
             identity,
             snapshot: AtomicU64::new(0),
             mode: timestamps,
+        })
+    }
+    #[getter]
+    fn worker_failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
+        self.diagnostics.failure().map(|e| {
+            transport_error(e, &self.diagnostics.operation())
+                .into_value(py)
+                .into_any()
         })
     }
     fn ports(&self, py: Python<'_>) -> PyResult<Vec<Port>> {
@@ -82,7 +113,7 @@ impl Input {
             move |native, callback| match native_port {
                 Some(port) => native.connect(&port, callback),
                 None => Err(transport::Error::Invalid(
-                    "port is not a native snapshot from this client",
+                    "port is not a native snapshot from this client".into(),
                 )),
             },
         )
@@ -121,7 +152,7 @@ impl InputConnection {
     }
     #[getter]
     fn closed(&self) -> bool {
-        self.resource.native.closed()
+        self.resource.native.closed() || self.client.get().diagnostics.failure().is_some()
     }
     #[getter]
     fn clock(&self) -> PyResult<Clock> {
@@ -139,7 +170,15 @@ impl InputConnection {
     }
     #[getter]
     fn worker_failure(&self, py: Python<'_>) -> Option<Py<PyAny>> {
-        self.resource.callback.as_ref().and_then(|c| c.failure(py))
+        self.diagnostics
+            .get()
+            .and_then(|d| d.worker_failure())
+            .map(|e| {
+                transport_error(e, &self.client.get().diagnostics.operation())
+                    .into_value(py)
+                    .into_any()
+            })
+            .or_else(|| self.resource.callback.as_ref().and_then(|c| c.failure(py)))
     }
     #[getter]
     fn last_message_time(&self) -> Option<f64> {

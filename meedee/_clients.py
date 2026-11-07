@@ -16,22 +16,24 @@ from queue import Empty, Full
 from threading import Lock, RLock, Thread
 from time import monotonic
 from types import TracebackType
-from typing import cast
+from typing import Literal, cast
 from uuid import uuid4
 
 from . import _native, _units, archive, codecs, events, gm, messages, midi
 from ._errors import CompoundSendError
-from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, Context, Delivery, ReceiveQueue
+from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, ReceiveQueue
 from .events import Clock
 
 
 class Input[T = messages.Message | events.StreamDiagnostic]:
     __slots__ = (
         "_native",
-        "_context",
         "_settings",
         "_initialization",
         "_run_in_subprocess",
+        "_subprocess_worker",
+        "_subprocess_executable",
+        "_failure",
         "_timeout",
         "_protocol",
         "_raw_mode",
@@ -57,11 +59,17 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         backend: midi.Backend | None = None,
         timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
         run_in_subprocess: bool = False,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = DEFAULT_RECEIVE_BYTE_LIMIT,
     ) -> None:
         timeout = _units.real(timeout, "second")
         validate_settings(protocol, backend, run_in_subprocess, timeout)
+        if subprocess_worker not in ("python", "rust"):
+            raise ValueError("subprocess_worker must be python or rust")
+        if subprocess_executable is not None:
+            subprocess_executable = str(Path(subprocess_executable))
         if not isinstance(timestamps, midi.TimestampMode):
             raise TypeError("timestamps must be TimestampMode")
         receive_byte_limit = _units.integer(receive_byte_limit, "byte")
@@ -95,7 +103,6 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             raise ValueError("port pattern must not be empty")
         self._port = port
         self._initialization = Lock()
-        self._context: Context | None = None
         self._closed = False
         self._channels = channels
         self._connection: _InputState[T] | None = None
@@ -112,6 +119,9 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             "receive_byte_limit": receive_byte_limit,
         }
         self._settings = settings
+        self._subprocess_worker = subprocess_worker
+        self._subprocess_executable = subprocess_executable
+        self._failure: Exception | None = None
         self._run_in_subprocess = run_in_subprocess
         self._timeout = timeout
         self._native = None
@@ -121,29 +131,36 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         with self._initialization:
             if self._closed:
                 raise midi.StateError("client is closed")
-            if self._native is not None or self._context is not None:
+            if self._native is not None:
                 return
+            settings: dict[str, object] = dict(self._settings)
             if self._run_in_subprocess:
-                self._context = Context(self._timeout, self._byte_limit)
-                self._context.request("init", [True, wire_settings(self._settings)])
-            else:
-                self._native = _native.Input(**self._settings)
+                settings.update(
+                    worker_program=self._subprocess_executable
+                    or (
+                        sys.executable
+                        if self._subprocess_worker == "python"
+                        else "meedee-worker"
+                    ),
+                    worker_args=["-m", "meedee._worker"]
+                    if self._subprocess_worker == "python"
+                    else [],
+                    worker_timeout=self._timeout,
+                )
+            self._native = _native.Input(**settings)
 
     def ports(self) -> list[midi.Port]:
         if self._closed or self._connection is not None:
             raise midi.StateError("client is connected or closed")
         self._initialize()
-        if self._native is not None:
-            return self._native.ports()
-        assert self._context is not None
-        return [
-            port_from_wire(cast(tuple[object, ...], p))
-            for p in cast(list[object], self._context.request("ports", []))
-        ]
+        assert self._native is not None
+        return self._native.ports()
 
     @property
     def worker_failure(self) -> Exception | None:
-        return None if self._context is None else self._context.failure_exception
+        if self._native is not None and self._run_in_subprocess:
+            return self._native.worker_failure
+        return self._failure
 
     def connect(
         self, port: midi.Port, callback: Callable[[T], object] | None = None
@@ -170,27 +187,15 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         if name is None and not isinstance(port, midi.Port):
             raise TypeError("port must be a discovery snapshot")
         self._initialize()
+        assert self._native is not None
         identity = uuid4().hex
         connection = _InputState[T]._create(self, callback)
         transport = _InputTransport[T]._create(self)
-        if self._native is not None:
-            transport._native = (
-                self._native.connect(
-                    cast(midi.Port, port), connection._deliver, identity
-                )
-                if name is None
-                else self._native.create_virtual(name, connection._deliver, identity)
-            )
-        else:
-            assert self._context is not None
-            transport._delivery = self._context.open(
-                "connect" if name is None else "virtual",
-                None if port is None else port._wire,
-                name or "",
-                connection._deliver,
-                identity,
-            )
-            transport._generation = self._context.generation
+        transport._native = (
+            self._native.connect(cast(midi.Port, port), connection._deliver, identity)
+            if name is None
+            else self._native.create_virtual(name, connection._deliver, identity)
+        )
         transport._closed = False
         connection._raw = transport
         self._connection = connection
@@ -299,8 +304,10 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
 
     @property
     def closed(self) -> bool:
-        return self._closed or (
-            self._connection is not None and self._connection.closed
+        return (
+            self._closed
+            or self.worker_failure is not None
+            or (self._connection is not None and self._connection.closed)
         )
 
     def close(self) -> None:
@@ -309,15 +316,12 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             if self._closed:
                 return
             self._closed = True
-        # Teardown may release user callbacks and run Python destructors.
-        # Do not hold the initialization lock across that reentrant work.
         try:
             if self._connection is not None:
                 self._connection.close()
         finally:
+            self._failure = self.worker_failure
             self._native = None
-            if self._context is not None:
-                self._context.dispose()
 
     def receive(
         self,
@@ -406,9 +410,6 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
                 self.close()
         except INPUT_ERRORS as error:
             print(error, file=sys.stderr)
-        finally:
-            if (context := getattr(self, "_context", None)) is not None:
-                context.dispose()
 
 
 class Output:
@@ -416,10 +417,12 @@ class Output:
 
     __slots__ = (
         "_native",
-        "_context",
         "_settings",
         "_initialization",
         "_run_in_subprocess",
+        "_subprocess_worker",
+        "_subprocess_executable",
+        "_failure",
         "_timeout",
         "_protocol",
         "_channel",
@@ -439,10 +442,16 @@ class Output:
         protocol: midi.Protocol = midi.Protocol.Midi1,
         backend: midi.Backend | None = None,
         run_in_subprocess: bool = False,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         timeout: float | str = 5.0,
     ) -> None:
         timeout = _units.real(timeout, "second")
         validate_settings(protocol, backend, run_in_subprocess, timeout)
+        if subprocess_worker not in ("python", "rust"):
+            raise ValueError("subprocess_worker must be python or rust")
+        if subprocess_executable is not None:
+            subprocess_executable = str(Path(subprocess_executable))
         messages.NoteOn(0, channel=channel)
         if port is not None and not isinstance(port, str):
             raise TypeError("port must be a name pattern or None")
@@ -455,7 +464,6 @@ class Output:
                 raise ValueError("bpm must be positive and finite")
         self._beat_period = None if bpm is None else Fraction(60) / Fraction(str(bpm))
         self._initialization = Lock()
-        self._context: Context | None = None
         self._closed = False
         self._channel = channel
         self._port = port
@@ -467,6 +475,9 @@ class Output:
             "backend": backend,
         }
         self._settings = settings
+        self._subprocess_worker = subprocess_worker
+        self._subprocess_executable = subprocess_executable
+        self._failure: Exception | None = None
         self._run_in_subprocess = run_in_subprocess
         self._timeout = timeout
         self._native = None
@@ -476,29 +487,36 @@ class Output:
         with self._initialization:
             if self._closed:
                 raise midi.StateError("client is closed")
-            if self._native is not None or self._context is not None:
+            if self._native is not None:
                 return
+            settings: dict[str, object] = dict(self._settings)
             if self._run_in_subprocess:
-                self._context = Context(self._timeout)
-                self._context.request("init", [False, wire_settings(self._settings)])
-            else:
-                self._native = _native.Output(**self._settings)
+                settings.update(
+                    worker_program=self._subprocess_executable
+                    or (
+                        sys.executable
+                        if self._subprocess_worker == "python"
+                        else "meedee-worker"
+                    ),
+                    worker_args=["-m", "meedee._worker"]
+                    if self._subprocess_worker == "python"
+                    else [],
+                    worker_timeout=self._timeout,
+                )
+            self._native = _native.Output(**settings)
 
     def ports(self) -> list[midi.Port]:
         if self._closed or self._connection is not None:
             raise midi.StateError("client is connected or closed")
         self._initialize()
-        if self._native is not None:
-            return self._native.ports()
-        assert self._context is not None
-        return [
-            port_from_wire(cast(tuple[object, ...], p))
-            for p in cast(list[object], self._context.request("ports", []))
-        ]
+        assert self._native is not None
+        return self._native.ports()
 
     @property
     def worker_failure(self) -> Exception | None:
-        return None if self._context is None else self._context.failure_exception
+        if self._native is not None and self._run_in_subprocess:
+            return self._native.worker_failure
+        return self._failure
 
     def connect(self, port: midi.Port) -> Output:
         _native.check_thread()
@@ -508,12 +526,8 @@ class Output:
             raise TypeError("port must be a discovery snapshot")
         self._initialize()
         connection = _OutputState._create(self)
-        if self._native is not None:
-            connection._native = self._native.connect(port)
-        else:
-            assert self._context is not None
-            self._context.open("connect", port._wire, "", None, "")
-            connection._generation = self._context.generation
+        assert self._native is not None
+        connection._native = self._native.connect(port)
         connection._closed = False
         self._connection = connection
         return self
@@ -524,12 +538,8 @@ class Output:
         validate_open(name)
         self._initialize()
         connection = _OutputState._create(self)
-        if self._native is not None:
-            connection._native = self._native.create_virtual(name)
-        else:
-            assert self._context is not None
-            self._context.open("virtual", None, name, None, "")
-            connection._generation = self._context.generation
+        assert self._native is not None
+        connection._native = self._native.create_virtual(name)
         connection._closed = False
         self._connection = connection
         return self
@@ -746,8 +756,10 @@ class Output:
 
     @property
     def closed(self) -> bool:
-        return self._closed or (
-            self._connection is not None and self._connection.closed
+        return (
+            self._closed
+            or self.worker_failure is not None
+            or (self._connection is not None and self._connection.closed)
         )
 
     def close(self) -> None:
@@ -756,13 +768,12 @@ class Output:
             if self._closed:
                 return
             self._closed = True
-            try:
-                if self._connection is not None:
-                    self._connection.close()
-            finally:
-                self._native = None
-                if self._context is not None:
-                    self._context.dispose()
+        try:
+            if self._connection is not None:
+                self._connection.close()
+        finally:
+            self._failure = self.worker_failure
+            self._native = None
 
     def __del__(self) -> None:
         try:
@@ -770,23 +781,12 @@ class Output:
                 self.close()
         except INPUT_ERRORS as error:
             print(error, file=sys.stderr)
-        finally:
-            if (context := getattr(self, "_context", None)) is not None:
-                context.dispose()
 
 
 class _InputTransport[T]:
-    _snapshot: tuple[Clock, int, float | None] | None
+    _snapshot: tuple[Clock, int, float | None, BaseException | None] | None
 
-    __slots__ = (
-        "_context",
-        "_native",
-        "_delivery",
-        "_closed",
-        "_generation",
-        "_snapshot",
-        "__weakref__",
-    )
+    __slots__ = ("_native", "_closed", "_snapshot", "__weakref__")
 
     def __init__(self) -> None:
         raise TypeError("MIDI connection handles cannot be constructed directly")
@@ -794,59 +794,40 @@ class _InputTransport[T]:
     @classmethod
     def _create(cls, client: Input[T]) -> _InputTransport[T]:
         connection = object.__new__(cls)
-        connection._context = client._context
         connection._native = cast(_native.InputConnection | None, None)
-        connection._delivery = cast(Delivery | None, None)
         connection._snapshot = None
         connection._closed = True
-        connection._generation = (
-            0 if client._context is None else client._context.generation
-        )
         return connection
 
     @property
     def closed(self) -> bool:
-        if self._native is not None:
-            return self._native.closed
-        return self._closed or bool(self._context and self._context.failure)
+        return self._closed if self._native is None else self._native.closed
 
     @property
     def clock(self) -> Clock:
         if self._snapshot is not None:
             return self._snapshot[0]
-        if self._native is not None:
-            return self._native.clock
-        assert self._delivery is not None and self._delivery.clock is not None
-        return self._delivery.clock
+        assert self._native is not None
+        return self._native.clock
 
     @property
     def dropped_packets(self) -> int:
         if self._snapshot is not None:
             return self._snapshot[1]
-        if self._native is not None:
-            return self._native.dropped_packets
-        assert self._delivery is not None
-        return (
-            self._delivery.dropped
-            + self._delivery.worker_dropped
-            + self._delivery.bridge.discarded_packets
-        )
+        assert self._native is not None
+        return self._native.dropped_packets
 
     @property
     def worker_failure(self) -> BaseException | None:
-        if self._native is not None:
-            return self._native.worker_failure
-        return None if self._context is None else self._context.failure_exception
+        if self._snapshot is not None:
+            return self._snapshot[3]
+        return None if self._native is None else self._native.worker_failure
 
     @property
     def last_message_time(self) -> float | None:
         if self._snapshot is not None:
             return self._snapshot[2]
-        if self._native is not None:
-            return self._native.last_message_time
-        return (
-            None if self._delivery is None else self._delivery.bridge.last_message_time
-        )
+        return None if self._native is None else self._native.last_message_time
 
     def close(self) -> None:
         _native.check_thread()
@@ -858,37 +839,24 @@ class _InputTransport[T]:
                     self._native.clock,
                     self._native.dropped_packets,
                     self._native.last_message_time,
+                    self._native.worker_failure,
                 )
                 self._closed = True
                 self._native = None
-        elif not self._closed:
-            assert self._context is not None and self._delivery is not None
-            self._delivery.retire()
-            try:
-                self._context.close(self._generation)
-                self._closed = True
-            finally:
-                self._delivery.drain()
-
-    def __del__(self) -> None:
-        if (delivery := getattr(self, "_delivery", None)) is not None:
-            delivery.retire()
-            if not self._closed and self._context is not None:
-                self._context.defer_close(self._generation)
 
 
 class _OutputState:
     """An open destination for messages, encoded packets and timed playback."""
 
     __slots__ = (
-        "_context",
         "_native",
         "_closed",
-        "_generation",
         "_state",
         "_protocol",
         "_channel",
         "_beat_period",
+        "_failure",
+        "_run_in_subprocess",
         "__weakref__",
     )
 
@@ -898,27 +866,20 @@ class _OutputState:
     @classmethod
     def _create(cls, client: Output) -> _OutputState:
         connection = object.__new__(cls)
-        connection._context = client._context
+        connection._failure = None
+        connection._run_in_subprocess = client._run_in_subprocess
         connection._state = _native.OutputState()
         connection._protocol = client._protocol
         connection._channel = client._channel
         connection._beat_period = client._beat_period
         connection._native = cast(_native.OutputConnection | None, None)
         connection._closed = True
-        connection._generation = (
-            0 if client._context is None else client._context.generation
-        )
         return connection
 
     def _send(self, value: object) -> None:
-        """Send a message, compound command or encoded packet immediately.
-
-        Compound operations serialize their entire expansion on this connection.
-        CompoundSendError reports known progress when part of an operation fails.
-        Protocol conversion is never implicit.
-        """
         _native.check_thread()
         prepared = _native.prepare_output(self._protocol, value)
+        assert self._native is not None
         if isinstance(prepared, tuple):
             total = prepared[2]
             packets = [
@@ -928,15 +889,7 @@ class _OutputState:
                 )(value)
             ]
             try:
-                if self._native is not None:
-                    self._native.send_command(value)
-                else:
-                    if self.closed:
-                        raise _native.StateError("MIDI connection is closed or failed")
-                    assert self._context is not None
-                    self._context.request(
-                        "send_command", [prepared, self._generation], serial=True
-                    )
+                self._native.send_command(value)
             except CompoundSendError as error:
                 for p in packets[: error.completed_messages or 0]:
                     self._state.feed(p)
@@ -949,35 +902,20 @@ class _OutputState:
                 raise CompoundSendError(str(error), None, total) from error
             for p in packets:
                 self._state.feed(p)
-        elif self._native is not None:
-            self._native.send(prepared)
         else:
-            if self.closed:
-                raise _native.StateError("MIDI connection is closed or failed")
-            assert self._context is not None
-            self._context.request(
-                "send",
-                [
-                    prepared.words
-                    if isinstance(prepared, midi.UmpPacket)
-                    else prepared,
-                    self._generation,
-                ],
-                serial=True,
-            )
-
+            self._native.send(prepared)
         if isinstance(prepared, bytes):
             self._state.feed(prepared)
 
     @property
     def closed(self) -> bool:
-        if self._native is not None:
-            return self._native.closed
-        return self._closed or bool(self._context and self._context.failure)
+        return self._closed or (self._native is not None and self._native.closed)
 
     @property
-    def worker_failure(self) -> Exception | None:
-        return None if self._context is None else self._context.failure_exception
+    def worker_failure(self) -> BaseException | None:
+        if self._native is not None and self._run_in_subprocess:
+            return self._native.worker_failure
+        return self._failure
 
     def close(self) -> None:
         _native.check_thread()
@@ -997,12 +935,9 @@ class _OutputState:
             try:
                 self._native.close()
             finally:
+                self._failure = self.worker_failure
                 self._closed = True
                 self._native = None
-        elif not self._closed:
-            assert self._context is not None
-            self._context.close(self._generation)
-            self._closed = True
 
     def __enter__(self) -> _OutputState:
         if self._native is not None:
@@ -1018,11 +953,6 @@ class _OutputState:
         traceback: TracebackType | None,
     ) -> None:
         close_context(self.close, exc_value)
-
-    def __del__(self) -> None:
-        if hasattr(self, "_context") and self._native is None and not self._closed:
-            assert self._context is not None
-            self._context.defer_close(self._generation)
 
 
 class _InputState[T = messages.Message | events.StreamDiagnostic]:
@@ -1464,28 +1394,6 @@ def append_record(
             records.append(
                 archive.Gap(stream=item.stream, lost=item.lost, reason=item.reason)
             )
-
-
-def port_from_wire(wire: tuple[object, ...]) -> midi.Port:
-    owner, snapshot, index, name, backend, backend_id, input_port = wire
-    return midi.Port._from_wire(
-        cast(str, owner),
-        cast(int, snapshot),
-        cast(int, index),
-        cast(str, name),
-        getattr(midi.Backend, cast(str, backend)),
-        cast(int, backend_id),
-        cast(bool, input_port),
-    )
-
-
-def wire_settings(settings: dict[str, object]) -> dict[str, object]:
-    return {
-        k: str(v).rpartition(".")[2]
-        if isinstance(v, (midi.Protocol, midi.Backend, midi.TimestampMode))
-        else v
-        for k, v in settings.items()
-    }
 
 
 def close_context(close: Callable[[], None], body_error: BaseException | None) -> None:

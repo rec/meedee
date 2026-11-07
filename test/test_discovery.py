@@ -1,6 +1,7 @@
 """Caller-driven discovery and CLI scheduling with controlled scan results."""
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -102,19 +103,35 @@ def test_initial_client_failure_has_no_baseline(
 
 @pytest.mark.parametrize(
     "flags,expected",
-    [([], True), (["--run-in-subprocess"], True), (["--no-run-in-subprocess"], False)],
+    [
+        ([], (True, "python", None)),
+        (["--run-in-subprocess"], (True, "python", None)),
+        (["--no-run-in-subprocess"], (False, "python", None)),
+        (
+            ["--subprocess-worker", "rust", "--subprocess-executable", "chosen-worker"],
+            (True, "rust", Path("chosen-worker")),
+        ),
+    ],
 )
 def test_ports_cli_passes_subprocess_choice_to_both_clients(
-    flags: list[str], expected: bool, monkeypatch: pytest.MonkeyPatch
+    flags: list[str],
+    expected: tuple[bool, str, Path | None],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     pytest.importorskip("tyro", reason="install meedee[cli]")
     pytest.importorskip("pydantic", reason="install meedee[cli]")
     from meedee import cli
 
-    choices: list[object] = []
+    choices: list[tuple[object, object, object]] = []
 
     def client(**kwargs: object) -> Client:
-        choices.append(kwargs["run_in_subprocess"])
+        choices.append(
+            (
+                kwargs["run_in_subprocess"],
+                kwargs["subprocess_worker"],
+                kwargs["subprocess_executable"],
+            )
+        )
         return Client([[]])
 
     monkeypatch.setattr(midi, "Input", client)

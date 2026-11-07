@@ -254,26 +254,23 @@ pub fn send_message(
     use crate::ump::UmpValue;
     match message {
         Payload::Command(_) => Err(crate::transport::Error::Capability(
-            "use send_command for compound commands",
+            "use send_command for compound commands".into(),
         )),
-        Payload::Midi1(v) => output
-            .send(&Packet::Bytes(v.encode().map_err(|_| {
-                crate::transport::Error::Invalid("message channel is unassigned")
-            })?)),
+        Payload::Midi1(v) => output.send(&Packet::Bytes(v.encode().map_err(|_| {
+            crate::transport::Error::Invalid("message channel is unassigned".into())
+        })?)),
         Payload::Ump(
             ump::UmpMessage::Opaque(_)
             | ump::UmpMessage::DeltaClockstamp(_)
             | ump::UmpMessage::DeltaClockstampTicksPerQuarter(_),
         ) => Err(crate::transport::Error::Capability(
-            "opaque/file-only UMP requires deliberate raw handling",
+            "opaque/file-only UMP requires deliberate raw handling".into(),
         )),
         Payload::Ump(ump::UmpMessage::Stream(v)) if matches!(v.status(), 32 | 33) => Err(
-            crate::transport::Error::Capability("clip markers are file-only records"),
+            crate::transport::Error::Capability("clip markers are file-only records".into()),
         ),
-        Payload::Ump(v) => {
-            output.send(&Packet::Ump(v.encode_words().map_err(|_| {
-                crate::transport::Error::Invalid("invalid or incomplete UMP message")
-            })?))
-        }
+        Payload::Ump(v) => output.send(&Packet::Ump(v.encode_words().map_err(|_| {
+            crate::transport::Error::Invalid("invalid or incomplete UMP message".into())
+        })?)),
     }
 }

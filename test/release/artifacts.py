@@ -77,7 +77,6 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                 "meedee/archive.py",
                 "meedee/archive.pyi",
                 "meedee/_errors.py",
-                "meedee/_wire.py",
             } <= set(names)
             assert "meedee/py.typed" in names
             assert {
@@ -319,7 +318,6 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "meedee/archive.py",
                 "meedee/archive.pyi",
                 "meedee/_errors.py",
-                "meedee/_wire.py",
                 "crates/meedee/Cargo.toml",
                 "crates/meedee/build.rs",
                 "crates/meedee/native/CMakeLists.txt",

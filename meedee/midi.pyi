@@ -66,8 +66,6 @@ class Port:
     def backend(self) -> Backend: ...
     @property
     def backend_id(self) -> int: ...
-    @property
-    def _wire(self) -> tuple[str, int, int, str, str, int, bool]: ...
     @staticmethod
     def _from_wire(
         owner: str,
@@ -93,6 +91,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         run_in_subprocess: bool = False,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = 8_388_608,
         event_limit: int = 128,
@@ -109,6 +109,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         run_in_subprocess: bool = False,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = 8_388_608,
         event_limit: int = 128,
@@ -125,6 +127,8 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         run_in_subprocess: bool = False,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         timeout: float | str = 5.0,
         receive_byte_limit: int | str = 8_388_608,
         event_limit: int = 128,
@@ -222,6 +226,8 @@ class Output:
         protocol: Protocol = Protocol.Midi1,
         backend: Backend | None = None,
         run_in_subprocess: bool = False,
+        subprocess_worker: Literal["python", "rust"] = "python",
+        subprocess_executable: str | PathLike[str] | None = None,
         timeout: float | str = 5.0,
     ) -> None: ...
     def send(
