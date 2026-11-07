@@ -22,6 +22,7 @@ mod comparison;
 mod controls;
 mod event_values;
 mod event_views;
+mod file_io;
 mod file_timing;
 mod files;
 mod live;
@@ -71,6 +72,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_syx, module)?)?;
     module.add_function(wrap_pyfunction!(populate_clip, module)?)?;
     module.add_function(wrap_pyfunction!(populate_archive, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_file_io, module)?)?;
     Ok(())
 }
 
@@ -262,4 +264,9 @@ fn populate_testing(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_metrics(module: &Bound<'_, PyModule>) -> PyResult<()> {
     metrics::register(module)
+}
+
+#[pyfunction]
+fn populate_file_io(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    file_io::register(module)
 }

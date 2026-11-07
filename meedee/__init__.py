@@ -105,6 +105,7 @@ __all__: list[str] = [
     "controls",
     "discovery",
     "events",
+    "file_io",
     "gm",
     "inspection",
     "messages",
@@ -133,6 +134,7 @@ from . import (
     controls,
     discovery,
     events,
+    file_io,
     gm,
     inspection,
     messages,
@@ -151,7 +153,7 @@ from . import (
     ump,
     universal,
 )
-from .archive import Reader, Recorder, RecordingReport, Writer
+from .archive import Recorder, RecordingReport
 from .codecs import Decoder
 from .controls import (
     ControlInterpreter,
@@ -173,6 +175,7 @@ from .events import (
     StreamDiagnostic,
     Timestamp,
 )
+from .file_io import Reader, Writer
 from .gm import (
     BankProgram,
     BankProgramSelect,

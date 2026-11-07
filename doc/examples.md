@@ -136,34 +136,21 @@ Read `song.mid` and write `song-up.mid`, preserving tracks, timing and metadata.
 Channel 10 is left unchanged under the GM drum convention. This opens no ports.
 
 ```python
-from pathlib import Path
-
 import meedee as md
 
-print(md.inspection.inspect_file("song.mid", format="smf"))
-reader = md.smf.Reader("song.mid")
-try:
-    transformed: list[md.smf.Event] = []
-    for event in reader:
-        message = event.record
-        if isinstance(
-            message, (md.NoteOn, md.NoteOff, md.PolyPressure)
-        ):
-            if message.channel != 10:
-                event = event.replace(record=message.replace(note=message.note + 12))
-        transformed.append(event)
-    with Path("song-up.mid").open("xb") as stream:
-        writer = md.smf.Writer(stream, header=reader.header)
-        for event in transformed:
-            writer.write(event)
-        writer.finish()
-finally:
-    reader.close()
-print(md.inspection.inspect_file("song-up.mid", format="smf"))
+with md.Writer("song-up.mid") as writer:
+    for m in md.Reader("song.mid"):
+        if getattr(m, "channel", 10) != 10:
+            m = m.transpose(12)
+        writer.write(m)
 ```
 
-The example holds the file in memory and rejects out-of-range notes before
-creating the destination. Exclusive creation preserves an existing destination.
+`Reader` detects MIDI files and meedee archives from their contents. For a MIDI
+file, it yields the header first, then file events. Events expose `channel` and
+`transpose()` directly; transposition clamps note numbers to 0..127 and preserves
+all other file data. `Writer` chooses the format from `.mid`, `.midi` or `.meedee`
+and refuses to overwrite an existing file. The context finalizes it on success;
+an error can leave a partial output, while the source remains unchanged.
 
 ## 8. Back up and restore SysEx
 

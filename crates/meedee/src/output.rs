@@ -97,6 +97,17 @@ impl OutputItem for io::Result<crate::archive::Record> {
         self.map(OutputValue::Record)
     }
 }
+impl OutputItem for io::Result<crate::file_io::Record> {
+    fn output_item(self) -> io::Result<OutputValue> {
+        match self? {
+            crate::file_io::Record::Archive(record) => Ok(OutputValue::Record(record)),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "use smf::TimedReader for MIDI-file playback",
+            )),
+        }
+    }
+}
 impl<I: IntoIterator> OutputSource<Sequence> for I
 where
     I::Item: OutputItem,

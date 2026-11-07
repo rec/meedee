@@ -163,7 +163,7 @@ To save and read the capture:
 
 ```rust
 use meedee::midi::{Input, Output};
-use meedee::archive::Reader;
+use meedee::Reader;
 use std::time::Duration;
 
 Input::new().record_to(Duration::from_secs(10), "rec.meedee", true)?;
@@ -180,6 +180,31 @@ complete file does not imply a loss-free performance.
 Replay stops at a gap, discontinuity, malformed record, timestamp regression or
 unmapped clock. Its error includes confirmed progress. Explicit clock mappings,
 rounding permission, cancellation and metrics are configured with `Output::with_playback`.
+
+## Transpose a MIDI file
+
+```rust
+use meedee::{Reader, Writer};
+
+let mut writer = Writer::create("song-up.mid")?;
+for record in Reader::open("song.mid")? {
+    let mut m = record?;
+    if m.channel().unwrap_or(10) != 10 {
+        m = m.transpose(12);
+    }
+    writer.write(&m)?;
+}
+writer.finish()?;
+```
+
+This preserves the header, tracks, ticks, tempo, SysEx fragments and other file
+records. Notes on channel 10 are unchanged; other note numbers are transposed
+and clamped to 0..127. The reader detects MIDI files and meedee archives from
+contents, yielding a `file_io::Record` for each value. MIDI files yield their
+header first. The writer selects `.mid`, `.midi` or `.meedee` from the destination
+name and refuses overwrite. Call `finish()` to validate and finalize the file;
+an earlier error can leave a partial output without changing the source.
+Format-specific readers and writers remain available for detailed control.
 
 ## 7. Handle input diagnostics explicitly
 

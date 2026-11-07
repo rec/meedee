@@ -46,7 +46,7 @@ pub mod drivers;
 pub mod discovery;
 
 // Common values and I/O; specialist operations remain in their public modules.
-pub use archive::{Reader, Recorder, RecordingReport, Writer};
+pub use archive::{Recorder, RecordingReport};
 pub use codecs::Decoder;
 pub use controls::{
     ControlInterpreter, Controller, ParameterFamily, StepDirection, VelocityInterpreter,
@@ -55,6 +55,7 @@ pub use events::{
     Cancellation, Clock, ClockMapping, PacketDecoder, PlaybackPlan, PlaybackReport, Rational,
     ReceivedPacket, SourceSpan, StreamDiagnostic, Timestamp,
 };
+pub use file_io::{Reader, Writer};
 pub use gm::{BankProgram, BankProgramSelect, DrumKit, Gm1On, Gm2On, GmOff, Percussion, Program};
 pub use inspection::{ComparisonReport, Monitor, MonitorReport};
 pub use messages::{

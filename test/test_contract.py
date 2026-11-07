@@ -119,7 +119,8 @@ def test_root_exports_all_public_modules_and_only_curated_classes() -> None:
     assert md.Input is md.midi.Input
     assert md.Output is md.midi.Output
     assert md.Note is md.messages.Note
-    assert md.Reader is md.archive.Reader
+    assert md.Reader is md.file_io.Reader
+    assert md.Writer is md.file_io.Writer
     assert md.Route is md.routing.Route
     assert md.ParameterStep is md.messages.ParameterStep
     assert not hasattr(md, "decode") and not hasattr(md, "run")

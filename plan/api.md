@@ -1977,15 +1977,15 @@ Python eagerly imports all public submodules and re-exports a curated set of
 common classes through meedee.__all__. Functions remain module-qualified; this
 iteration adds no function exports or renames. Root classes are the exact same
 objects as their canonical submodule classes, retaining __module__, identity,
-serialization and typing behavior. Reader/Writer select archive types, Decoder
-the MIDI 1 byte codec, Route the routing definition, and ParameterStep the
+serialization and typing behavior. Reader/Writer select the unified file_io
+types, Decoder the MIDI 1 byte codec, Route the routing definition, and ParameterStep the
 compound message. Ambiguous Tracker/Session/Report names stay module-qualified.
 
 The Rust crate root exposes the corresponding common values and I/O, retaining
 idiomatic enums, traits and options where Python uses classes and keywords.
 Existing error and tuning-value representation differences remain explicit:
 Rust Error/TuningValue correspond to Python's exception classes and Pitch/NoChange.
-No new wrappers or duplicated implementations are introduced.
+The file_io interface delegates to the existing file codecs.
 
 Eager import validates the supported interpreter but starts no native cleanup
 workers, isolated workers or MIDI clients. Native cleanup workers initialize
@@ -2027,3 +2027,24 @@ formatting, Python 3.13 pyupgrade, type checking and the documentation build pas
 Built wheel/source archives exclude all 12 removed production files. An isolated
 import from the extracted wheel exercised the consolidated namespaces and query
 tracking without opening devices. Public-symbols.txt remains uncommitted.
+## Unified file editing
+
+The package-root Reader and Writer live in file_io in both languages. Reader
+sniffs file contents for Standard MIDI Files and meedee archives. MIDI-file
+iteration yields the original smf.Header followed by smf.Event values, preserving
+track order, ticks, metadata, unknown chunks and fragmented SysEx. SMF events
+expose channel (None for non-channel records) and transpose(semitones), which
+preserves file context and uses the shared clamping message transformation.
+Rust file_io::Record distinguishes Header, Event and Archive variants and offers
+the same channel/transpose operations. Archive iteration retains existing Python
+record types. Format-specific codecs remain available unchanged.
+
+Writer selects .mid/.midi or .meedee from the destination filename and exclusively
+creates it. MIDI output requires the header first. Python borrowed output streams
+retain the previous archive default; Rust Writer::new accepts an explicit file
+extension for stream destinations. Borrowed streams remain open. Python context
+exit finalizes on success and abandons on an exception; Rust requires finish().
+Neither abandonment nor object destruction certifies completion. Errors may leave
+partial output, and never overwrite an existing destination. Reader archive
+recovery/preserve_unknown options are rejected for MIDI files. Archive completion
+and problem information remain readable after Python close.
