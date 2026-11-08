@@ -164,14 +164,12 @@ interpreters after known loss; never silently replay uncertain operations.
 
 ### 6. SysEx transfer execution and diagnostics
 
-**Implemented MIDI 1 foundation:** bounded complete-message transfer
-plans, strict whole-file SYX validation, caller-driven paced Rust/Python sessions,
-a synchronous Python output adapter, and separate preview/send CLI commands.
-Progress distinguishes handoff from uncertain delivery; cancellation never
-retries. Passive MIDI 1 capture now collects an explicit expected SysEx count
-within an overall timeout, with bounded retention and exclusive post-success
-SYX export through Rust/Python APIs and the `sysex-receive` CLI. Loss or decoding
-failure stops capture; success does not infer device-specific dump completeness.
+**Implemented MIDI 1 foundation:** ordinary Input.record and Output.send handle
+SysEx with timing. The syx.send helper provides completion-relative pacing for
+untimed dumps; strict SYX codecs and preview/send CLI commands retain exact bytes.
+There are no separate transfer plans, sessions or capture objects. Passive backup
+records for a duration, then exports SysEx. Recording diagnostics remain visible;
+a completed observation window does not prove dump completeness.
 One-shot ordinary/banked MTS dump queries now reuse the existing reply tracker
 and decoder through Rust/Python APIs, a caller-thread host and preview/live CLI.
 Original reply bytes and checksum status survive export; uncertain sends never
@@ -180,9 +178,8 @@ protocols remain separate work requiring explicit rules.
 
 **Use:** Back up or restore an instrument using documented transfer rules.
 
-Build bounded transfer plans over existing SysEx files/codecs, deadlines and
-request tracking. Plans may express device-specific pacing, chunks and expected
-replies. Retain original bytes and show progress and uncertainty. Do not infer
+Use Input.record and Output.send for timed data, and syx.send for explicitly paced
+untimed dumps. Retain original bytes and report confirmed progress. Do not infer
 arbitrary manufacturer protocols or retry uncertain state-changing commands.
 
 Device descriptions and librarian organization belong to the integration work
@@ -338,7 +335,7 @@ encoding a MIDI message.
 **Implemented foundation:** the optional Python
 [`meedee.tuning` bridge](ufor-tuning.md) converts individual notes and constructs
 ordinary/banked per-key MTS messages with explicit preservation and error policy.
-It opens no ports. Bounded bulk transfer-plan composition and optional offline
+It opens no ports. Bulk-dump construction and optional offline
 CLI exclusive SYX export accepts existing uFor Tuning JSON and Scala
 sources. Exported files use the existing explicit transfer workflow; no second
 sending host is added. Optional enge audition remains separate integration work.

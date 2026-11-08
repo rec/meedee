@@ -29,7 +29,6 @@ def main() -> None:
             testing,
             timecode,
             topology,
-            transfer,
             tuning,
             ump,
             universal,
@@ -174,13 +173,8 @@ def main() -> None:
         assert router.snapshot().admitted == 1
         tracker = topology.Tracker()
         assert tracker.observe([]).generation == 1
-        plan = transfer.read_file(BytesIO(b"\xf0\x7d\xf7"), gap="0 ns")
-        assert transfer.Session(plan).snapshot().total_messages == 1
-        assert callable(transfer.send)
-        capture = transfer.Capture(stream="pure", expected_messages=1, timeout="10 ns")
-        capture.start(0)
-        capture.feed((messages.SysEx(data=b"\x7d")).replace(stream="pure"), 1)
-        assert capture.snapshot().status == "completed" and callable(transfer.capture)
+        assert list(syx.Reader(BytesIO(b"\xf0\x7d\xf7")))[0].data == b"\x7d"
+        assert callable(syx.send)
         from meedee import discovery
 
         poller = discovery.Poller(protocol="midi1")

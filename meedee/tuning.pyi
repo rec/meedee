@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, BinaryIO
 if TYPE_CHECKING:
     from ufor.tuning import Tuning
 
-from . import events, messages, midi, transfer
+from . import events, messages, midi
 
 class Pitch:
     def __init__(self, *, semitone: int, fraction: int) -> None: ...
@@ -427,16 +427,6 @@ def bulk_dump(
     bank: int | None = None,
     preserve_unmapped: bool = False,
 ) -> BulkDump | KeyBasedDump: ...
-def bulk_plan(
-    result: list[NoteTuning],
-    *,
-    device_id: int,
-    program: int,
-    name: str,
-    gap: float | str,
-    bank: int | None = None,
-    preserve_unmapped: bool = False,
-) -> transfer.Plan: ...
 def note_changes(
     result: list[NoteTuning],
     *,

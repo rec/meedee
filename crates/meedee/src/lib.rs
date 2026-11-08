@@ -12,7 +12,6 @@ pub mod routing;
 pub mod testing;
 pub mod timecode;
 pub mod topology;
-pub mod transfer;
 pub mod transport;
 pub mod tuning;
 pub mod ump;

@@ -1,4 +1,4 @@
-"""Passive CLI capture never opens an output or overwrites existing files."""
+"""Duration-based SysEx export rejects incomplete recordings and overwrite."""
 
 import json
 from pathlib import Path
@@ -6,10 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-pytest.importorskip("tyro", reason="install meedee[cli]")
-pytest.importorskip("pydantic", reason="install meedee[cli]")
-
-from meedee import cli, events, midi, testing, transfer
+from meedee import archive, cli, messages, midi
 
 
 def invoke(path: Path, *args: str) -> int:
@@ -20,9 +17,7 @@ def invoke(path: Path, *args: str) -> int:
                 str(path),
                 "--port",
                 "synth",
-                "--expected-messages",
-                "2",
-                "--timeout",
+                "--duration",
                 "100 ms",
                 "--output",
                 "json",
@@ -34,11 +29,21 @@ def invoke(path: Path, *args: str) -> int:
 
 
 def install(
-    monkeypatch: pytest.MonkeyPatch,
-    receiver: testing.Input,
-    names: list[str],
+    monkeypatch: pytest.MonkeyPatch, records: list[object], names: list[str]
 ) -> list[str]:
     actions: list[str] = []
+
+    class Receiver:
+        def __enter__(self) -> "Receiver":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            actions.append("closed")
+
+        def record(self, duration: float) -> list[object]:
+            assert duration == 0.1
+            actions.append("recorded")
+            return records
 
     class Client:
         def __init__(self, **kwargs: object) -> None:
@@ -51,69 +56,61 @@ def install(
         def ports(self) -> list[SimpleNamespace]:
             return [SimpleNamespace(name=n) for n in names]
 
-        def connect(self, port: SimpleNamespace) -> testing.Input:
+        def connect(self, port: SimpleNamespace) -> Receiver:
             actions.append("connected")
-            return receiver
+            return Receiver()
 
     monkeypatch.setattr(midi, "Input", Client)
-    monkeypatch.setattr(transfer, "monotonic_ns", lambda: 0)
     return actions
 
 
-def test_passive_capture_closes_input_then_exports_exact_messages(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+def test_recording_exports_only_sysex_after_closing_and_refuses_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    receiver = testing.Input(stream="s", protocol="midi1")
-    receiver.inject(b"\xf0\x01\xf8\xf7\xf0\x02\xf7", clock=events.Clock(identity="c"))
-    actions = install(monkeypatch, receiver, ["synth"])
+    actions = install(
+        monkeypatch,
+        [
+            messages.SysEx(data=b"\x01"),
+            messages.TimingClock(),
+            messages.SysEx(data=b"\x02"),
+        ],
+        ["synth"],
+    )
     path = tmp_path / "dump.syx"
-    assert invoke(path) == 0 and receiver.closed
+    assert invoke(path) == 0
+    assert actions == ["created", "connected", "recorded", "closed"]
     assert path.read_bytes() == b"\xf0\x01\xf7\xf0\x02\xf7"
     report = json.loads(capsys.readouterr().out)
-    assert report["exported"] and report["status"] == "completed"
-    assert report["ignored_events"] == 1 and actions == ["created", "connected"]
+    assert report["received_messages"] == 2 and report["ignored_events"] == 1
     assert invoke(path) == 2
-    assert actions == ["created", "connected"]
-    assert path.read_bytes() == b"\xf0\x01\xf7\xf0\x02\xf7"
+    assert actions == ["created", "connected", "recorded", "closed"]
 
 
-@pytest.mark.parametrize("fault", ["timeout", "loss", "worker", "malformed"])
-def test_receive_failures_never_create_output(
-    fault: str,
+@pytest.mark.parametrize(
+    "records",
+    [
+        [],
+        [archive.Gap(stream="s", lost=1, reason="loss")],
+        [archive.Discontinuity(stream="s", reason="failed")],
+    ],
+)
+def test_empty_or_incomplete_recording_never_creates_file(
+    records: list[object],
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    receiver = testing.Input(stream="s", protocol="midi1")
-    install(monkeypatch, receiver, ["synth"])
-    if fault == "loss":
-        receiver.lose(1)
-    elif fault == "worker":
-        receiver.fail("worker failed")
-    elif fault == "malformed":
-        receiver.inject(b"\xf0\x01\x90\x40\x01", clock=events.Clock(identity="c"))
-    else:
-        ticks = iter([0])
-        monkeypatch.setattr(transfer, "monotonic_ns", lambda: next(ticks, 100_000_000))
+    install(monkeypatch, records, ["synth"])
     path = tmp_path / "failed.syx"
-    assert invoke(path) == (1 if fault == "timeout" else 2)
-    report = json.loads(capsys.readouterr().out)
-    assert not report["exported"] and not path.exists() and receiver.closed
+    assert invoke(path) == 2 and not path.exists()
+    assert not json.loads(capsys.readouterr().out)["exported"]
 
 
-def test_validation_and_unique_name_selection_precede_receiving(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+def test_ambiguous_port_precedes_recording(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    receiver = testing.Input(stream="s", protocol="midi1")
-    actions = install(monkeypatch, receiver, ["synth", "synth"])
+    actions = install(monkeypatch, [], ["synth", "synth"])
     path = tmp_path / "invalid.syx"
-    assert invoke(path, "--byte-limit", "2") == 2
-    assert not actions and capsys.readouterr().err
     assert invoke(path) == 2
     assert actions == ["created"] and not path.exists()
     assert "found 2" in json.loads(capsys.readouterr().out)["failure"]
-    receiver.close()

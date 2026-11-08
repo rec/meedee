@@ -912,3 +912,31 @@ def test_callback_cleanup_allows_reentrant_close_from_callable_destruction(
     assert source.closed
     assert isinstance(source.failure, TypeError)
     source.close()
+
+
+def test_recorded_fragmented_sysex_exports_and_replays_with_timing(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from meedee import syx
+
+    client = midi.Input()
+    client.connect(client.ports()[0])
+    iterable_input[0](packet(b"\xf0\x7d\x01", 1, 10))
+    iterable_input[0](packet(b"\xf8\x02\xf7", 2, 20))
+    records = client.record(0)
+    dump = [r for r in records if isinstance(r, messages.SysEx)]
+    assert len(dump) == 1 and dump[0].data == b"\x7d\x01\x02"
+    assert dump[0].timestamp is not None and dump[0].timestamp.ticks == 20
+    path = tmp_path / "dump.syx"
+    syx.write(path, dump)
+    assert list(syx.Reader(path)) == dump
+    sent: list[object] = []
+    monkeypatch.setattr(midi.Output, "__enter__", lambda self: self)
+    monkeypatch.setattr(midi.Output, "_send", lambda self, value: sent.append(value))
+    output = midi.Output()
+    report = output.send(records)
+    assert report.sent_events == 3
+    assert b"\xf0\x7d\x01\x02\xf7" in sent
+    output.close()

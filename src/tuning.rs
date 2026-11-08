@@ -412,7 +412,6 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<QueryReport>()?;
     module.add_function(wrap_pyfunction!(decode, module)?)?;
     module.add_function(wrap_pyfunction!(bulk_dump, module)?)?;
-    module.add_function(wrap_pyfunction!(bulk_plan, module)?)?;
     module.add_function(wrap_pyfunction!(note_changes, module)?)?;
     Ok(())
 }
@@ -442,33 +441,6 @@ fn bulk_dump(
         )
         .map_err(value_error)?,
     )
-}
-
-/// Prepare one bulk dump for the existing transfer executor, without I/O.
-#[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature=(result, *, device_id, program, name, gap, bank=None, preserve_unmapped=false))]
-fn bulk_plan(
-    #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
-    #[pyo3(from_py_with=int)] device_id: i64,
-    #[pyo3(from_py_with=int)] program: i64,
-    name: String,
-    #[pyo3(from_py_with=crate::units::duration)] gap: u64,
-    bank: Option<&Bound<'_, PyAny>>,
-    #[pyo3(from_py_with=flag)] preserve_unmapped: bool,
-) -> PyResult<crate::transfer::Plan> {
-    Ok(crate::transfer::Plan {
-        value: model::bulk_plan(
-            &result,
-            device_id,
-            program,
-            name,
-            gap,
-            bank.map(int).transpose()?,
-            preserve_unmapped,
-        )
-        .map_err(|e| PyValueError::new_err(e.to_string()))?,
-    })
 }
 
 /// Build ordered batches of at most 127 keys, with explicit real-time intent.

@@ -154,36 +154,35 @@ an error can leave a partial output, while the source remains unchanged.
 
 ## 8. Back up and restore SysEx
 
-Start a dump on the instrument after launching this capture script. It expects
-one complete SysEx message within 30 seconds and creates `backup.syx` only after
-successful capture, refusing overwrite. Adjust the count for your instrument.
+Start a dump on the instrument during this 30-second recording. Save the complete
+recording with timing, then export its SysEx messages to a new `.syx` file.
+The recording's diagnostics remain available for checking loss or failure.
 
 ```python
 import meedee as md
 
-client = md.Input(run_in_subprocess=False)
-with client.connect(client.ports()[0]) as receiver:
-    capture = md.transfer.Capture(stream=receiver.stream, expected_messages=1, timeout=30)
-    report = md.transfer.capture(capture, receiver)
-print(report)
-if report.status != "completed":
-    raise RuntimeError(report.reason)
-capture.write("backup.syx")
+recording = md.Input().record(30, output="backup.meedee")
+print(recording)
+md.syx.write("backup.syx", (m for m in recording if isinstance(m, md.SysEx)))
 ```
 
-Run this separate script to restore it. The first output must be the intended
-instrument, ready to receive this dump: restoration can replace sounds/settings.
-The 100 ms gap is transfer pacing, not musical timing; use the device's documented
-requirement. Successful handoff does not prove the device accepted the dump.
+Replay the recording, preserving its timing:
 
 ```python
 import meedee as md
 
-plan = md.transfer.read_file("backup.syx", gap=0.1)
-print(plan)
-client = md.Output()
-with client.connect(client.ports()[0]) as output:
-    print(md.transfer.send(md.transfer.Session(plan), output))
+print(md.Output().send(md.Reader("backup.meedee")))
+```
+
+Alternatively, restore an untimed `.syx` file with a minimum pause between sends.
+Use the instrument's documented pause; restoration can replace sounds/settings.
+Successful handoff does not prove the instrument accepted the dump.
+
+```python
+import meedee as md
+
+with md.Output() as output:
+    print(md.syx.send(output, md.syx.Reader("backup.syx"), gap="100 ms"))
 ```
 
 ## 9. Export a just-intonation tuning
@@ -219,9 +218,8 @@ After the instrument has loaded it, select the tuning with
 Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
-Only `md.tuning.convert()` needs uFor. The shared Rust builders `md.tuning.bulk_dump()`, `md.tuning.bulk_plan()`
-and `md.tuning.note_changes()` also accept `md.NoteTuning` values constructed directly.
-`md.tuning.bulk_plan()` prepares a dump for paced transfer; `md.tuning.note_changes()` produces
+Only `md.tuning.convert()` needs uFor. The shared Rust builders `md.tuning.bulk_dump()` and `md.tuning.note_changes()` also accept `md.NoteTuning` values constructed directly.
+Use `md.syx.send()` for paced delivery; `md.tuning.note_changes()` produces
 ordered messages of at most 127 keys each.
 
 ## 10. Bend one note of an MPE chord

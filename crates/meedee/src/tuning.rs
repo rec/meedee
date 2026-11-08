@@ -41,22 +41,6 @@ pub fn bulk_dump(
     }
 }
 
-/// Prepare one bulk dump for transfer, with a minimum gap in nanoseconds.
-/// The resulting plan permits exactly its single message and encoded size.
-pub fn bulk_plan(
-    result: &[NoteTuning],
-    device_id: i64,
-    program: i64,
-    name: String,
-    gap_ns: u64,
-    bank: Option<i64>,
-    preserve_unmapped: bool,
-) -> std::io::Result<crate::transfer::Plan> {
-    let wire = bulk_dump(result, device_id, program, name, bank, preserve_unmapped)?.encode()?;
-    let message = SysEx::new(wire[1..wire.len() - 1].to_vec())?;
-    crate::transfer::Plan::new([Ok(message)], gap_ns, 1, wire.len())
-}
-
 /// Build ordered messages of at most 127 keys each. Unbanked changes must
 /// be real-time. NoChange entries require explicit preservation.
 pub fn note_changes(

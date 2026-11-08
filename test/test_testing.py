@@ -1,7 +1,5 @@
 """Public deterministic transports and selected toolkit conformance workflows."""
 
-from typing import cast
-
 import pytest
 
 from meedee import (
@@ -12,7 +10,6 @@ from meedee import (
     midi,
     routing,
     testing,
-    transfer,
     ump,
 )
 
@@ -181,43 +178,6 @@ def test_routing_conformance_uses_shared_injected_decode_and_recorded_output() -
     assert isinstance(loss, events.StreamDiagnostic)
     router.feed(loss)
     assert router.snapshot().stopped
-
-
-def test_transfer_conformance_retains_known_handoffs_and_uncertain_sink_effects(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    time = testing.ManualClock()
-    monkeypatch.setattr(transfer, "monotonic_ns", lambda: time.now_ns)
-    monkeypatch.setattr(
-        events.Cancellation,
-        "wait_for",
-        lambda self, seconds: time.advance(round(seconds * 1_000_000_000)),
-    )
-    session = transfer.Session(
-        transfer.Plan(
-            [messages.SysEx(data=b"\x7d\x01"), messages.SysEx(data=b"\x7d\x02")],
-            gap="10 ns",
-        )
-    )
-    o = testing.Output(protocol="midi1")
-    first = session.prepare(time.now_ns)
-    assert first is not None
-    o.send(first.message)
-    session.confirm(first.index, time.now_ns)
-    o.fail_next_send(accepted=True)
-    with pytest.raises(ValueError, match="fresh"):
-        transfer.send(session, cast(midi.Output, o))
-    time.advance(10)
-    second = session.prepare(time.now_ns)
-    assert second is not None
-    with pytest.raises(midi.SendError):
-        o.send(second.message)
-    session.fail(second.index, "send may have been accepted")
-    report = session.snapshot()
-    assert report.confirmed_messages == 1 and report.uncertain_message == 1
-    assert time.now_ns == 10 and o.snapshot().accepted == 2
-    assert o.take_packet() == bytes.fromhex("f0 7d 01 f7")
-    assert o.take_packet() == bytes.fromhex("f0 7d 02 f7")
 
 
 @pytest.mark.parametrize("group", [None, 3])

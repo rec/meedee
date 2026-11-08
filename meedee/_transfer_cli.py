@@ -1,55 +1,41 @@
-"""Explicit SysEx preview/send commands; no transport imports for preview."""
+"""SysEx preview, paced sending and duration-based recording commands."""
 
-from . import transfer
+from . import archive, messages, syx
 from ._cli import SysexReceive, TransferPreview, TransferSend, emit
 
 
-def report_data(report: transfer.Report) -> dict[str, object]:
-    return {
-        n: getattr(report, n)
-        for n in (
-            "status",
-            "total_messages",
-            "total_bytes",
-            "confirmed_messages",
-            "confirmed_bytes",
-            "remaining_messages",
-            "in_flight",
-            "uncertain_message",
-            "next_ready_ns",
-            "reason",
-        )
-    }
-
-
 def run_transfer(config: TransferPreview) -> int:
-    plan = transfer.read_file(
-        config.source,
-        gap=config.gap,
-        message_limit=config.message_limit,
-        byte_limit=config.byte_limit,
-        payload_limit=config.payload_limit,
-    )
+    values: list[messages.SysEx] = []
+    wire_bytes = 0
+    reader = syx.Reader(config.source, payload_limit=config.payload_limit)
+    try:
+        for m in reader:
+            wire_bytes += len(m.data) + 2
+            if len(values) == config.message_limit or wire_bytes > config.byte_limit:
+                raise ValueError("transfer message or byte limit exceeded")
+            values.append(m)
+    finally:
+        reader.close()
+    if not values:
+        raise ValueError("transfer requires at least one SysEx message")
     if not isinstance(config, TransferSend):
-        count = min(plan.message_count, config.detail_limit)
+        count = min(len(values), config.detail_limit)
         emit(
             {
                 "kind": "transfer_preview",
                 "dry_run": True,
-                "message_count": plan.message_count,
-                "wire_bytes": plan.wire_bytes,
-                "gap": plan.gap,
+                "message_count": len(values),
+                "wire_bytes": wire_bytes,
+                "gap": config.gap,
                 "examples": [
                     {
                         "index": i,
-                        "wire_bytes": len(plan.message(i).data) + 2,
-                        "payload_preview": plan.message(i)
-                        .data[: config.preview_bytes]
-                        .hex(),
+                        "wire_bytes": len(m.data) + 2,
+                        "payload_preview": m.data[: config.preview_bytes].hex(),
                     }
-                    for i in range(count)
+                    for i, m in enumerate(values[:count])
                 ],
-                "omitted_examples": plan.message_count - count,
+                "omitted_examples": len(values) - count,
             },
             config.output,
         )
@@ -58,26 +44,29 @@ def run_transfer(config: TransferPreview) -> int:
     from . import midi
     from ._monitor import select_port
 
-    session = transfer.Session(plan)
     failure: str | None = None
     interrupted = False
+    confirmed = 0
+    uncertain = None
+    completed = False
     try:
-        backend = (
-            None if config.backend is None else getattr(midi.Backend, config.backend)
-        )
         client = midi.Output(
             protocol=midi.Protocol.Midi1,
-            backend=backend,
+            backend=None
+            if config.backend is None
+            else getattr(midi.Backend, config.backend),
             run_in_subprocess=config.run_in_subprocess,
             subprocess_worker=config.subprocess_worker,
             subprocess_executable=config.subprocess_executable,
         )
         port = select_port(client.ports(), config.port, direction="output")
         with client.connect(port) as output:
-            transfer.send(session, output)
-    except KeyboardInterrupt:
+            report = syx.send(output, values, gap=config.gap)
+            confirmed = report.sent_events
+            completed = not report.cancelled
+    except KeyboardInterrupt as error:
+        confirmed = getattr(error, "completed_events", confirmed)
         interrupted = True
-        session.cancel("interrupted during setup or close")
     except (
         midi.MidiError,
         midi.StateError,
@@ -90,47 +79,55 @@ def run_transfer(config: TransferPreview) -> int:
         ValueError,
         ExceptionGroup,
     ) as error:
+        confirmed = getattr(error, "completed_events", confirmed)
+        if hasattr(error, "completed_events") and isinstance(
+            error, (midi.SendError, midi.WorkerError, midi.WorkerTimeoutError)
+        ):
+            uncertain = confirmed
         failure = str(error)[:1024]
-        session.cancel(failure)
-    report = session.snapshot()
-    data = report_data(report)
-    data.update(
+    emit(
         {
             "kind": "transfer_summary",
             "dry_run": False,
             "port": config.port,
-            "gap": plan.gap,
+            "gap": config.gap,
             "failure": failure,
-            "interrupted": interrupted or report.reason == "interrupted",
-        }
+            "interrupted": interrupted,
+            "status": "completed"
+            if completed
+            else "failed"
+            if failure
+            else "cancelled",
+            "total_messages": len(values),
+            "total_bytes": wire_bytes,
+            "confirmed_messages": confirmed,
+            "confirmed_bytes": sum(len(m.data) + 2 for m in values[:confirmed]),
+            "remaining_messages": len(values) - confirmed,
+            "uncertain_message": uncertain,
+        },
+        config.output,
     )
-    emit(data, config.output)
-    if (
-        failure is not None
-        or report.status == "failed"
-        or report.uncertain_message is not None
-    ):
-        return 2
-    return 0 if report.status == "completed" and not interrupted else 1
+    return 2 if failure else 0 if completed and not interrupted else 1
 
 
 def run_receive(config: SysexReceive) -> int:
     from . import midi
     from ._monitor import select_port
 
-    capture = None
     failure: str | None = None
     interrupted = False
     exported = False
+    values: list[messages.SysEx] = []
+    ignored = 0
+    wire_bytes = 0
     try:
         if config.destination.exists():
             raise FileExistsError("capture destination already exists")
-        backend = (
-            None if config.backend is None else getattr(midi.Backend, config.backend)
-        )
         client = midi.Input(
             protocol=midi.Protocol.Midi1,
-            backend=backend,
+            backend=None
+            if config.backend is None
+            else getattr(midi.Backend, config.backend),
             run_in_subprocess=config.run_in_subprocess,
             subprocess_worker=config.subprocess_worker,
             subprocess_executable=config.subprocess_executable,
@@ -139,21 +136,24 @@ def run_receive(config: SysexReceive) -> int:
         )
         port = select_port(client.ports(), config.port)
         with client.connect(port) as receiver:
-            capture = transfer.Capture(
-                stream=receiver.stream,
-                expected_messages=config.expected_messages,
-                timeout=config.timeout,
-                byte_limit=config.byte_limit,
-                payload_limit=config.payload_limit,
-            )
-            transfer.capture(capture, receiver)
-        if capture.snapshot().status == "completed":
-            capture.write(config.destination)
-            exported = True
+            records = receiver.record(config.duration)
+        for r in records:
+            if isinstance(r, (archive.Gap, archive.Discontinuity)):
+                raise ValueError(f"incomplete recording: {r}")
+            if isinstance(r, messages.SysEx):
+                wire_bytes += len(r.data) + 2
+                if wire_bytes > config.byte_limit:
+                    raise ValueError("SysEx export byte limit exceeded")
+                values.append(r)
+            elif isinstance(r, messages.Message):
+                ignored += 1
+        if not values:
+            raise ValueError("recording contained no SysEx messages")
+        with config.destination.open("xb") as destination:
+            syx.write(destination, values, payload_limit=config.payload_limit)
+        exported = True
     except KeyboardInterrupt:
         interrupted = True
-        if capture is not None:
-            capture.cancel("interrupted during setup, close or export")
     except (
         midi.MidiError,
         midi.StateError,
@@ -167,45 +167,24 @@ def run_receive(config: SysexReceive) -> int:
         ExceptionGroup,
     ) as error:
         failure = str(error)[:1024]
-        if capture is not None:
-            capture.fail(failure)
-    data: dict[str, object] = {
-        "kind": "sysex_receive_summary",
-        "port": config.port,
-        "destination": str(config.destination),
-        "exported": exported,
-        "failure": failure,
-        "interrupted": interrupted,
-    }
-    if capture is not None:
-        report = capture.snapshot()
-        data.update(
-            {
-                n: getattr(report, n)
-                for n in (
-                    "status",
-                    "expected_messages",
-                    "received_messages",
-                    "wire_bytes",
-                    "ignored_events",
-                    "deadline_ns",
-                    "reason",
-                )
-            }
-        )
-        interrupted = interrupted or report.reason == "interrupted"
-        data["interrupted"] = interrupted
-    emit(data, config.output)
-    if failure is not None:
-        return 2
-    if exported:
-        return 0
-    return (
-        1
-        if interrupted
-        or (
-            capture is not None
-            and capture.snapshot().status in ("cancelled", "timed_out")
-        )
-        else 2
+    emit(
+        {
+            "kind": "sysex_receive_summary",
+            "port": config.port,
+            "destination": str(config.destination),
+            "duration": config.duration,
+            "exported": exported,
+            "failure": failure,
+            "interrupted": interrupted,
+            "status": "completed"
+            if exported
+            else "cancelled"
+            if interrupted
+            else "failed",
+            "received_messages": len(values),
+            "wire_bytes": wire_bytes,
+            "ignored_events": ignored,
+        },
+        config.output,
     )
+    return 0 if exported else 1 if interrupted else 2

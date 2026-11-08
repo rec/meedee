@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import syx
+from . import codecs, messages, syx
 from ._cli import UforExport, emit
 
 
@@ -41,24 +41,25 @@ def run_ufor(config: UforExport) -> int:
         "selected_keys": len(result),
         "converted_keys": converted,
     }
-    plan = tuning.bulk_plan(
+    dump = tuning.bulk_dump(
         result,
         device_id=config.device_id,
         program=config.program,
         name=config.name,
         bank=config.bank,
         preserve_unmapped=config.preserve_unmapped,
-        gap=0,
     )
+    wire = codecs.encode(dump)
+    message = messages.SysEx(data=wire[1:-1])
     with config.destination.open("xb") as destination:
-        syx.write(destination, [plan.message(0)])
+        syx.write(destination, [message])
     data.update(
         {
             "kind": "ufor_export",
             "exported": True,
             "destination": str(config.destination),
-            "message_count": plan.message_count,
-            "wire_bytes": plan.wire_bytes,
+            "message_count": 1,
+            "wire_bytes": len(wire),
             "preserved_keys": 128 - converted,
         }
     )

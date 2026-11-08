@@ -1258,76 +1258,29 @@ mutation, MIDI-state replay, cleanup or physical-identity guarantee is supplied.
 
 ## Bounded MIDI 1 SysEx transfers
 
-Rust `transfer::Plan` and frozen Python `transfer.Plan` retain a nonempty sequence
-of complete MIDI 1 SysEx messages in original order, without splitting, rewriting
-or inferred manufacturer semantics. Python construction takes a list of `SysEx`
-values. Rust construction accepts an iterator of fallible values. Both require
-an explicit nonnegative gap, including zero: Python `gap` uses seconds and
-Rust `gap_ns` uses nanoseconds. Default limits are 256 messages
-and 8 MiB of wire bytes, including each F0/F7 pair. Plans expose message count,
-wire size, gap and zero-based indexed message access; Python returns independent
-frozen message values. Sessions share the immutable plan internally.
+SysEx uses ordinary `Input.record(duration)` and `Output.send(recording)` in both
+languages. Recordings retain timing, source declarations and receive diagnostics.
+There are no separate transfer Plan, Session, Capture, Step or report types.
+`Output.send()` has no gap option.
 
-Rust `Plan::read` and Python `transfer.read_file` use the existing strict SYX
-reader with a default 1 MiB per-message payload limit. They validate the entire
-input before returning a plan: an empty, malformed, truncated or oversized file
-cannot yield an executable prefix. Caller-owned binary streams remain open.
-File construction failures are OSError in Python; invalid direct plans and
-session operations are ValueError. Bounds constrain retained plan content;
-parsing can temporarily hold one additional message up to the payload limit,
-and caller-owned values, extracted arguments and copies are outside that bound.
-Limits do not impose a native transport allocation budget.
+Python `syx.send(output, messages, *, gap)` and Rust
+`syx::send(&mut output, messages, Duration)` send untimed SysEx through the ordinary
+output. Rust accepts an iterator of fallible SysEx values; Python accepts an
+iterable of SysEx. Pacing waits at least gap after each successful handoff before
+the next, with no wait after the final message. Zero sends consecutively. The
+helper returns the ordinary playback report. Failures preserve typed send errors
+and the number of confirmed messages, without retrying or closing the output.
+Python exceptions carry report/completed_events; Rust returns playback::Failure.
+No instrument acknowledgement or delivery guarantee is inferred. Invalid later
+streaming input can fail after an already-sent prefix.
 
-Rust/Python `transfer.Session(plan)` performs no I/O and starts no threads. Callers
-supply nondecreasing unsigned nanoseconds from one monotonic clock to `prepare`
-and `confirm`. `prepare(now_ns)` reserves the next zero-based `Step` exactly once,
-or returns None before its deadline. A second prepare while a send is reserved
-is an error. `confirm(index, now_ns)` records one successful transport handoff.
-The next message is eligible only at that confirmation time plus the selected
-gap. There is no initial delay or final trailing delay, and no timing-accuracy
-promise. Deadline overflow stops the session while retaining the successful
-confirmation. A gap is host pacing, not a measured wire or device processing gap.
-
-`fail(index, reason)` stops a reserved send and marks that index uncertain.
-`cancel(reason)` stops an active session; a reserved send becomes uncertain,
-while cancellation between sends does not imply delivery of the next message.
-Terminal state is permanent and the first terminal reason is retained, capped
-at 1024 Unicode characters. No retry, resume, replay, acknowledgement inference,
-cleanup, reset, readback or device-specific request/reply exchange is provided.
-A new explicit session is a new transfer attempt, not automatic recovery.
-
-Frozen reports contain status (`active`, `completed`, `cancelled`, `failed`),
-total messages/bytes, confirmed messages/bytes, remaining messages, in-flight and
-uncertain indices, next eligible time and reason. Remaining includes every
-unconfirmed message, including an in-flight/uncertain one; neither counts as
-confirmed. Snapshots remain independent of later session operations. A successful
-handoff does not establish that bytes reached the wire or that an instrument
-accepted, applied or persisted the dump.
-
-`transfer.send(session, output, cancel=None)` is a synchronous Python
-adapter for an existing MIDI 1 `Output`. It uses monotonic time,
-checks the existing `events.Cancellation` between sends and at most every 50 ms
-while waiting, and does not own/close the output. Native calls cannot be forcibly
-interrupted. Operational send failures return a failed report; Ctrl-C returns a
-cancelled report, conservatively marking an interrupted send uncertain.
-Unexpected exceptions propagate with the session available for inspection and
-any reserved message marked uncertain. Importing the planner/output adapter
-starts no native clients. Callers must serialize access to the session/output
-and avoid interleaving unrelated sends if device pacing requires exclusivity.
-
-The optional CLI adds `transfer-preview SOURCE --gap N` and the distinct
-`transfer-send SOURCE --gap N --port EXACT_NAME`. Gap is a required nonnegative
-integer number of milliseconds. Both fully validate the bounded SYX plan first.
-Preview opens no ports and prints bounded payload samples with omission counts;
-sending selects exactly one MIDI 1 output by name and defaults to process
-isolation. It closes its connection and prints final known/uncertain progress.
-Explicit backend selection is limited to existing MIDI 1 backends. Neither
-command guesses device-specific pacing. Status 0 means valid preview/completed
-handoffs, 1 means cancellation/interruption without uncertain delivery, and 2
-means malformed input, access/argument/setup/close failure, execution failure
-or uncertain delivery.
-An interruption during shutdown remains visible even if all handoffs completed.
-No physical device compatibility or native transfer qualification is claimed.
+`syx.Reader` and `syx.write` retain the strict `.syx` file helpers. The CLI retains
+`transfer-preview SOURCE --gap N` and `transfer-send SOURCE --gap N --port NAME`,
+validating the complete file and message/byte/payload bounds before discovery.
+The preview's gap is prospective sending policy, never file metadata. The CLI
+reports confirmed handoffs separately from known send uncertainty. Exit status
+is 0 for successful preview/send, 1 for interruption, and 2 for malformed input,
+setup, send or close failure. No compatibility transfer namespace is retained.
 
 ## MIDI-CI management browser
 
@@ -1484,73 +1437,22 @@ unchanged.
 
 ## Passive MIDI 1 SysEx capture
 
-Rust `transfer::Capture` and Python `transfer.Capture` collect whole SysEx messages
-from one explicit stream. Construction requires stream, expected_messages and
-a positive timeout (Python `timeout` in seconds, Rust `timeout_ns`), with
-byte_limit=8_388_608 and payload_limit=1_048_576 defaults
-in Python. The byte budget includes F0/F7 framing; the expected count also bounds
-retained message objects. Impossible counts exceeding byte_limit/2 are rejected.
-Budgets exclude object/metadata overhead, decoder state, caller copies and native
-queues. This is passive MIDI 1 byte capture, not UMP or a dump-request protocol.
+Use `Input.record(duration)` to retain MIDI messages with their timestamps and
+receive diagnostics, then select SysEx messages for `syx.write`. Recording remains
+duration-only; there is no expected-count stopping rule. Receive queue and decoder
+limits still apply; the returned recording grows with received traffic and has
+no independent total recording-memory budget.
 
-`start(now_ns)` starts a fresh session and checks deadline arithmetic. `poll(now_ns)`
-notices expiry, and `feed(item, now_ns)` consumes existing typed Message or
-StreamDiagnostic values using the same unsigned, nondecreasing host clock.
-Source timestamps are preserved in the input events but do not set deadlines.
-At or after the overall deadline, the session times out before accepting another
-message. Timing begins at start, not at the first SysEx; no implicit timer or
-background polling is created. Starting twice or feeding/polling a non-active
-capture is an error. Invalid clock operations leave the prior observation intact.
-
-Every whole SysEx from the selected source counts, including empty payloads and
-unrelated manufacturer traffic. Non-SysEx MIDI 1 events increment ignored_events;
-UMP/compound events and mismatched sources fail. All decoder diagnostics stop
-capture, including known loss, malformed/truncated input and clock changes.
-Payload or aggregate-byte exhaustion fails before retaining the offending
-message. Reaching the expected count before the deadline completes the capture.
-It proves neither device-specific dump completeness nor the absence of later
-traffic or unobservable driver loss. It does not correlate replies, infer an idle
-end marker, filter manufacturer IDs or send any requests/acknowledgements.
-
-`fail(reason)` / `cancel(reason)` stop ready/active sessions and retain the first
-terminal outcome and received prefix. Independent frozen Python CaptureReport
-snapshots expose status (`ready`, `active`, `completed`, `failed`, `cancelled`,
-`timed_out`), expected_messages, received_messages, wire_bytes, ignored_events,
-deadline_ns and an optional reason capped at 1024 Unicode characters. `message(i)`
-returns a received SysEx even after failure. No automatic retry or state cleanup
-is implied.
-
-`write(destination)` exports only a completed capture through the existing SYX
-writer, preserving retained payload bytes and order. Rust accepts a caller-owned
-writer. Python paths use exclusive creation and never overwrite an existing file;
-caller-owned binary streams remain open and write at their current position.
-Writes flush without fsync. Errors propagate and can leave a partial destination;
-export does not change the capture outcome or claim power-loss durability.
-
-`transfer.capture(capture, receiver, cancel=None)` starts a fresh capture on the
-caller thread. Supply an existing queued MIDI 1 typed input for the same stream;
-its already queued events are eligible and are not drained automatically. The
-adapter checks failure/loss counters before and after receives, polls the deadline
-and waits at most 50 ms per receive. Cancellation/Ctrl-C retain a cancelled prefix;
-known transport errors retain failed progress. Unexpected exceptions propagate
-after retiring an active capture. The caller owns and closes the input, serializes
-access and configures its existing queue/decoder budgets. No native output, timer,
-worker or additional decoder is created. Uninterruptible in-process driver or
-Python work can exceed the observation deadline.
-
-`meedee sysex-receive DESTINATION --port NAME --expected-messages N --timeout SECONDS`
-requires one exact, unique input name and uses process isolation by default.
-Start a dump on the instrument after opening capture. Backend, receive-byte,
-capture-byte and payload limits are explicit options. The capture deadline starts
-after connection setup. Setup itself uses existing transport operation deadlines.
-The input is closed before export, and a close failure prevents writing. Existing
-destinations are rejected before discovery and exclusive creation also catches
-files appearing later. Failed/cancelled/timed-out receives create no destination.
-Final write/flush failures may leave a partial file. The final text/JSON summary
-separates capture status, exported, failure and interrupted evidence; completed
-capture with exported=false is not a saved backup. Exit status is 0 for successful
-export, 1 for timeout/cancellation/interruption and 2 for setup, input, limit or
-export failure. No physical instrument was used to qualify this workflow.
+`meedee sysex-receive DESTINATION --port NAME --duration SECONDS` selects one exact,
+unique MIDI 1 input and uses subprocess execution by default. It records for the
+requested duration, closes input, checks gaps/discontinuities, selects SysEx,
+checks export bytes and writes exclusively. An empty SysEx recording or any input
+diagnostic prevents export. `--byte-limit` bounds the exported SysEx bytes, not
+retained recording memory. The payload/receive limits retain their input meanings.
+Existing files are preserved. A final disk error can leave a partial destination.
+Exit status is 0 for successful export, 1 for interruption and 2 for input, setup,
+limit, empty-result or export failure. Finishing the duration proves only that
+the observation window ended, not that a device-specific dump completed.
 
 ## One-shot MIDI 1 MTS dump queries
 
@@ -2003,18 +1905,18 @@ Additional work beyond the prompt: None.
 Each group now has one public namespace and production source file per language
 layer. tuning contains codecs, values, the uFor adapter, query tracking and the
 live query driver; ci contains codecs, sessions, browser tracking and live
-browsing; transfer contains plans, sessions, passive capture and both live drivers.
+browsing. SysEx file helpers and paced sending live in syx; recording/replay uses Input and Output.
 Rust CI browser/session and tuning-query implementations are colocated with their
 public modules. The native Python tuning query binding is colocated with the
 other tuning bindings.
 
-The canonical workflow functions in both APIs are tuning.query, ci.browse,
-transfer.send and transfer.capture. Their arguments, defaults, clock ownership,
-fresh-session checks, cancellation, known-progress reporting and connection
-ownership are unchanged. Rust keeps the corresponding query_with, browse_with,
-send_with and capture_with drivers for explicit clock/I/O adapters; CI Options
+The canonical workflow functions in both APIs are tuning.query, ci.browse and
+syx.send. Tuning and CI retain their fresh-session, cancellation and clock
+ownership rules. SysEx instead uses ordinary recording/replay plus a paced
+helper returning the standard playback report. Rust keeps the corresponding query_with, browse_with,
+and syx::send_with drivers for explicit clock/I/O adapters; CI Options
 now lives in ci. The former live/input/output modules are removed, with no
-compatibility aliases or forwarding modules. Root __all__ now contains the 25
+compatibility aliases or forwarding modules. Root __all__ now contains the 24
 public submodules and the same 96 classes; functions remain module-qualified.
 
 All callers, type declarations, examples and distribution source manifests use

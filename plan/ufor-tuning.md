@@ -82,11 +82,9 @@ native message validation. Device, bank and program identifiers use MTS values
 0..127. Library callers may explicitly select broadcast device ID 127.
 Construction opens no ports and sends nothing.
 
-`bulk_plan(notes, *, device_id, program, name, gap, bank=None,
-preserve_unmapped=False)` combines the bulk builder with a bounded `transfer.Plan`
-containing one SysEx message. `gap` is an explicit duration in seconds or a unit
-expression. The plan creates no timer and performs no transmission. A caller can
-send it through the existing transfer executor.
+Use `bulk_dump` directly to build the typed dump. Its encoded wire bytes can be
+wrapped as a SysEx message for `syx.write` or `syx.send`; no transfer plan or
+separate execution object is needed. The former bulk_plan helper is removed.
 
 ## Offline file export
 

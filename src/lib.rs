@@ -10,7 +10,6 @@ mod routing;
 mod state;
 mod testing;
 mod topology;
-mod transfer;
 
 mod callback;
 mod lifecycle;
@@ -45,8 +44,7 @@ mod transport_tests;
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
-    module.add_function(wrap_pyfunction!(drivers::run_transfer_output, module)?)?;
-    module.add_function(wrap_pyfunction!(drivers::run_transfer_input, module)?)?;
+    module.add_function(wrap_pyfunction!(drivers::run_syx_send, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
@@ -58,7 +56,6 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_routing, module)?)?;
     module.add_function(wrap_pyfunction!(populate_topology, module)?)?;
     module.add_function(wrap_pyfunction!(populate_testing, module)?)?;
-    module.add_function(wrap_pyfunction!(populate_transfer, module)?)?;
     module.add_function(wrap_pyfunction!(populate_midi, module)?)?;
     module.add_function(wrap_pyfunction!(populate_events, module)?)?;
     module.add_function(wrap_pyfunction!(populate_codecs, module)?)?;
@@ -250,11 +247,6 @@ fn populate_routing(module: &Bound<'_, PyModule>) -> PyResult<()> {
 #[pyfunction]
 fn populate_topology(module: &Bound<'_, PyModule>) -> PyResult<()> {
     topology::register(module)
-}
-
-#[pyfunction]
-fn populate_transfer(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    transfer::register(module)
 }
 
 #[pyfunction]

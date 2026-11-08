@@ -246,12 +246,11 @@ class TransferSend(TransferPreview, frozen=True):
 
 
 class SysexReceive(BaseModel, frozen=True):
-    """Passively capture an expected MIDI 1 SysEx count, then create a new file."""
+    """Record MIDI 1 for a duration, then export SysEx messages to a new file."""
 
     destination: tyro.conf.Positional[Path]
     port: str = Field(min_length=1)
-    expected_messages: int = Field(gt=0)
-    timeout: Annotated[
+    duration: Annotated[
         float, units.unit_validator("second"), tyro.conf.arg(constructor=str)
     ] = Field(gt=0, le=18_446_744_073.709)
     byte_limit: Annotated[
@@ -268,19 +267,6 @@ class SysexReceive(BaseModel, frozen=True):
     subprocess_worker: Literal["python", "rust"] = "python"
     subprocess_executable: Path | None = None
     output: Literal["text", "json"] = "text"
-
-    @model_validator(mode="after")
-    def check_capture(self) -> Self:
-        from . import transfer
-
-        transfer.Capture(
-            stream="validation",
-            expected_messages=self.expected_messages,
-            timeout=float(self.timeout),
-            byte_limit=int(self.byte_limit),
-            payload_limit=int(self.payload_limit),
-        )
-        return self
 
 
 class TuningPreview(BaseModel, frozen=True):

@@ -10,7 +10,7 @@ from meedee import (
     events,
     messages,
     midi,
-    transfer,
+    syx,
     tuning,
 )
 
@@ -56,21 +56,22 @@ def exercise(run_in_subprocess: bool, directory: Path) -> None:
             messages.SysEx(data=b"\x7d\x01"),
             messages.SysEx(data=b"\x7d" + bytes(range(128)) * 32),
         ]
-        plan = transfer.Plan(messages_to_capture, gap="1000000 ns")
-        capture = transfer.Capture(
-            stream=receiver.stream,
-            expected_messages=2,
-            timeout="3000000000 ns",
-        )
-        delivery = worker.submit(transfer.send, transfer.Session(plan), peer_output)
-        report = transfer.capture(capture, receiver)
-        assert report.status == "completed", report.reason
-        assert delivery.result(timeout=4).status == "completed"
+        with (
+            midi.Input(run_in_subprocess=run_in_subprocess).create_virtual(
+                names[0] + "-dump"
+            ) as dump_input,
+            connect(names[0] + "-dump", run_in_subprocess) as dump_output,
+        ):
+            delivery = worker.submit(
+                syx.send, dump_output, messages_to_capture, gap="1 ms"
+            )
+            recording = dump_input.record(1)
+        assert delivery.result(timeout=4).sent_events == 2
+        captured = [m for m in recording if isinstance(m, messages.SysEx)]
         capture_path = directory / f"capture-{run_in_subprocess}.syx"
-        capture.write(capture_path)
+        syx.write(capture_path, captured)
         expected = b"".join(codecs.encode(m) for m in messages_to_capture)
         assert capture_path.read_bytes() == expected
-        assert report.wire_bytes == len(expected)
 
         table = tuning.TuningTable(values=[tuning.NoChange() for _ in range(128)])
         cases: list[

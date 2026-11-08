@@ -346,37 +346,34 @@ expose read-only getters with the same names as Python properties.
 
 ## 12. Capture and restore a SysEx dump
 
-Initiate a one-message dump on the instrument within ten seconds. The capture
-retains complete messages, then creates a new backup file only after success.
+Initiate a dump on the instrument during a ten-second recording. Save its SysEx
+messages separately; `recording.records` also retains timing and diagnostics.
 
 ```rust
-use meedee::{midi::Input, transfer};
-use std::fs::OpenOptions;
+use meedee::{midi::Input, syx, archive::Record, events::Payload, messages::AnyMessage};
+use std::{fs::OpenOptions, time::Duration};
 
-let mut input = Input::new();
-let mut capture = transfer::Capture::new(
-    input.stream()?.into(), 1, 10_000_000_000, 8_388_608, 1_048_576,
-)?;
-let report = transfer::capture(&mut capture, &mut input, None)?;
-input.close()?;
-println!("{report:?}");
-if report.status == "completed" {
-    capture.write(&mut OpenOptions::new().write(true).create_new(true).open("backup.syx")?)?;
+let recording = Input::new().record(Duration::from_secs(10))?;
+println!("{:?}", recording.records);
+let mut file = OpenOptions::new().write(true).create_new(true).open("backup.syx")?;
+for record in &recording.records {
+    if let Record::Event(message) = record {
+        if let Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() {
+            syx::write(&mut file, message, 1_048_576)?;
+        }
+    }
 }
 ```
 
-Run this separately to restore the backup. The first output must be the intended
-instrument, ready to receive it. Sending a dump can replace sounds or settings;
-choose the gap from the device's documentation.
+Run this separately to restore the backup. Choose the minimum pause from the
+instrument's documentation. Sending a dump can replace sounds or settings.
 
 ```rust
-use meedee::{midi::Output, transfer};
+use meedee::{midi::Output, syx};
 use std::time::Duration;
 
-let plan = transfer::read_file("backup.syx", Duration::from_millis(100), &Default::default())?;
-let mut session = transfer::Session::new(plan);
 let mut output = Output::new();
-println!("{:?}", transfer::send(&mut session, &mut output, None)?);
+println!("{:?}", syx::send(&mut output, syx::Reader::open("backup.syx")?, Duration::from_millis(100))?);
 output.close()?;
 ```
 
@@ -471,8 +468,7 @@ OpenOptions::new().write(true).create_new(true).open("just-three.syx")?
 println!("{dump:?}");
 ```
 
-For a transfer plan with a 20 ms gap, use
-`tuning::bulk_plan(&pitches, 0, 2, "Just three".into(), 20_000_000, None, true)?`.
+Use `syx::send` to send complete SysEx messages with explicit pacing.
 For individual real-time changes, use
 `tuning::note_changes(&pitches, 0, 2, true, None, false)?`.
 These builders do not open ports or send messages. `None` selects the unbanked

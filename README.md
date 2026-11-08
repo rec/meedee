@@ -14,10 +14,10 @@ to the archive format, `Decoder` to the MIDI 1 byte codec, `Route` to routing, a
 `Session` and `Report` stay in their submodules. Importing the package does not
 load the optional CLI implementation or uFor adapter dependencies.
 
-The domain workflows are grouped under `md.tuning`, `md.ci` and `md.transfer`:
+The domain workflows are grouped under `md.tuning`, `md.ci` and `md.syx`:
 `tuning.query` runs a tuning query, `ci.browse` runs a management scan, and
-`transfer.send` / `transfer.capture` deliver or receive SysEx dumps. Their codecs,
-values and caller-driven state trackers live in those same modules.
+`syx.send` sends SysEx messages with explicit pacing. Use ordinary `Input.record()`
+and `Output.send()` to record and replay SysEx with timing.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
 are implemented but native platform qualification remains incomplete. Immutable
@@ -176,15 +176,15 @@ histogram boundaries and measurement windows.
 To receive a dump initiated on an instrument, use the optional CLI:
 
 ```bash
-meedee sysex-receive backup.syx --port "Synth MIDI Out" --expected-messages 8 --timeout 30.0
+meedee sysex-receive backup.syx --port "Synth MIDI Out" --duration 30.0
 ```
 
-This passively collects MIDI 1 SysEx, closes the input, then creates a new file.
-It refuses overwrite and writes nothing after receive loss, timeout or decoding
-failure. Final disk errors can leave a partial file. The count is caller-supplied;
-success does not establish instrument-specific dump completeness. Shared
-`transfer.Capture` and `transfer.capture` provide the same workflow to library
-users. See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
+This records MIDI 1 for the requested duration, closes the input, then exports
+its SysEx messages to a new file. It refuses overwrite and writes nothing after
+recording loss, decoding failure, or an empty SysEx result. Finishing the duration
+does not establish instrument-specific dump completeness. Final disk errors can
+leave a partial file. Library users use `Input.record()` and `syx.write()`.
+See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
 ## Offline uFor tuning
 
@@ -992,18 +992,18 @@ meedee transfer-send backup.syx --gap 0.1 --port 'Exact output name'
 The 100 ms value is an example, not a device recommendation. `--gap` is
 required; zero sends consecutive complete messages. No message splitting,
 automatic retries or device acknowledgements are inferred. The file is fully
-validated before output discovery. Defaults bound plans to 256 messages, 8 MiB
+validated before output discovery. Defaults bound CLI input to 256 messages, 8 MiB
 of framed bytes and 1 MiB per payload; CLI options can change these limits.
 Preview samples are bounded by `--detail-limit` and `--preview-bytes`.
 
-The shared Rust/Python `transfer` module supplies immutable plans and caller-driven
-sessions; Python `transfer.send` delivers through an existing MIDI 1 typed
-output and accepts `events.Cancellation`. Successful handoffs and uncertain sends
-are reported separately. Handoff does not prove instrument acceptance; Ctrl-C or
-cancellation cannot interrupt a blocked native call. See the
-[transfer contract](plan/api.md#bounded-midi-1-sysex-transfers) for timing,
-cancellation, progress fields and CLI status codes. No native device transfer
-has been qualified by this implementation's automated checks.
+The shared Rust/Python `syx.send(output, messages, gap)` helper accepts untimed
+SysEx messages and waits at least the selected gap after each successful handoff
+before sending the next. It returns the ordinary playback report, retains typed
+send failures with confirmed progress, and never retries or closes the output.
+There is no pause after the last message. `Output.send()` itself has no gap option;
+use it directly for timestamped recordings. `syx.Reader` and `syx.write` retain
+strict file parsing and export. See the
+[transfer contract](plan/api.md#bounded-midi-1-sysex-transfers).
 
 ### One MIDI-CI management scan
 

@@ -143,8 +143,15 @@ impl Sender for Output<'_, '_> {
         let message = self
             .calls
             .convert(crate::event_values::to_python(self.calls.py, message))?;
-        self.calls
+        let report = self
+            .calls
             .convert(self.object.call_method1("send", (message,)))?;
+        if report
+            .extract::<PyRef<'_, crate::playback::PlaybackReport>>()
+            .is_ok_and(|report| report.value.cancelled)
+        {
+            return Err(midi::Error::Cancelled);
+        }
         Ok(())
     }
 }
@@ -175,17 +182,14 @@ impl PlaybackClock for Clock<'_, '_> {
 }
 
 #[pyfunction]
-pub(crate) fn run_transfer_output(
+pub(crate) fn run_syx_send(
     py: Python<'_>,
-    mut session: PyRefMut<'_, crate::transfer::Session>,
     output: Bound<'_, PyAny>,
+    messages: Bound<'_, PyAny>,
+    #[pyo3(from_py_with=crate::units::duration)] gap: u64,
     cancel: Bound<'_, PyAny>,
     now: Bound<'_, PyAny>,
-) -> PyResult<crate::transfer::Report> {
-    let token = cancel
-        .extract::<PyRef<'_, crate::playback::Cancellation>>()?
-        .value
-        .clone();
+) -> PyResult<crate::playback::PlaybackReport> {
     let calls = Calls::new(py);
     let mut output = Output {
         calls: &calls,
@@ -197,49 +201,42 @@ pub(crate) fn run_transfer_output(
         cancel,
         last: 0,
     };
-    let result = meedee::transfer::send_with(&mut session.value, &mut output, &mut clock, &token);
-    calls
-        .finish(result, false)
-        .map(|value| crate::transfer::Report { value })
-}
-
-#[pyfunction]
-pub(crate) fn run_transfer_input(
-    py: Python<'_>,
-    mut capture: PyRefMut<'_, crate::transfer::Capture>,
-    receiver: Bound<'_, PyAny>,
-    cancel: Bound<'_, PyAny>,
-    now: Bound<'_, PyAny>,
-) -> PyResult<crate::transfer::CaptureReport> {
-    if capture.value.snapshot().status != "ready" {
-        return Err(PyValueError::new_err("capture must be fresh"));
+    let mut iterator = messages.try_iter()?;
+    let source = std::iter::from_fn(|| {
+        iterator.next().map(|value| {
+            let value = value.and_then(|value| {
+                value
+                    .extract::<PyRef<'_, crate::messages::SysEx>>()
+                    .map(|value| value.value.clone())
+                    .map_err(Into::into)
+            });
+            calls.convert(value).map_err(io::Error::from)
+        })
+    });
+    let result = meedee::syx::send_with(&mut output, source, Duration::from_nanos(gap), &mut clock);
+    match result {
+        Ok(value) => Ok(crate::playback::PlaybackReport { value }),
+        Err(failure) => {
+            let error = calls
+                .failure
+                .borrow_mut()
+                .take()
+                .unwrap_or_else(|| PyOSError::new_err(failure.to_string()));
+            error
+                .value(py)
+                .setattr("completed_events", failure.report.sent_events)?;
+            error.value(py).setattr(
+                "report",
+                Py::new(
+                    py,
+                    crate::playback::PlaybackReport {
+                        value: failure.report,
+                    },
+                )?,
+            )?;
+            Err(error)
+        }
     }
-    let token = cancel
-        .extract::<PyRef<'_, crate::playback::Cancellation>>()?
-        .value
-        .clone();
-    let calls = Calls::new(py);
-    let mut receiver = Input {
-        calls: &calls,
-        object: receiver,
-    };
-    let mut clock = Clock {
-        calls: &calls,
-        now,
-        cancel,
-        last: 0,
-    };
-    if let Err(error) =
-        meedee::transfer::capture_with(&mut capture.value, &mut receiver, &mut clock, &token)
-    {
-        capture.value.fail(&error.to_string());
-    }
-    calls.finish(
-        Ok(crate::transfer::CaptureReport {
-            value: capture.value.snapshot(),
-        }),
-        false,
-    )
 }
 
 #[pyfunction]

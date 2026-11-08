@@ -13,9 +13,9 @@ from meedee import (
     events,
     messages,
     smf,
+    syx,
     testing,
     timecode,
-    transfer,
     tuning,
     ump,
 )
@@ -34,25 +34,6 @@ def test_configuration_retains_authored_units_and_normalizes_cli() -> None:
     assert WatchPorts.model_validate(units.revalidation_dump(config)) == config
 
 
-def test_time_strings_and_numbers_produce_identical_transfer_plans() -> None:
-    message = messages.SysEx(data=b"\x7d\x01")
-    authored = transfer.Plan([message], gap="2 ms", byte_limit="1 KiB")
-    numeric = transfer.Plan([message], gap=0.002, byte_limit=1024)
-    assert authored.gap == numeric.gap == 0.002
-
-
-@pytest.mark.parametrize("timeout", [0.25, "250 ms"])
-def test_capture_timeout_uses_seconds_against_nanosecond_clock(
-    timeout: float | str,
-) -> None:
-    capture = transfer.Capture(stream="test", expected_messages=1, timeout=timeout)
-    capture.start(100)
-    capture.poll(250_000_099)
-    assert capture.snapshot().status == "active"
-    capture.poll(250_000_100)
-    assert capture.snapshot().status == "timed_out"
-
-
 def test_public_defaults_are_seconds_and_bpm() -> None:
     assert inspect.signature(ci.Session.discover).parameters["timeout"].default == 3
     parameters = inspect.signature(ci.Browser).parameters
@@ -65,7 +46,9 @@ def test_public_defaults_are_seconds_and_bpm() -> None:
 @pytest.mark.parametrize("gap", [-1, float("nan"), float("inf"), "1 ns / 3", "1 beat"])
 def test_transfer_rejects_invalid_or_inexact_durations(gap: float | str) -> None:
     with pytest.raises(ValueError):
-        transfer.Plan([messages.SysEx(data=b"\x7d")], gap=gap)
+        syx.send(
+            testing.Output(protocol="midi1"), [messages.SysEx(data=b"\x7d")], gap=gap
+        )  # ty: ignore[invalid-argument-type]
 
 
 def test_exact_time_conversion_and_wrong_dimensions() -> None:

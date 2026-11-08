@@ -198,29 +198,17 @@ def test_ufor_numeric_overflow_and_underflow_cannot_generate_mts(detune: float) 
 
 
 @pytest.mark.parametrize("bank", [None, 3])
-@pytest.mark.parametrize("gap", [0.02, "20 ms"])
-def test_bulk_plan_uses_existing_transfer_bounds_and_preserves_library_broadcast(
+def test_bulk_dump_can_be_sent_as_sysex_with_library_broadcast(
     bank: int | None,
-    gap: float | str,
 ) -> None:
-    from meedee import transfer
+    from meedee import syx
     from meedee.testing import Output
 
     result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
-    plan = tuning.bulk_plan(
-        result,
-        device_id=127,
-        program=2,
-        name="planned",
-        gap=gap,
-        bank=bank,
-    )
-    assert plan.message_count == 1 and plan.gap == 0.02
-    wire = codecs.encode(plan.message(0))
-    assert plan.wire_bytes == len(wire)
-    decoded = tuning.decode(plan.message(0))
-    assert decoded is not None and decoded.message.device_id == 127
+    dump = tuning.bulk_dump(result, device_id=127, program=2, name="dump", bank=bank)
+    wire = codecs.encode(dump)
+    message = messages.SysEx(data=wire[1:-1])
     output = Output(protocol="midi1")
-    report = transfer.send(transfer.Session(plan), output)  # ty: ignore[invalid-argument-type]
-    assert report.status == "completed" and output.take_packet() == wire
+    report = syx.send(output, [message], gap=0)  # ty: ignore[invalid-argument-type]
+    assert report.sent_events == 1 and output.take_packet() == wire
     output.close()

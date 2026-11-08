@@ -159,12 +159,11 @@ jobs:
             "$GITHUB_WORKSPACE/test/test_patch.py" \
             "$GITHUB_WORKSPACE/test/test_topology.py" \
             "$GITHUB_WORKSPACE/test/test_discovery.py" \
-            "$GITHUB_WORKSPACE/test/test_transfer.py" \
+            "$GITHUB_WORKSPACE/test/test_syx_send.py" \
             "$GITHUB_WORKSPACE/test/test_transfer_cli.py" \
             "$GITHUB_WORKSPACE/test/test_ci_browser.py" \
             "$GITHUB_WORKSPACE/test/test_testing.py" \
             "$GITHUB_WORKSPACE/test/test_metrics.py" \
-            "$GITHUB_WORKSPACE/test/test_capture.py" \
             "$GITHUB_WORKSPACE/test/test_capture_cli.py" \
             "$GITHUB_WORKSPACE/test/test_tuning_query.py" \
             "$GITHUB_WORKSPACE/test/test_tuning_cli.py" \

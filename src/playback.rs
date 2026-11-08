@@ -90,8 +90,8 @@ impl Cancellation {
     }
 }
 #[pyclass(frozen, module = "meedee.events")]
-struct PlaybackReport {
-    value: model::PlaybackReport,
+pub(crate) struct PlaybackReport {
+    pub(crate) value: model::PlaybackReport,
 }
 #[pymethods]
 impl PlaybackReport {

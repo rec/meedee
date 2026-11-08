@@ -4,6 +4,7 @@ from collections.abc import Iterable, Iterator
 from os import PathLike
 from typing import BinaryIO
 
+from . import events, midi
 from .messages import SysEx
 
 class Reader:
@@ -23,3 +24,6 @@ def write(
     *,
     payload_limit: int | str = 1_048_576,
 ) -> None: ...
+def send(
+    output: midi.Output, messages: Iterable[SysEx], *, gap: float | str
+) -> events.PlaybackReport: ...
