@@ -241,6 +241,71 @@ pub(crate) fn run_sysex_send(
 }
 
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_sysex_dump(
+    py: Python<'_>,
+    receiver: Bound<'_, PyAny>,
+    output: Bound<'_, PyAny>,
+    model: String,
+    scope: String,
+    device_id: Option<u8>,
+    #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
+    #[pyo3(from_py_with=crate::units::duration)] silence: u64,
+    #[pyo3(from_py_with=crate::files::limit)] message_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
+    cancel: Bound<'_, PyAny>,
+    now: Bound<'_, PyAny>,
+) -> PyResult<crate::sysex::DumpReport> {
+    let stream = receiver.getattr("stream")?.extract::<String>()?;
+    let token = cancel
+        .extract::<PyRef<'_, crate::playback::Cancellation>>()?
+        .value
+        .clone();
+    let calls = Calls::new(py);
+    let mut receiver = Input {
+        calls: &calls,
+        object: receiver,
+    };
+    let mut output = if output.is_none() {
+        None
+    } else {
+        Some(Output {
+            calls: &calls,
+            object: output,
+        })
+    };
+    let mut clock = Clock {
+        calls: &calls,
+        now,
+        cancel,
+        last: 0,
+    };
+    let options = meedee::sysex::DumpOptions {
+        scope,
+        device_id,
+        timeout: Duration::from_nanos(timeout),
+        silence: Duration::from_nanos(silence),
+        message_limit,
+        byte_limit,
+        payload_limit,
+        cancel: token,
+    };
+    let result = meedee::sysex::dump_with(
+        &mut receiver,
+        output.as_mut(),
+        &stream,
+        &model,
+        &options,
+        &mut clock,
+    );
+    calls.finish(
+        result.map(|value| crate::sysex::DumpReport { value }),
+        false,
+    )
+}
+
+#[pyfunction]
 pub(crate) fn run_tuning(
     py: Python<'_>,
     mut query: PyRefMut<'_, crate::tuning::Query>,

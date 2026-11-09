@@ -32,6 +32,7 @@ mod playback;
 mod ports;
 mod profiles;
 mod recording;
+mod sysex;
 mod tuning;
 mod ump;
 mod units;
@@ -45,6 +46,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
     module.add_function(wrap_pyfunction!(drivers::run_sysex_send, module)?)?;
+    module.add_function(wrap_pyfunction!(drivers::run_sysex_dump, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
@@ -210,7 +212,8 @@ fn populate_smf(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 #[pyfunction]
 fn populate_sysex(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    files::register_sysex(module)
+    files::register_sysex(module)?;
+    sysex::register(module)
 }
 #[pyfunction]
 fn populate_clip(module: &Bound<'_, PyModule>) -> PyResult<()> {

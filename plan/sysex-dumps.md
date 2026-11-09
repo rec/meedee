@@ -1,5 +1,19 @@
 # Basic SysEx dump requests and opaque capture
 
+## Implementation status
+
+Implemented in `sysex` in Python and Rust. The simple entry point is
+`sysex.dump(receiver, output, model=...)`; omit output for manual capture.
+The existing recorder retains matched opaque messages. Current model/scope
+coverage, source inconsistencies and qualification limits are recorded in
+[doc/sysex-dumps.md](../doc/sysex-dumps.md).
+
+Three models support automatic stored-data collections; minilogue xd and Rev2
+support current/system requests only because their published program addressing
+is inconsistent. Peak, Digitakt and Subsequent 37 support explicitly unverified
+manual manufacturer-filtered capture, as approved for the basic implementation.
+Roland support is VT-4 only, not a claim of Boss support. Hardware was not used.
+
 ## Objective and agreed scope
 
 Request documented instrument dumps and capture the replies without decoding or
@@ -22,8 +36,7 @@ Decisions agreed with the user:
 - Implement checksums or handshakes only when the supported transfer protocol
   requires them. Do not build a general patch decoder or validation framework.
 
-This document is a plan only. It does not authorize hardware operations or
-implementation in this task.
+Hardware qualification remains a separate explicitly authorized activity.
 
 ## Existing foundations and ownership
 

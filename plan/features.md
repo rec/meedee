@@ -173,8 +173,12 @@ a completed observation window does not prove dump completeness.
 One-shot ordinary/banked MTS dump queries now reuse the existing reply tracker
 and decoder through Rust/Python APIs, a caller-thread host and preview/live CLI.
 Original reply bytes and checksum status survive export; uncertain sends never
-retry. UMP, device-specific chunking, acknowledgements and other request/reply
-protocols remain separate work requiring explicit rules.
+retry. `sysex.dump` now requests documented model-specific dump scopes and captures
+opaque replies, or captures manually initiated dumps. It reuses the recorder and
+caller-thread workflow adapters, with bounded retention and explicit completion
+evidence. [Coverage and limitations](../doc/sysex-dumps.md) distinguish automatic
+support from unverified manual capture. UMP dump workflows and device protocols
+outside those documented recipes remain separate work requiring explicit rules.
 
 **Use:** Back up or restore an instrument using documented transfer rules.
 

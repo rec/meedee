@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from types import ModuleType
 
-from . import ci, events, inspection, topology, tuning
+from . import ci, events, inspection, sysex, topology, tuning
 
 def run_monitor(
     monitor: inspection.Monitor,
@@ -46,6 +46,20 @@ def run_sysex_send(
     cancel: events.Cancellation,
     now: Callable[[], int],
 ) -> events.PlaybackReport: ...
+def run_sysex_dump(
+    receiver: object,
+    output: object,
+    model: str,
+    scope: str,
+    device_id: int | None,
+    timeout: float | str,
+    silence: float | str,
+    message_limit: int,
+    byte_limit: int | str,
+    payload_limit: int | str,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+) -> sysex.DumpReport: ...
 def populate_metrics(module: ModuleType) -> None: ...
 def populate_testing(module: ModuleType) -> None: ...
 def populate_topology(module: ModuleType) -> None: ...

@@ -1,0 +1,12 @@
+# Synthetic protocol vectors, not hardware captures. Source sections: doc/sysex-dumps.md.
+# model|scope|request payload hex (without F0/F7)|reply prefix hex|zero payload bytes|reply suffix hex|status
+yamaha/vl70-m|system|432057000000|4300570018000000|24|68|complete
+yamaha/vl70-m|current|432057100000|430057000f100000|15|61|complete
+yamaha/vl70-m|current|432057200000|4300570a6b200000|1387|6b|complete
+roland/vt-4|system|41100000005111000000000000001070|4110000000511200000000|16|00|complete
+sequential/prophet-rev2|current|012f06|012f03|2339||complete
+sequential/prophet-rev2|system|012f0e|012f0f|50||complete
+korg/minilogue-xd|current|423000015110|423000015140|384||unverified
+korg/minilogue-xd|system|42300001510e|423000015151|37||unverified
+behringer/deepmind-12|current|002032200003|00203220000406|278||complete
+behringer/deepmind-12|system|002032200005|00203220000606|56||complete
