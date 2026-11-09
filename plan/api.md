@@ -849,7 +849,7 @@ source integration remain slice 10; profile negotiation remains slice 11.
 
 ## Slices 8–10 approved policies, 2026-10-15
 
-Rust-owned codecs live in smf/syx/clip/archive, with Python modules of the same
+Rust-owned codecs live in smf/sysex/clip/archive, with Python modules of the same
 names. Shared event/time values live in events. SMF types 0/1/2, PPQN/SMPTE,
 SYX and MIDI Clip 1.0 are selected; other containers are out of scope. Type 2
 sequences are independent. File writes preserve meaning/order, not byte-exact
@@ -905,7 +905,7 @@ instruments and Windows/Linux native validation remain open.
 
 ## Final slices 8–10 contracts
 
-Rust modules smf/syx/clip/archive/events/live/recording/playback/file_timing and
+Rust modules smf/sysex/clip/archive/events/live/recording/playback/file_timing and
 source-scoped event_views contain the shared logic. Python uses the same native
 implementations through focused modules; typed input composes the sole input
 transport, and output unifies packet/message access on the same connection.
@@ -1263,8 +1263,8 @@ languages. Recordings retain timing, source declarations and receive diagnostics
 There are no separate transfer Plan, Session, Capture, Step or report types.
 `Output.send()` has no gap option.
 
-Python `syx.send(output, messages, *, gap)` and Rust
-`syx::send(&mut output, messages, Duration)` send untimed SysEx through the ordinary
+Python `sysex.send(output, messages, *, gap)` and Rust
+`sysex::send(&mut output, messages, Duration)` send untimed SysEx through the ordinary
 output. Rust accepts an iterator of fallible SysEx values; Python accepts an
 iterable of SysEx. Pacing waits at least gap after each successful handoff before
 the next, with no wait after the final message. Zero sends consecutively. The
@@ -1274,7 +1274,7 @@ Python exceptions carry report/completed_events; Rust returns playback::Failure.
 No instrument acknowledgement or delivery guarantee is inferred. Invalid later
 streaming input can fail after an already-sent prefix.
 
-`syx.Reader` and `syx.write` retain the strict `.syx` file helpers. The CLI retains
+`sysex.Reader` and `sysex.write` retain the strict `.syx` file helpers. The CLI retains
 `transfer-preview SOURCE --gap N` and `transfer-send SOURCE --gap N --port NAME`,
 validating the complete file and message/byte/payload bounds before discovery.
 The preview's gap is prospective sending policy, never file metadata. The CLI
@@ -1438,7 +1438,7 @@ unchanged.
 ## Passive MIDI 1 SysEx capture
 
 Use `Input.record(duration)` to retain MIDI messages with their timestamps and
-receive diagnostics, then select SysEx messages for `syx.write`. Recording remains
+receive diagnostics, then select SysEx messages for `sysex.write`. Recording remains
 duration-only; there is no expected-count stopping rule. Receive queue and decoder
 limits still apply; the returned recording grows with received traffic and has
 no independent total recording-memory budget.
@@ -1905,16 +1905,16 @@ Additional work beyond the prompt: None.
 Each group now has one public namespace and production source file per language
 layer. tuning contains codecs, values, the uFor adapter, query tracking and the
 live query driver; ci contains codecs, sessions, browser tracking and live
-browsing. SysEx file helpers and paced sending live in syx; recording/replay uses Input and Output.
+browsing. SysEx file helpers and paced sending live in sysex; recording/replay uses Input and Output.
 Rust CI browser/session and tuning-query implementations are colocated with their
 public modules. The native Python tuning query binding is colocated with the
 other tuning bindings.
 
 The canonical workflow functions in both APIs are tuning.query, ci.browse and
-syx.send. Tuning and CI retain their fresh-session, cancellation and clock
+sysex.send. Tuning and CI retain their fresh-session, cancellation and clock
 ownership rules. SysEx instead uses ordinary recording/replay plus a paced
 helper returning the standard playback report. Rust keeps the corresponding query_with, browse_with,
-and syx::send_with drivers for explicit clock/I/O adapters; CI Options
+and sysex::send_with drivers for explicit clock/I/O adapters; CI Options
 now lives in ci. The former live/input/output modules are removed, with no
 compatibility aliases or forwarding modules. Root __all__ now contains the 24
 public submodules and the same 96 classes; functions remain module-qualified.

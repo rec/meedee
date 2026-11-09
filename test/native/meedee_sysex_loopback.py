@@ -10,7 +10,7 @@ from meedee import (
     events,
     messages,
     midi,
-    syx,
+    sysex,
     tuning,
 )
 
@@ -63,13 +63,13 @@ def exercise(run_in_subprocess: bool, directory: Path) -> None:
             connect(names[0] + "-dump", run_in_subprocess) as dump_output,
         ):
             delivery = worker.submit(
-                syx.send, dump_output, messages_to_capture, gap="1 ms"
+                sysex.send, dump_output, messages_to_capture, gap="1 ms"
             )
             recording = dump_input.record(1)
         assert delivery.result(timeout=4).sent_events == 2
         captured = [m for m in recording if isinstance(m, messages.SysEx)]
         capture_path = directory / f"capture-{run_in_subprocess}.syx"
-        syx.write(capture_path, captured)
+        sysex.write(capture_path, captured)
         expected = b"".join(codecs.encode(m) for m in messages_to_capture)
         assert capture_path.read_bytes() == expected
 

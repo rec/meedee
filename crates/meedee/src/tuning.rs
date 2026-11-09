@@ -996,7 +996,7 @@ impl Query {
                     "only a completed query can be exported",
                 )
             })?;
-        crate::syx::write(writer, reply, reply.data().len())?;
+        crate::sysex::write(writer, reply, reply.data().len())?;
         writer.flush()
     }
     fn finish(&mut self, status: &'static str, reason: &str) {

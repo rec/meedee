@@ -10,7 +10,7 @@ pytest.importorskip("tyro", reason="install meedee[cli]")
 
 from ufor.tuning import Computed, FrequencyTable, RatioTable, Tuning
 
-from meedee import cli, midi, syx, tuning
+from meedee import cli, midi, sysex, tuning
 
 
 def invoke(args: list[str]) -> int:
@@ -66,7 +66,7 @@ def test_scala_export_converts_each_selected_note(
     )
     report = json.loads(capsys.readouterr().out)
     assert report["converted_keys"] == 4
-    plan = list(syx.Reader(destination))
+    plan = list(sysex.Reader(destination))
     decoded = tuning.decode(plan[0])
     assert decoded is not None and isinstance(decoded.message, tuning.BulkDump)
     assert decoded.message.table.values[71] == tuning.Pitch(semitone=76, fraction=320)
@@ -103,7 +103,7 @@ def test_complete_bulk_export_is_transfer_ready_and_refuses_overwrite(
         and report["converted_keys"] == 128
         and report["preserved_keys"] == 0
     )
-    plan = list(syx.Reader(destination))
+    plan = list(sysex.Reader(destination))
     assert len(plan) == 1
     decoded = tuning.decode(plan[0])
     assert decoded is not None and decoded.checksum == tuning.ChecksumStatus.Matches
@@ -146,7 +146,7 @@ def test_partial_export_requires_preservation_and_never_hides_invalid_pitches(
     assert invoke(args + ["--preserve-unmapped"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["converted_keys"] == 2 and report["preserved_keys"] == 126
-    reader = syx.Reader(destination)
+    reader = sysex.Reader(destination)
     decoded = tuning.decode(next(reader))
     reader.close()
     assert decoded is not None and isinstance(decoded.message, tuning.BulkDump)

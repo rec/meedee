@@ -1,5 +1,5 @@
 use meedee::messages::{AnyMessage, NoteOn};
-use meedee::{clip, smf, syx, ump};
+use meedee::{clip, smf, sysex, ump};
 use std::io::{self, Cursor, Write};
 const SMF:&[u8]=b"MThd\0\0\0\x06\0\0\0\x01\x01\xe0MTrk\0\0\0\x13\0\xff\x51\x03\x07\xa1\x20\0\x90\x3c\x64\x83\x60\x3c\0\0\xff\x2f\0";
 #[test]
@@ -110,19 +110,19 @@ fn smf_fragments_meta_and_independent_tracks_roundtrip() {
 }
 #[test]
 fn syx_limits_and_interruption_never_return_partial_dump() {
-    let v = syx::Reader::new(Cursor::new(b"\xf0\x7d\x01\xf7\xf0\xf7"), 10)
+    let v = sysex::Reader::new(Cursor::new(b"\xf0\x7d\x01\xf7\xf0\xf7"), 10)
         .unwrap()
         .collect::<io::Result<Vec<_>>>()
         .unwrap();
     assert_eq!(v.len(), 2);
     assert_eq!(v[0].data(), [125, 1]);
     for b in [&b"\xf0\x7d"[..], &b"\xf0\x90\xf7"[..], &b"\x90"[..]] {
-        assert!(syx::Reader::new(Cursor::new(b), 10)
+        assert!(sysex::Reader::new(Cursor::new(b), 10)
             .unwrap()
             .collect::<io::Result<Vec<_>>>()
             .is_err());
     }
-    assert!(syx::Reader::new(Cursor::new(b"\xf0\x01\x02\xf7"), 1)
+    assert!(sysex::Reader::new(Cursor::new(b"\xf0\x01\x02\xf7"), 1)
         .unwrap()
         .collect::<io::Result<Vec<_>>>()
         .is_err());
@@ -180,5 +180,5 @@ impl Write for FullDisk {
 fn disk_errors_propagate() {
     assert!(clip::Writer::new(FullDisk).is_err());
     let v = meedee::messages::SysEx::new(vec![125]).unwrap();
-    assert!(syx::write(&mut FullDisk, &v, 10).is_err());
+    assert!(sysex::write(&mut FullDisk, &v, 10).is_err());
 }

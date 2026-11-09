@@ -1,13 +1,13 @@
 """SysEx preview, paced sending and duration-based recording commands."""
 
-from . import archive, messages, syx
+from . import archive, messages, sysex
 from ._cli import SysexReceive, TransferPreview, TransferSend, emit
 
 
 def run_transfer(config: TransferPreview) -> int:
     values: list[messages.SysEx] = []
     wire_bytes = 0
-    reader = syx.Reader(config.source, payload_limit=config.payload_limit)
+    reader = sysex.Reader(config.source, payload_limit=config.payload_limit)
     try:
         for m in reader:
             wire_bytes += len(m.data) + 2
@@ -61,7 +61,7 @@ def run_transfer(config: TransferPreview) -> int:
         )
         port = select_port(client.ports(), config.port, direction="output")
         with client.connect(port) as output:
-            report = syx.send(output, values, gap=config.gap)
+            report = sysex.send(output, values, gap=config.gap)
             confirmed = report.sent_events
             completed = not report.cancelled
     except KeyboardInterrupt as error:
@@ -150,7 +150,7 @@ def run_receive(config: SysexReceive) -> int:
         if not values:
             raise ValueError("recording contained no SysEx messages")
         with config.destination.open("xb") as destination:
-            syx.write(destination, values, payload_limit=config.payload_limit)
+            sysex.write(destination, values, payload_limit=config.payload_limit)
         exported = True
     except KeyboardInterrupt:
         interrupted = True

@@ -25,7 +25,7 @@ def main() -> None:
             notes,
             routing,
             smf,
-            syx,
+            sysex,
             testing,
             timecode,
             topology,
@@ -145,7 +145,7 @@ def main() -> None:
         assert ci.Header(source_muid=1, destination_muid=2).version == 2
         assert ci.Address.channel(channel=16).channel_number == 16
         assert smf.Header(format=0, tracks=1, division=480).division == 480
-        assert syx.Reader.__module__ == "meedee.syx"
+        assert sysex.Reader.__module__ == "meedee.sysex"
         assert clip.Reader.__module__ == "meedee.clip"
         assert inspection.inspect_file(BytesIO(b"\xf0\x7d\xf7"), format="syx").complete
         assert inspection.compare_files(
@@ -173,8 +173,8 @@ def main() -> None:
         assert router.snapshot().admitted == 1
         tracker = topology.Tracker()
         assert tracker.observe([]).generation == 1
-        assert list(syx.Reader(BytesIO(b"\xf0\x7d\xf7")))[0].data == b"\x7d"
-        assert callable(syx.send)
+        assert list(sysex.Reader(BytesIO(b"\xf0\x7d\xf7")))[0].data == b"\x7d"
+        assert callable(sysex.send)
         from meedee import discovery
 
         poller = discovery.Poller(protocol="midi1")

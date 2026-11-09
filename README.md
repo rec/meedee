@@ -14,9 +14,9 @@ to the archive format, `Decoder` to the MIDI 1 byte codec, `Route` to routing, a
 `Session` and `Report` stay in their submodules. Importing the package does not
 load the optional CLI implementation or uFor adapter dependencies.
 
-The domain workflows are grouped under `md.tuning`, `md.ci` and `md.syx`:
+The domain workflows are grouped under `md.tuning`, `md.ci` and `md.sysex`:
 `tuning.query` runs a tuning query, `ci.browse` runs a management scan, and
-`syx.send` sends SysEx messages with explicit pacing. Use ordinary `Input.record()`
+`sysex.send` sends SysEx messages with explicit pacing. Use ordinary `Input.record()`
 and `Output.send()` to record and replay SysEx with timing.
 
 The toolkit is under development. Raw MIDI 1.0 bytes and native UMP transport
@@ -103,7 +103,7 @@ bounded lookahead and deterministic tick/track order; Type 2 requires an explici
 `sequence`. `smf.TimedReader` is a performance view with exact tempo conversion,
 not a metadata-preserving replacement for `Reader`. `smf.export_event` reports
 unsupported content and quantization; loss and UMP group routing require explicit
-decisions. `syx` handles concatenated SysEx dumps; `clip` handles MIDI Clip 1.0.
+decisions. `sysex` handles concatenated SysEx dumps; `clip` handles MIDI Clip 1.0.
 File writers require `finish()`. Readers have `close()`; borrowed streams remain
 open. No codec starts MIDI workers. See [the API contract](plan/api.md).
 
@@ -183,7 +183,7 @@ This records MIDI 1 for the requested duration, closes the input, then exports
 its SysEx messages to a new file. It refuses overwrite and writes nothing after
 recording loss, decoding failure, or an empty SysEx result. Finishing the duration
 does not establish instrument-specific dump completeness. Final disk errors can
-leave a partial file. Library users use `Input.record()` and `syx.write()`.
+leave a partial file. Library users use `Input.record()` and `sysex.write()`.
 See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
 ## Offline uFor tuning
@@ -996,12 +996,12 @@ validated before output discovery. Defaults bound CLI input to 256 messages, 8 M
 of framed bytes and 1 MiB per payload; CLI options can change these limits.
 Preview samples are bounded by `--detail-limit` and `--preview-bytes`.
 
-The shared Rust/Python `syx.send(output, messages, gap)` helper accepts untimed
+The shared Rust/Python `sysex.send(output, messages, gap)` helper accepts untimed
 SysEx messages and waits at least the selected gap after each successful handoff
 before sending the next. It returns the ordinary playback report, retains typed
 send failures with confirmed progress, and never retries or closes the output.
 There is no pause after the last message. `Output.send()` itself has no gap option;
-use it directly for timestamped recordings. `syx.Reader` and `syx.write` retain
+use it directly for timestamped recordings. `sysex.Reader` and `sysex.write` retain
 strict file parsing and export. See the
 [transfer contract](plan/api.md#bounded-midi-1-sysex-transfers).
 

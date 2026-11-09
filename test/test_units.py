@@ -13,7 +13,7 @@ from meedee import (
     events,
     messages,
     smf,
-    syx,
+    sysex,
     testing,
     timecode,
     tuning,
@@ -46,7 +46,7 @@ def test_public_defaults_are_seconds_and_bpm() -> None:
 @pytest.mark.parametrize("gap", [-1, float("nan"), float("inf"), "1 ns / 3", "1 beat"])
 def test_transfer_rejects_invalid_or_inexact_durations(gap: float | str) -> None:
     with pytest.raises(ValueError):
-        syx.send(
+        sysex.send(
             testing.Output(protocol="midi1"), [messages.SysEx(data=b"\x7d")], gap=gap
         )  # ty: ignore[invalid-argument-type]
 

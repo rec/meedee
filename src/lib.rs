@@ -44,7 +44,7 @@ mod transport_tests;
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
-    module.add_function(wrap_pyfunction!(drivers::run_syx_send, module)?)?;
+    module.add_function(wrap_pyfunction!(drivers::run_sysex_send, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
@@ -67,7 +67,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_timecode, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ump, module)?)?;
     module.add_function(wrap_pyfunction!(populate_smf, module)?)?;
-    module.add_function(wrap_pyfunction!(populate_syx, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_sysex, module)?)?;
     module.add_function(wrap_pyfunction!(populate_clip, module)?)?;
     module.add_function(wrap_pyfunction!(populate_archive, module)?)?;
     module.add_function(wrap_pyfunction!(populate_file_io, module)?)?;
@@ -209,8 +209,8 @@ fn populate_smf(module: &Bound<'_, PyModule>) -> PyResult<()> {
     file_timing::register_smf(module)
 }
 #[pyfunction]
-fn populate_syx(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    files::register_syx(module)
+fn populate_sysex(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    files::register_sysex(module)
 }
 #[pyfunction]
 fn populate_clip(module: &Bound<'_, PyModule>) -> PyResult<()> {

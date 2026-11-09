@@ -12,7 +12,7 @@ from . import _core, events, messages
 if TYPE_CHECKING:
     from . import midi
 
-_core.populate_syx(sys.modules[__name__])
+_core.populate_sysex(sys.modules[__name__])
 
 del sys
 
@@ -24,6 +24,6 @@ def send(
 
     Does not close the output, retry a failure, or infer device acknowledgement.
     """
-    return _core.run_syx_send(
+    return _core.run_sysex_send(
         output, messages, gap, events.Cancellation(), monotonic_ns
     )

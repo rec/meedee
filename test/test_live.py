@@ -919,7 +919,7 @@ def test_recorded_fragmented_sysex_exports_and_replays_with_timing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    from meedee import syx
+    from meedee import sysex
 
     client = midi.Input()
     client.connect(client.ports()[0])
@@ -930,8 +930,8 @@ def test_recorded_fragmented_sysex_exports_and_replays_with_timing(
     assert len(dump) == 1 and dump[0].data == b"\x7d\x01\x02"
     assert dump[0].timestamp is not None and dump[0].timestamp.ticks == 20
     path = tmp_path / "dump.syx"
-    syx.write(path, dump)
-    assert list(syx.Reader(path)) == dump
+    sysex.write(path, dump)
+    assert list(sysex.Reader(path)) == dump
     sent: list[object] = []
     monkeypatch.setattr(midi.Output, "__enter__", lambda self: self)
     monkeypatch.setattr(midi.Output, "_send", lambda self, value: sent.append(value))

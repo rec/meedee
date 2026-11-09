@@ -31,7 +31,7 @@ mod live;
 mod playback;
 mod recording;
 pub mod smf;
-pub mod syx;
+pub mod sysex;
 
 mod sequence;
 

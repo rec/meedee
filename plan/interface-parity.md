@@ -51,7 +51,7 @@ Completion requires finishing this inventory, not merely aligning symbol counts.
 | archive.Recorder, RecordingReport | archive::Recorder, RecordingReport | Rust generic readers/writers |
 | ci.Session, Browser, BrowseReport | ci::Session, Browser, BrowseReport | Rust Browser takes an explicitly constructed Session |
 | tuning.Query, QueryReport | tuning::Query, QueryReport | Same request/progress semantics |
-| syx, tuning, ci | Same module names and run drivers | Caller-owned connections and monotonic clocks |
+| sysex, tuning, ci | Same module names and run drivers | Caller-owned connections and monotonic clocks |
 | discovery.Poller | discovery::Poller | Caller-driven full snapshots; stop on failed scans |
 | inspection reports/comparison | inspection reports/comparison | Immutable getters use Python property names |
 | metrics.Distribution | metrics::Distribution | Detached snapshot, separate Histogram accumulator |

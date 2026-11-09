@@ -1,6 +1,6 @@
 //! Python stream adapters and Rust file codecs. Caller-owned streams stay open.
 use crate::messages;
-use meedee::{clip, smf, syx};
+use meedee::{clip, smf, sysex};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -325,12 +325,12 @@ impl Writer {
 pub fn closed() -> PyErr {
     PyValueError::new_err("file codec is closed")
 }
-#[pyclass(name = "Reader", module = "meedee.syx")]
-struct SyxReader {
-    value: Option<syx::Reader<Stream>>,
+#[pyclass(name = "Reader", module = "meedee.sysex")]
+struct SysexReader {
+    value: Option<sysex::Reader<Stream>>,
 }
 #[pymethods]
-impl SyxReader {
+impl SysexReader {
     #[new]
     #[pyo3(signature=(source,*,payload_limit=1_048_576))]
     fn new(
@@ -338,7 +338,9 @@ impl SyxReader {
         #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: Some(syx::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?),
+            value: Some(
+                sysex::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?,
+            ),
         })
     }
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
@@ -357,7 +359,7 @@ impl SyxReader {
 }
 #[pyfunction]
 #[pyo3(signature=(destination,messages,*,payload_limit=1_048_576))]
-fn write_syx(
+fn write_sysex(
     destination: &Bound<'_, PyAny>,
     messages: &Bound<'_, PyAny>,
     #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
@@ -370,7 +372,7 @@ fn write_syx(
         };
         destination
             .py()
-            .detach(|| syx::write(&mut stream, &v, payload_limit))
+            .detach(|| sysex::write(&mut stream, &v, payload_limit))
             .map_err(os_error)?;
     }
     destination.py().detach(|| stream.flush()).map_err(os_error)
@@ -469,9 +471,9 @@ pub fn register_smf(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Reader>()?;
     m.add_class::<Writer>()
 }
-pub fn register_syx(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("Reader", m.py().get_type::<SyxReader>())?;
-    m.add("write", wrap_pyfunction!(write_syx, m)?)?;
+pub fn register_sysex(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add("Reader", m.py().get_type::<SysexReader>())?;
+    m.add("write", wrap_pyfunction!(write_sysex, m)?)?;
     Ok(())
 }
 pub fn register_clip(m: &Bound<'_, PyModule>) -> PyResult<()> {

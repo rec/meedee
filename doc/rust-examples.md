@@ -350,7 +350,7 @@ Initiate a dump on the instrument during a ten-second recording. Save its SysEx
 messages separately; `recording.records` also retains timing and diagnostics.
 
 ```rust
-use meedee::{midi::Input, syx, archive::Record, events::Payload, messages::AnyMessage};
+use meedee::{midi::Input, sysex, archive::Record, events::Payload, messages::AnyMessage};
 use std::{fs::OpenOptions, time::Duration};
 
 let recording = Input::new().record(Duration::from_secs(10))?;
@@ -359,7 +359,7 @@ let mut file = OpenOptions::new().write(true).create_new(true).open("backup.syx"
 for record in &recording.records {
     if let Record::Event(message) = record {
         if let Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() {
-            syx::write(&mut file, message, 1_048_576)?;
+            sysex::write(&mut file, message, 1_048_576)?;
         }
     }
 }
@@ -369,11 +369,11 @@ Run this separately to restore the backup. Choose the minimum pause from the
 instrument's documentation. Sending a dump can replace sounds or settings.
 
 ```rust
-use meedee::{midi::Output, syx};
+use meedee::{midi::Output, sysex};
 use std::time::Duration;
 
 let mut output = Output::new();
-println!("{:?}", syx::send(&mut output, syx::Reader::open("backup.syx")?, Duration::from_millis(100))?);
+println!("{:?}", sysex::send(&mut output, sysex::Reader::open("backup.syx")?, Duration::from_millis(100))?);
 output.close()?;
 ```
 
@@ -468,7 +468,7 @@ OpenOptions::new().write(true).create_new(true).open("just-three.syx")?
 println!("{dump:?}");
 ```
 
-Use `syx::send` to send complete SysEx messages with explicit pacing.
+Use `sysex::send` to send complete SysEx messages with explicit pacing.
 For individual real-time changes, use
 `tuning::note_changes(&pitches, 0, 2, true, None, false)?`.
 These builders do not open ports or send messages. `None` selects the unbanked
@@ -778,10 +778,10 @@ Read a saved dump without opening a MIDI port. One decoder recognizes GM mode
 changes, controller destinations, key controls and global parameters:
 
 ```rust
-use meedee::{gm, syx};
+use meedee::{gm, sysex};
 use std::fs::File;
 
-for message in syx::Reader::new(File::open("backup.syx")?, 1_048_576)? {
+for message in sysex::Reader::new(File::open("backup.syx")?, 1_048_576)? {
     if let Some(decoded) = gm::decode(&message?, 1024)? {
         println!("{decoded:?}");
     }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import codecs, messages, syx
+from . import codecs, messages, sysex
 from ._cli import UforExport, emit
 
 
@@ -52,7 +52,7 @@ def run_ufor(config: UforExport) -> int:
     wire = codecs.encode(dump)
     message = messages.SysEx(data=wire[1:-1])
     with config.destination.open("xb") as destination:
-        syx.write(destination, [message])
+        sysex.write(destination, [message])
     data.update(
         {
             "kind": "ufor_export",

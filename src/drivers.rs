@@ -182,7 +182,7 @@ impl PlaybackClock for Clock<'_, '_> {
 }
 
 #[pyfunction]
-pub(crate) fn run_syx_send(
+pub(crate) fn run_sysex_send(
     py: Python<'_>,
     output: Bound<'_, PyAny>,
     messages: Bound<'_, PyAny>,
@@ -213,7 +213,8 @@ pub(crate) fn run_syx_send(
             calls.convert(value).map_err(io::Error::from)
         })
     });
-    let result = meedee::syx::send_with(&mut output, source, Duration::from_nanos(gap), &mut clock);
+    let result =
+        meedee::sysex::send_with(&mut output, source, Duration::from_nanos(gap), &mut clock);
     match result {
         Ok(value) => Ok(crate::playback::PlaybackReport { value }),
         Err(failure) => {

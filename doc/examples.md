@@ -163,7 +163,7 @@ import meedee as md
 
 recording = md.Input().record(30, output="backup.meedee")
 print(recording)
-md.syx.write("backup.syx", (m for m in recording if isinstance(m, md.SysEx)))
+md.sysex.write("backup.syx", (m for m in recording if isinstance(m, md.SysEx)))
 ```
 
 Replay the recording, preserving its timing:
@@ -182,7 +182,7 @@ Successful handoff does not prove the instrument accepted the dump.
 import meedee as md
 
 with md.Output() as output:
-    print(md.syx.send(output, md.syx.Reader("backup.syx"), gap="100 ms"))
+    print(md.sysex.send(output, md.sysex.Reader("backup.syx"), gap="100 ms"))
 ```
 
 ## 9. Export a just-intonation tuning
@@ -210,7 +210,7 @@ dump = md.tuning.bulk_dump(
     preserve_unmapped=True,
 )
 with Path("just-three.syx").open("xb") as stream:
-    md.syx.write(stream, [md.SysEx(data=md.codecs.encode(dump)[1:-1])])
+    md.sysex.write(stream, [md.SysEx(data=md.codecs.encode(dump)[1:-1])])
 ```
 
 After the instrument has loaded it, select the tuning with
@@ -219,7 +219,7 @@ Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
 Only `md.tuning.convert()` needs uFor. The shared Rust builders `md.tuning.bulk_dump()` and `md.tuning.note_changes()` also accept `md.NoteTuning` values constructed directly.
-Use `md.syx.send()` for paced delivery; `md.tuning.note_changes()` produces
+Use `md.sysex.send()` for paced delivery; `md.tuning.note_changes()` produces
 ordered messages of at most 127 keys each.
 
 ## 10. Bend one note of an MPE chord
@@ -458,7 +458,7 @@ an observation produced by the UMP assembler.
 ```python
 import meedee as md
 
-message = next(md.syx.Reader("tuning.syx"))
+message = next(md.sysex.Reader("tuning.syx"))
 print(md.tuning.decode(message))
 print(md.tuning.Decoder().feed(message))
 ```
@@ -625,7 +625,7 @@ GM mode changes, controller destinations, key controls and global parameters:
 ```python
 import meedee as md
 
-with md.syx.Reader("backup.syx") as dump:
+with md.sysex.Reader("backup.syx") as dump:
     for message in dump:
         if (decoded := md.gm.decode(message)) is not None:
             print(decoded)
