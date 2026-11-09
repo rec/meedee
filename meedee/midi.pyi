@@ -202,7 +202,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
     ) -> T | None: ...
     def start_recording(
         self,
-        destination: str | PathLike[str],
+        destination: str | PathLike[str] | None = None,
         *,
         label: str = "",
         best_effort: bool = False,

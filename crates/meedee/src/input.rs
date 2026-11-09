@@ -350,7 +350,12 @@ impl Core {
                     self.accept_item(item);
                 }
             }
-            Err(error) => self.pending.push_back(Err(error)),
+            Err(error) => {
+                if let Some(attachment) = &self.recording {
+                    attachment.recorder.fail(error.to_string());
+                }
+                self.pending.push_back(Err(error));
+            }
         }
     }
     fn accept_item(&mut self, item: Item) {
@@ -685,7 +690,7 @@ mod tests {
         ));
         let recorder = input
             .start_recording(
-                &path,
+                Some(&path),
                 &RecordingOptions {
                     metrics: true,
                     ..Default::default()
@@ -737,7 +742,7 @@ mod tests {
         let mut input = Input::decoded(core);
         input
             .start_recording(
-                &path,
+                Some(&path),
                 &RecordingOptions {
                     best_effort: true,
                     ..Default::default()
@@ -921,6 +926,35 @@ mod tests {
         producer.join().unwrap();
         input.close().unwrap();
         assert!(input.next().is_none());
+    }
+
+    #[test]
+    fn memory_recording_stops_without_closing_input() {
+        let core = input(transport::Protocol::Midi1);
+        core.queue.push(packet(0, &[0x90, 60, 90]));
+        let queue = core.queue.clone();
+        let mut input = Input::decoded(core);
+        let recorder = input
+            .start_recording(None::<&std::path::Path>, &Default::default())
+            .unwrap();
+        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        assert!(report.complete);
+        assert!(!input.closed());
+        assert_eq!(input.recording_report(), Some(report));
+        let records = recorder.records().unwrap();
+        assert_eq!(records.len(), 3);
+        queue.push(packet(1, &[0x90, 62, 90]));
+        for note in [60, 62] {
+            let item = input
+                .receive(Some(Duration::from_secs(1)), None)
+                .unwrap()
+                .unwrap();
+            assert!(
+                matches!(item, Item::Message(m) if matches!(*m, Payload::Midi1(AnyMessage::NoteOn(ref m)) if m.note() == note))
+            );
+        }
+        assert_eq!(recorder.records().unwrap(), records);
+        input.close().unwrap();
     }
 
     #[test]

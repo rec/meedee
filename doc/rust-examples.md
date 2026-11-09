@@ -832,7 +832,7 @@ use meedee::midi::{Input, RecordingOptions};
 use std::time::Duration;
 
 let mut input = Input::new();
-input.start_recording("rec.meedee", &RecordingOptions::default())?;
+input.start_recording(Some("rec.meedee"), &RecordingOptions::default())?;
 println!("{:?}", input.receive(Some(Duration::from_secs(10)), None)?);
 println!("{:?}", input.stop_recording(Duration::from_secs(5))?);
 input.close()?;
@@ -842,6 +842,25 @@ The returned Arc<archive::Recorder> gives access to the same recorder, including
 opt-in pressure metrics. RecordingOptions matches Python's label, best_effort,
 payload_limit, record_limit, byte_limit and metrics keywords. File handling matches
 Python's existing recorder: starting a recording creates or truncates the path.
+
+For unbounded memory capture, pass no path and read the records after stopping:
+
+```rust
+use meedee::midi::{Input, RecordingOptions};
+use std::path::Path;
+use std::time::Duration;
+
+let mut input = Input::new();
+let recorder = input.start_recording(None::<&Path>, &RecordingOptions::default())?;
+println!("{:?}", input.receive(Some(Duration::from_secs(10)), None)?);
+let report = input.stop_recording(Duration::from_secs(5))?;
+let records = recorder.records().unwrap();
+input.close()?;
+```
+
+Memory capture retains diagnostics and continues after them, marking the final
+report incomplete. `Input::record(duration)` uses the same attached memory
+recorder, closes the input and returns the captured records.
 
 Recording has independent admission. Receive-queue overflow does not by itself
 make a successfully retained recording incomplete. Known loss, unfinished messages,

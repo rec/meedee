@@ -177,7 +177,7 @@ fn attached_recording_with_callbacks_retains_activity_and_marks_panics_incomplet
             .create_virtual(&name)
             .unwrap();
         input
-            .start_recording(&path, &midi::RecordingOptions::default())
+            .start_recording(Some(&path), &midi::RecordingOptions::default())
             .unwrap();
         let output = Output::new(OutputOptions::default()).unwrap();
         let port = output

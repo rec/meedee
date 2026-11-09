@@ -185,6 +185,7 @@ def test_recording_preserves_verified_events_and_reports_observed_loss(
     assert recorder.record(event(1))
     report = recorder.stop()
     assert report.complete and report.gap_records == 0
+    assert recorder.records is None
     reader = archive.Reader(path)
     assert len(list(reader)) == 3 and reader.complete
     recorder = archive.Recorder(path, clock=clock(), stream="s")
@@ -197,6 +198,100 @@ def test_recording_preserves_verified_events_and_reports_observed_loss(
     report = recorder.stop()
     assert report.complete and report.gap_records == 1
     assert len(list(archive.Reader(path))) == 3
+
+
+def test_memory_recorder_retains_diagnostics_and_stops_admission() -> None:
+    recorder = archive.Recorder(clock=clock(), stream="s")
+    assert recorder.records is None
+    assert recorder.record(event(1))
+    assert recorder.record(archive.Gap(stream="s", lost=1, reason="lost input"))
+    assert recorder.record(archive.Discontinuity(stream="s", reason="clock changed"))
+    assert recorder.record(event(2))
+    report = recorder.stop()
+    assert not report.complete and report.failure == "lost input"
+    assert report.records == 6 and report.gap_records == 1
+    records = recorder.records
+    assert records is not None
+    assert [r for r in records if isinstance(r, messages.Message)] == [
+        event(1),
+        event(2),
+    ]
+    assert not recorder.record(event(3))
+    assert recorder.stop().records == report.records
+    assert recorder.records == records
+
+
+def test_memory_recording_stops_without_closing_input(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+) -> None:
+    with midi.Input() as receiver:
+        recorder = receiver.start_recording()
+        iterable_input[0](packet(b"\x90\x3e\x64", 1, 2))
+        report = receiver.stop_recording()
+        assert report.complete and receiver.recording_report is report
+        assert not receiver.closed
+        records = recorder.records
+        assert records is not None
+        assert [r.note for r in records if isinstance(r, messages.NoteOn)] == [60, 62]
+        iterable_input[0](packet(b"\x90\x40\x64", 2, 3))
+        assert recorder.records == records
+        assert receiver.receive(timeout=0) == messages.NoteOn(60, 100, 1)
+        # The receive queue remains independent of recording.
+        assert receiver.receive(timeout=0) == messages.NoteOn(62, 100, 1)
+        assert receiver.receive(timeout=0) == messages.NoteOn(64, 100, 1)
+
+
+def test_memory_capture_preserves_buffered_prefix_after_receive_overflow(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+) -> None:
+    receiver = midi.Input(event_limit=1)
+    receiver.connect(receiver.ports()[0])
+    iterable_input[0](packet(b"\x90\x3e\x64", 1, 2))
+    records = receiver.record(0)
+    assert [r.note for r in records if isinstance(r, messages.NoteOn)] == [60]
+    failures = [r for r in records if isinstance(r, archive.Discontinuity)]
+    assert len(failures) == 1 and "overflow" in failures[0].reason
+    assert receiver.recording_report is not None
+    assert not receiver.recording_report.complete
+
+
+def test_memory_capture_declares_changed_clocks_and_retains_later_events(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
+) -> None:
+    receiver = midi.Input()
+    recorder = receiver.start_recording()
+    changed = events.Clock(
+        identity="changed",
+        backend=midi.Backend.CoreMidi,
+        mode=midi.TimestampMode.Absolute,
+    )
+    iterable_input[0](
+        events.ReceivedPacket(
+            timestamp_ns=2, clock=changed, packet=b"\x90\x3e\x64", sequence=1
+        )
+    )
+    report = receiver.stop_recording()
+    assert not report.complete
+    records = recorder.records
+    assert records is not None
+    assert [r.identity for r in records if isinstance(r, events.Clock)] == [
+        "c",
+        "changed",
+    ]
+    assert [r.note for r in records if isinstance(r, messages.NoteOn)] == [60, 62]
+    assert len([r for r in records if isinstance(r, archive.Discontinuity)]) == 1
+    path = tmp_path / "changed.meedee"
+    with path.open("wb") as destination:
+        writer = archive.Writer(destination)
+        for r in records:
+            writer.write(r)
+        writer.finish()
+    reader = archive.Reader(path)
+    try:
+        assert list(reader) == records
+    finally:
+        reader.close()
+    receiver.close()
 
 
 def test_replay_rejects_loss_records_and_missing_times() -> None:

@@ -139,10 +139,42 @@ fields must be checked. By default any observed input loss or write/admission
 failure makes recording incomplete. `best_effort=True` permits explicit gap
 records, not silent loss. Capture defaults to 128 in-flight records and 8 MiB of
 payload. General file records default to a configurable 1 MiB payload limit.
-Rust exposes the same attachment through Input::start_recording(path, options)
+Rust exposes the same attachment through Input::start_recording(Some(path), options)
 and stop_recording(timeout). Recording runs without receive calls and can accompany
 callbacks. A stop timeout retains the stopping recorder for a later retry, including
 after input close; recording_report retains the last finalized report.
+
+Omit the destination (`start_recording()` in Python,
+`start_recording(None::<&Path>, options)` in Rust) to retain records in memory.
+`Recorder.stop()` still returns a report; `Recorder.records` (Rust: `records()`)
+provides the captured records after stopping, or `None` for active/file recorders.
+Memory retention grows without a size bound; file writer queue limits do not
+apply. Memory recording retains gaps and discontinuities, continues capturing,
+and reports these diagnostics as incomplete. File recording keeps the failure
+policy described above. Memory recording includes buffered input events present
+when it starts, without consuming them from the independent receive queue.
+
+`Input.record(duration)` uses this same attached memory recorder, closes the input
+and finalizes accepted events before returning the records. Its optional file
+output is saved from those records afterward, preserving overwrite behavior.
+For explicit control without closing the input:
+
+```python
+with Input() as receiver:
+    recorder = receiver.start_recording()
+    # Other application work can run while recording continues.
+    report = receiver.stop_recording()
+    records = recorder.records
+```
+
+```rust,no_run
+let mut receiver = meedee::midi::Input::new();
+let recorder = receiver.start_recording(None::<&std::path::Path>, &Default::default())?;
+// Other application work can run while recording continues.
+let report = receiver.stop_recording(std::time::Duration::from_secs(5))?;
+let records = recorder.records();
+```
+
 Direct receive returns None only on timeout. Normal closure and cancellation
 are distinct errors; cancellation leaves queued input and the connection usable.
 
