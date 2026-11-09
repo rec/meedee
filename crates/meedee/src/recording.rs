@@ -19,6 +19,8 @@ pub struct RecordingReport {
     pub pressure: Option<crate::metrics::Pressure>,
 }
 struct Admission {
+    captured: Option<Vec<Record>>,
+    diagnostic_failure: Option<String>,
     used: usize,
     records: usize,
     stopping: bool,
@@ -33,13 +35,55 @@ struct Shared {
 }
 pub struct Recorder {
     shared: Arc<Shared>,
-    sender: mpsc::SyncSender<(Record, usize)>,
+    sender: Option<mpsc::SyncSender<(Record, usize)>>,
     record_limit: usize,
     byte_limit: usize,
     payload_limit: usize,
     best_effort: bool,
 }
 impl Recorder {
+    /// Capture owned records in memory. Retention grows with the recording.
+    pub fn memory(descriptors: Vec<Record>, collect_metrics: bool) -> io::Result<Self> {
+        if descriptors
+            .iter()
+            .any(|r| !matches!(r, Record::Clock(_) | Record::Stream { .. }))
+        {
+            return Err(invalid(
+                0,
+                "recording descriptors must be clocks or streams",
+            ));
+        }
+        Ok(Self {
+            shared: Arc::new(Shared {
+                state: Mutex::new(Admission {
+                    captured: Some(descriptors),
+                    diagnostic_failure: None,
+                    used: 0,
+                    records: 0,
+                    stopping: false,
+                    finalizing: false,
+                    failure: None,
+                    result: None,
+                    pressure: collect_metrics.then(crate::metrics::Pressure::default),
+                }),
+                changed: Condvar::new(),
+            }),
+            sender: None,
+            record_limit: 0,
+            byte_limit: 0,
+            payload_limit: 0,
+            best_effort: true,
+        })
+    }
+    /// Owned memory records after stopping; None for file or active recorders.
+    pub fn records(&self) -> Option<Vec<Record>> {
+        let s = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
+        s.result.as_ref()?;
+        s.captured.clone()
+    }
+    pub(crate) fn is_memory(&self) -> bool {
+        self.sender.is_none()
+    }
     pub fn new(
         writer: impl Write + Send + 'static,
         descriptors: Vec<Record>,
@@ -65,6 +109,8 @@ impl Recorder {
         let (sender, receiver) = mpsc::sync_channel::<(Record, usize)>(record_limit);
         let shared = Arc::new(Shared {
             state: Mutex::new(Admission {
+                captured: None,
+                diagnostic_failure: None,
                 used: 0,
                 records: 0,
                 stopping: false,
@@ -127,7 +173,7 @@ impl Recorder {
             })?;
         Ok(Self {
             shared,
-            sender,
+            sender: Some(sender),
             record_limit,
             byte_limit,
             payload_limit,
@@ -135,6 +181,20 @@ impl Recorder {
         })
     }
     pub fn record(&self, record: Record) -> bool {
+        if self.sender.is_none() {
+            let mut s = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
+            if s.stopping || s.result.is_some() {
+                return false;
+            }
+            if let Record::Gap { reason, .. } | Record::Discontinuity { reason, .. } = &record {
+                s.diagnostic_failure.get_or_insert_with(|| reason.clone());
+            }
+            s.captured.as_mut().expect("memory recorder").push(record);
+            if let Some(p) = &mut s.pressure {
+                p.accepted_records += 1;
+            }
+            return true;
+        }
         match &record {
             Record::Gap { reason, .. } if !self.best_effort => {
                 self.fail(reason.clone());
@@ -171,7 +231,12 @@ impl Recorder {
         }
         s.used += size;
         s.records += 1;
-        match self.sender.try_send((record, size)) {
+        match self
+            .sender
+            .as_ref()
+            .expect("file recorder")
+            .try_send((record, size))
+        {
             Ok(()) => {
                 let (records, bytes) = (s.records, s.used);
                 if let Some(p) = &mut s.pressure {
@@ -201,17 +266,26 @@ impl Recorder {
     pub fn fail(&self, reason: String) {
         let mut s = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
         if !s.finalizing && s.result.is_none() {
+            if s.failure.is_none() {
+                if let Some(records) = &mut s.captured {
+                    if let Some(stream) = records.iter().find_map(|r| match r {
+                        Record::Stream { id, .. } => Some(id.clone()),
+                        _ => None,
+                    }) {
+                        records.push(Record::Discontinuity {
+                            stream,
+                            reason: reason.clone(),
+                        });
+                    }
+                }
+            }
             s.failure.get_or_insert(reason);
         }
         self.shared.changed.notify_all();
     }
     pub fn failure(&self) -> Option<String> {
-        self.shared
-            .state
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .failure
-            .clone()
+        let s = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
+        s.failure.clone().or_else(|| s.diagnostic_failure.clone())
     }
     pub fn pressure(&self) -> Option<crate::metrics::Pressure> {
         self.shared
@@ -227,6 +301,22 @@ impl Recorder {
             .ok_or_else(|| invalid(0, "timeout overflow"))?;
         let mut s = self.shared.state.lock().unwrap_or_else(|p| p.into_inner());
         s.stopping = true;
+        if s.result.is_none() && self.sender.is_none() {
+            let captured = s.captured.as_ref().expect("memory recorder");
+            let records = captured.len() as u64;
+            let gap_records = captured
+                .iter()
+                .filter(|r| matches!(r, Record::Gap { .. }))
+                .count() as u64;
+            let failure = s.failure.clone().or_else(|| s.diagnostic_failure.clone());
+            s.result = Some(RecordingReport {
+                complete: failure.is_none(),
+                records,
+                gap_records,
+                failure,
+                pressure: s.pressure.clone(),
+            });
+        }
         loop {
             if let Some(r) = &s.result {
                 return Ok(r.clone());

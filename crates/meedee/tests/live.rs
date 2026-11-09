@@ -292,6 +292,49 @@ impl Write for Buffer {
     }
 }
 #[test]
+fn memory_recording_retains_diagnostics_and_stops_admission() {
+    let r = recording::Recorder::memory(
+        vec![
+            Record::Clock(clock()),
+            Record::Stream {
+                id: "s".into(),
+                label: String::new(),
+                clock_identity: None,
+            },
+        ],
+        false,
+    )
+    .unwrap();
+    assert!(r.records().is_none());
+    assert!(r.record(Record::Event(Box::new(event(1)))));
+    assert!(r.record(Record::Gap {
+        stream: "s".into(),
+        lost: 1,
+        reason: "lost input".into()
+    }));
+    assert!(r.record(Record::Discontinuity {
+        stream: "s".into(),
+        reason: "clock changed".into()
+    }));
+    assert!(r.record(Record::Event(Box::new(event(2)))));
+    let report = r.stop(Duration::from_secs(1)).unwrap();
+    assert!(!report.complete);
+    assert_eq!(report.failure.as_deref(), Some("lost input"));
+    assert_eq!((report.records, report.gap_records), (6, 1));
+    let records = r.records().unwrap();
+    assert_eq!(
+        records
+            .iter()
+            .filter(|r| matches!(r, Record::Event(_)))
+            .count(),
+        2
+    );
+    assert!(!r.record(Record::Event(Box::new(event(3)))));
+    assert_eq!(r.stop(Duration::from_secs(1)).unwrap(), report);
+    assert_eq!(r.records().unwrap(), records);
+}
+
+#[test]
 fn recording_finishes_verified_data_and_marks_loss_without_blocking_admission() {
     let saved = Arc::new(Mutex::new(vec![]));
     let r = recording::Recorder::new(
@@ -314,6 +357,7 @@ fn recording_finishes_verified_data_and_marks_loss_without_blocking_admission() 
     assert!(r.record(Record::Event(Box::new(event(1)))));
     let report = r.stop(Duration::from_secs(2)).unwrap();
     assert!(report.complete);
+    assert!(r.records().is_none());
     assert!(report.pressure.is_none());
     let data = saved.lock().unwrap().clone();
     let mut reader = archive::Reader::new(&data[..], 1024, false, false).unwrap();

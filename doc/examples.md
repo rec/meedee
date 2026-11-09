@@ -681,6 +681,22 @@ loss, unfinished messages, callback failure or writer failure can make it incomp
 Starting creates or truncates the destination file. Raw inputs cannot attach a
 decoded archive recorder.
 
+Omit the destination to capture in memory, with no total retention limit:
+
+```python
+import meedee as md
+
+with md.Input() as source:
+    recorder = source.start_recording()
+    print(source.receive(timeout=10))
+    report = source.stop_recording()
+    records = recorder.records
+```
+
+Memory capture retains diagnostics and continues after them, marking the final
+report incomplete. `Input.record(duration)` uses the same attached memory
+recorder, closes the input and returns the captured records.
+
 If stop_recording times out, it stops admitting records but retains the recorder.
 Call stop_recording again to obtain the final report, even after closing the input.
 A new recording cannot start until finalization succeeds. recording_report keeps

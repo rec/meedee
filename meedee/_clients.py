@@ -223,43 +223,34 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             raise midi.StateError("recording requires decoded input (raw=False)")
         if self._connection is not None and self._connection._bridge is not None:
             raise midi.StateError("recording is unavailable in callback mode")
-        records: list[
-            events.Clock
-            | archive.Stream
-            | messages.Message
-            | archive.Gap
-            | archive.Discontinuity
-        ] = []
         with self as receiver:
-            records.extend(
-                [receiver.clock, archive.Stream(id=receiver.stream, label="")]
-            )
-            clocks = {receiver.clock.identity}
+            recorder = receiver.start_recording()
             deadline = monotonic() + seconds
             while (remaining := deadline - monotonic()) > 0:
                 try:
-                    item = receiver.receive(timeout=min(0.05, remaining))
+                    receiver.receive(timeout=min(0.05, remaining))
                 except INPUT_ERRORS as error:
-                    records.append(
-                        archive.Discontinuity(stream=receiver.stream, reason=str(error))
-                    )
+                    recorder.fail(str(error))
                     break
-                append_record(records, item, clocks)
             receiver.close()
-            # Closing finalizes partial messages and reports loss followed by silence.
-            while True:
-                try:
-                    item = receiver.receive(timeout=0)
-                except INPUT_ERRORS:
-                    break
-                append_record(records, item, clocks)
+        records = recorder.records
+        assert records is not None
         if output is not None:
             with Path(output).open("wb" if overwrite else "xb") as destination:
                 writer = archive.Writer(destination)
                 for r in records:
                     writer.write(r)
                 writer.finish()
-        return records
+        return cast(
+            list[
+                events.Clock
+                | archive.Stream
+                | messages.Message
+                | archive.Gap
+                | archive.Discontinuity
+            ],
+            records,
+        )
 
     def __enter__(self) -> Input[T]:
         # An early receive overflow may still have an accepted prefix to drain.
@@ -338,7 +329,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
 
     def start_recording(
         self,
-        destination: str | PathLike[str],
+        destination: str | PathLike[str] | None = None,
         *,
         label: str = "",
         best_effort: bool = False,
@@ -966,6 +957,8 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
     _closing: bool
     _failure: BaseException | None
     _recorder: archive.Recorder | None
+    _recording_in_memory: bool
+    _recording_clocks: set[str]
     _recording_starting: bool
     _known_lost: int
     _ignored_on_close: int
@@ -1007,6 +1000,8 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
         connection._closing = False
         connection._failure = None
         connection._recorder = None
+        connection._recording_in_memory = False
+        connection._recording_clocks = set()
         connection._recording_starting = False
         connection._known_lost = 0
         connection._ignored_on_close = 0
@@ -1073,7 +1068,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
                 and not self._recording_stopping
                 and not isinstance(item, events.ReceivedPacket)
             ):
-                self._recorder.record(item)
+                record_item(self._recorder, item, self._recording_clocks)
             if self._bridge is None and self._failure is None:
                 try:
                     self._queue.put_nowait(cast(T, item))
@@ -1211,7 +1206,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
 
     def start_recording(
         self,
-        destination: str | PathLike[str],
+        destination: str | PathLike[str] | None = None,
         *,
         label: str = "",
         best_effort: bool = False,
@@ -1226,7 +1221,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
         with self._lock:
             if (
                 self._closing
-                or self.closed
+                or (destination is not None and self.closed)
                 or self._recorder is not None
                 or self._recording_starting
             ):
@@ -1247,6 +1242,16 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             with self._lock:
                 closed = self._closing
                 if not closed:
+                    self._recording_clocks = {self.clock.identity}
+                    self._recording_in_memory = destination is None
+                    if destination is None:
+                        # Memory capture includes events buffered before attachment.
+                        with self._queue.mutex:
+                            buffered = list(self._queue.queue)
+                        for item in buffered:
+                            record_item(recorder, item, self._recording_clocks)
+                        if (failure := self.failure) is not None:
+                            recorder.fail(str(failure))
                     self._recorder = recorder
             if closed:
                 recorder.fail("input closed while recording started")
@@ -1336,7 +1341,10 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
                 if recorder is not None:
                     self._finish_recording(recorder)
                     assert self._recording_report is not None
-                    if not self._recording_report.complete:
+                    if (
+                        not self._recording_report.complete
+                        and not self._recording_in_memory
+                    ):
                         raise OSError(self._recording_report.failure)
             except BaseException as error:
                 if isinstance(error, Exception) and self._failure is None:
@@ -1369,29 +1377,19 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             recorder.fail("input was abandoned during recording")
 
 
-def append_record(
-    records: list[
-        events.Clock
-        | archive.Stream
-        | messages.Message
-        | archive.Gap
-        | archive.Discontinuity
-    ],
-    item: object,
-    clocks: set[str],
-) -> None:
+def record_item(recorder: archive.Recorder, item: object, clocks: set[str]) -> None:
     if isinstance(item, messages.Message):
         if item.timestamp is not None and item.timestamp.clock.identity not in clocks:
-            records.append(item.timestamp.clock)
+            recorder.record(item.timestamp.clock)
             clocks.add(item.timestamp.clock.identity)
-        records.append(item)
+        recorder.record(item)
     elif isinstance(item, events.StreamDiagnostic):
         if item.kind == "clock_change":
-            records.append(
+            recorder.record(
                 archive.Discontinuity(stream=item.stream, reason=item.reason)
             )
         else:
-            records.append(
+            recorder.record(
                 archive.Gap(stream=item.stream, lost=item.lost, reason=item.reason)
             )
 

@@ -1,4 +1,4 @@
-//! Explicit path-only background recording; Python-owned streams use synchronous Writer.
+//! File and memory recording backed by the shared recorder lifecycle.
 use crate::files::{limit, os_error};
 use crate::packets::Clock;
 use meedee::messages::Message;
@@ -46,11 +46,11 @@ pub struct Recorder {
 #[pymethods]
 impl Recorder {
     #[new]
-    #[pyo3(signature=(destination,*,clock,stream,label="",best_effort=false,payload_limit=1_048_576,record_limit=128,byte_limit=8_388_608,metrics=false))]
+    #[pyo3(signature=(destination=None,*,clock,stream,label="",best_effort=false,payload_limit=1_048_576,record_limit=128,byte_limit=8_388_608,metrics=false))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
-        destination: PathBuf,
+        destination: Option<PathBuf>,
         clock: PyRef<'_, Clock>,
         stream: String,
         label: &str,
@@ -66,11 +66,14 @@ impl Recorder {
             Record::Stream {
                 id: stream.clone(),
                 label: label.into(),
-                clock_identity: Some(clock.value.identity().into()),
+                clock_identity: destination.as_ref().map(|_| clock.value.identity().into()),
             },
         ];
         let value = py
             .detach(move || {
+                let Some(destination) = destination else {
+                    return model::Recorder::memory(descriptors, metrics);
+                };
                 model::Recorder::new(
                     File::create(destination)?,
                     descriptors,
@@ -83,6 +86,17 @@ impl Recorder {
             })
             .map_err(os_error)?;
         Ok(Self { value, stream })
+    }
+    #[getter]
+    fn records(&self, py: Python<'_>) -> PyResult<Option<Vec<Py<PyAny>>>> {
+        self.value
+            .records()
+            .map(|r| {
+                r.into_iter()
+                    .map(|r| crate::archive::to_python(py, r))
+                    .collect()
+            })
+            .transpose()
     }
     #[getter]
     fn pressure(&self) -> Option<crate::metrics::Pressure> {

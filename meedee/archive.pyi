@@ -132,11 +132,29 @@ class RecordingReport:
     def failure(self) -> str | None: ...
 
 class Recorder:
+    """Record to a file, or retain unbounded memory records with destination=None."""
+    @property
+    def records(
+        self,
+    ) -> (
+        list[
+            events.Clock
+            | Stream
+            | messages.Message
+            | Gap
+            | Discontinuity
+            | Metadata
+            | Opaque
+        ]
+        | None
+    ):
+        """Captured records after stopping a memory recorder; otherwise None."""
+        ...
     @property
     def pressure(self) -> metrics.Pressure | None: ...
     def __init__(
         self,
-        destination: str | PathLike[str],
+        destination: str | PathLike[str] | None = None,
         *,
         clock: events.Clock,
         stream: str,
@@ -149,7 +167,9 @@ class Recorder:
     ) -> None: ...
     def record(
         self,
-        record: messages.Message
+        record: events.Clock
+        | Stream
+        | messages.Message
         | events.StreamDiagnostic
         | Gap
         | Discontinuity

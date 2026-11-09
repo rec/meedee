@@ -47,62 +47,26 @@ impl Input {
         Instant::now()
             .checked_add(duration)
             .ok_or_else(|| super::invalid("recording duration exceeds clock range"))?;
-        self.stream()?;
+        let recorder = self.start_recording(None::<&Path>, &Default::default())?;
         let deadline = Instant::now()
             .checked_add(duration)
             .ok_or_else(|| super::invalid("recording duration exceeds clock range"))?;
-        let clock = self.clock()?.clone();
-        let stream = self.stream()?.to_owned();
-        let mut clocks = BTreeSet::from([clock.identity().to_owned()]);
-        let mut recording = Recording {
-            records: vec![
-                Record::Clock(clock),
-                Record::Stream {
-                    id: stream.clone(),
-                    label: String::new(),
-                    clock_identity: None,
-                },
-            ],
-        };
         while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
             match self.receive(Some(remaining), None) {
-                Ok(Some(item)) => append(&mut recording.records, Ok(item), &stream, &mut clocks),
+                Ok(Some(_)) => {}
                 Ok(None) => break,
                 Err(error) => {
-                    append(
-                        &mut recording.records,
-                        Err(error.into()),
-                        &stream,
-                        &mut clocks,
-                    );
+                    recorder.fail(error.to_string());
                     break;
                 }
             }
         }
         if let Err(error) = self.close() {
-            append(
-                &mut recording.records,
-                Err(error.into()),
-                &stream,
-                &mut clocks,
-            );
+            recorder.fail(error.to_string());
         }
-        loop {
-            match self.receive(Some(Duration::ZERO), None) {
-                Ok(Some(item)) => append(&mut recording.records, Ok(item), &stream, &mut clocks),
-                Ok(None) | Err(crate::midi::Error::Closed) => break,
-                Err(error) => {
-                    append(
-                        &mut recording.records,
-                        Err(error.into()),
-                        &stream,
-                        &mut clocks,
-                    );
-                    break;
-                }
-            }
-        }
-        Ok(recording)
+        Ok(Recording {
+            records: recorder.records().expect("stopped memory recording"),
+        })
     }
     /// Capture in memory, then save the same records and return them. Existing
     /// files are preserved unless overwrite is true. A write failure can leave
@@ -141,43 +105,6 @@ impl Input {
         Ok(recording)
     }
 }
-fn append(
-    records: &mut Vec<Record>,
-    item: io::Result<Item>,
-    stream: &str,
-    clocks: &mut BTreeSet<String>,
-) {
-    let record = match item {
-        Ok(Item::Message(message)) => {
-            if let Some(timestamp) = message.timestamp() {
-                if clocks.insert(timestamp.clock.identity().into()) {
-                    records.push(Record::Clock(timestamp.clock.clone()));
-                }
-            }
-            Record::Event(message)
-        }
-        Ok(Item::Diagnostic(diagnostic)) => {
-            if diagnostic.kind == DiagnosticKind::ClockChange {
-                Record::Discontinuity {
-                    stream: diagnostic.stream,
-                    reason: diagnostic.reason,
-                }
-            } else {
-                Record::Gap {
-                    stream: diagnostic.stream,
-                    lost: diagnostic.lost,
-                    reason: diagnostic.reason,
-                }
-            }
-        }
-        Err(error) => Record::Discontinuity {
-            stream: stream.into(),
-            reason: error.to_string(),
-        },
-    };
-    records.push(record);
-}
-
 pub(super) struct Attachment {
     pub recorder: Arc<crate::archive::Recorder>,
     stopping: bool,
@@ -200,6 +127,17 @@ impl Core {
             stopping: false,
             clocks: BTreeSet::from([clock.identity().into()]),
         });
+        if recorder.is_memory() {
+            let pending: Vec<_> = self
+                .pending
+                .iter()
+                .filter_map(|r| r.as_ref().ok())
+                .cloned()
+                .collect();
+            for item in pending {
+                self.record_item(&item);
+            }
+        }
         Ok(())
     }
     pub(super) fn record_item(&mut self, item: &Item) {
@@ -209,16 +147,33 @@ impl Core {
         if attachment.stopping {
             return;
         }
-        let mut records = Vec::new();
-        append(
-            &mut records,
-            Ok(item.clone()),
-            self.stream.as_deref().expect("opened source"),
-            &mut attachment.clocks,
-        );
-        for record in records {
-            attachment.recorder.record(record);
-        }
+        let record = match item {
+            Item::Message(message) => {
+                if let Some(timestamp) = message.timestamp() {
+                    if attachment.clocks.insert(timestamp.clock.identity().into()) {
+                        attachment
+                            .recorder
+                            .record(Record::Clock(timestamp.clock.clone()));
+                    }
+                }
+                Record::Event(message.clone())
+            }
+            Item::Diagnostic(diagnostic) => {
+                if diagnostic.kind == DiagnosticKind::ClockChange {
+                    Record::Discontinuity {
+                        stream: diagnostic.stream.clone(),
+                        reason: diagnostic.reason.clone(),
+                    }
+                } else {
+                    Record::Gap {
+                        stream: diagnostic.stream.clone(),
+                        lost: diagnostic.lost,
+                        reason: diagnostic.reason.clone(),
+                    }
+                }
+            }
+        };
+        attachment.recorder.record(record);
     }
     pub(super) fn stop_recording_admission(&mut self) -> Option<Arc<crate::archive::Recorder>> {
         let attachment = self.recording.as_ref()?;

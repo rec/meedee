@@ -42,7 +42,7 @@ type Receive<T> = fn(&mut Core, Option<Instant>) -> Option<io::Result<Item<T>>>;
 /// ```
 /// ```compile_fail
 /// use meedee::midi::Input;
-/// Input::new().raw().unwrap().start_recording("rec.meedee", &Default::default());
+/// Input::new().raw().unwrap().start_recording(Some("rec.meedee"), &Default::default());
 /// ```
 pub struct Input<T: Send + 'static = Payload> {
     core: Arc<Mutex<Core>>,
@@ -156,10 +156,12 @@ impl Input<Payload> {
         self.core = Arc::new(Mutex::new(core));
         Ok(self)
     }
-    /// Record independently of receive calls, using the existing archive writer.
+    /// Record independently of receive calls. None retains unbounded memory records;
+    /// Some(path) uses a bounded background archive writer. Stop through the input
+    /// to finalize diagnostics and detach while keeping the connection open.
     pub fn start_recording(
         &mut self,
-        path: impl AsRef<Path>,
+        path: Option<impl AsRef<Path>>,
         options: &RecordingOptions,
     ) -> midi::Result<Arc<Recorder>> {
         transport::ensure_control_thread().map_err(midi::Error::Transport)?;
@@ -180,27 +182,42 @@ impl Input<Payload> {
                 core.stream.clone().expect("opened stream"),
             )
         };
-        let recorder = Arc::new(Recorder::new(
-            std::fs::File::create(path)?,
-            vec![
-                Record::Clock(clock.clone()),
-                Record::Stream {
-                    id: stream,
-                    label: options.label.clone(),
-                    clock_identity: Some(clock.identity().into()),
-                },
-            ],
-            options.payload_limit,
-            options.record_limit,
-            options.byte_limit,
-            options.best_effort,
-            options.metrics,
-        )?);
-        let attached = self
-            .core
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .attach_recording(recorder.clone());
+        let descriptors = vec![
+            Record::Clock(clock.clone()),
+            Record::Stream {
+                id: stream,
+                label: options.label.clone(),
+                clock_identity: path.as_ref().map(|_| clock.identity().into()),
+            },
+        ];
+        let recorder = Arc::new(if let Some(path) = path {
+            Recorder::new(
+                std::fs::File::create(path)?,
+                descriptors,
+                options.payload_limit,
+                options.record_limit,
+                options.byte_limit,
+                options.best_effort,
+                options.metrics,
+            )?
+        } else {
+            Recorder::memory(descriptors, options.metrics)?
+        });
+        let attached = {
+            let mut core = self.core.lock().unwrap_or_else(|p| p.into_inner());
+            let attached = core.attach_recording(recorder.clone());
+            if attached.is_ok() && recorder.is_memory() {
+                let delivery = self
+                    .delivery
+                    .state
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner());
+                for (item, _) in &delivery.pending {
+                    core.record_item(item);
+                }
+            }
+            attached
+        };
         if let Err(error) = attached {
             recorder.fail(error.to_string());
             if let Err(cleanup) = recorder.stop(Duration::from_secs(5)) {
@@ -526,6 +543,13 @@ impl<T: Send + 'static> Input<T> {
             .unwrap_or_else(|p| p.into_inner())
             .closed = true;
         let mut failure = None;
+        let memory_recording = self
+            .core
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .recording
+            .as_ref()
+            .is_some_and(|a| a.recorder.is_memory());
         let mut finalized = false;
         if let Some(dispatch) = self.dispatch.take() {
             dispatch.stop.store(true, Ordering::Release);
@@ -550,12 +574,21 @@ impl<T: Send + 'static> Input<T> {
                 }
             }
         }
-        if let Err(error) = self.core.lock().unwrap_or_else(|p| p.into_inner()).close() {
+        let closed = self.core.lock().unwrap_or_else(|p| p.into_inner()).close();
+        if let Err(error) = closed {
+            if let Some(attachment) = &self
+                .core
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .recording
+            {
+                attachment.recorder.fail(error.to_string());
+            }
             failure.get_or_insert_with(|| self.retain(error));
         }
         if !finalized {
             match finish_recording(&self.core, Duration::from_secs(5)) {
-                Ok(Some(report)) if !report.complete => {
+                Ok(Some(report)) if !report.complete && !memory_recording => {
                     failure.get_or_insert_with(|| {
                         self.retain(io::Error::other(report.failure.unwrap_or_default()).into())
                     });
@@ -700,8 +733,20 @@ impl<T: Send + 'static> Input<T> {
                     }));
                 }
             }
+            let memory_recording = core
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .recording
+                .as_ref()
+                .is_some_and(|a| a.recorder.is_memory());
+            if let Some(error) = &close_error {
+                if let Some(attachment) = &core.lock().unwrap_or_else(|p| p.into_inner()).recording
+                {
+                    attachment.recorder.fail(error.to_string());
+                }
+            }
             match finish_recording(&core, Duration::from_secs(5)) {
-                Ok(Some(report)) if !report.complete => {
+                Ok(Some(report)) if !report.complete && !memory_recording => {
                     close_error.get_or_insert_with(|| {
                         Arc::new(midi::Error::Io(io::Error::other(
                             report.failure.unwrap_or_default(),

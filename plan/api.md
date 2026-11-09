@@ -1820,7 +1820,7 @@ adaptations. This does not assert whole-API or platform runtime equivalence.
 
 ### Input method-level parity
 
-- Rust Input::start_recording(path, &RecordingOptions) attaches the existing
+- Rust Input::start_recording(Some(path), &RecordingOptions) attaches the existing
   archive recorder and returns Arc<archive::Recorder>. Defaults and path behavior
   match Python: label="", best_effort=false, payload_limit=1,048,576,
   record_limit=128, byte_limit=8,388,608, metrics=false. Starting creates or
@@ -1828,8 +1828,15 @@ adaptations. This does not assert whole-API or platform runtime equivalence.
 - Background decoding/recording continues without receive calls and works with
   callbacks. The existing bounded dispatcher is reused. Receive capacity and
   recorder admission are independent: a receive overflow alone does not invalidate
-  records successfully admitted to the writer. Capture begins at attachment;
+  records successfully admitted to the writer. File capture begins at attachment;
   already decoded messages waiting for receive are not retroactively recorded.
+- Omitting the destination selects unbounded memory capture in both languages.
+  Memory capture includes buffered messages, retains gaps and discontinuities,
+  and continues after diagnostics while reporting the result incomplete.
+  Recorder.stop returns a report; Recorder.records (Rust: records()) returns the
+  retained records after stopping, or None for active/file recorders.
+  Input.record uses this same attachment and recorder lifecycle, preserving its
+  returned capture, close/drain semantics and optional subsequent archive saving.
 - stop_recording uses a positive bounded timeout. Timeout retains a stopping
   recorder, stops new recording admission and permits retry even after input close.
   A new recorder cannot attach until the prior one has finalized. The report
