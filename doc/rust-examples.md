@@ -377,6 +377,26 @@ println!("{:?}", sysex::send(&mut output, sysex::Reader::open("backup.syx")?, Du
 output.close()?;
 ```
 
+### Request or capture an opaque instrument dump
+
+```rust
+use meedee::{midi::{Input, Output}, sysex};
+
+let mut receiver = Input::new().with_port("VL70")?;
+let mut output = Output::new().with_port("VL70")?;
+let result = sysex::dump(&mut receiver, Some(&mut output), "yamaha/vl70-m", &Default::default())?;
+println!("{}: {:?}", result.status, result.reason);
+let mut file = std::fs::File::create("vl70.syx")?;
+for message in &result.messages {
+    sysex::write(&mut file, message, 1_048_576)?;
+}
+```
+
+Pass `None` for the output to capture a dump started on the instrument. The call
+leaves connections open. Manual completion remains unverified. `DumpOptions`
+controls scope, device ID, deadlines, retention limits and cancellation. See
+[model coverage and scope limits](sysex-dumps.md).
+
 ## 13. Query a tuning dump
 
 This asks device 0 for tuning program 2 through the first input/output pair.

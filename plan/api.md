@@ -1260,7 +1260,7 @@ mutation, MIDI-state replay, cleanup or physical-identity guarantee is supplied.
 
 SysEx uses ordinary `Input.record(duration)` and `Output.send(recording)` in both
 languages. Recordings retain timing, source declarations and receive diagnostics.
-There are no separate transfer Plan, Session, Capture, Step or report types.
+There are no separate transfer Plan, Session or Capture interfaces for replay.
 `Output.send()` has no gap option.
 
 Python `sysex.send(output, messages, *, gap)` and Rust
@@ -1281,6 +1281,30 @@ The preview's gap is prospective sending policy, never file metadata. The CLI
 reports confirmed handoffs separately from known send uncertainty. Exit status
 is 0 for successful preview/send, 1 for interruption, and 2 for malformed input,
 setup, send or close failure. No compatibility transfer namespace is retained.
+
+## Opaque SysEx dump requests
+
+Python `sysex.dump(receiver, output=None, *, model, scope="all", ...)` and Rust
+`sysex::dump(&mut receiver, output: Option<&mut Output>, model, &DumpOptions)`
+run the same bounded caller-thread capture. Supplied connections stay open.
+Omitting output selects manual capture; supplying it executes the documented
+request sequence for that model and scope. `sysex.models()` lists supported keys.
+The existing recorder retains matching opaque SysEx; no parameter decoder or
+new recording storage engine is introduced.
+
+`DumpReport` exposes messages, model/scope, status, complete, requests_sent,
+uncertain_send, ignored_events, wire_bytes and reason. Exact byte retention and
+completion evidence remain separate. Manual/silence captures are unverified;
+documented response sequences can establish completeness only for their stated
+scope. Invalid options/scopes fail before sending. Expected transport failures
+return a partial report, with uncertain sends never retried. The operation
+consumes input, discards buffered traffic before capture and keeps caller-owned
+connections open. No discovery, device configuration or restore is performed.
+
+Defaults and current model limitations are specified in
+[doc/sysex-dumps.md](../doc/sysex-dumps.md). Rust `dump_with` is the corresponding
+explicit clock/I/O adapter driver. Python unit strings and Rust typed durations
+express the same timeout and retention policy. No dump CLI is added.
 
 ## MIDI-CI management browser
 
@@ -1909,19 +1933,21 @@ Additional work beyond the prompt: None.
 
 ## Consolidated domain modules
 
-Each group now has one public namespace and production source file per language
-layer. tuning contains codecs, values, the uFor adapter, query tracking and the
+Each group has one public namespace per language layer. tuning contains codecs,
+values, the uFor adapter, query tracking and the
 live query driver; ci contains codecs, sessions, browser tracking and live
-browsing. SysEx file helpers and paced sending live in sysex; recording/replay uses Input and Output.
+browsing. SysEx file helpers, paced sending and opaque dump workflows live in
+sysex; recording/replay uses Input and Output.
 Rust CI browser/session and tuning-query implementations are colocated with their
 public modules. The native Python tuning query binding is colocated with the
 other tuning bindings.
 
-The canonical workflow functions in both APIs are tuning.query, ci.browse and
-sysex.send. Tuning and CI retain their fresh-session, cancellation and clock
+The canonical workflow functions in both APIs are tuning.query, ci.browse,
+sysex.send and sysex.dump. Tuning and CI retain their fresh-session, cancellation and clock
 ownership rules. SysEx instead uses ordinary recording/replay plus a paced
-helper returning the standard playback report. Rust keeps the corresponding query_with, browse_with,
-and sysex::send_with drivers for explicit clock/I/O adapters; CI Options
+helper returning the standard playback report. Dump capture returns DumpReport.
+Rust keeps the corresponding query_with, browse_with,
+sysex::send_with and sysex::dump_with drivers for explicit clock/I/O adapters; CI Options
 now lives in ci. The former live/input/output modules are removed, with no
 compatibility aliases or forwarding modules. Root __all__ now contains the 24
 public submodules and the same 96 classes; functions remain module-qualified.

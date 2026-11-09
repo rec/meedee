@@ -185,6 +185,23 @@ with md.Output() as output:
     print(md.sysex.send(output, md.sysex.Reader("backup.syx"), gap="100 ms"))
 ```
 
+### Request or capture an opaque instrument dump
+
+```python
+from meedee import midi, sysex
+
+with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
+    result = sysex.dump(receiver, output, model="yamaha/vl70-m")
+    print(result.status, result.reason)
+    sysex.write("vl70.syx", result.messages)
+```
+
+Omit `output` for a dump started on the instrument. The call retains opaque
+SysEx and leaves connections open; manual completion remains unverified.
+See [model coverage and scope limits](sysex-dumps.md) before interpreting a
+capture as a backup. Some models support only manual capture or current/system
+requests, and `all` names the documented collection for that model.
+
 ## 9. Export a just-intonation tuning
 
 Create `just-three.syx` with keys 69, 70 and 71 tuned to 440, 660 and 880 Hz.
