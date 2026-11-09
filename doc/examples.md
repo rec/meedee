@@ -196,12 +196,30 @@ with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
     sysex.write("vl70.syx", result.messages)
 ```
 
-Set `model` to skip identity detection. Omit `output` and supply `model` for a
-dump started on the instrument. The call retains opaque
-SysEx and leaves connections open; manual completion remains unverified.
+The call sends an identity request and requires exactly one supported reply
+before requesting the dump. Set `model="yamaha/vl70-m"` to skip detection.
+Omit `output` and supply `model` for a dump started on the instrument. The call
+retains opaque SysEx and leaves connections open; manual completion remains
+unverified.
 See [model coverage and scope limits](sysex-dumps.md) before interpreting a
 capture as a backup. Some models support only manual capture or current/system
 requests, and `all` names the documented collection for that model.
+
+To restore the in-memory capture with its observed relative message timing,
+run this separately after checking the capture report and deciding to restore:
+
+```python
+with midi.Output(port="VL70") as output:
+    print(output.send(result.messages))
+```
+
+This uses timestamps retained from the input, whose default timestamp mode is
+`Absolute`. It preserves observed message timing; it does not infer the synth's
+required receive gap. In particular, separately requested replies include request
+turnaround time. Saving to `.syx` discards timing. For an untimed `.syx` file, use
+the explicit `sysex.send(..., gap="100 ms")` example above, choosing the gap from
+the instrument's documentation. That pause is measured between send handoffs,
+not confirmed wire completion.
 
 ## 9. Export a just-intonation tuning
 

@@ -392,10 +392,29 @@ for message in &result.messages {
 }
 ```
 
-Pass `None` for the output to capture a dump started on the instrument. The call
-leaves connections open. Manual completion remains unverified. `DumpOptions`
+The call sends an identity request and requires exactly one supported reply
+before requesting the dump. Pass `Some("yamaha/vl70-m")` for the model to skip
+detection. For a dump started on the instrument, pass `None` for the output and
+an explicit model such as `Some("moog/subsequent-37")`. The call leaves connections
+open. Manual completion remains unverified. `DumpOptions`
 controls scope, device ID, deadlines, retention limits and cancellation. See
 [model coverage and scope limits](sysex-dumps.md).
+
+To restore the in-memory capture with its observed relative message timing,
+run this separately after checking the capture report and deciding to restore:
+
+```rust
+println!("{:?}", output.send(result.messages)?);
+output.close()?;
+```
+
+This uses timestamps retained from the input, whose default timestamp mode is
+`TimestampMode::Absolute`. It preserves observed message timing; it does not infer
+the synth's required receive gap. In particular, separately requested replies
+include request turnaround time. Saving to `.syx` discards timing. For an untimed
+`.syx` file, use the explicit `sysex::send` example above, choosing the gap from
+the instrument's documentation. That pause is measured between send handoffs,
+not confirmed wire completion.
 
 ## 13. Query a tuning dump
 
