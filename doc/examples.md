@@ -670,9 +670,9 @@ on calls to receive.
 import meedee as md
 
 with md.Input() as source:
-    source.start_recording("rec.meedee")
+    source.start("rec.meedee")
     print(source.receive(timeout=10))
-    print(source.stop_recording())
+    print(source.stop())
 ```
 
 The recorder has its own bounded admission budget. A receive-queue overflow does
@@ -687,9 +687,9 @@ Omit the destination to capture in memory, with no total retention limit:
 import meedee as md
 
 with md.Input() as source:
-    recorder = source.start_recording()
+    recorder = source.start()
     print(source.receive(timeout=10))
-    report = source.stop_recording()
+    report = source.stop()
     records = recorder.records
 ```
 
@@ -697,8 +697,8 @@ Memory capture retains diagnostics and continues after them, marking the final
 report incomplete. `Input.record(duration)` uses the same attached memory
 recorder, closes the input and returns the captured records.
 
-If stop_recording times out, it stops admitting records but retains the recorder.
-Call stop_recording again to obtain the final report, even after closing the input.
+If stop times out, it stops admitting records but retains the recorder.
+Call stop again to obtain the final report, even after closing the input.
 A new recording cannot start until finalization succeeds. recording_report keeps
 the last finalized report after close.
 

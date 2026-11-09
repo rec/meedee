@@ -47,7 +47,7 @@ impl Input {
         Instant::now()
             .checked_add(duration)
             .ok_or_else(|| super::invalid("recording duration exceeds clock range"))?;
-        let recorder = self.start_recording(None::<&Path>, &Default::default())?;
+        let recorder = self.start(None::<&Path>, &Default::default())?;
         let deadline = Instant::now()
             .checked_add(duration)
             .ok_or_else(|| super::invalid("recording duration exceeds clock range"))?;
@@ -303,7 +303,7 @@ mod tests {
         });
         let mut input = Input::decoded(core);
         assert!(
-            matches!(input.stop_recording(Duration::from_millis(1)), Err(midi::Error::Io(e)) if e.kind() == io::ErrorKind::TimedOut)
+            matches!(input.stop(Duration::from_millis(1)), Err(midi::Error::Io(e)) if e.kind() == io::ErrorKind::TimedOut)
         );
         assert!(input.recording_report().is_none());
         assert!(input.close().is_err());
@@ -311,7 +311,7 @@ mod tests {
         assert!(input.recording_report().is_none());
         gate.0.lock().unwrap().released = true;
         gate.1.notify_all();
-        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        let report = input.stop(Duration::from_secs(1)).unwrap();
         assert!(report.complete);
         assert_eq!(input.recording_report(), Some(report));
         input.close().unwrap();

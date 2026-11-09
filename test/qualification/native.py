@@ -37,7 +37,7 @@ def test_roundtrip(run_in_subprocess: bool, tmp_path: Path) -> None:
                 child_cpu_measured=False,
             )
             samples = []
-            receiver.start_recording(tmp_path / "loopback.meedee")
+            receiver.start(tmp_path / "loopback.meedee")
             for n in range(256):
                 value = messages.ControlChange(channel=1, controller=7, value=n % 128)
                 start = perf_counter_ns()
@@ -46,7 +46,7 @@ def test_roundtrip(run_in_subprocess: bool, tmp_path: Path) -> None:
                 assert isinstance(received, messages.Message), received
                 assert received == value
                 samples.append(perf_counter_ns() - start)
-            report = receiver.stop_recording()
+            report = receiver.stop()
             assert report.complete and report.gap_records == 0, report.failure
             reader = archive.Reader(tmp_path / "loopback.meedee")
             try:

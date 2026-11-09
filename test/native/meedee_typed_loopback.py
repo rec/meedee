@@ -17,7 +17,7 @@ def exercise(run_in_subprocess: bool, destination: Path) -> None:
         matches = [p for p in sender.ports() if p.name == name]
         assert len(matches) == 1, "test-owned endpoint was not discovered uniquely"
         with sender.connect(matches[0]) as output:
-            receiver.start_recording(destination, metrics=True)
+            receiver.start(destination, metrics=True)
             notes = [
                 messages.NoteOn(channel=1, note=60, velocity=1),
                 messages.NoteOff(channel=1, note=60, velocity=0),
@@ -27,7 +27,7 @@ def exercise(run_in_subprocess: bool, destination: Path) -> None:
             received = [receiver.receive(timeout=3) for _ in notes]
             assert all(isinstance(e, messages.Message) for e in received), received
             assert [e for e in received if isinstance(e, messages.Message)] == notes
-            report = receiver.stop_recording()
+            report = receiver.stop()
             assert report.complete and report.gap_records == 0, report.failure
             pressure = report.pressure
             assert pressure is not None and pressure.accepted_records == 2

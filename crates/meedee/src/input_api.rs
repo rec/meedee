@@ -42,7 +42,7 @@ type Receive<T> = fn(&mut Core, Option<Instant>) -> Option<io::Result<Item<T>>>;
 /// ```
 /// ```compile_fail
 /// use meedee::midi::Input;
-/// Input::new().raw().unwrap().start_recording(Some("rec.meedee"), &Default::default());
+/// Input::new().raw().unwrap().start(Some("rec.meedee"), &Default::default());
 /// ```
 pub struct Input<T: Send + 'static = Payload> {
     core: Arc<Mutex<Core>>,
@@ -84,7 +84,7 @@ pub struct InputErrors<'a, T: Send + 'static = Payload> {
     input: &'a mut Input<T>,
     finished: bool,
 }
-/// Attached recording controls, corresponding to Python start_recording keywords.
+/// Attached recording controls, corresponding to Python start keywords.
 #[derive(Clone, Debug)]
 pub struct RecordingOptions {
     pub label: String,
@@ -159,7 +159,7 @@ impl Input<Payload> {
     /// Record independently of receive calls. None retains unbounded memory records;
     /// Some(path) uses a bounded background archive writer. Stop through the input
     /// to finalize diagnostics and detach while keeping the connection open.
-    pub fn start_recording(
+    pub fn start(
         &mut self,
         path: Option<impl AsRef<Path>>,
         options: &RecordingOptions,
@@ -401,7 +401,7 @@ impl<T: Send + 'static> Input<T> {
             .clone()
     }
     /// Timeout retains the stopping handle; retry to obtain the final report.
-    pub fn stop_recording(&mut self, timeout: Duration) -> midi::Result<RecordingReport> {
+    pub fn stop(&mut self, timeout: Duration) -> midi::Result<RecordingReport> {
         transport::ensure_control_thread().map_err(midi::Error::Transport)?;
         finish_recording(&self.core, timeout)?
             .ok_or_else(|| invalid("no recording is attached").into())
