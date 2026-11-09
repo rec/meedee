@@ -1,10 +1,10 @@
 //! Opaque dump capture. Only transport envelopes are interpreted.
-use super::dump_models::{recipe, Recipe};
+use super::dump_models::{identify, is_identity_reply, recipe, Recipe};
 use crate::archive::{Record, Recorder};
 use crate::drivers::{self, Receiver, Sender};
 use crate::events::Payload;
 use crate::live::Item;
-use crate::messages::{AnyMessage, Message, SysEx};
+use crate::messages::{AnyMessage, Message, PrimitiveMessage, SysEx};
 use crate::midi;
 use crate::playback::{Cancellation, MonotonicClock, PlaybackClock};
 use std::collections::BTreeSet;
@@ -14,7 +14,7 @@ use std::time::Duration;
 /// requested scope, never restorability or the identity of the physical sender.
 #[derive(Clone, Debug)]
 pub struct DumpReport {
-    pub model: String,
+    pub model: Option<String>,
     pub scope: String,
     pub messages: Vec<SysEx>,
     pub status: &'static str,
@@ -29,10 +29,12 @@ pub struct DumpReport {
 #[derive(Clone)]
 pub struct DumpOptions {
     pub scope: String,
-    /// Wire device number, not a MIDI channel; None uses the model's default.
+    /// Wire device number; None uses the detected address or model's default.
     pub device_id: Option<u8>,
     pub timeout: Duration,
     pub silence: Duration,
+    /// Full identity reply collection window, within the overall timeout.
+    pub identity_timeout: Duration,
     pub message_limit: usize,
     pub byte_limit: usize,
     pub payload_limit: usize,
@@ -45,6 +47,7 @@ impl Default for DumpOptions {
             device_id: None,
             timeout: Duration::from_secs(120),
             silence: Duration::from_secs(1),
+            identity_timeout: Duration::from_secs(1),
             message_limit: 4096,
             byte_limit: 8_388_608,
             payload_limit: 1_048_576,
@@ -54,16 +57,24 @@ impl Default for DumpOptions {
 }
 
 /// Request a supported dump, or capture a front-panel dump when output is None.
+/// With an output, model None requests identity discovery; manual capture needs
+/// an explicit model. Multiple identity replies never select a model.
 /// Connections remain open. Capture consumes input; do not concurrently receive
 /// from the same connection. Inspect the report before exporting its messages.
 pub fn dump(
     receiver: &mut midi::Input,
     output: Option<&mut midi::Output>,
-    model: &str,
+    model: Option<&str>,
     options: &DumpOptions,
 ) -> midi::Result<DumpReport> {
     // Validate before opening a connection.
-    recipe(model, &options.scope, options.device_id, output.is_some())?;
+    if let Some(model) = model {
+        recipe(model, &options.scope, options.device_id, output.is_some())?;
+    } else if output.is_none() {
+        return Err(drivers::invalid(
+            "manual capture requires an explicit model",
+        ));
+    }
     validate(options)?;
     let stream = receiver.stream()?.to_owned();
     dump_with(
@@ -81,11 +92,25 @@ pub fn dump_with(
     receiver: &mut impl Receiver,
     mut output: Option<&mut impl Sender>,
     stream: &str,
-    model: &str,
+    model: Option<&str>,
     options: &DumpOptions,
     clock: &mut impl PlaybackClock,
 ) -> midi::Result<DumpReport> {
-    let recipe = recipe(model, &options.scope, options.device_id, output.is_some())?;
+    let selected = if let Some(model) = model {
+        Some(recipe(
+            model,
+            &options.scope,
+            options.device_id,
+            output.is_some(),
+        )?)
+    } else {
+        if output.is_none() {
+            return Err(drivers::invalid(
+                "manual capture requires an explicit model",
+            ));
+        }
+        None
+    };
     validate(options)?;
     if stream.is_empty() {
         return Err(drivers::invalid("dump input stream must not be empty"));
@@ -104,7 +129,7 @@ pub fn dump_with(
     )?;
     let mut capture = Capture {
         report: DumpReport {
-            model: model.into(),
+            model: model.map(str::to_owned),
             scope: options.scope.clone(),
             messages: vec![],
             status: "timed_out",
@@ -120,6 +145,7 @@ pub fn dump_with(
         count: 0,
         step: 0,
         last_match: None,
+        autodetected: false,
     };
     let baseline = receiver.dropped_packets()?;
     // A finite drain establishes the boundary before any request. Stale traffic
@@ -143,6 +169,31 @@ pub fn dump_with(
             }
         }
     }
+    let recipe = match selected {
+        Some(recipe) => recipe,
+        None => {
+            let Some((model, device)) = capture.detect(
+                receiver,
+                output.as_deref_mut().expect("remote discovery"),
+                stream,
+                options,
+                baseline,
+                clock,
+                deadline,
+            )?
+            else {
+                return capture.finish();
+            };
+            if options.device_id.zip(device).is_some_and(|(a, b)| a != b) {
+                capture.end("failed", "device_id differs from the identity reply; specify model explicitly to select another address");
+                return capture.finish();
+            }
+            let selected = recipe(model, &options.scope, options.device_id.or(device), true)?;
+            capture.report.model = Some(model.into());
+            capture.autodetected = true;
+            selected
+        }
+    };
     if let Some(sender) = output.as_deref_mut() {
         if !capture.send(sender, &recipe) {
             return capture.finish();
@@ -224,8 +275,113 @@ struct Capture {
     count: usize,
     step: usize,
     last_match: Option<u64>,
+    autodetected: bool,
 }
 impl Capture {
+    #[allow(clippy::too_many_arguments)]
+    fn detect(
+        &mut self,
+        receiver: &mut impl Receiver,
+        output: &mut impl Sender,
+        stream: &str,
+        options: &DumpOptions,
+        baseline: u64,
+        clock: &mut impl PlaybackClock,
+        deadline: u64,
+    ) -> midi::Result<Option<(&'static str, Option<u8>)>> {
+        if self.check(receiver, options, baseline, clock, deadline) {
+            return Ok(None);
+        }
+        self.report.uncertain_send = true;
+        let request = crate::universal::IdentityRequest::new(127)?;
+        let wire = request.encode()?;
+        if let Err(error) = output.send(Payload::Midi1(AnyMessage::SysEx(SysEx::new(
+            wire[1..wire.len() - 1].to_vec(),
+        )?))) {
+            self.error(&error);
+            return Ok(None);
+        }
+        self.report.uncertain_send = false;
+        let until = clock
+            .now_ns()
+            .checked_add(nanos(options.identity_timeout)?)
+            .ok_or_else(|| drivers::invalid("identity deadline overflow"))?
+            .min(deadline);
+        let mut seen = 0;
+        let mut replied = false;
+        let mut candidate = None;
+        while clock.now_ns() < until {
+            if self.check(receiver, options, baseline, clock, deadline) {
+                return Ok(None);
+            }
+            let item = match receiver.receive(drivers::remaining(clock, until)) {
+                Ok(Some(item)) => item,
+                Ok(None) => continue,
+                Err(error) => {
+                    self.error(&error);
+                    return Ok(None);
+                }
+            };
+            seen += 1;
+            if seen > options.message_limit {
+                self.end(
+                    "limit_reached",
+                    "identity reply collection exceeded its event limit; specify model explicitly",
+                );
+                return Ok(None);
+            }
+            match item {
+                Item::Diagnostic(d) if d.stream == stream => {
+                    self.end("failed", &d.reason);
+                    return Ok(None);
+                }
+                Item::Message(m) if m.stream() == Some(stream) => {
+                    if let Payload::Midi1(AnyMessage::SysEx(reply)) = m.as_ref() {
+                        if is_identity_reply(reply.data()) {
+                            if replied {
+                                self.end("failed", "multiple identity replies; specify model and device_id explicitly instead of guessing");
+                                return Ok(None);
+                            }
+                            replied = true;
+                            if reply.data().len() > options.payload_limit
+                                || reply.data().len() + 2 > options.byte_limit
+                            {
+                                self.end(
+                                    "limit_reached",
+                                    "identity reply exceeds dump limits; specify model explicitly",
+                                );
+                                return Ok(None);
+                            }
+                            match identify(reply) {
+                                Ok(value) => candidate = value,
+                                Err(reason) => {
+                                    self.end("failed", reason);
+                                    return Ok(None);
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                    self.report.ignored_events += 1;
+                }
+                _ => self.report.ignored_events += 1,
+            }
+        }
+        if self.check(receiver, options, baseline, clock, deadline) {
+            return Ok(None);
+        }
+        if candidate.is_none() {
+            self.end(
+                "failed",
+                if replied {
+                    "unrecognized or unsupported identity; specify model explicitly"
+                } else {
+                    "no identity reply within identity_timeout; specify model explicitly"
+                },
+            );
+        }
+        Ok(candidate)
+    }
     fn end(&mut self, status: &'static str, reason: &str) {
         self.report.status = status;
         self.report.complete = false;
@@ -325,6 +481,10 @@ impl Capture {
             self.report.ignored_events += 1;
             return true;
         }
+        if self.autodetected && is_identity_reply(sysex.data()) {
+            self.end("failed", "additional identity reply after discovery; multiple responders require explicit model selection");
+            return false;
+        }
         let matched = if remote {
             recipe.steps[self.step].matches(sysex.data())
         } else {
@@ -391,6 +551,7 @@ fn nanos(duration: Duration) -> midi::Result<u64> {
 }
 fn validate(options: &DumpOptions) -> midi::Result<()> {
     if options.timeout.is_zero()
+        || options.identity_timeout.is_zero()
         || options.silence.is_zero()
         || options.message_limit == 0
         || options.byte_limit == 0
@@ -401,6 +562,7 @@ fn validate(options: &DumpOptions) -> midi::Result<()> {
         ));
     }
     nanos(options.timeout)?;
+    nanos(options.identity_timeout)?;
     nanos(options.silence)?;
     Ok(())
 }

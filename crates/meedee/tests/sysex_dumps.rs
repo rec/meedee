@@ -121,7 +121,7 @@ fn documented_requests_retain_exact_opaque_replies() {
             &mut receiver,
             Some(&mut output),
             "s",
-            model,
+            Some(model),
             &sysex::DumpOptions {
                 scope: scope.into(),
                 ..Default::default()
@@ -176,7 +176,7 @@ fn manual_capture_preserves_repetitions_and_never_claims_completion() {
             &mut receiver,
             None::<&mut Output>,
             "s",
-            model,
+            Some(model),
             &sysex::DumpOptions {
                 silence: Duration::from_millis(10),
                 ..Default::default()
@@ -220,7 +220,7 @@ fn corrupt_matching_reply_is_retained_and_limits_stop_admission() {
         &mut receiver,
         Some(&mut output),
         "s",
-        "yamaha/vl70-m",
+        Some("yamaha/vl70-m"),
         &sysex::DumpOptions {
             scope: "system".into(),
             ..Default::default()
@@ -236,7 +236,7 @@ fn corrupt_matching_reply_is_retained_and_limits_stop_admission() {
         &mut receiver,
         None::<&mut Output>,
         "s",
-        "moog/subsequent-37",
+        Some("moog/subsequent-37"),
         &sysex::DumpOptions {
             message_limit: 1,
             ..Default::default()
@@ -246,4 +246,164 @@ fn corrupt_matching_reply_is_retained_and_limits_stop_admission() {
     .unwrap();
     assert_eq!(report.status, "limit_reached");
     assert_eq!(report.messages.len(), 1);
+}
+
+#[test]
+fn identity_selects_documented_model_and_address_without_retaining_inquiry() {
+    for line in include_str!("fixtures/sysex-identities.txt")
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+    {
+        let fields: Vec<_> = line.split('|').collect();
+        let mut reply = hex(fields[3]);
+        reply.extend(vec![0; fields[4].parse().unwrap()]);
+        reply.extend(hex(fields[5]));
+        let clock = Clock::default();
+        let queue = Rc::new(RefCell::new(VecDeque::from([item(hex(fields[1]))])));
+        let mut receiver = Input {
+            clock: clock.clone(),
+            queue: queue.clone(),
+            scheduled: vec![],
+        };
+        let mut output = Output {
+            queue,
+            requests: [hex("7e7f0601"), hex(fields[2])].into(),
+            replies: [hex(fields[1]), reply.clone()].into(),
+            sent: 0,
+        };
+        let report = sysex::dump_with(
+            &mut receiver,
+            Some(&mut output),
+            "s",
+            None,
+            &sysex::DumpOptions {
+                scope: "system".into(),
+                ..Default::default()
+            },
+            &mut clock.clone(),
+        )
+        .unwrap();
+        assert_eq!(report.model.as_deref(), Some(fields[0]));
+        assert_eq!(report.status, fields[6]);
+        assert_eq!(report.requests_sent, 1);
+        assert_eq!(output.sent, 2);
+        assert_eq!(report.messages.len(), 1);
+        assert_eq!(report.messages[0].data(), reply);
+        assert!(clock.0.get() >= 1_000_000_000);
+    }
+}
+
+struct Inquiry {
+    queue: Rc<RefCell<VecDeque<InputItem>>>,
+    replies: Vec<Vec<u8>>,
+    sent: usize,
+}
+impl Sender for Inquiry {
+    fn send(&mut self, message: Payload) -> midi::Result<()> {
+        let Payload::Midi1(AnyMessage::SysEx(message)) = message else {
+            panic!("request was not SysEx")
+        };
+        assert_eq!(message.data(), hex("7e7f0601"));
+        self.queue
+            .borrow_mut()
+            .extend(std::mem::take(&mut self.replies).into_iter().map(item));
+        self.sent += 1;
+        Ok(())
+    }
+}
+
+#[test]
+fn failed_detection_never_sends_dump_requests() {
+    let known = "7e0006024300410c0200000002";
+    let unknown = "7e0006027d0000000000000000";
+    for (replies, reason) in [
+        (vec![], "no identity"),
+        (vec![unknown], "unsupported"),
+        (vec!["7e0006024300410d0200000002"], "unsupported"),
+        (vec!["7e00060243"], "malformed"),
+        (vec![known, known], "multiple"),
+        (vec![unknown, known], "multiple"),
+        (vec![known, "7e100602415103000000030100"], "multiple"),
+    ] {
+        let clock = Clock::default();
+        let queue = Rc::new(RefCell::new(VecDeque::new()));
+        let mut receiver = Input {
+            clock: clock.clone(),
+            queue: queue.clone(),
+            scheduled: vec![],
+        };
+        let mut output = Inquiry {
+            queue,
+            replies: replies.into_iter().map(hex).collect(),
+            sent: 0,
+        };
+        let report = sysex::dump_with(
+            &mut receiver,
+            Some(&mut output),
+            "s",
+            None,
+            &Default::default(),
+            &mut clock.clone(),
+        )
+        .unwrap();
+        assert_eq!(report.status, "failed");
+        assert!(report.reason.unwrap().contains(reason));
+        assert_eq!(report.model, None);
+        assert_eq!(report.requests_sent, 0);
+        assert!(report.messages.is_empty());
+        assert_eq!(output.sent, 1);
+    }
+}
+
+#[test]
+fn manual_capture_requires_an_explicit_model() {
+    let clock = Clock::default();
+    let mut receiver = Input {
+        clock: clock.clone(),
+        queue: Rc::new(RefCell::new(VecDeque::new())),
+        scheduled: vec![],
+    };
+    assert!(sysex::dump_with(
+        &mut receiver,
+        None::<&mut Output>,
+        "s",
+        None,
+        &Default::default(),
+        &mut clock.clone(),
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("explicit model"));
+}
+
+#[test]
+fn identity_after_discovery_aborts_remaining_requests() {
+    let clock = Clock::default();
+    let queue = Rc::new(RefCell::new(VecDeque::new()));
+    let mut receiver = Input {
+        clock: clock.clone(),
+        queue: queue.clone(),
+        scheduled: vec![],
+    };
+    let identity = hex("7e0006024300410c0200000002");
+    let mut output = Output {
+        queue,
+        requests: [hex("7e7f0601"), hex("432057000000")].into(),
+        replies: [identity.clone(), identity].into(),
+        sent: 0,
+    };
+    let report = sysex::dump_with(
+        &mut receiver,
+        Some(&mut output),
+        "s",
+        None,
+        &Default::default(),
+        &mut clock.clone(),
+    )
+    .unwrap();
+    assert_eq!(report.status, "failed");
+    assert!(report.reason.unwrap().contains("additional identity"));
+    assert_eq!(report.requests_sent, 1);
+    assert!(report.messages.is_empty());
+    assert!(!report.complete);
 }

@@ -1284,11 +1284,16 @@ setup, send or close failure. No compatibility transfer namespace is retained.
 
 ## Opaque SysEx dump requests
 
-Python `sysex.dump(receiver, output=None, *, model, scope="all", ...)` and Rust
-`sysex::dump(&mut receiver, output: Option<&mut Output>, model, &DumpOptions)`
+Python `sysex.dump(receiver, output=None, *, model=None, scope="all", ...)` and Rust
+`sysex::dump(&mut receiver, output: Option<&mut Output>, model: Option<&str>, &DumpOptions)`
 run the same bounded caller-thread capture. Supplied connections stay open.
 Omitting output selects manual capture; supplying it executes the documented
-request sequence for that model and scope. `sysex.models()` lists supported keys.
+request sequence for that model and scope. Omitting model with an output first
+sends a universal identity request and waits through `identity_timeout` (one
+second by default) for exactly one documented identity. Multiple replies,
+including duplicates, fail without sending a dump request. Unsupported or absent
+identities require explicit selection; explicit model skips probing. Manual
+capture requires a model. `sysex.models()` lists supported keys.
 The existing recorder retains matching opaque SysEx; no parameter decoder or
 new recording storage engine is introduced.
 
@@ -1296,10 +1301,12 @@ new recording storage engine is introduced.
 uncertain_send, ignored_events, wire_bytes and reason. Exact byte retention and
 completion evidence remain separate. Manual/silence captures are unverified;
 documented response sequences can establish completeness only for their stated
-scope. Invalid options/scopes fail before sending. Expected transport failures
+scope. The report's model is optional on failed discovery; inquiry replies are
+not exported and do not count as dump requests. Invalid options/scopes fail
+before sending dump requests. Expected transport failures
 return a partial report, with uncertain sends never retried. The operation
 consumes input, discards buffered traffic before capture and keeps caller-owned
-connections open. No discovery, device configuration or restore is performed.
+connections open. No device configuration or restore is performed.
 
 Defaults and current model limitations are specified in
 [doc/sysex-dumps.md](../doc/sysex-dumps.md). Rust `dump_with` is the corresponding

@@ -1,0 +1,7 @@
+# model|identity reply payload|system request payload|system reply prefix|zero bytes|suffix|status
+# Exact identity fields from the manuals cited in doc/sysex-dumps.md.
+yamaha/vl70-m|7e0506024300410c0200000002|432557000000|4305570018000000|24|68|complete
+roland/vt-4|7e100602415103000000030100|41100000005111000000000000001070|4110000000511200000000|16|00|complete
+korg/minilogue-xd|7e030602425101000000000000|42330001510e|423300015151|37||unverified
+sequential/prophet-rev2|7e000602012f01000001000000|012f0e|012f0f|50||complete
+sequential/prophet-rev2|7e000602012f01000001|012f0e|012f0f|50||complete

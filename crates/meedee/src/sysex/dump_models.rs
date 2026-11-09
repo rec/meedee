@@ -2,6 +2,7 @@
 use crate::drivers;
 use crate::messages::SysEx;
 use crate::midi;
+use crate::universal::{self, UniversalMessage};
 
 pub(super) struct Recipe {
     pub steps: Vec<Step>,
@@ -22,6 +23,36 @@ enum Checksum {
     None,
     Yamaha,
     Roland,
+}
+
+pub(super) fn is_identity_reply(data: &[u8]) -> bool {
+    data.first() == Some(&0x7e) && data.get(2..4) == Some(&[6, 2])
+}
+
+/// Exact identity signatures and address relationships from the model manuals.
+/// Unknown identities never select a recipe by manufacturer alone.
+pub(super) fn identify(
+    message: &SysEx,
+) -> Result<Option<(&'static str, Option<u8>)>, &'static str> {
+    let data = message.data();
+    // Rev2 Appendix E also documents a single revision byte. Recognize that
+    // exact layout locally; keep the general universal decoder strict.
+    if data.len() == 10 && is_identity_reply(data) && data.get(4..9) == Some(&[1, 0x2f, 1, 0, 0]) {
+        return Ok(Some(("sequential/prophet-rev2", None)));
+    }
+    let Some(UniversalMessage::IdentityReply(reply)) = universal::decode(message)
+        .map_err(|_| "malformed identity reply; specify model explicitly")?
+    else {
+        return Ok(None);
+    };
+    let id = reply.device_id();
+    match (reply.manufacturer(), reply.family(), reply.model()) {
+        ([0x43], 0x2080, 0x010c) if id <= 15 => Ok(Some(("yamaha/vl70-m", Some(id)))),
+        ([0x41], 0x01d1, 0) if id == 0x10 => Ok(Some(("roland/vt-4", Some(id)))),
+        ([0x42], 0x00d1, 0) if id <= 15 => Ok(Some(("korg/minilogue-xd", Some(id)))),
+        ([1], 0x00af, 0) => Ok(Some(("sequential/prophet-rev2", None))),
+        _ => Ok(None),
+    }
 }
 
 pub(super) fn recipe(

@@ -3,7 +3,10 @@
 ## Implementation status
 
 Implemented in `sysex` in Python and Rust. The simple entry point is
-`sysex.dump(receiver, output, model=...)`; omit output for manual capture.
+`sysex.dump(receiver, output)`; omit output for manual capture with explicit model.
+Optional `model` skips identity discovery. Without it, one universal identity
+request must produce exactly one supported reply within the bounded collection
+window. Missing, unsupported or multiple identities require explicit selection.
 The existing recorder retains matched opaque messages. Current model/scope
 coverage, source inconsistencies and qualification limits are recorded in
 [doc/sysex-dumps.md](../doc/sysex-dumps.md).
@@ -29,6 +32,9 @@ remote dump command or can export its whole state.
 Decisions agreed with the user:
 
 - Include remote requests and user-triggered manual capture.
+- Make model optional for remote requests. Use a universal identity request and
+  select only a single documented identity; never guess among multiple replies.
+  Keep explicit selection for manual capture and failed discovery.
 - Keep the received SysEx payload completely opaque. Inspect only the envelope
   and protocol fields required to match replies and manage a transfer.
 - Allow header/length matching and a silence timeout where no documented end
@@ -61,9 +67,11 @@ plugin system or executable recipe language.
 
 ## Minimal supported operation
 
-1. The caller selects the model, supported dump scope, input endpoint and, for a
-   remote request, output endpoint. Manufacturer identity alone is insufficient.
-   Do not automatically probe devices or guess endpoint pairings.
+1. The caller selects the supported dump scope, input endpoint and, for a remote
+   request, output endpoint. Without an explicit model, issue a universal
+   identity request and require exactly one supported identity through a bounded
+   collection window. Manufacturer identity alone is insufficient. Manual
+   capture requires explicit model selection. Do not guess endpoint pairings.
 2. Validate the selected recipe and address values before sending. Prepare the
    input and recording boundary before sending the request so immediate replies
    cannot be missed. Exclude buffered traffic preceding that boundary, even

@@ -9,7 +9,7 @@ from .messages import SysEx
 
 class DumpReport:
     @property
-    def model(self) -> str: ...
+    def model(self) -> str | None: ...
     @property
     def scope(self) -> str: ...
     @property
@@ -34,11 +34,12 @@ def dump(
     receiver: midi.Input,
     output: midi.Output | None = None,
     *,
-    model: str,
+    model: str | None = None,
     scope: str = "all",
     device_id: int | None = None,
     timeout: float | str = 120.0,
     silence: float | str = 1.0,
+    identity_timeout: float | str = 1.0,
     message_limit: int = 4096,
     byte_limit: int | str = 8_388_608,
     payload_limit: int | str = 1_048_576,

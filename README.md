@@ -19,8 +19,9 @@ The domain workflows are grouped under `md.tuning`, `md.ci` and `md.sysex`:
 `sysex.send` sends SysEx messages with explicit pacing. Use ordinary `Input.record()`
 and `Output.send()` to record and replay SysEx with timing.
 
-`sysex.dump(receiver, output, model="yamaha/vl70-m")` requests and captures opaque
-dump replies. Omit `output` to capture a dump started on the instrument.
+`sysex.dump(receiver, output)` detects a supported model with an identity request,
+then requests and captures opaque dump replies. Set `model` explicitly to skip
+detection. Omit `output` and supply `model` to capture a dump started on the instrument.
 `result.messages` can be saved with `sysex.write`; check `result.status` and
 `result.complete` for completion evidence. See [model coverage and manual
 instructions](doc/sysex-dumps.md). Connections remain open; no device settings

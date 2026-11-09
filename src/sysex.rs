@@ -8,8 +8,8 @@ pub(crate) struct DumpReport {
 #[pymethods]
 impl DumpReport {
     #[getter]
-    fn model(&self) -> &str {
-        &self.value.model
+    fn model(&self) -> Option<&str> {
+        self.value.model.as_deref()
     }
     #[getter]
     fn scope(&self) -> &str {
