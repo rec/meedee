@@ -133,19 +133,19 @@ must stop a live session: typed queue overflow is reported through `failure`.
 Isolated updates are asynchronous, so neither property proves loss-free delivery
 or device health.
 
-`input_connection.start_recording(path)` attaches a bounded background recorder;
-`stop_recording()` returns a report whose `complete`, `gap_records` and `failure`
+`input_connection.start(path)` attaches a bounded background recorder;
+`stop()` returns a report whose `complete`, `gap_records` and `failure`
 fields must be checked. By default any observed input loss or write/admission
 failure makes recording incomplete. `best_effort=True` permits explicit gap
 records, not silent loss. Capture defaults to 128 in-flight records and 8 MiB of
 payload. General file records default to a configurable 1 MiB payload limit.
-Rust exposes the same attachment through Input::start_recording(Some(path), options)
-and stop_recording(timeout). Recording runs without receive calls and can accompany
+Rust exposes the same attachment through Input::start(Some(path), options)
+and stop(timeout). Recording runs without receive calls and can accompany
 callbacks. A stop timeout retains the stopping recorder for a later retry, including
 after input close; recording_report retains the last finalized report.
 
-Omit the destination (`start_recording()` in Python,
-`start_recording(None::<&Path>, options)` in Rust) to retain records in memory.
+Omit the destination (`start()` in Python,
+`start(None::<&Path>, options)` in Rust) to retain records in memory.
 `Recorder.stop()` still returns a report; `Recorder.records` (Rust: `records()`)
 provides the captured records after stopping, or `None` for active/file recorders.
 Memory retention grows without a size bound; file writer queue limits do not
@@ -161,17 +161,17 @@ For explicit control without closing the input:
 
 ```python
 with Input() as receiver:
-    recorder = receiver.start_recording()
+    recorder = receiver.start()
     # Other application work can run while recording continues.
-    report = receiver.stop_recording()
+    report = receiver.stop()
     records = recorder.records
 ```
 
 ```rust,no_run
 let mut receiver = meedee::midi::Input::new();
-let recorder = receiver.start_recording(None::<&std::path::Path>, &Default::default())?;
+let recorder = receiver.start(None::<&std::path::Path>, &Default::default())?;
 // Other application work can run while recording continues.
-let report = receiver.stop_recording(std::time::Duration::from_secs(5))?;
+let report = receiver.stop(std::time::Duration::from_secs(5))?;
 let records = recorder.records();
 ```
 
@@ -189,7 +189,7 @@ streaming: reading and verifying an entire capture before playback is necessary
 if no output may precede discovering a damaged or incomplete trailer. CRCs detect
 accidental corruption and do not authenticate a file.
 
-Pass `metrics=True` to `start_recording` or `archive.Recorder` for live/final
+Pass `metrics=True` to `start` or `archive.Recorder` for live/final
 `.pressure` reports: admitted records, capacity rejections and peak reserved
 records/payload bytes, including in-flight writes. Pass it to `output.play` for
 `.lateness`, a bounded histogram with exact count/minimum/maximum/sum covering

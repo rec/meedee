@@ -200,7 +200,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         timeout: float | str | None = None,
         cancel: events.Cancellation | None = None,
     ) -> T | None: ...
-    def start_recording(
+    def start(
         self,
         destination: str | PathLike[str] | None = None,
         *,
@@ -211,9 +211,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         byte_limit: int | str = 8_388_608,
         metrics: bool = False,
     ) -> archive.Recorder: ...
-    def stop_recording(
-        self, *, timeout: float | str = 5.0
-    ) -> archive.RecordingReport: ...
+    def stop(self, *, timeout: float | str = 5.0) -> archive.RecordingReport: ...
     def close(self) -> None: ...
 
 class Output:

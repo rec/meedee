@@ -224,7 +224,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         if self._connection is not None and self._connection._bridge is not None:
             raise midi.StateError("recording is unavailable in callback mode")
         with self as receiver:
-            recorder = receiver.start_recording()
+            recorder = receiver.start()
             deadline = monotonic() + seconds
             while (remaining := deadline - monotonic()) > 0:
                 try:
@@ -327,7 +327,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         assert self._connection is not None
         return self._connection.receive(timeout=timeout, cancel=cancel)
 
-    def start_recording(
+    def start(
         self,
         destination: str | PathLike[str] | None = None,
         *,
@@ -342,7 +342,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             raise midi.StateError("recording requires decoded input (raw=False)")
         self.__enter__()
         assert self._connection is not None
-        return self._connection.start_recording(
+        return self._connection.start(
             destination,
             label=label,
             best_effort=best_effort,
@@ -352,10 +352,10 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             metrics=metrics,
         )
 
-    def stop_recording(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
+    def stop(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
         if self._connection is None:
             raise midi.StateError("no recording is attached")
-        return self._connection.stop_recording(timeout=timeout)
+        return self._connection.stop(timeout=timeout)
 
     @property
     def stream(self) -> str:
@@ -1204,7 +1204,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             except Empty:
                 continue
 
-    def start_recording(
+    def start(
         self,
         destination: str | PathLike[str] | None = None,
         *,
@@ -1284,7 +1284,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             self._recorder.fail(str(failure))
         self._ignored_on_close = 0
 
-    def stop_recording(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
+    def stop(self, *, timeout: float | str = 5.0) -> archive.RecordingReport:
         _native.check_thread()
         timeout = _units.real(timeout, "second")
         if not math.isfinite(timeout) or timeout <= 0:

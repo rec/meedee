@@ -735,7 +735,7 @@ return promptly. Blocking MIDI operations are rejected inside callbacks. Use a
 channel to ask the controlling thread to perform them.
 
 Receive, iteration and timed record/record_to are unavailable in callback mode.
-Attached background recording is available through start_recording.
+Attached background recording is available through start.
 Callback panic stops further delivery and is observable through `check_health()`.
 Close stops native delivery, drains accepted input to the callback and joins the
 dispatch thread. It waits for an active callback to return. Closing is terminal.
@@ -832,9 +832,9 @@ use meedee::midi::{Input, RecordingOptions};
 use std::time::Duration;
 
 let mut input = Input::new();
-input.start_recording(Some("rec.meedee"), &RecordingOptions::default())?;
+input.start(Some("rec.meedee"), &RecordingOptions::default())?;
 println!("{:?}", input.receive(Some(Duration::from_secs(10)), None)?);
-println!("{:?}", input.stop_recording(Duration::from_secs(5))?);
+println!("{:?}", input.stop(Duration::from_secs(5))?);
 input.close()?;
 ```
 
@@ -851,9 +851,9 @@ use std::path::Path;
 use std::time::Duration;
 
 let mut input = Input::new();
-let recorder = input.start_recording(None::<&Path>, &RecordingOptions::default())?;
+let recorder = input.start(None::<&Path>, &RecordingOptions::default())?;
 println!("{:?}", input.receive(Some(Duration::from_secs(10)), None)?);
-let report = input.stop_recording(Duration::from_secs(5))?;
+let report = input.stop(Duration::from_secs(5))?;
 let records = recorder.records().unwrap();
 input.close()?;
 ```
@@ -867,7 +867,7 @@ make a successfully retained recording incomplete. Known loss, unfinished messag
 callback panic and writer failure remain visible in the final report. Raw input
 cannot attach decoded archive recording.
 
-A stop timeout retains the stopping recorder. Retry stop_recording later, including
+A stop timeout retains the stopping recorder. Retry stop later, including
 after close, to obtain the final report. No replacement recording can start until
 finalization succeeds. recording_report() retains the completed snapshot after
 close; an unfinished stop does not invent a report.

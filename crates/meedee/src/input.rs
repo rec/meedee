@@ -689,7 +689,7 @@ mod tests {
                 .as_nanos()
         ));
         let recorder = input
-            .start_recording(
+            .start(
                 Some(&path),
                 &RecordingOptions {
                     metrics: true,
@@ -703,7 +703,7 @@ mod tests {
             assert!(Instant::now() < deadline, "background recorder did not run");
             std::thread::yield_now();
         }
-        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        let report = input.stop(Duration::from_secs(1)).unwrap();
         assert!(report.complete && report.records == 5);
         assert!(input.failure().is_some()); // receive capacity is independent
         let records = crate::archive::Reader::open(&path)
@@ -741,7 +741,7 @@ mod tests {
         ));
         let mut input = Input::decoded(core);
         input
-            .start_recording(
+            .start(
                 Some(&path),
                 &RecordingOptions {
                     best_effort: true,
@@ -749,7 +749,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        let report = input.stop(Duration::from_secs(1)).unwrap();
         assert!(report.complete);
         assert_eq!(report.gap_records, 1);
         input.close().unwrap();
@@ -935,9 +935,9 @@ mod tests {
         let queue = core.queue.clone();
         let mut input = Input::decoded(core);
         let recorder = input
-            .start_recording(None::<&std::path::Path>, &Default::default())
+            .start(None::<&std::path::Path>, &Default::default())
             .unwrap();
-        let report = input.stop_recording(Duration::from_secs(1)).unwrap();
+        let report = input.stop(Duration::from_secs(1)).unwrap();
         assert!(report.complete);
         assert!(!input.closed());
         assert_eq!(input.recording_report(), Some(report));
