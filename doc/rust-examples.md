@@ -384,7 +384,7 @@ use meedee::{midi::{Input, Output}, sysex};
 
 let mut receiver = Input::new().with_port("VL70")?;
 let mut output = Output::new().with_port("VL70")?;
-let result = sysex::dump(&mut receiver, Some(&mut output), "yamaha/vl70-m", &Default::default())?;
+let result = sysex::dump(&mut receiver, Some(&mut output), None, &Default::default())?;
 println!("{}: {:?}", result.status, result.reason);
 let mut file = std::fs::File::create("vl70.syx")?;
 for message in &result.messages {

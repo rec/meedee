@@ -371,3 +371,164 @@ def test_documented_negative_reply_is_retained(monkeypatch: pytest.MonkeyPatch) 
     )
     assert report.status == "failed" and "rejected" in (report.reason or "")
     assert report.messages[0].data == reply
+
+
+def identities() -> list[list[str]]:
+    path = (
+        Path(__file__).parents[1] / "crates/meedee/tests/fixtures/sysex-identities.txt"
+    )
+    return [
+        r.split("|")
+        for r in path.read_text().splitlines()
+        if r and not r.startswith("#")
+    ]
+
+
+@pytest.mark.parametrize("vector", identities())
+def test_identity_selects_exact_model_and_wire_address(
+    vector: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model, identity, request, prefix, size, suffix, status = vector
+    clock = testing.ManualClock()
+    monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    reply = bytes.fromhex(prefix) + bytes(int(size)) + bytes.fromhex(suffix)
+    output = Output(
+        receiver,
+        [bytes.fromhex("7e7f0601"), bytes.fromhex(request)],
+        [bytes.fromhex(identity), reply],
+    )
+    # Stale identity replies cannot select a device or cause ambiguity.
+    receiver.items.append(messages.SysEx(bytes.fromhex(identity)).replace(stream="s"))
+    report = sysex.dump(
+        cast(midi.Input, receiver), cast(midi.Output, output), scope="system"
+    )
+    assert report.model == model and report.status == status
+    assert report.requests_sent == 1 and len(output.sent) == 2
+    assert [m.data for m in report.messages] == [reply]
+    assert clock.now_ns >= 1_000_000_000
+
+
+@pytest.mark.parametrize(
+    "replies,reason",
+    [
+        ([], "no identity"),
+        (["7e0006027d0000000000000000"], "unsupported"),
+        (["7e0006024300410d0200000002"], "unsupported"),
+        (["7e00060243"], "malformed"),
+        (["7e0006024300410c0200000002"] * 2, "multiple"),
+        (["7e0006027d0000000000000000", "7e0006024300410c0200000002"], "multiple"),
+        (["7e0006024300410c0200000002", "7e100602415103000000030100"], "multiple"),
+    ],
+)
+def test_failed_detection_never_sends_a_dump_request(
+    replies: list[str], reason: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    receiver.scheduled = [
+        messages.SysEx(bytes.fromhex(r)).replace(stream="s") for r in replies
+    ]
+    output = testing.Output(protocol="midi1")
+    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    assert report.status == "failed" and reason in (report.reason or "")
+    assert report.model is None and report.requests_sent == 0 and not report.messages
+    assert output.snapshot().accepted == 1
+    output.close()
+
+
+def test_later_identity_in_window_prevents_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    identity = bytes.fromhex("7e0006024300410c0200000002")
+    output = Output(receiver, [bytes.fromhex("7e7f0601")], [identity])
+
+    def delayed_reply() -> None:
+        clock.advance(100_000_000)
+        if clock.now_ns == 200_000_000:
+            receiver.items.append(messages.SysEx(identity).replace(stream="s"))
+
+    receiver.on_receive = delayed_reply
+    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    assert report.status == "failed" and "multiple" in (report.reason or "")
+    assert report.requests_sent == 0 and len(output.sent) == 1
+
+
+def test_identity_from_another_stream_is_ignored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    receiver.scheduled = [
+        messages.SysEx(bytes.fromhex("7e0006024300410c0200000002")).replace(
+            stream="other"
+        )
+    ]
+    output = testing.Output(protocol="midi1")
+    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    assert report.status == "failed" and report.model is None
+    assert report.ignored_events == 1 and report.requests_sent == 0
+    output.close()
+
+
+def test_identity_after_discovery_aborts_remaining_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    identity = bytes.fromhex("7e0006024300410c0200000002")
+    output = Output(
+        receiver,
+        [bytes.fromhex("7e7f0601"), bytes.fromhex("432057000000")],
+        [identity, identity],
+    )
+    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    assert report.status == "failed" and "additional identity" in (report.reason or "")
+    assert report.requests_sent == 1 and not report.messages and not report.complete
+
+
+def test_manual_capture_requires_explicit_model() -> None:
+    receiver = Input(testing.ManualClock())
+    with pytest.raises(ValueError, match="explicit model"):
+        sysex.dump(cast(midi.Input, receiver))
+
+
+@pytest.mark.parametrize("failure", ["loss", "cancel", "send", "limit", "address"])
+def test_discovery_failures_prevent_dump_requests(
+    failure: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    receiver.scheduled = [
+        messages.SysEx(bytes.fromhex("7e0006024300410c0200000002")).replace(stream="s")
+    ]
+    cancel = events.Cancellation()
+    if failure == "loss":
+        receiver.on_receive = lambda: setattr(receiver, "dropped_packets", 1)
+    elif failure == "cancel":
+        cancel.cancel()
+    output = testing.Output(protocol="midi1")
+    if failure == "send":
+        output.fail_next_send(accepted=True)
+    report = sysex.dump(
+        cast(midi.Input, receiver),
+        cast(midi.Output, output),
+        cancel=cancel,
+        payload_limit=1 if failure == "limit" else 1_048_576,
+        device_id=1 if failure == "address" else None,
+    )
+    assert report.requests_sent == 0 and not report.messages
+    assert report.status == {
+        "cancel": "cancelled",
+        "limit": "limit_reached",
+    }.get(failure, "failed")
+    assert report.uncertain_send == (failure == "send")
+    assert output.snapshot().accepted == (0 if failure == "cancel" else 1)
+    output.close()

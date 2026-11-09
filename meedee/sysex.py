@@ -33,11 +33,12 @@ def dump(
     receiver: midi.Input,
     output: midi.Output | None = None,
     *,
-    model: str,
+    model: str | None = None,
     scope: str = "all",
     device_id: int | None = None,
     timeout: float | str = 120.0,
     silence: float | str = 1.0,
+    identity_timeout: float | str = 1.0,
     message_limit: int = 4096,
     byte_limit: int | str = 8_388_608,
     payload_limit: int | str = 1_048_576,
@@ -45,6 +46,8 @@ def dump(
 ) -> sysex.DumpReport:
     """Request an opaque dump, or capture a front-panel dump with output=None.
 
+    Omit model to discover exactly one supported identity using output. Explicit
+    model skips discovery and is required for manual capture.
     Connections remain open. This consumes input and discards buffered events
     before capture. Manual completion and model identity remain unverified.
     """
@@ -56,6 +59,7 @@ def dump(
         device_id,
         timeout,
         silence,
+        identity_timeout,
         message_limit,
         byte_limit,
         payload_limit,

@@ -7,7 +7,7 @@ captures a dump you start on the instrument. The payload remains opaque.
 from meedee import midi, sysex
 
 with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
-    result = sysex.dump(receiver, output, model="yamaha/vl70-m")
+    result = sysex.dump(receiver, output)
     print(result.status, result.reason)
     sysex.write("vl70.syx", result.messages)
 ```
@@ -29,10 +29,10 @@ use meedee::{midi, sysex};
 let mut receiver = midi::Input::new().with_port("VL70")?;
 let mut output = midi::Output::new().with_port("VL70")?;
 let result = sysex::dump(
-    &mut receiver, Some(&mut output), "yamaha/vl70-m", &Default::default(),
+    &mut receiver, Some(&mut output), None, &Default::default(),
 )?;
 println!("{}: {:?}", result.status, result.reason);
-// Pass None instead of Some(&mut output) for manual capture.
+// Manual capture: output None and model Some("moog/subsequent-37").
 # Ok(())
 # }
 ```
@@ -41,7 +41,43 @@ println!("{}: {:?}", result.status, result.reason);
 to the caller. The operation consumes input, including discarding already buffered
 events before requesting/capturing. Do not concurrently receive on that input or
 use callback-mode input. Requests are serialized and never retried automatically.
-No identity probing, program selection, parameter writes or restores are sent.
+No program selection, parameter writes or restores are sent.
+
+## Model detection
+
+With an output and no `model`, the operation sends one broadcast Universal
+Non-Realtime Identity Request (`F0 7E 7F 06 01 F7`). It collects replies for
+`identity_timeout` (default one second), within the overall timeout, before
+sending any dump request. It requires exactly one reply with a documented
+manufacturer/family/member combination. Revision bytes are accepted without
+using them to guess another model.
+
+| Detected model | Family bytes | Member bytes | Dump addressing |
+| --- | --- | --- | --- |
+| Yamaha VL70-m (`43`) | `00 41` | `0C 02` | Reply device ID 0-15. |
+| Roland VT-4 (`41`) | `51 03` | `00 00` | Fixed reply/dump device ID `10`. |
+| Korg minilogue xd (`42`) | `51 01` | `00 00` | Reply device ID 0-15 becomes the dump channel nibble. |
+| Sequential Prophet Rev2 (`01`) | `2F 01` | `00 00` | No dump address field. |
+
+These signatures come from the identity sections of the model manuals linked
+below: Yamaha p. 29, Roland p. 2, Korg messages 1-5/2-1, and Sequential Appendix E.
+The Rev2's documented single revision byte is accepted as well as the standard
+four-byte revision. The general universal decoder remains strict.
+
+No reply, an unknown or malformed identity, or multiple replies produces a
+failed report without sending a dump request. Even identical replies count as
+multiple, since two devices may share an ID. A later identity reply observed
+during capture also aborts the transfer. A finite window cannot prove that no
+device will respond later; increase `identity_timeout` for slow devices and
+avoid shared routes when selecting a device explicitly.
+
+Use `model="yamaha/vl70-m"` to skip detection, including when detection fails.
+Manual capture requires explicit `model`. DeepMind 12, Peak, Digitakt and
+Subsequent 37 currently require explicit selection because this implementation
+has no verified identity mapping for them. Manufacturer alone never selects a
+model. If `device_id` conflicts with the detected address, detection fails;
+explicit selection lets the caller choose an address. Korg and Rev2 still need
+`scope="current"` or `scope="system"` because their `all` requests are unsupported.
 
 ## Results and limits
 
@@ -53,6 +89,9 @@ its reason is retained. An unfinished fragment is never made into a message.
 
 The result also exposes `model`, `scope`, `status`, `complete`, `requests_sent`,
 `uncertain_send`, `ignored_events`, `wire_bytes` and `reason`.
+`model` is absent (`None`) if detection did not select a model. Identity replies
+are excluded from `messages` and `wire_bytes`; `requests_sent` counts dump
+requests only. `uncertain_send` also covers an uncertain identity request send.
 
 | Status | Meaning |
 | --- | --- |
@@ -61,7 +100,7 @@ The result also exposes `model`, `scope`, `status`, `complete`, `requests_sent`,
 | `timed_out` | No matching response, an incomplete requested sequence, or the overall deadline expired. The reason distinguishes these cases. |
 | `cancelled` | Caller cancellation or interruption. Already admitted messages are retained. |
 | `limit_reached` | A retention limit was reached, or the initial input queue could not be drained within its event budget. |
-| `failed` | Input failure/loss, a device rejection, envelope validation failure or send failure. |
+| `failed` | Identity detection failure/ambiguity, input failure/loss, a device rejection, envelope validation failure or send failure. |
 
 `complete` verifies the transfer's stated scope, not physical sender identity,
 restorability or an entire-machine backup. Some devices omit data from their
@@ -75,15 +114,18 @@ Avoid shared MIDI sources carrying other instruments' traffic during a dump.
 An in-flight old reply with the same envelope cannot be distinguished from a new
 one where the device protocol has no transaction identifier.
 
-Defaults are a 120-second total `timeout`, one-second `silence`, 4096 retained
+Defaults are a 120-second total `timeout`, one-second `silence` and
+`identity_timeout`, 4096 retained
 messages, 8 MiB total wire bytes and a 1 MiB message payload. Python accepts unit
 strings such as `timeout="3 minutes"` and `byte_limit="16 MiB"`; Rust uses
 `DumpOptions` and typed durations. Limits apply before retaining each message.
 The receiver's own decoder/queue limits also apply independently. Other traffic
 does not extend the silence window. Timeout starts when the operation starts,
 including its initial queue drain. A cancelled `events.Cancellation` can stop it
-early. Unsupported models/scopes and invalid options raise an error before any
-request is sent.
+early. Discovery uses the same message/payload limits to bound reply collection.
+Unsupported models/scopes and invalid options raise an error before any dump
+request is sent. With automatic detection, model-specific scope validation
+necessarily happens after the identity request.
 
 ## Model coverage
 

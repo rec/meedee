@@ -49,11 +49,12 @@ def run_sysex_send(
 def run_sysex_dump(
     receiver: object,
     output: object,
-    model: str,
+    model: str | None,
     scope: str,
     device_id: int | None,
     timeout: float | str,
     silence: float | str,
+    identity_timeout: float | str,
     message_limit: int,
     byte_limit: int | str,
     payload_limit: int | str,
