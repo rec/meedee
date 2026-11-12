@@ -3,7 +3,6 @@
 __all__: list[str] = [
     "ActiveSensing",
     "Backend",
-    "BankProgram",
     "CallbackThreadError",
     "Cancellation",
     "CapabilityError",
@@ -22,9 +21,7 @@ __all__: list[str] = [
     "DrumKit",
     "Encoding",
     "FrameRate",
-    "Gm1On",
-    "Gm2On",
-    "GmOff",
+    "GmMode",
     "Histogram",
     "IdentityReply",
     "IdentityRequest",
@@ -175,11 +172,8 @@ from .events import (
 )
 from .file_io import Reader, Writer
 from .gm import (
-    BankProgram,
     DrumKit,
-    Gm1On,
-    Gm2On,
-    GmOff,
+    GmMode,
     Percussion,
     Program,
 )

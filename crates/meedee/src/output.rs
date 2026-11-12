@@ -1673,7 +1673,7 @@ macro_rules! system_values {
         })*
     };
 }
-system_values!(gm: Gm1On, GmOff, Gm2On);
+system_values!(gm: GmMode);
 system_values!(universal: IdentityRequest, IdentityReply, MasterVolume, MasterFineTuning, MasterCoarseTuning);
 system_values!(timecode: FullFrame);
 system_values!(ci: Management);

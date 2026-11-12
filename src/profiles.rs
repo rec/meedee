@@ -44,8 +44,18 @@ macro_rules! classes {
         }
     )*};
 }
+macro_rules! entry_annotation {
+    (OptionalInt,$py:ident) => {
+        $py.import("typing")?
+            .getattr("Optional")?
+            .get_item($py.get_type::<PyInt>())?
+    };
+    ($type:ident,$py:ident) => {
+        $py.get_type::<$type>().into_any()
+    };
+}
 macro_rules! entries {
-    ($($name:ident { $($field:ident : $ty:ty => $annotation:ty),* };)*)=>{$(
+    ($($name:ident { $($field:ident : $ty:ty => $annotation:ident),* };)*)=>{$(
         #[pyclass(frozen,module="meedee.gm")]
         pub(super) struct $name {value:model::$name}
         #[pymethods]
@@ -55,65 +65,118 @@ macro_rules! entries {
             fn __eq__(&self,other:&Bound<'_,PyAny>)->bool {other.extract::<PyRef<'_,Self>>().is_ok_and(|other|self.value==other.value)}
             fn __hash__(&self)->u64 {hash(&self.value)}
             #[classattr] fn __match_args__(py:Python<'_>)->PyResult<Bound<'_,PyTuple>> {PyTuple::new(py,[$(stringify!($field)),*])}
-            #[classattr] fn __annotations__(py:Python<'_>)->PyResult<Bound<'_,PyDict>> {let fields=PyDict::new(py);$(fields.set_item(stringify!($field),py.get_type::<$annotation>())?;)*Ok(fields)}
+            #[classattr] fn __annotations__(py:Python<'_>)->PyResult<Bound<'_,PyDict>> {let fields=PyDict::new(py);$(fields.set_item(stringify!($field),entry_annotation!($annotation,py))?;)*Ok(fields)}
         }
     )*};
 }
 mod gm {
     use super::*;
     use meedee::gm as model;
-    classes! {"meedee.gm";
-        Gm1On {device_id:int=>number:PyInt};
-        GmOff {device_id:int=>number:PyInt};
-        Gm2On {device_id:int=>number:PyInt};
+    #[pyclass(frozen, extends=Message, module="meedee.gm")]
+    pub(super) struct GmMode {
+        pub(super) value: model::GmMode,
+    }
+    #[pymethods]
+    impl GmMode {
+        #[new]
+        #[pyo3(signature=(mode,*,device_id))]
+        fn new(mode: &str, device_id: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
+            let mode = match mode {
+                "gm1" => model::Mode::Gm1,
+                "gm2" => model::Mode::Gm2,
+                "off" => model::Mode::Off,
+                _ => {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "mode must be gm1, gm2 or off",
+                    ))
+                }
+            };
+            let value = model::GmMode::new(mode, int(device_id)?).map_err(value_error)?;
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+        #[getter]
+        fn mode(&self) -> &'static str {
+            match self.value.mode() {
+                model::Mode::Gm1 => "gm1",
+                model::Mode::Gm2 => "gm2",
+                model::Mode::Off => "off",
+            }
+        }
+        #[getter]
+        fn device_id(&self) -> u8 {
+            self.value.device_id()
+        }
+        fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+            other
+                .extract::<PyRef<'_, Self>>()
+                .is_ok_and(|v| self.value == v.value)
+        }
+        fn __hash__(&self) -> u64 {
+            hash(&self.value)
+        }
+        fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
+            let py = slf.py();
+            render(
+                slf.into_pyobject(py)?.as_any(),
+                "GmMode",
+                &["mode", "device_id"],
+            )
+        }
+        #[pyo3(signature=(**changes))]
+        fn replace<'py>(
+            slf: PyRef<'py, Self>,
+            changes: Option<&Bound<'py, PyDict>>,
+        ) -> PyResult<Bound<'py, PyAny>> {
+            let py = slf.py();
+            replacement(
+                slf.into_pyobject(py)?.as_any(),
+                &["mode", "device_id"],
+                changes,
+            )
+        }
+        #[classattr]
+        fn __match_args__() -> (&'static str,) {
+            ("mode",)
+        }
+        #[classattr]
+        fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+            let fields = PyDict::new(py);
+            fields.set_item("mode", py.get_type::<PyString>())?;
+            fields.set_item("device_id", py.get_type::<PyInt>())?;
+            Ok(fields)
+        }
     }
     entries! {
-        Program {program:u8=>PyInt,name:&'static str=>PyString,family:&'static str=>PyString};
-        BankProgram {program:u8=>PyInt,bank_msb:u8=>PyInt,bank_lsb:u8=>PyInt,name:&'static str=>PyString,family:&'static str=>PyString};
+        Program {program:u8=>PyInt,bank_msb:Option<u8> =>OptionalInt,bank_lsb:Option<u8> =>OptionalInt,name:&'static str=>PyString,family:&'static str=>PyString};
         DrumKit {program:u8=>PyInt,bank_msb:u8=>PyInt,bank_lsb:u8=>PyInt,name:&'static str=>PyString};
         Percussion {note:u8=>PyInt,name:&'static str=>PyString};
     }
     #[pyfunction]
-    fn programs() -> Vec<Program> {
-        model::programs()
+    #[pyo3(signature=(*,version=1))]
+    fn programs(#[pyo3(from_py_with=int)] version: i64) -> PyResult<Vec<Program>> {
+        Ok(model::programs(version)
+            .map_err(value_error)?
             .into_iter()
             .map(|value| Program { value })
-            .collect()
+            .collect())
     }
     #[pyfunction]
-    #[pyo3(signature=(*,program))]
-    fn program(program: &Bound<'_, PyAny>) -> PyResult<Program> {
-        Ok(Program {
-            value: model::program(int(program)?).map_err(value_error)?,
-        })
-    }
-    #[pyfunction]
-    fn gm2_programs() -> Vec<BankProgram> {
-        model::gm2_programs()
-            .into_iter()
-            .map(|value| BankProgram { value })
-            .collect()
-    }
-    #[pyfunction]
-    #[pyo3(signature=(*,bank_lsb,program))]
-    fn gm2_program(
-        bank_lsb: &Bound<'_, PyAny>,
+    #[pyo3(signature=(*,program,bank_lsb=None))]
+    fn program(
         program: &Bound<'_, PyAny>,
-    ) -> PyResult<Option<BankProgram>> {
-        Ok(model::gm2_program(int(bank_lsb)?, int(program)?)
-            .map_err(value_error)?
-            .map(|value| BankProgram { value }))
+        bank_lsb: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Option<Program>> {
+        Ok(
+            model::program(int(program)?, bank_lsb.map(int).transpose()?)
+                .map_err(value_error)?
+                .map(|value| Program { value }),
+        )
     }
     #[pyfunction]
-    fn find_programs(py: Python<'_>, name: &str) -> PyResult<Vec<Py<PyAny>>> {
+    fn find_programs(name: &str) -> Vec<Program> {
         model::find_programs(name)
             .into_iter()
-            .map(|entry| match entry {
-                model::ProgramMatch::Gm1(value) => Ok(Py::new(py, Program { value })?.into_any()),
-                model::ProgramMatch::Gm2(value) => {
-                    Ok(Py::new(py, BankProgram { value })?.into_any())
-                }
-            })
+            .map(|value| Program { value })
             .collect()
     }
     #[pyfunction]
@@ -131,19 +194,12 @@ mod gm {
             .collect()
     }
     #[pyfunction]
-    #[pyo3(signature=(*,note))]
-    fn percussion(note: &Bound<'_, PyAny>) -> PyResult<Option<Percussion>> {
-        Ok(model::percussion(int(note)?)
-            .map_err(value_error)?
-            .map(|value| Percussion { value }))
-    }
-    #[pyfunction]
-    #[pyo3(signature=(*,program,note))]
-    fn gm2_percussion(
-        program: &Bound<'_, PyAny>,
+    #[pyo3(signature=(*,note,program=None))]
+    fn percussion(
         note: &Bound<'_, PyAny>,
+        program: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Option<Percussion>> {
-        Ok(model::gm2_percussion(int(program)?, int(note)?)
+        Ok(model::percussion(int(note)?, program.map(int).transpose()?)
             .map_err(value_error)?
             .map(|value| Percussion { value }))
     }
@@ -161,24 +217,18 @@ mod gm {
             .transpose()
     }
     pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-        module.add_class::<Gm1On>()?;
-        module.add_class::<GmOff>()?;
-        module.add_class::<Gm2On>()?;
+        module.add_class::<GmMode>()?;
         module.add_class::<Program>()?;
-        module.add_class::<BankProgram>()?;
         module.add_class::<DrumKit>()?;
         module.add_class::<Percussion>()?;
         module.add("GM1_DRUM_CHANNEL", model::GM1_DRUM_CHANNEL)?;
         module.add("GM2_ON_SETTLING_NS", model::GM2_ON_SETTLING_NS)?;
         module.add_function(wrap_pyfunction!(programs, module)?)?;
         module.add_function(wrap_pyfunction!(program, module)?)?;
-        module.add_function(wrap_pyfunction!(gm2_programs, module)?)?;
-        module.add_function(wrap_pyfunction!(gm2_program, module)?)?;
         module.add_function(wrap_pyfunction!(find_programs, module)?)?;
         module.add_function(wrap_pyfunction!(drum_kits, module)?)?;
         module.add_function(wrap_pyfunction!(find_drum_kits, module)?)?;
         module.add_function(wrap_pyfunction!(percussion, module)?)?;
-        module.add_function(wrap_pyfunction!(gm2_percussion, module)?)?;
         module.add_function(wrap_pyfunction!(decode, module)?)?;
         Ok(())
     }
@@ -384,9 +434,7 @@ macro_rules! primitives {
     };
 }
 primitives!(
-    gm::Gm1On,
-    gm::GmOff,
-    gm::Gm2On,
+    gm::GmMode,
     universal::IdentityRequest,
     universal::IdentityReply,
     universal::MasterVolume,

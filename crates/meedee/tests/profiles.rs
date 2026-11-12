@@ -35,9 +35,18 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
                     .flat_map(|m| codecs::encode(m).unwrap())
                     .collect()
             }
-            "Gm1On" => gm::Gm1On::new(v[0]).unwrap().encode().unwrap(),
-            "GmOff" => gm::GmOff::new(v[0]).unwrap().encode().unwrap(),
-            "Gm2On" => gm::Gm2On::new(v[0]).unwrap().encode().unwrap(),
+            "Gm1On" => gm::GmMode::new(gm::Mode::Gm1, v[0])
+                .unwrap()
+                .encode()
+                .unwrap(),
+            "GmOff" => gm::GmMode::new(gm::Mode::Off, v[0])
+                .unwrap()
+                .encode()
+                .unwrap(),
+            "Gm2On" => gm::GmMode::new(gm::Mode::Gm2, v[0])
+                .unwrap()
+                .encode()
+                .unwrap(),
             "IdentityRequest" => universal::IdentityRequest::new(v[0])
                 .unwrap()
                 .encode()
@@ -82,7 +91,6 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
     }
     let command = meedee::messages::ProgramChange::new(1)
         .and_then(|m| m.with_bank(0, 0))
-        .and_then(|m| m.with_bank(0, 0))
         .and_then(|m| m.with_channel(1))
         .unwrap();
     assert!(matches!(
@@ -92,59 +100,66 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
 }
 #[test]
 fn gm_tables_cover_exact_addresses_without_fabricating_fallbacks() {
-    let gm1 = gm::programs();
+    let gm1 = gm::programs(1).unwrap();
     assert_eq!(gm1.len(), 128);
     assert_eq!(gm1[0].name(), "Acoustic Grand Piano");
+    assert_eq!(gm1[0].bank_msb(), None);
+    assert_eq!(gm1[0].bank_lsb(), None);
     assert_eq!(gm1[127].program(), 128);
     assert_eq!(gm1[127].name(), "Gunshot");
     assert_eq!(gm::find_programs("  acoustic GRAND piano ").len(), 2);
     assert_eq!(gm::find_programs("Piano").len(), 0);
-    let gm2 = gm::gm2_programs();
+    let gm2 = gm::programs(2).unwrap();
     assert_eq!(gm2.len(), 256);
+    assert_eq!(gm2[0].bank_msb(), Some(121));
+    assert_eq!(gm2[0].bank_lsb(), Some(0));
+    assert!(gm::programs(0).is_err());
+    assert!(gm::programs(3).is_err());
+    assert!(gm::program(1, Some(128)).is_err());
     let addresses: HashSet<_> = gm2
         .iter()
         .map(|entry| (entry.bank_msb(), entry.bank_lsb(), entry.program()))
         .collect();
     assert_eq!(addresses.len(), 256);
     for program in 1..=128 {
-        assert!(gm::gm2_program(0, program).unwrap().is_some());
+        assert!(gm::program(program, Some(0)).unwrap().is_some());
     }
-    assert_eq!(gm::gm2_program(4, 6).unwrap().unwrap().name(), "EP Phase");
+    assert_eq!(gm::program(6, Some(4)).unwrap().unwrap().name(), "EP Phase");
     assert_eq!(
-        gm::gm2_program(9, 126).unwrap().unwrap().name(),
+        gm::program(126, Some(9)).unwrap().unwrap().name(),
         "Burst Noise"
     );
-    assert!(gm::gm2_program(127, 1).unwrap().is_none());
+    assert!(gm::program(1, Some(127)).unwrap().is_none());
     assert_eq!(gm::drum_kits().len(), 9);
     assert_eq!(gm::find_drum_kits("  room SET ")[0].program(), 9);
     assert_eq!(
         (35..=81)
-            .filter(|&note| gm::percussion(note).unwrap().is_some())
+            .filter(|&note| gm::percussion(note, None).unwrap().is_some())
             .count(),
         47
     );
-    assert!(gm::percussion(34).unwrap().is_none());
+    assert!(gm::percussion(34, None).unwrap().is_none());
     assert_eq!(
-        gm::gm2_percussion(17, 36).unwrap().unwrap().name(),
+        gm::percussion(36, Some(17)).unwrap().unwrap().name(),
         "Power Kick Drum"
     );
     assert_eq!(
-        gm::gm2_percussion(26, 75).unwrap().unwrap().name(),
+        gm::percussion(75, Some(26)).unwrap().unwrap().name(),
         "Analog Claves"
     );
     assert_eq!(
-        gm::gm2_percussion(49, 41).unwrap().unwrap().name(),
+        gm::percussion(41, Some(49)).unwrap().unwrap().name(),
         "Timpani F"
     );
-    assert!(gm::gm2_percussion(57, 27).unwrap().is_none());
-    assert!(gm::gm2_percussion(2, 36).unwrap().is_none());
+    assert!(gm::percussion(27, Some(57)).unwrap().is_none());
+    assert!(gm::percussion(36, Some(2)).unwrap().is_none());
     for kit in gm::drum_kits() {
         for note in 0..128 {
-            let _ = gm::gm2_percussion(kit.program().into(), note).unwrap();
+            let _ = gm::percussion(note, Some(kit.program().into())).unwrap();
         }
     }
     for bad in [0, 129] {
-        assert!(gm::program(bad).is_err());
+        assert!(gm::program(bad, None).is_err());
     }
 }
 #[test]
@@ -247,7 +262,10 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
         ))
     };
     interpreter.feed(&cc(7, 1)).unwrap();
-    let wire = gm::Gm2On::new(127).unwrap().encode().unwrap();
+    let wire = gm::GmMode::new(gm::Mode::Gm2, 127)
+        .unwrap()
+        .encode()
+        .unwrap();
     let mode = meedee::events::Payload::Message(AnyMessage::SysEx(
         SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap(),
     ));

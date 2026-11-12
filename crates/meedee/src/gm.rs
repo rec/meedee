@@ -12,36 +12,19 @@ pub use extensions::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Program {
     program: u8,
+    bank_lsb: Option<u8>,
     name: &'static str,
     family: &'static str,
 }
 impl Program {
-    pub fn program(&self) -> u8 {
-        self.program
+    pub fn bank_msb(&self) -> Option<u8> {
+        self.bank_lsb.map(|_| 121)
     }
-    pub fn name(&self) -> &'static str {
-        self.name
-    }
-    pub fn family(&self) -> &'static str {
-        self.family
-    }
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct BankProgram {
-    program: u8,
-    bank_lsb: u8,
-    name: &'static str,
-    family: &'static str,
-}
-impl BankProgram {
-    pub fn program(&self) -> u8 {
-        self.program
-    }
-    pub fn bank_msb(&self) -> u8 {
-        121
-    }
-    pub fn bank_lsb(&self) -> u8 {
+    pub fn bank_lsb(&self) -> Option<u8> {
         self.bank_lsb
+    }
+    pub fn program(&self) -> u8 {
+        self.program
     }
     pub fn name(&self) -> &'static str {
         self.name
@@ -82,60 +65,55 @@ impl Percussion {
         self.name
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ProgramMatch {
-    Gm1(Program),
-    Gm2(BankProgram),
-}
-pub fn program(number: i64) -> Result<Program, ValueError> {
+pub fn program(number: i64, bank_lsb: Option<i64>) -> Result<Option<Program>, ValueError> {
     ProgramChange::new(number).and_then(|m| m.with_channel(1))?;
-    Ok(Program {
+    if let Some(bank_lsb) = bank_lsb {
+        ControlChange::new(32, bank_lsb)?;
+        return Ok(GM2_VOICES
+            .iter()
+            .find(|&&(program, bank, _)| bank as i64 == bank_lsb && program as i64 == number)
+            .map(|&(program, bank_lsb, name)| Program {
+                program,
+                bank_lsb: Some(bank_lsb),
+                name,
+                family: FAMILIES[(program as usize - 1) / 8],
+            }));
+    }
+    Ok(Some(Program {
         program: number as u8,
+        bank_lsb: None,
         name: GM1_VOICES[number as usize - 1],
         family: FAMILIES[(number as usize - 1) / 8],
-    })
+    }))
 }
-pub fn programs() -> Vec<Program> {
-    (1..=128)
-        .map(|number| program(number).expect("GM1 range"))
-        .collect()
+pub fn programs(version: i64) -> Result<Vec<Program>, ValueError> {
+    match version {
+        1 => Ok((1..=128)
+            .map(|number| {
+                program(number, None)
+                    .expect("GM1 range")
+                    .expect("GM1 entry")
+            })
+            .collect()),
+        2 => Ok(GM2_VOICES
+            .iter()
+            .map(|&(program, bank_lsb, name)| Program {
+                program,
+                bank_lsb: Some(bank_lsb),
+                name,
+                family: FAMILIES[(program as usize - 1) / 8],
+            })
+            .collect()),
+        _ => Err(ValueError("version must be 1 or 2".into())),
+    }
 }
-pub fn gm2_programs() -> Vec<BankProgram> {
-    GM2_VOICES
-        .iter()
-        .map(|&(program, bank_lsb, name)| BankProgram {
-            program,
-            bank_lsb,
-            name,
-            family: FAMILIES[(program as usize - 1) / 8],
-        })
-        .collect()
-}
-pub fn gm2_program(bank_lsb: i64, number: i64) -> Result<Option<BankProgram>, ValueError> {
-    ControlChange::new(32, bank_lsb).and_then(|m| m.with_channel(1))?;
-    ProgramChange::new(number).and_then(|m| m.with_channel(1))?;
-    Ok(GM2_VOICES
-        .iter()
-        .find(|&&(program, bank, _)| bank as i64 == bank_lsb && program as i64 == number)
-        .map(|&(program, bank_lsb, name)| BankProgram {
-            program,
-            bank_lsb,
-            name,
-            family: FAMILIES[(program as usize - 1) / 8],
-        }))
-}
-pub fn find_programs(name: &str) -> Vec<ProgramMatch> {
+pub fn find_programs(name: &str) -> Vec<Program> {
     let name = name.trim();
-    programs()
+    programs(1)
+        .expect("GM1 catalogue")
         .into_iter()
+        .chain(programs(2).expect("GM2 catalogue"))
         .filter(|entry| entry.name.eq_ignore_ascii_case(name))
-        .map(ProgramMatch::Gm1)
-        .chain(
-            gm2_programs()
-                .into_iter()
-                .filter(|entry| entry.name.eq_ignore_ascii_case(name))
-                .map(ProgramMatch::Gm2),
-        )
         .collect()
 }
 pub fn drum_kits() -> Vec<DrumKit> {
@@ -150,26 +128,21 @@ pub fn find_drum_kits(name: &str) -> Vec<DrumKit> {
         .filter(|entry| entry.name.eq_ignore_ascii_case(name.trim()))
         .collect()
 }
-pub fn percussion(note: i64) -> Result<Option<Percussion>, ValueError> {
+pub fn percussion(note: i64, program: Option<i64>) -> Result<Option<Percussion>, ValueError> {
     crate::messages::NoteOn::new(note)
         .and_then(|m| m.with_velocity(0))
         .and_then(|m| m.with_channel(10))?;
-    Ok(if (35..=81).contains(&note) {
-        Some(Percussion {
-            note: note as u8,
-            name: GM1_DRUMS[note as usize - 35],
-        })
-    } else {
-        None
-    })
-}
-/// Undefined/silent notes and unsupported kit programs return None. No fallback
-/// instrument is invented, even where a GM2 sound generator should apply one.
-pub fn gm2_percussion(program: i64, note: i64) -> Result<Option<Percussion>, ValueError> {
+    let Some(program) = program else {
+        return Ok(if (35..=81).contains(&note) {
+            Some(Percussion {
+                note: note as u8,
+                name: GM1_DRUMS[note as usize - 35],
+            })
+        } else {
+            None
+        });
+    };
     ProgramChange::new(program).and_then(|m| m.with_channel(10))?;
-    crate::messages::NoteOn::new(note)
-        .and_then(|m| m.with_velocity(0))
-        .and_then(|m| m.with_channel(10))?;
     if !DRUM_KITS.iter().any(|entry| entry.0 as i64 == program) {
         return Ok(None);
     }
@@ -192,29 +165,56 @@ pub fn gm2_percussion(program: i64, note: i64) -> Result<Option<Percussion>, Val
     })
 }
 
-macro_rules! modes {
-    ($($name:ident => $code:literal),*) => {$(
-        #[derive(Clone,Debug)]
-        pub struct $name {metadata: Option<Box<crate::messages::Metadata>>, device_id:u8}
-        impl $name {
-            pub fn new(device_id:i64)->Result<Self,ValueError> {
-                if !(0..=127).contains(&device_id) {return Err(ValueError("device_id must be in 0..=127".into()));}
-                Ok(Self {metadata: None, device_id:device_id as u8})
-            }
-            pub fn device_id(&self)->u8 {self.device_id}
-        }
-        crate::messages::value_metadata!($name { device_id });
-        impl crate::messages::PrimitiveMessage for $name {
-            fn encode(&self) -> Result<Vec<u8>, crate::messages::ValueError> { Ok(vec![240,126,self.device_id,9,$code,247]) }
-        }
-    )*};
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Mode {
+    Gm1,
+    Gm2,
+    Off,
 }
-modes!(Gm1On=>1,GmOff=>2,Gm2On=>3);
+#[derive(Clone, Debug)]
+pub struct GmMode {
+    metadata: Option<Box<crate::messages::Metadata>>,
+    mode: Mode,
+    device_id: u8,
+}
+crate::messages::value_metadata!(GmMode { mode, device_id });
+impl GmMode {
+    pub fn new(mode: Mode, device_id: i64) -> Result<Self, ValueError> {
+        if !(0..=127).contains(&device_id) {
+            return Err(ValueError("device_id must be in 0..=127".into()));
+        }
+        Ok(Self {
+            metadata: None,
+            mode,
+            device_id: device_id as u8,
+        })
+    }
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+    pub fn device_id(&self) -> u8 {
+        self.device_id
+    }
+}
+impl crate::messages::PrimitiveMessage for GmMode {
+    fn encode(&self) -> Result<Vec<u8>, ValueError> {
+        Ok(vec![
+            240,
+            126,
+            self.device_id,
+            9,
+            match self.mode {
+                Mode::Gm1 => 1,
+                Mode::Off => 2,
+                Mode::Gm2 => 3,
+            },
+            247,
+        ])
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GmMessage {
-    Gm1On(Gm1On),
-    GmOff(GmOff),
-    Gm2On(Gm2On),
+    GmMode(GmMode),
     ControllerDestination(ControllerDestination),
     KeyBasedControl(KeyBasedControl),
     GlobalParameterControl(GlobalParameterControl),
@@ -240,11 +240,12 @@ pub fn decode(
     if data.len() != 4 {
         return Err(ValueError("incorrect GM mode message length".into()));
     }
-    Ok(Some(match data[3] {
-        1 => GmMessage::Gm1On(Gm1On::new(data[1].into())?),
-        2 => GmMessage::GmOff(GmOff::new(data[1].into())?),
-        _ => GmMessage::Gm2On(Gm2On::new(data[1].into())?),
-    }))
+    let mode = match data[3] {
+        1 => Mode::Gm1,
+        2 => Mode::Off,
+        _ => Mode::Gm2,
+    };
+    Ok(Some(GmMessage::GmMode(GmMode::new(mode, data[1].into())?)))
 }
 
 include!("gm_tables.rs");

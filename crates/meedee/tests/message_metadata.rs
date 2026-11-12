@@ -60,7 +60,7 @@ fn metadata_is_ignored_by_equality_and_hash_across_message_families() {
     check_value(AnyMessage::NoteOn(NoteOn::new(60).unwrap()));
     check_value(meedee::messages::TimingClock::new().unwrap());
     check_value(meedee::messages::SysEx::new(vec![125, 1, 2]).unwrap());
-    check_value(gm::Gm2On::new(1).unwrap());
+    check_value(gm::GmMode::new(gm::Mode::Gm2, 1).unwrap());
     check_value(universal::MasterVolume::new(1, 123).unwrap());
     check_value(tuning::BulkDumpRequest::new(1, 2).unwrap());
     check_value(tuning::TuningMessage::NoteChange(

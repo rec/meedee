@@ -396,7 +396,7 @@ macro_rules! profile_records {
         }
     })* };
 }
-profile_records!(gm: Gm1On,GmOff,Gm2On);
+profile_records!(gm: GmMode);
 profile_records!(universal: IdentityRequest,IdentityReply,MasterVolume,MasterFineTuning,MasterCoarseTuning);
 profile_records!(timecode: FullFrame);
 profile_records!(ci: Management);

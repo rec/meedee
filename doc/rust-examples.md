@@ -667,6 +667,21 @@ host delivery metrics. The library retains no payload history or formatted text.
 ## Select a program and bank
 
 ```rust
+use meedee::{GmMode, Output, ProgramChange, gm};
+use std::time::Duration;
+
+println!("{:?}", gm::program(34, None)?);
+println!("{:?}", gm::program(6, Some(4))?);
+println!("{:?}", gm::percussion(36, Some(17))?);
+
+let mut out = Output::new();
+out.send(GmMode::new(gm::Mode::Gm2, 1)?)?;
+out.send(Duration::from_millis(100))?;
+out.send(ProgramChange::new(34)?)?;
+out.close()?;
+```
+
+```rust
 use meedee::{Output, ProgramChange};
 
 let mut out = Output::new();

@@ -17,9 +17,6 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
     modules = {
         "ProgramChange": messages,
         "ZoneConfiguration": mpe,
-        "Gm1On": gm,
-        "GmOff": gm,
-        "Gm2On": gm,
         "IdentityRequest": universal,
         "MasterVolume": universal,
         "MasterFineTuning": universal,
@@ -31,6 +28,10 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
             continue
         fields, wire = line.split("|")
         name, *numbers = fields.split()
+        if name in {"Gm1On", "Gm2On", "GmOff"}:
+            mode = {"Gm1On": "gm1", "Gm2On": "gm2", "GmOff": "off"}[name]
+            yield gm.GmMode(mode, device_id=int(numbers[0])), bytes.fromhex(wire)
+            continue
         constructor = getattr(modules[name], name)
         values: dict[str, object] = dict(
             zip(
@@ -65,12 +66,12 @@ def test_shared_vectors_and_explicit_interpretation_preserve_raw_messages() -> N
             raw = messages.SysEx(data=b[1:-1])
             assert codecs.Decoder().feed(b) == [raw]
             assert v in (gm.decode(raw), universal.decode(raw), timecode.decode(raw))
-            if not isinstance(v, (gm.Gm1On, gm.GmOff, gm.Gm2On)):
+            if not isinstance(v, gm.GmMode):
                 assert controls.ControlInterpreter().feed(v) == []
             for i in range(3, len(raw.data)):
                 truncated = messages.SysEx(data=raw.data[:i])
                 with pytest.raises(ValueError):
-                    if isinstance(v, (gm.Gm1On, gm.GmOff, gm.Gm2On)):
+                    if isinstance(v, gm.GmMode):
                         gm.decode(truncated)
                     elif isinstance(v, timecode.FullFrame):
                         timecode.decode(truncated)
@@ -99,14 +100,18 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
         assert v == v.replace()
         assert hash(v) == hash(v.replace())
         assert not hasattr(v, "__dict__")
-        assert cls.__match_args__ == tuple(f for f in fields if f != "group")
+        assert cls.__match_args__ == (
+            ("mode",)
+            if isinstance(value, gm.GmMode)
+            else tuple(f for f in fields if f != "group")
+        )
         assert repr(v).startswith(cls.__name__ + "(")
         with pytest.raises(TypeError):
             v.replace(unknown=1)
         for f in fields:
             assert inspect.signature(cls).parameters[f].kind == (
                 inspect.Parameter.POSITIONAL_OR_KEYWORD
-                if cls is messages.ProgramChange and f != "group"
+                if cls is gm.GmMode and f == "mode"
                 else inspect.Parameter.KEYWORD_ONLY
             )
             with pytest.raises(AttributeError):
@@ -140,28 +145,30 @@ def test_gm_lookup_tables_are_complete_independent_copies_without_bank_guesses()
     assert len(all_programs) == 128
     assert all_programs[0] == gm.program(program=1)
     assert all_programs[-1].name == "Gunshot"
-    assert not hasattr(all_programs[0], "bank_msb")
+    assert all_programs[0].bank_msb is None and all_programs[0].bank_lsb is None
     assert gm.program(program=65).family == "Reed"
     all_programs.clear()
     assert len(gm.programs()) == 128
     matches = gm.find_programs("  acoustic GRAND piano ")
     assert len(matches) == 2
     assert isinstance(matches[0], gm.Program)
-    assert isinstance(matches[1], gm.BankProgram)
+    assert isinstance(matches[1], gm.Program)
+    assert matches[0].bank_lsb is None
+    assert (matches[1].bank_msb, matches[1].bank_lsb) == (121, 0)
     assert gm.find_programs("piano") == []
-    voices = gm.gm2_programs()
+    voices = gm.programs(version=2)
     assert len({(v.bank_msb, v.bank_lsb, v.program) for v in voices}) == 256
-    phase = gm.gm2_program(bank_lsb=4, program=6)
+    phase = gm.program(bank_lsb=4, program=6)
     assert phase is not None and phase.name == "EP Phase"
-    assert gm.gm2_program(bank_lsb=127, program=1) is None
+    assert gm.program(bank_lsb=127, program=1) is None
     assert len(gm.drum_kits()) == 9
     assert gm.find_drum_kits(" room SET ")[0].program == 9
-    power = gm.gm2_percussion(program=17, note=36)
+    power = gm.percussion(program=17, note=36)
     assert power is not None and power.name == "Power Kick Drum"
-    analog = gm.gm2_percussion(program=26, note=75)
+    analog = gm.percussion(program=26, note=75)
     assert analog is not None and analog.name == "Analog Claves"
-    assert gm.gm2_percussion(program=57, note=27) is None
-    assert gm.gm2_percussion(program=2, note=36) is None
+    assert gm.percussion(program=57, note=27) is None
+    assert gm.percussion(program=2, note=36) is None
     assert len([n for n in range(128) if gm.percussion(note=n) is not None]) == 47
     for entry in [gm.program(program=1), phase, gm.drum_kits()[0], power]:
         with pytest.raises(AttributeError):
@@ -171,6 +178,28 @@ def test_gm_lookup_tables_are_complete_independent_copies_without_bank_guesses()
         gm.program(program=0)
     with pytest.raises(TypeError):
         gm.program(program=True)
+    for version in (0, 3):
+        with pytest.raises(ValueError):
+            gm.programs(version=version)
+    for version in (True, "2"):
+        with pytest.raises(TypeError):
+            gm.programs(version=version)
+    with pytest.raises(ValueError):
+        gm.program(program=1, bank_lsb=128)
+
+
+def test_gm_mode_requires_explicit_valid_mode_and_device() -> None:
+    with pytest.raises(TypeError):
+        gm.GmMode(device_id=1)  # ty: ignore[missing-argument]
+    with pytest.raises(TypeError):
+        gm.GmMode("gm1")  # ty: ignore[missing-argument]
+    with pytest.raises(ValueError):
+        gm.GmMode("unknown", device_id=1)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(ValueError):
+        gm.GmMode("gm1", device_id=128)
+    values = [gm.GmMode(m, device_id=1) for m in ("gm1", "gm2", "off")]
+    assert len(set(values)) == 3
+    assert values[0].replace(mode="gm2") == values[1]
 
 
 def test_identity_reply_keeps_raw_revision_bytes_and_owns_bounded_inputs() -> None:
@@ -230,7 +259,11 @@ def test_named_controls_keep_distinct_units_and_reset_on_explicit_input() -> Non
     combined = interpreter.feed(messages.ControlChange(39, 2, channel=1))[0].value
     assert isinstance(combined, controls.ControlObservation)
     assert combined.value == 130
-    for mode in (gm.Gm1On(device_id=1), gm.Gm2On(device_id=1), gm.GmOff(device_id=1)):
+    for mode in (
+        gm.GmMode("gm1", device_id=1),
+        gm.GmMode("gm2", device_id=1),
+        gm.GmMode("off", device_id=1),
+    ):
         interpreter.feed(messages.ControlChange(channel=1, controller=7, value=1))
         diagnostic = interpreter.feed(mode)[0].value
         assert isinstance(diagnostic, controls.Diagnostic)

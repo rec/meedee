@@ -725,7 +725,7 @@ impl Universe {
         };
         let channel = message.channel().unwrap_or(1);
         let reset = matches!(message, AnyMessage::SystemReset(_))
-            || matches!(message, AnyMessage::SysEx(s) if matches!(crate::gm::decode(s,1024),Ok(Some(crate::gm::GmMessage::Gm1On(_) | crate::gm::GmMessage::Gm2On(_) | crate::gm::GmMessage::GmOff(_)))));
+            || matches!(message, AnyMessage::SysEx(s) if matches!(crate::gm::decode(s,1024),Ok(Some(crate::gm::GmMessage::GmMode(_)))));
         if reset {
             self.snapshot
                 .controllers

@@ -234,9 +234,7 @@ pub(super) fn gm_to_python(
         gm_model::GmMessage::GlobalParameterControl(value) => {
             object(py, GlobalParameterControl { value, max_entries })
         }
-        gm_model::GmMessage::Gm1On(value) => object(py, super::gm::Gm1On { value }),
-        gm_model::GmMessage::Gm2On(value) => object(py, super::gm::Gm2On { value }),
-        gm_model::GmMessage::GmOff(value) => object(py, super::gm::GmOff { value }),
+        gm_model::GmMessage::GmMode(value) => object(py, super::gm::GmMode { value }),
     }
 }
 #[pyfunction]

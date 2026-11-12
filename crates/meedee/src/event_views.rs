@@ -179,12 +179,9 @@ fn midi1(event: &Payload, group: Option<u8>) -> io::Result<Option<Cow<'_, AnyMes
 fn resets(message: &AnyMessage) -> bool {
     match message {
         AnyMessage::SystemReset(_) => true,
-        AnyMessage::SysEx(message) => matches!(
-            gm::decode(message, 1024),
-            Ok(Some(
-                GmMessage::Gm1On(_) | GmMessage::Gm2On(_) | GmMessage::GmOff(_)
-            ))
-        ),
+        AnyMessage::SysEx(message) => {
+            matches!(gm::decode(message, 1024), Ok(Some(GmMessage::GmMode(_))))
+        }
         _ => false,
     }
 }

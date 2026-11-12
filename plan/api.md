@@ -591,16 +591,18 @@ and banks without adding an automatic selection operation here.
 Pure public modules are `meedee.gm`, `meedee.universal`, `meedee.mpe` and
 `meedee.timecode`; named controllers and RPN/channel-mode helpers remain in
 `meedee.controls`. Imports initialize no MIDI workers. Native message/command
-classes inherit Message and retain frozen fields, strict keyword constructors,
+classes inherit Message and retain frozen fields, strict constructors,
 checked replacement, equality/hash, annotations and pattern matching. Lookup
 entries are frozen, non-constructible records; list results are caller-owned
-copies. There are no package-root re-exports or compatibility aliases.
+copies. Common classes are also exported at the package root; there are no
+compatibility aliases.
 
 GM lookup has a single Rust table source. `program(program=...)` and `programs()`
-return the 128 GM1 Program entries (program/name/family). GM1 defines no bank
-address, so these entries expose no bank fields. `gm2_program(bank_lsb=...,
-program=...)` and `gm2_programs()` return BankProgram entries for the 256
-standard melodic sounds, with bank_msb=121 and their specified LSB. Programs
+return the 128 GM1 Program entries (program/name/family), with absent bank fields.
+`program(bank_lsb=..., program=...)` and `programs(version=2)` return the same
+Program type for the 256 standard GM2 melodic sounds, with bank_msb=121 and
+their specified LSB. Rust uses `program(number, bank_lsb)`, `programs(version)`
+and `percussion(note, kit_program)` with explicit optional arguments. Programs
 are 1–128 and bank bytes are 0–127; no general shift is applied to other IDs.
 Families use the GM1 instrument-group labels. Invalid numeric ranges raise
 ValueError; structurally valid but undefined GM2 addresses return None.
@@ -611,7 +613,7 @@ ASCII case; standard display names are preserved. It does not normalize internal
 spacing or add nickname/fuzzy aliases. `drum_kits()` and `find_drum_kits(name)`
 expose the nine GM2 kits in bank 120/0, with one-based program numbers.
 `percussion(note=...)` returns GM1 note/name entries at 35–81;
-`gm2_percussion(program=..., note=...)` returns the specified kit's entry or None
+`percussion(program=..., note=...)` returns the specified GM2 kit's entry or None
 for a silent/undefined position or unknown kit. GM2 standard-set inheritance is
 resolved from the Rust table; None does not emulate a sound generator's fallback.
 Pan positions/exclusion-group synthesis rules are not implemented by these name
@@ -624,9 +626,10 @@ caller or copied from a GM2 entry. It expands into CC0, CC32, ProgramChange in
 that order. It never chooses a GM mode or inherits an unobserved bank. GM1
 callers can send the existing ProgramChange primitive or deliberately specify
 both bank bytes; the library supplies no invented GM1 bank. Mode controls are
-separate Gm1On/GmOff/Gm2On primitive SysEx classes with explicit device_id.
+represented by `GmMode("gm1" | "gm2" | "off", device_id=...)`, with both the
+mode and device ID explicit. Rust uses `GmMode::new(gm::Mode, device_id)`.
 Mode changes can mute notes and reset programs/controllers/tuning. GM2 specifies
-completion within 100 ms after Gm2On; `GM2_ON_SETTLING_NS=100_000_000` records
+completion within 100 ms after GM2-on; `GM2_ON_SETTLING_NS=100_000_000` records
 that standard interval, not a runtime device-health guarantee. GM1's developer
 guidelines discuss varying initialization times rather than a universal safe
 constant. Callers schedule settling themselves; no codec/command inserts sleeps
@@ -704,8 +707,8 @@ forms. Known malformed lengths/fields raise ValueError. The byte decoder keeps
 raw SysEx and does not promote it. Callers retain raw bytes for unknown messages
 or byte-for-byte evidence. Typed GM mode messages explicitly fed to the control
 interpreter clear all cached channels with StateReset diagnostics, including
-GmOff as a conservative context boundary; raw SysEx is ignored. Rust accepts
-GmMessage mode variants or the individual mode types as interpreter input. A caller selects
+GM-off as a conservative context boundary; raw SysEx is ignored. Rust accepts
+GmMessage::GmMode or GmMode as interpreter input. A caller selects
 which addressed mode changes are relevant to that source, or calls reset after
 known mode changes/loss; sending a value does not implicitly feed an interpreter.
 

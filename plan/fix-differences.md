@@ -67,8 +67,8 @@ code, tests and examples; do not retain the superseded public decoder as an alia
 | R10 | `events::PlaybackCause` | Python playback exceptions and their causes. Preserve typed Rust causes; verify failure reason, confirmed progress, cancellation and metrics, rather than matching exception text. |
 | R11 | `events::StreamDiagnosticKind` | Python StreamDiagnostic.kind strings. Keep the enum/string adaptation; document and verify the exact case-to-string mapping. |
 | R12 | `gm::ExtendedMessage` | Python extended GM classes. Replace as a public split result family under D1. |
-| R13 | `gm::ModeMessage` | Python Gm1On/Gm2On/GmOff. Replace as a public split result family under D1. |
-| R14 | `gm::ProgramMatch` | Python Program or BankProgram. Keep the enum; verify search results, order and bank/program numbering. |
+| R13 | `gm::GmMode` | Unified in both languages with an explicit mode and device ID. |
+| R14 | `gm::Program` | Unified catalogue result with optional banks in both languages; search keeps GM1 followed by GM2 ordering. |
 | R15 | `inspection::Format` | Python format strings. Keep the enum/string adaptation; verify accepted formats and explicit-format behavior. |
 | R16 | `messages::AnyCommand` | Python compound Message subclasses. Keep the enum; verify expansion order, channel resolution, provenance and partial-send reporting. |
 | R17 | `messages::AnyMessage` | Python primitive Message subclasses. Keep the enum; verify constructors, defaults, version selection and encoding validation. |

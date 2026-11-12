@@ -431,6 +431,17 @@ history. Metrics use host delivery times, independently of source timestamps.
 ```python
 import meedee as md
 
+print(md.gm.program(program=34))
+print(md.gm.program(program=6, bank_lsb=4))
+print(md.gm.percussion(note=36, program=17))
+
+with md.Output() as out:
+    out.send(md.GmMode("gm2", device_id=1), "100 ms", md.ProgramChange(34))
+```
+
+```python
+import meedee as md
+
 with md.Output() as out:
     out.send(md.ProgramChange(34))
     out.send(md.ProgramChange(34, bank_msb=0, bank_lsb=8))
