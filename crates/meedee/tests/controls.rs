@@ -259,7 +259,7 @@ fn repeated_selectors_preserve_data_and_its_source_range() {
 }
 
 #[test]
-fn family_switches_retain_complete_and_partial_selectors_but_not_data() {
+fn family_switches_retain_complete_and_partial_selectors() {
     for (family, msb, lsb, other_msb, other_lsb) in [
         (ParameterFamily::Nrpn, 99, 98, 101, 100),
         (ParameterFamily::Rpn, 101, 100, 99, 98),
@@ -298,6 +298,54 @@ fn family_switches_retain_complete_and_partial_selectors_but_not_data() {
 }
 
 #[test]
+fn each_family_retains_data_only_for_its_current_parameter() {
+    for (msb, lsb, other_msb, other_lsb) in [(99, 98, 101, 100), (101, 100, 99, 98)] {
+        let mut interpreter = ControlInterpreter::new(None).unwrap();
+        for (controller, value) in [
+            (msb, 1),
+            (lsb, 2),
+            (6, 10),
+            (other_msb, 3),
+            (other_lsb, 4),
+            (6, 20),
+        ] {
+            cc(&mut interpreter, 1, controller, value);
+        }
+        cc(&mut interpreter, 1, lsb, 2);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 3)[0], Observation::Parameter(v) if v.parameter == 130 && v.value == 1283 && v.resolution == 14 && v.first_index == 0)
+        );
+        cc(&mut interpreter, 1, 96, 0);
+        cc(&mut interpreter, 1, other_lsb, 4);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 5)[0], Observation::Parameter(v) if v.parameter == 388 && v.value == 2565)
+        );
+        cc(&mut interpreter, 1, lsb, 2);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 6)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+        cc(&mut interpreter, 1, 6, 30);
+        cc(&mut interpreter, 1, other_msb, 5);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 6)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+        cc(&mut interpreter, 1, 6, 40);
+        cc(&mut interpreter, 1, msb, 1);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 7)[0], Observation::Parameter(v) if v.parameter == 130 && v.value == 3847)
+        );
+        interpreter.reset();
+        for (selector_msb, selector_lsb) in [(msb, lsb), (other_msb, other_lsb)] {
+            cc(&mut interpreter, 1, selector_msb, 1);
+            cc(&mut interpreter, 1, selector_lsb, 2);
+            assert!(
+                matches!(&cc(&mut interpreter, 1, 38, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+            );
+        }
+    }
+}
+
+#[test]
 fn relative_updates_are_direction_only_and_invalidate_absolute_context() {
     let mut interpreter = ControlInterpreter::new(None).unwrap();
     cc(&mut interpreter, 1, 101, 0);
@@ -329,7 +377,7 @@ fn rpn_null_deselects_both_families_without_reserving_nrpn_16383() {
     );
     cc(&mut interpreter, 1, 98, 127);
     assert!(
-        matches!(&cc(&mut interpreter, 1, 38, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        matches!(&cc(&mut interpreter, 1, 38, 1)[0], Observation::Parameter(v) if v.parameter == 16383 && v.value == 16257)
     );
     assert!(
         matches!(&cc(&mut interpreter, 1, 6, 2)[0], Observation::Parameter(v) if v.family == ParameterFamily::Nrpn && v.parameter == 16383)

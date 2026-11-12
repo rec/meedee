@@ -107,6 +107,65 @@ fn inactive_parameter_selectors_retain_their_contributor_times() {
     );
     assert_eq!(result[0].first_timestamp.as_ref().unwrap().ticks, 0);
     assert_eq!(result[0].last_timestamp.as_ref().unwrap().ticks, 50);
+    for (index, (controller, value)) in [(101, 0), (100, 0), (99, 1), (98, 3), (38, 3)]
+        .into_iter()
+        .enumerate()
+    {
+        result = interpreter
+            .feed(&event(
+                AnyMessage::ControlChange(
+                    ControlChange::new(controller, value)
+                        .unwrap()
+                        .with_channel(1)
+                        .unwrap(),
+                ),
+                (index as i64 + 6) * 10,
+            ))
+            .unwrap();
+    }
+    assert!(
+        matches!(&result[0].value, Value::Control(Observation::Parameter(v)) if v.value == 3843)
+    );
+    assert_eq!(
+        (result[0].first_index, result[0].last_index),
+        (Some(5), Some(10))
+    );
+    assert_eq!(result[0].first_timestamp.as_ref().unwrap().ticks, 50);
+    interpreter
+        .feed_diagnostic(&Diagnostic {
+            stream: "s".into(),
+            packet: 1,
+            kind: DiagnosticKind::Loss,
+            lost: 1,
+            reason: "known loss".into(),
+        })
+        .unwrap();
+    for (controller, value) in [(99, 1), (98, 3), (101, 0), (100, 0)] {
+        interpreter
+            .feed(&event(
+                AnyMessage::ControlChange(
+                    ControlChange::new(controller, value)
+                        .unwrap()
+                        .with_channel(1)
+                        .unwrap(),
+                ),
+                110,
+            ))
+            .unwrap();
+        if controller == 98 || controller == 100 {
+            let missing = interpreter
+                .feed(&event(
+                    AnyMessage::ControlChange(
+                        ControlChange::new(38, 3).unwrap().with_channel(1).unwrap(),
+                    ),
+                    120,
+                ))
+                .unwrap();
+            assert!(
+                matches!(&missing[0].value, Value::Control(Observation::Diagnostic(d)) if d.kind == meedee::controls::DiagnosticKind::MissingCoarse)
+            );
+        }
+    }
 }
 
 #[test]

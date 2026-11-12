@@ -390,7 +390,7 @@ def test_repeated_selectors_preserve_data_and_its_source_range(
         (controls.ParameterFamily.Rpn, 101, 100, 99, 98),
     ),
 )
-def test_family_switches_retain_complete_and_partial_selectors_but_not_data(
+def test_family_switches_retain_complete_and_partial_selectors(
     family: controls.ParameterFamily, msb: int, lsb: int, other_msb: int, other_lsb: int
 ) -> None:
     interpreter = controls.ControlInterpreter()
@@ -427,6 +427,65 @@ def test_family_switches_retain_complete_and_partial_selectors_but_not_data(
         partial = cc(6, 60)
         assert isinstance(partial, controls.Diagnostic)
         assert partial.kind == controls.DiagnosticKind.IncompleteSelection
+
+
+@pytest.mark.parametrize(
+    ("msb", "lsb", "other_msb", "other_lsb"), ((99, 98, 101, 100), (101, 100, 99, 98))
+)
+def test_each_family_retains_data_only_for_its_current_parameter(
+    msb: int, lsb: int, other_msb: int, other_lsb: int
+) -> None:
+    interpreter = controls.ControlInterpreter()
+
+    def cc(controller: int, value: int) -> object:
+        result = interpreter.feed(messages.ControlChange(controller, value, channel=1))
+        return result[-1].value if result else None
+
+    for controller, value in (
+        (msb, 1),
+        (lsb, 2),
+        (6, 10),
+        (other_msb, 3),
+        (other_lsb, 4),
+        (6, 20),
+    ):
+        cc(controller, value)
+    cc(lsb, 2)
+    restored = cc(38, 3)
+    assert isinstance(restored, controls.ParameterObservation)
+    assert (
+        restored.parameter,
+        restored.value,
+        restored.resolution,
+        restored.first_index,
+    ) == (130, 1283, 14, 0)
+    cc(96, 0)
+    cc(other_lsb, 4)
+    other = cc(38, 5)
+    assert isinstance(other, controls.ParameterObservation)
+    assert (other.parameter, other.value) == (388, 2565)
+    assert other.family != restored.family
+    cc(lsb, 2)
+    missing = cc(38, 6)
+    assert isinstance(missing, controls.Diagnostic)
+    assert missing.kind == controls.DiagnosticKind.MissingCoarse
+    cc(6, 30)
+    cc(other_msb, 5)
+    missing = cc(38, 6)
+    assert isinstance(missing, controls.Diagnostic)
+    assert missing.kind == controls.DiagnosticKind.MissingCoarse
+    cc(6, 40)
+    cc(msb, 1)
+    restored = cc(38, 7)
+    assert isinstance(restored, controls.ParameterObservation)
+    assert (restored.parameter, restored.value) == (130, 3847)
+    interpreter.reset()
+    for selector_msb, selector_lsb in ((msb, lsb), (other_msb, other_lsb)):
+        cc(selector_msb, 1)
+        cc(selector_lsb, 2)
+        missing = cc(38, 1)
+        assert isinstance(missing, controls.Diagnostic)
+        assert missing.kind == controls.DiagnosticKind.MissingCoarse
 
 
 def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() -> None:
@@ -486,9 +545,9 @@ def test_rpn_null_deselects_nrpn_without_reserving_its_maximum_identifier() -> N
     )
 
     interpreter.feed(messages.ControlChange(98, 127, channel=1))
-    missing = interpreter.feed(messages.ControlChange(38, 1, channel=1))[0].value
-    assert isinstance(missing, controls.Diagnostic)
-    assert missing.kind == controls.DiagnosticKind.MissingCoarse
+    retained = interpreter.feed(messages.ControlChange(38, 1, channel=1))[0].value
+    assert isinstance(retained, controls.ParameterObservation)
+    assert (retained.parameter, retained.value) == (16383, 16257)
     restored = interpreter.feed(messages.ControlChange(6, 2, channel=1))[0].value
     assert isinstance(restored, controls.ParameterObservation)
     assert (restored.family, restored.parameter) == (

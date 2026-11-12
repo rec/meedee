@@ -460,9 +460,11 @@ observed. It also accepts plain messages without source or timing metadata.
 For example, CC 99=1 and CC 98=2 select NRPN 130. A later CC 98=3
 selects NRPN 131 using the retained MSB and clears cached Data Entry, so send
 a fresh CC 6 before CC 38. Repeating selectors for the same complete selection
-preserves cached Data Entry. RPN and NRPN retain separate selector halves across
-switches; each family needs both halves initially. Switching families clears Data
-Entry. RPN-null disables updates until a later selector activates a family.
+preserves cached Data Entry. RPN and NRPN retain separate selector halves and
+coarse Data Entry across switches; each family needs both selector halves initially.
+Changing or stepping a family's parameter clears only its Data Entry cache.
+RPN-null disables updates until a later selector activates a family, preserving
+the NRPN cache.
 
 ```python
 import meedee as md

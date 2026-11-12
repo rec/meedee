@@ -338,22 +338,24 @@ the new absolute value is unknown. Observation ranges include selector context
 for parameters and the contributing coarse/fine inputs for generic controls.
 
 Selector halves may arrive in either order. Editing one half retains the other
-half within the same family. Selector messages retain cached Data Entry only
-when the complete family and parameter selection is unchanged. Changing,
-incomplete or released selections clear it. Fine observation ranges include
+half within the same family. Each family caches coarse Data Entry for its current
+parameter. Switching families preserves both caches; changing a selector's value
+clears only that family's cache. Increment/decrement also clears only the active
+family's cache. No values are remembered for older selections. Fine observation ranges include
 the retained coarse message even when both selectors were repeated later.
 Each channel retains independent RPN and NRPN selector pairs, including partial
 pairs. A selector message activates its family and updates only that family's
 corresponding half. Switching families emits SelectionInvalidated for the prior
-active selection and clears Data Entry, but preserves both families' selectors.
+active selection, but preserves both families' selectors and Data Entry caches.
 Both halves must be known for the active family. Data received while selection is
 missing/partial yields MissingSelection/IncompleteSelection; a fine value without
 coarse data yields MissingCoarse. A normal first selector simply waits for its
 partner; the incomplete diagnostic is emitted if parameter data arrives too soon.
-RPN-null disables the active selection and clears Data Entry without erasing
-selector history or activating the other family. A later selector message can
-reactivate a family using its retained halves. Reset/loss clears both families'
-selector history. Observation ranges retain inactive selectors' provenance.
+RPN-null disables the active selection and invalidates RPN Data Entry without
+erasing selector history, clearing NRPN Data Entry or activating the other family.
+A later selector message can reactivate a family using its retained halves and
+coarse data. Reset/loss clears both families' selector and Data Entry history.
+Observation ranges retain inactive selectors' and coarse data's provenance.
 
 `reset()` clears source binding, clock and interpretation state, returning nothing.
 Clock changes emit a StateReset diagnostic on an enclosing observation carrying

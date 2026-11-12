@@ -117,6 +117,35 @@ def test_inactive_parameter_selectors_retain_their_contributor_times() -> None:
         and observation.last_timestamp.ticks == 50
     )
 
+    for index, (controller, value) in enumerate(
+        ((101, 0), (100, 0), (99, 1), (98, 3)), start=6
+    ):
+        interpreter.feed(
+            event(messages.ControlChange(controller, value, channel=1), index * 10)
+        )
+    observation = interpreter.feed(
+        event(messages.ControlChange(38, 3, channel=1), 100)
+    )[0]
+    assert isinstance(observation.value, controls.ParameterObservation)
+    assert observation.value.value == 3843
+    assert (observation.first_index, observation.last_index) == (5, 10)
+    assert (
+        observation.first_timestamp is not None
+        and observation.first_timestamp.ticks == 50
+    )
+    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    interpreter.feed(decoder.loss(lost=1, reason="known loss"))
+    for controller, value in ((99, 1), (98, 3), (101, 0), (100, 0)):
+        interpreter.feed(
+            event(messages.ControlChange(controller, value, channel=1), 110)
+        )
+        if controller in (98, 100):
+            missing = interpreter.feed(
+                event(messages.ControlChange(38, 3, channel=1), 120)
+            )[0].value
+            assert isinstance(missing, controls.Diagnostic)
+            assert missing.kind == controls.DiagnosticKind.MissingCoarse
+
 
 def test_control_and_velocity_views_keep_contributor_times_after_long_gaps() -> None:
     view = controls.ControlInterpreter()

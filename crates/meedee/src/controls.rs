@@ -141,7 +141,7 @@ impl ControlState {
                     .iter()
                     .copied()
                     .chain(c.selectors.into_iter().flatten())
-                    .chain([c.data])
+                    .chain(c.data)
             })
             .flatten()
             .map(|v| v.index)
@@ -175,7 +175,7 @@ struct Channel {
     family: Option<ParameterFamily>,
     // Indexed by ParameterFamily, then MSB/LSB.
     selectors: [[Option<IndexedByte>; 2]; 2],
-    data: Option<IndexedByte>,
+    data: [Option<IndexedByte>; 2],
 }
 
 impl Channel {
@@ -188,7 +188,6 @@ impl Channel {
         let byte = IndexedByte { value, index };
         match controller {
             98..=101 => {
-                let previous = self.selected();
                 let family = if controller >= 100 {
                     ParameterFamily::Rpn
                 } else {
@@ -211,12 +210,13 @@ impl Channel {
                 } else {
                     1
                 };
-                self.selectors[family as usize][half] = Some(byte);
+                let selector = &mut self.selectors[family as usize][half];
+                if selector.map(|b| b.value) != Some(value) {
+                    self.data[family as usize] = None;
+                }
+                *selector = Some(byte);
                 if self.selected() == Some((ParameterFamily::Rpn, 16383)) {
                     self.family = None;
-                }
-                if previous.is_none() || self.selected() != previous {
-                    self.data = None;
                 }
                 result
             }
@@ -239,7 +239,7 @@ impl Channel {
                 if controller == 96 || controller == 97 {
                     // Relative changes can cross a coarse boundary. A later LSB
                     // must not combine with the stale pre-step coarse value.
-                    self.data = None;
+                    self.data[family as usize] = None;
                     return vec![Observation::Step(ParameterStep {
                         channel,
                         family,
@@ -254,9 +254,9 @@ impl Channel {
                     })];
                 }
                 let (value, resolution, first_index) = if controller == 6 {
-                    self.data = Some(byte);
+                    self.data[family as usize] = Some(byte);
                     (u16::from(value), 7, first_index)
-                } else if let Some(coarse) = self.data {
+                } else if let Some(coarse) = self.data[family as usize] {
                     (
                         (u16::from(coarse.value) << 7) | u16::from(value),
                         14,
