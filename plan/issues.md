@@ -101,7 +101,7 @@ oversized sends, discovery lists and
 allocation/process aborts remain resource risks. Rust/native allocation failures
 are not universally recoverable Python exceptions.
 The optional control interpreter tracks 16 channels of one source and caches
-observed coarse parameter data and provenance without eviction. Cache memory and
+observed coarse/fine parameter data and provenance without eviction. Cache memory and
 per-message bookkeeping grow with observed channel/family/parameter combinations,
 up to the finite MIDI 1 parameter space. Many application-created interpreters and
 retained observation lists also cost memory. Built-in commands expand to at most six messages, but their native

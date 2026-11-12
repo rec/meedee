@@ -135,6 +135,8 @@ def test_inactive_parameter_selectors_retain_their_contributor_times() -> None:
     )
     decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
     interpreter.feed(decoder.loss(lost=1, reason="known loss"))
+    assert interpreter.parameter_state(1, controls.ParameterFamily.Nrpn, 131) is None
+    assert interpreter.parameter_state(1, controls.ParameterFamily.Nrpn, 132) is None
     for controller, value in ((99, 1), (98, 3), (101, 0), (100, 0)):
         interpreter.feed(
             event(messages.ControlChange(controller, value, channel=1), 110)

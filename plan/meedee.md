@@ -687,8 +687,9 @@ and wire evidence before stateful interpretation or live writes.
    Seven frozen commands expand into primitive CCs; send serializes all
    steps including RPN-null release and reports known/unknown progress without
    retries. The optional pure interpreter tracks 16 channels per source, retains
-   selector halves for each family and caches observed coarse Data Entry per
-   channel/family/parameter. It returns indexed immutable observations and explicit
+   selector halves for each family and caches observed coarse/fine Data Entry per
+   channel/family/parameter. The parameter_state lookup exposes optional components.
+   It returns indexed immutable observations and explicit
    reset/loss diagnostics. Generic CC pairing follows wire order;
    relative parameter steps do not invent absolute values. The API contract
    records the approved Rust Message/PrimitiveMessage/Command trait split.

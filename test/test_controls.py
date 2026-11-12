@@ -513,6 +513,104 @@ def test_parameter_caches_are_independent_across_selections_and_families(
         assert missing.kind == controls.DiagnosticKind.MissingCoarse
 
 
+@pytest.mark.parametrize(
+    ("family", "msb", "lsb", "other_family", "other_msb", "other_lsb"),
+    (
+        (controls.ParameterFamily.Nrpn, 99, 98, controls.ParameterFamily.Rpn, 101, 100),
+        (controls.ParameterFamily.Rpn, 101, 100, controls.ParameterFamily.Nrpn, 99, 98),
+    ),
+)
+def test_parameter_state_preserves_partial_knowledge_and_returns_frozen_snapshots(
+    family: controls.ParameterFamily,
+    msb: int,
+    lsb: int,
+    other_family: controls.ParameterFamily,
+    other_msb: int,
+    other_lsb: int,
+) -> None:
+    interpreter = controls.ControlInterpreter()
+
+    def cc(controller: int, value: int) -> object:
+        result = interpreter.feed(messages.ControlChange(controller, value, channel=1))
+        return result[-1].value if result else None
+
+    assert interpreter.parameter_state(1, family, 0) is None
+    cc(msb, 0)
+    cc(lsb, 0)
+    missing = cc(38, 7)
+    assert isinstance(missing, controls.Diagnostic)
+    assert missing.kind == controls.DiagnosticKind.MissingCoarse
+    fine_only = interpreter.parameter_state(1, family, 0)
+    assert fine_only is not None and (fine_only.coarse, fine_only.fine) == (None, 7)
+    coarse = cc(6, 10)
+    assert isinstance(coarse, controls.ParameterObservation)
+    assert (coarse.resolution, coarse.last_index) == (7, 3)
+    coarse_only = interpreter.parameter_state(1, family, 0)
+    assert coarse_only is not None and (coarse_only.coarse, coarse_only.fine) == (
+        10,
+        None,
+    )
+    assert (fine_only.coarse, fine_only.fine) == (None, 7)
+    cc(38, 5)
+    complete = interpreter.parameter_state(1, family, 0)
+    assert complete is not None and (complete.coarse, complete.fine) == (10, 5)
+    with pytest.raises(AttributeError):
+        complete.fine = 6  # ty: ignore[invalid-assignment]
+    cc(6, 10)
+    refreshed = interpreter.parameter_state(1, family, 0)
+    assert refreshed is not None and (refreshed.coarse, refreshed.fine) == (10, None)
+    assert complete.fine == 5
+    cc(38, 5)
+    cc(lsb, 1)
+    cc(38, 9)
+    sibling = interpreter.parameter_state(1, family, 1)
+    assert sibling is not None and (sibling.coarse, sibling.fine) == (None, 9)
+    for controller, value in (
+        (other_msb, 0),
+        (other_lsb, 0),
+        (6, 20),
+        (38, 6),
+        (101, 127),
+        (100, 127),
+    ):
+        cc(controller, value)
+    assert interpreter.parameter_state(1, family, 0) == complete
+    other = interpreter.parameter_state(1, other_family, 0)
+    assert other is not None and (other.coarse, other.fine) == (20, 6)
+    assert interpreter.parameter_state(1, controls.ParameterFamily.Rpn, 16383) is None
+    assert interpreter.parameter_state(2, family, 0) is None
+    cc(msb, 0)
+    cc(lsb, 0)
+    cc(96, 0)
+    assert interpreter.parameter_state(1, family, 0) is None
+    assert interpreter.parameter_state(1, family, 1) == sibling
+    assert interpreter.parameter_state(1, other_family, 0) == other
+    cc(121, 0)
+    assert interpreter.parameter_state(1, family, 1) is None
+    assert interpreter.parameter_state(1, other_family, 0) is None
+    cc(msb, 0)
+    cc(lsb, 0)
+    cc(38, 3)
+    interpreter.reset()
+    assert interpreter.parameter_state(1, family, 0) is None
+
+
+def test_parameter_state_lookup_validates_ranges() -> None:
+    interpreter = controls.ControlInterpreter()
+    family = controls.ParameterFamily.Nrpn
+    for channel, parameter in ((0, 0), (17, 0), (-1, 0), (1, -1), (1, 16384)):
+        with pytest.raises(ValueError):
+            interpreter.parameter_state(channel, family, parameter)
+    for value in (True, 1.0, "1"):
+        with pytest.raises(TypeError):
+            interpreter.parameter_state(value, family, 0)  # ty: ignore[invalid-argument-type]
+        with pytest.raises(TypeError):
+            interpreter.parameter_state(1, family, value)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(TypeError):
+        interpreter.parameter_state(1, "nrpn", 0)  # ty: ignore[invalid-argument-type]
+    assert interpreter.parameter_state(16, family, 16383) is None
+
+
 def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() -> None:
     interpreter = controls.ControlInterpreter()
     for controller, value in ((101, 0), (100, 1), (6, 2)):

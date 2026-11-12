@@ -619,9 +619,14 @@ alongside your retained raw stream. It never fabricates a missing fine value or
 an absolute value from a relative step. A new coarse CC forgets old fine state;
 repeated fine updates can use that known coarse value. RPN/NRPN selector edits
 retain the other half within the same family. Each channel caches observed coarse
-Data Entry separately for every RPN and NRPN parameter. Selection changes and
-RPN-null preserve cached values; stepping a parameter invalidates only its cached
-coarse value. The sparse cache grows with observed parameters and clears on reset/loss.
+and fine Data Entry separately for every RPN and NRPN parameter. Missing components
+remain unknown; a new coarse component clears the previous fine component.
+`interpreter.parameter_state(channel, family, parameter)` returns a frozen
+`ParameterState` snapshot with optional `coarse` and `fine`, or `None` for no cached
+data. A fine-only input is cached while still reporting `MissingCoarse`.
+Selection changes and RPN-null preserve cached values; stepping a parameter
+invalidates only its cached components. The sparse cache grows with observed
+parameters and clears on reset/loss.
 Both selector halves
 must be known before interpreting data for that family. RPN-null disables updates
 without erasing selector history or activating the other family. Bank Select and Data

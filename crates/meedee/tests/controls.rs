@@ -369,6 +369,147 @@ fn parameter_caches_are_independent_across_selections_and_families() {
 }
 
 #[test]
+fn parameter_state_preserves_partial_knowledge_and_returns_snapshots() {
+    use meedee::controls::ParameterState;
+    for (family, msb, lsb, other_family, other_msb, other_lsb) in [
+        (
+            ParameterFamily::Nrpn,
+            99,
+            98,
+            ParameterFamily::Rpn,
+            101,
+            100,
+        ),
+        (
+            ParameterFamily::Rpn,
+            101,
+            100,
+            ParameterFamily::Nrpn,
+            99,
+            98,
+        ),
+    ] {
+        let mut interpreter = ControlInterpreter::new(None).unwrap();
+        assert_eq!(interpreter.parameter_state(1, family, 0).unwrap(), None);
+        cc(&mut interpreter, 1, msb, 0);
+        cc(&mut interpreter, 1, lsb, 0);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 7)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+        let fine_only = interpreter.parameter_state(1, family, 0).unwrap();
+        assert_eq!(
+            fine_only,
+            Some(ParameterState {
+                coarse: None,
+                fine: Some(7)
+            })
+        );
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 6, 10)[0], Observation::Parameter(v) if v.resolution == 7 && v.last_index == 3)
+        );
+        assert_eq!(
+            interpreter.parameter_state(1, family, 0).unwrap(),
+            Some(ParameterState {
+                coarse: Some(10),
+                fine: None
+            })
+        );
+        assert_eq!(fine_only.unwrap().fine, Some(7));
+        cc(&mut interpreter, 1, 38, 5);
+        let complete = interpreter.parameter_state(1, family, 0).unwrap();
+        assert_eq!(
+            complete,
+            Some(ParameterState {
+                coarse: Some(10),
+                fine: Some(5)
+            })
+        );
+        cc(&mut interpreter, 1, 6, 10);
+        assert_eq!(
+            interpreter.parameter_state(1, family, 0).unwrap(),
+            Some(ParameterState {
+                coarse: Some(10),
+                fine: None
+            })
+        );
+        assert_eq!(complete.unwrap().fine, Some(5));
+        cc(&mut interpreter, 1, 38, 5);
+        cc(&mut interpreter, 1, lsb, 1);
+        cc(&mut interpreter, 1, 38, 9);
+        let sibling = interpreter.parameter_state(1, family, 1).unwrap();
+        assert_eq!(
+            sibling,
+            Some(ParameterState {
+                coarse: None,
+                fine: Some(9)
+            })
+        );
+        for (controller, value) in [
+            (other_msb, 0),
+            (other_lsb, 0),
+            (6, 20),
+            (38, 6),
+            (101, 127),
+            (100, 127),
+        ] {
+            cc(&mut interpreter, 1, controller, value);
+        }
+        assert_eq!(interpreter.parameter_state(1, family, 0).unwrap(), complete);
+        let other = interpreter.parameter_state(1, other_family, 0).unwrap();
+        assert_eq!(
+            other,
+            Some(ParameterState {
+                coarse: Some(20),
+                fine: Some(6)
+            })
+        );
+        assert_eq!(
+            interpreter
+                .parameter_state(1, ParameterFamily::Rpn, 16383)
+                .unwrap(),
+            None
+        );
+        assert_eq!(interpreter.parameter_state(2, family, 0).unwrap(), None);
+        cc(&mut interpreter, 1, msb, 0);
+        cc(&mut interpreter, 1, lsb, 0);
+        cc(&mut interpreter, 1, 96, 0);
+        assert_eq!(interpreter.parameter_state(1, family, 0).unwrap(), None);
+        assert_eq!(interpreter.parameter_state(1, family, 1).unwrap(), sibling);
+        assert_eq!(
+            interpreter.parameter_state(1, other_family, 0).unwrap(),
+            other
+        );
+        cc(&mut interpreter, 1, 121, 0);
+        assert_eq!(interpreter.parameter_state(1, family, 1).unwrap(), None);
+        assert_eq!(
+            interpreter.parameter_state(1, other_family, 0).unwrap(),
+            None
+        );
+        cc(&mut interpreter, 1, msb, 0);
+        cc(&mut interpreter, 1, lsb, 0);
+        cc(&mut interpreter, 1, 38, 3);
+        interpreter.reset();
+        assert_eq!(interpreter.parameter_state(1, family, 0).unwrap(), None);
+    }
+}
+
+#[test]
+fn parameter_state_lookup_validates_ranges() {
+    let interpreter = ControlInterpreter::new(None).unwrap();
+    for (channel, parameter) in [(0, 0), (17, 0), (1, 16384)] {
+        assert!(interpreter
+            .parameter_state(channel, ParameterFamily::Nrpn, parameter)
+            .is_err());
+    }
+    assert_eq!(
+        interpreter
+            .parameter_state(16, ParameterFamily::Nrpn, 16383)
+            .unwrap(),
+        None
+    );
+}
+
+#[test]
 fn relative_updates_are_direction_only_and_invalidate_absolute_context() {
     let mut interpreter = ControlInterpreter::new(None).unwrap();
     cc(&mut interpreter, 1, 101, 0);

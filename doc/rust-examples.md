@@ -667,13 +667,43 @@ words and raises an exception on failure.
 The same interpreter accepts plain `events::Payload` messages and messages with
 source/timing metadata. Keep one instance per source.
 For example, CC 99=1 and CC 98=2 select NRPN 130. A later CC 98=3
-selects NRPN 131 using the retained MSB. Each channel caches coarse Data Entry
+selects NRPN 131 using the retained MSB. Each channel caches both Data Entry components
 separately for each RPN/NRPN parameter, so returning to NRPN 130 permits a CC 38
 update using its earlier observed CC 6. An unobserved coarse value still produces
 MissingCoarse. Each family needs both selector halves initially. Stepping a
-parameter invalidates only its cached coarse value. RPN-null disables updates
+parameter invalidates only its cached components. RPN-null disables updates
 until a later selector activates a family, preserving cached values. Reset/loss
 clears the applicable cache; the sparse cache otherwise grows with observed parameters.
+
+Inspect the cache without changing the selection or consuming an input:
+
+```rust
+use meedee::controls::{ControlInterpreter, ParameterFamily, ParameterState};
+use meedee::events::Payload;
+use meedee::messages::{AnyMessage, ControlChange};
+
+let mut view = ControlInterpreter::new(None)?;
+for (controller, value) in [(99, 1), (98, 2), (38, 5)] {
+    view.feed(&Payload::Midi1(AnyMessage::ControlChange(
+        ControlChange::new(controller, value)?.with_channel(1)?,
+    )))?;
+}
+assert_eq!(view.parameter_state(1, ParameterFamily::Nrpn, 130)?,
+    Some(ParameterState { coarse: None, fine: Some(5) }));
+view.feed(&Payload::Midi1(AnyMessage::ControlChange(
+    ControlChange::new(6, 10)?.with_channel(1)?,
+)))?;
+assert_eq!(view.parameter_state(1, ParameterFamily::Nrpn, 130)?,
+    Some(ParameterState { coarse: Some(10), fine: None }));
+view.feed(&Payload::Midi1(AnyMessage::ControlChange(
+    ControlChange::new(38, 6)?.with_channel(1)?,
+)))?;
+assert_eq!(view.parameter_state(1, ParameterFamily::Nrpn, 130)?,
+    Some(ParameterState { coarse: Some(10), fine: Some(6) }));
+```
+
+The lookup returns an owned snapshot, or `None` for no cached data. Missing
+components use `None` independently. A new coarse input clears the previous fine.
 
 ```rust
 use meedee::controls::ControlInterpreter;

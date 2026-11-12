@@ -128,7 +128,31 @@ macro_rules! view_methods{($name:ident, $profiles:expr;{$($ctor:item)*})=>{
 struct Controls {
     value: meedee::controls::ControlInterpreter,
 }
-view_methods!(Controls, true;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::ControlInterpreter::new(selected(group)?).map_err(error)?})}});
+view_methods!(Controls, true;{
+    #[new]
+    #[pyo3(signature=(*,group=None))]
+    fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::ControlInterpreter::new(selected(group)?).map_err(error)?})}
+
+    fn parameter_state(
+        &self,
+        py: Python<'_>,
+        channel: &Bound<'_, PyAny>,
+        family: &Bound<'_, PyAny>,
+        parameter: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        let channel = crate::messages::integer(channel, "channel")?;
+        let parameter = crate::messages::integer(parameter, "parameter")?;
+        let channel = u8::try_from(channel)
+            .map_err(|_| PyValueError::new_err("channel must be 1..16"))?;
+        let parameter = u16::try_from(parameter)
+            .map_err(|_| PyValueError::new_err("parameter must be 0..16383"))?;
+        self.value
+            .parameter_state(channel, crate::controls::parameter_family(family)?, parameter)
+            .map_err(error)?
+            .map(|v| crate::controls::parameter_state_object(py, v))
+            .transpose()
+    }
+});
 #[pyclass(name = "VelocityInterpreter", module = "meedee.controls")]
 struct Velocity {
     value: meedee::controls::VelocityInterpreter,

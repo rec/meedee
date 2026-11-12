@@ -789,10 +789,16 @@ either half, retained contributor timestamps, null release/reactivation and rese
 Per-parameter Data Entry regressions cover arbitrary reselection, equal parameter
 numbers across families, isolated step invalidation, channel isolation, retained
 coarse timestamps, null release/reactivation and channel/source reset/loss.
-Validation: 618 Python tests pass on Python 3.13.12 with the virtual environment's
-site-packages on `PYTHONPATH` for embedded Python callback tests. The eleven Rust
-controls tests and five event-view tests pass, as do Clippy, Rust formatting,
+The component-cache lookup regressions cover fine-only, coarse-only and complete
+knowledge, immutable snapshots, range validation, source-index stability, family
+and channel separation, null selection, step invalidation and resets. Every coarse
+input clears the cached fine component; incomplete fine input remains inspectable.
+Validation: 621 Python tests pass on Python 3.13.12 with the virtual environment's
+site-packages on `PYTHONPATH` for embedded Python callback tests. The thirteen Rust
+controls tests and five event-view tests pass, as do core-crate Clippy, Rust formatting,
 Ruff, `ty check meedee`, the changed Python test's type check and pyupgrade.
+Workspace-wide Clippy reports existing unused imports, needless borrows and a
+too-many-arguments warning in untouched Python binding files.
 
 Python 3.11.7 and 3.15.0 each pass 183 tests. The Rust workspace passes 69
 ordinary tests with five ignored cases; pytest separately runs the three

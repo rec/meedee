@@ -84,9 +84,11 @@ Tests distinguish valid NRPN 16383 from RPN-null and preserve seven-bit coarse
 observations instead of inventing an observed fine zero. Single-half selector
 edits retain the other half, with independent selector history for each family
 across switches. Both halves must be known before interpreting a family's data.
-Observed coarse Data Entry is cached per channel/family/parameter across selection
+Observed coarse and fine Data Entry are cached per channel/family/parameter across selection
 changes and null selection. Stepping a parameter invalidates only its cached data;
-reset/loss clears the applicable cache. This does not infer unobserved values.
+reset/loss clears the applicable cache. A new coarse input makes fine unknown;
+fine-only input is retained without inventing a coarse value. The read-only
+parameter_state lookup exposes this partial knowledge. This does not infer unobserved values.
 Physical instrument responses and cross-platform native qualification remain
 separate from wire layout/state-machine validation.
 

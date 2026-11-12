@@ -311,7 +311,7 @@ connection mutex, so import hooks/exception constructors cannot run under it.
 
 `meedee.controls.ControlInterpreter()` is pure and optional. Use one instance per source;
 it tracks 16 channels and has no source registry. A sparse cache retains the latest
-observed coarse Data Entry and its provenance for each channel/family/parameter.
+observed coarse and fine Data Entry and their provenance for each channel/family/parameter.
 It grows with observed parameters, without eviction, up to the finite MIDI 1
 parameter space (16 channels, two families, 16384 numbers; RPN-null is excluded).
 Retained timestamp markers and per-message bookkeeping also grow with this cache.
@@ -319,6 +319,14 @@ Retained timestamp markers and per-message bookkeeping also grow with this cache
 Their `value` contains ControlObservation, ParameterObservation, ParameterStep
 or Diagnostic; known-loss input retains its original StreamDiagnostic.
 The interpreter does not return, mutate or replace raw messages.
+`parameter_state(channel, family, parameter)` returns an immutable `ParameterState`
+snapshot, with `coarse` and `fine` each an optional raw seven-bit component. `None`
+means no cached data, including after relative-step invalidation. Fine-only data
+returns a state with `coarse=None`; coarse-only data has `fine=None`. RPN-null has
+no cached entry. The lookup does not bind a source, consume an input index or change
+the active selection. Channels must be 1..16 and parameters 0..16383. Python uses
+`controls.ParameterFamily` and raises ValueError for invalid ranges; Rust returns
+`io::Result<Option<controls::ParameterState>>` with the same ranges.
 Observations have optional source and contributor timestamps; plain messages
 need no metadata. Anonymous input is one source: switching between anonymous
 and named input, or between named sources, requires `reset()`. Rejected source
@@ -337,16 +345,18 @@ to parameter interpretation rather than a generic knob observation.
 ParameterObservation adds family (Rpn/Nrpn) and parameter. It emits coarse data
 at resolution 7 and complete observed pairs at 14. ParameterStep has direction
 (Increment/Decrement) instead of an absolute value or magnitude. CC 96/97 data
-bytes do not become an amount. A step invalidates cached coarse data because
+bytes do not become an amount. A step invalidates both cached components because
 the new absolute value is unknown. Observation ranges include selector context
 for parameters and the contributing coarse/fine inputs for generic controls.
 
 Selector halves may arrive in either order. Editing one half retains the other
-half within the same family. Coarse Data Entry is cached separately for each
+half within the same family. Both Data Entry components are cached separately for each
 channel, family and parameter, and retained across arbitrary reselection.
-Increment/decrement invalidates only the selected parameter's cached coarse value.
-Fine input without a known coarse value still produces MissingCoarse and is not
-buffered for a future coarse input. Fine observation ranges include
+Increment/decrement invalidates only the selected parameter's cached components.
+Fine input without a known coarse value is retained as partial knowledge while
+still producing MissingCoarse. Every coarse input clears the previously cached
+fine component, including a fine-only component, and reports a seven-bit observation.
+A later fine input establishes a complete pair. Fine observation ranges include
 the retained coarse message even when both selectors were repeated later.
 Each channel retains independent RPN and NRPN selector pairs, including partial
 pairs. A selector message activates its family and updates only that family's
@@ -359,8 +369,8 @@ partner; the incomplete diagnostic is emitted if parameter data arrives too soon
 RPN-null disables the active selection without erasing selector history or cached
 Data Entry, or activating the other family.
 A later selector message can reactivate a family using its retained halves and
-coarse data. Reset/loss clears both families' selector and Data Entry history.
-Observation ranges retain inactive selectors' and coarse data's provenance.
+cached components. Reset/loss clears both families' selector and Data Entry history.
+Observation ranges retain inactive selectors' and cached components' provenance.
 
 `reset()` clears source binding, clock and interpretation state, returning nothing.
 Clock changes emit a StateReset diagnostic on an enclosing observation carrying

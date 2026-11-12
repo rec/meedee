@@ -148,6 +148,18 @@ fn inactive_parameter_selectors_retain_their_contributor_times() {
             reason: "known loss".into(),
         })
         .unwrap();
+    assert_eq!(
+        interpreter
+            .parameter_state(1, ParameterFamily::Nrpn, 131)
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        interpreter
+            .parameter_state(1, ParameterFamily::Nrpn, 132)
+            .unwrap(),
+        None
+    );
     for (controller, value) in [(99, 1), (98, 3), (101, 0), (100, 0)] {
         interpreter
             .feed(&event(

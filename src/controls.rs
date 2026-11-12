@@ -65,10 +65,25 @@ macro_rules! observations {
 }
 
 observations! {
+    ParameterState { coarse: Option<u8>, fine: Option<u8> };
     ControlObservation { channel: u8, controller: u8, value: u16, resolution: u8, first_index: usize, last_index: usize };
     ParameterObservation { channel: u8, family: ParameterFamily, parameter: u16, value: u16, resolution: u8, first_index: usize, last_index: usize };
     ParameterStep { channel: u8, family: ParameterFamily, parameter: u16, direction: StepDirection, first_index: usize, last_index: usize };
     Diagnostic { kind: DiagnosticKind, channel: Option<u8>, controller: Option<u8>, first_index: usize, last_index: usize };
+}
+
+pub(crate) fn parameter_family(value: &Bound<'_, PyAny>) -> PyResult<controls::ParameterFamily> {
+    Ok(match *value.extract::<PyRef<'_, ParameterFamily>>()? {
+        ParameterFamily::Rpn => controls::ParameterFamily::Rpn,
+        ParameterFamily::Nrpn => controls::ParameterFamily::Nrpn,
+    })
+}
+
+pub(crate) fn parameter_state_object(
+    py: Python<'_>,
+    value: controls::ParameterState,
+) -> PyResult<Py<PyAny>> {
+    Ok(Py::new(py, ParameterState { value })?.into_any())
 }
 
 pub(crate) fn to_python(

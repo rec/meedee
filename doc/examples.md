@@ -458,13 +458,34 @@ Move a high-resolution controller or send RPN/NRPN changes from the first input.
 The interpreter combines the contributing MIDI 1 messages and reports what was
 observed. It also accepts plain messages without source or timing metadata.
 For example, CC 99=1 and CC 98=2 select NRPN 130. A later CC 98=3
-selects NRPN 131 using the retained MSB. Each channel caches coarse Data Entry
+selects NRPN 131 using the retained MSB. Each channel caches both Data Entry components
 separately for each RPN/NRPN parameter, so returning to NRPN 130 permits a CC 38
 update using its earlier observed CC 6. An unobserved coarse value still produces
 MissingCoarse. Each family needs both selector halves initially. Stepping a
-parameter invalidates only its cached coarse value. RPN-null disables updates
+parameter invalidates only its cached components. RPN-null disables updates
 until a later selector activates a family, preserving cached values. Reset/loss
 clears the applicable cache; the sparse cache otherwise grows with observed parameters.
+
+Inspect the cache without changing the selection or consuming an input:
+
+```python
+from meedee import controls, messages
+
+view = controls.ControlInterpreter()
+for controller, value in ((99, 1), (98, 2), (38, 5)):
+    view.feed(messages.ControlChange(controller, value, channel=1))
+state = view.parameter_state(1, controls.ParameterFamily.Nrpn, 130)
+assert state is not None and (state.coarse, state.fine) == (None, 5)
+view.feed(messages.ControlChange(6, 10, channel=1))
+state = view.parameter_state(1, controls.ParameterFamily.Nrpn, 130)
+assert state is not None and (state.coarse, state.fine) == (10, None)
+view.feed(messages.ControlChange(38, 6, channel=1))
+state = view.parameter_state(1, controls.ParameterFamily.Nrpn, 130)
+assert state is not None and (state.coarse, state.fine) == (10, 6)
+```
+
+Snapshots are frozen. Missing cached data returns `None`; missing components use
+`None` independently. A new coarse input clears the previous fine component.
 
 ```python
 import meedee as md

@@ -2,8 +2,10 @@
 //! messages or infers physical units, lost messages, or unknown absolute values.
 
 use std::collections::HashMap;
+use std::io;
 
 pub use crate::event_views::{ControlInterpreter, VelocityInterpreter};
+use crate::file_io::invalid;
 use crate::messages::{AnyMessage, ControlChange};
 pub use crate::velocity::VelocityObservation;
 
@@ -38,6 +40,13 @@ pub struct ParameterObservation {
     pub resolution: u8,
     pub first_index: usize,
     pub last_index: usize,
+}
+
+/// Last observed components of one parameter; missing components remain unknown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ParameterState {
+    pub coarse: Option<u8>,
+    pub fine: Option<u8>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -135,6 +144,27 @@ impl ControlState {
         self.clear(None, self.next_index)
     }
 
+    pub(crate) fn parameter_state(
+        &self,
+        channel: u8,
+        family: ParameterFamily,
+        parameter: u16,
+    ) -> io::Result<Option<ParameterState>> {
+        if !(1..=16).contains(&channel) {
+            return Err(invalid(0, "channel must be 1..16"));
+        }
+        if parameter > 16383 {
+            return Err(invalid(0, "parameter must be 0..16383"));
+        }
+        Ok(self.channels[usize::from(channel - 1)]
+            .data
+            .get(&(family, parameter))
+            .map(|d| ParameterState {
+                coarse: d.coarse.map(|v| v.value),
+                fine: d.fine.map(|v| v.value),
+            }))
+    }
+
     pub(crate) fn retained_indexes(&self) -> Vec<usize> {
         self.channels
             .iter()
@@ -144,7 +174,7 @@ impl ControlState {
                     .copied()
                     .chain(c.selectors.into_iter().flatten())
                     .flatten()
-                    .chain(c.data.values().copied())
+                    .chain(c.data.values().flat_map(|d| [d.coarse, d.fine]).flatten())
             })
             .map(|v| v.index)
             .collect()
@@ -172,12 +202,18 @@ struct IndexedByte {
 }
 
 #[derive(Default)]
+struct ParameterData {
+    coarse: Option<IndexedByte>,
+    fine: Option<IndexedByte>,
+}
+
+#[derive(Default)]
 struct Channel {
     coarse: [Option<IndexedByte>; 32],
     family: Option<ParameterFamily>,
     // Indexed by ParameterFamily, then MSB/LSB.
     selectors: [[Option<IndexedByte>; 2]; 2],
-    data: HashMap<(ParameterFamily, u16), IndexedByte>,
+    data: HashMap<(ParameterFamily, u16), ParameterData>,
 }
 
 impl Channel {
@@ -251,23 +287,28 @@ impl Channel {
                         last_index: index,
                     })];
                 }
+                let data = self.data.entry((family, parameter)).or_default();
                 let (value, resolution, first_index) = if controller == 6 {
-                    self.data.insert((family, parameter), byte);
+                    data.coarse = Some(byte);
+                    data.fine = None;
                     (u16::from(value), 7, first_index)
-                } else if let Some(coarse) = self.data.get(&(family, parameter)) {
-                    (
-                        (u16::from(coarse.value) << 7) | u16::from(value),
-                        14,
-                        first_index.min(coarse.index),
-                    )
                 } else {
-                    return vec![diagnostic(
-                        DiagnosticKind::MissingCoarse,
-                        channel,
-                        controller,
-                        first_index,
-                        index,
-                    )];
+                    data.fine = Some(byte);
+                    if let Some(coarse) = data.coarse {
+                        (
+                            (u16::from(coarse.value) << 7) | u16::from(value),
+                            14,
+                            first_index.min(coarse.index),
+                        )
+                    } else {
+                        return vec![diagnostic(
+                            DiagnosticKind::MissingCoarse,
+                            channel,
+                            controller,
+                            first_index,
+                            index,
+                        )];
+                    }
                 };
                 vec![Observation::Parameter(ParameterObservation {
                     channel,

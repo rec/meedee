@@ -198,6 +198,16 @@ pub struct ControlInterpreter {
     group: Option<u8>,
 }
 impl ControlInterpreter {
+    /// Read cached components without selecting a parameter or changing source state.
+    pub fn parameter_state(
+        &self,
+        channel: u8,
+        family: controls::ParameterFamily,
+        parameter: u16,
+    ) -> io::Result<Option<controls::ParameterState>> {
+        self.state.parameter_state(channel, family, parameter)
+    }
+
     pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
         View::feed(self, message, None)
     }
