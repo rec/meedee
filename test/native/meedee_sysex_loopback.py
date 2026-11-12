@@ -8,9 +8,9 @@ from uuid import uuid4
 from meedee import (
     codecs,
     events,
+    file_io,
     messages,
     midi,
-    sysex,
     tuning,
 )
 
@@ -69,7 +69,9 @@ def exercise(run_in_subprocess: bool, directory: Path) -> None:
         assert delivery.result(timeout=4).sent_events == 2
         captured = [m for m in recording if isinstance(m, messages.SysEx)]
         capture_path = directory / f"capture-{run_in_subprocess}.syx"
-        sysex.write(capture_path, captured)
+        with file_io.Writer(capture_path) as writer:
+            for m in captured:
+                writer.write(m)
         expected = b"".join(codecs.encode(m) for m in messages_to_capture)
         assert capture_path.read_bytes() == expected
 

@@ -3,7 +3,7 @@ use meedee::drivers::{Receiver, Sender};
 use meedee::events::InputItem;
 use meedee::events::{Cancellation, Payload, PlaybackClock};
 use meedee::messages::{AnyMessage, Message, SysEx};
-use meedee::{midi, sysex};
+use meedee::{file_io, midi, sysex, universal};
 use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,
@@ -143,14 +143,28 @@ fn documented_requests_retain_exact_opaque_replies() {
             replies
         );
         assert_eq!(output.sent, selected.len());
-        let mut saved = vec![];
+        let mut saved = io::Cursor::new(vec![]);
+        let mut writer = file_io::Writer::new(&mut saved, "syx", 1_048_576).unwrap();
         for m in &report.messages {
-            sysex::write(&mut saved, m, 1_048_576).unwrap();
+            writer.write(m).unwrap();
         }
+        writer.finish().unwrap();
+        drop(writer);
+        saved.set_position(0);
         assert_eq!(
-            sysex::Reader::new(&saved[..], 1_048_576)
+            file_io::Reader::new(saved, 1_048_576, false, false)
                 .unwrap()
-                .map(|m| m.unwrap().data().to_vec())
+                .map(|m| {
+                    let file_io::Record::Archive(meedee::archive::Record::Event(message)) =
+                        m.unwrap()
+                    else {
+                        panic!("expected SysEx event")
+                    };
+                    let Payload::Midi1(AnyMessage::SysEx(m)) = message.as_ref() else {
+                        panic!("expected SysEx")
+                    };
+                    m.data().to_vec()
+                })
                 .collect::<Vec<_>>(),
             replies
         );
@@ -406,4 +420,88 @@ fn identity_after_discovery_aborts_remaining_requests() {
     assert_eq!(report.requests_sent, 1);
     assert!(report.messages.is_empty());
     assert!(!report.complete);
+}
+
+#[test]
+fn universal_inquiry_keeps_all_raw_identity_replies_including_duplicates() {
+    let clock = Clock::default();
+    let queue = Rc::new(RefCell::new(VecDeque::new()));
+    let mut receiver = Input {
+        clock: clock.clone(),
+        queue: queue.clone(),
+        scheduled: vec![],
+    };
+    let mut replies: Vec<_> = include_str!("fixtures/sysex-identities.txt")
+        .lines()
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .map(|l| hex(l.split('|').nth(1).unwrap()))
+        .collect();
+    replies.push(replies[0].clone());
+    replies.push(hex("7e00060243"));
+    let mut output = Inquiry {
+        queue,
+        replies: replies.clone(),
+        sent: 0,
+    };
+    let report = universal::identify_with(
+        &mut receiver,
+        &mut output,
+        "s",
+        &Default::default(),
+        &mut clock.clone(),
+    )
+    .unwrap();
+    assert_eq!(report.status, "completed");
+    assert_eq!(
+        report
+            .messages
+            .iter()
+            .map(|m| m.data().to_vec())
+            .collect::<Vec<_>>(),
+        replies
+    );
+    assert_eq!(clock.0.get(), 1_000_000_000);
+    assert_eq!(output.sent, 1);
+    assert!(!report.uncertain_send);
+}
+
+#[test]
+fn universal_inquiry_limits_and_cancellation_keep_confirmed_prefix() {
+    let clock = Clock::default();
+    let queue = Rc::new(RefCell::new(VecDeque::new()));
+    let mut receiver = Input {
+        clock: clock.clone(),
+        queue: queue.clone(),
+        scheduled: vec![],
+    };
+    let mut output = Inquiry {
+        queue,
+        replies: vec![hex("7e00060243"); 2],
+        sent: 0,
+    };
+    let report = universal::identify_with(
+        &mut receiver,
+        &mut output,
+        "s",
+        &universal::IdentityOptions {
+            message_limit: 1,
+            ..Default::default()
+        },
+        &mut clock.clone(),
+    )
+    .unwrap();
+    assert_eq!(report.status, "limit_reached");
+    assert_eq!(report.messages.len(), 1);
+    let options = universal::IdentityOptions::default();
+    options.cancel.cancel();
+    let report = universal::identify_with(
+        &mut receiver,
+        &mut output,
+        "s",
+        &options,
+        &mut clock.clone(),
+    )
+    .unwrap();
+    assert_eq!(report.status, "cancelled");
+    assert_eq!(output.sent, 1);
 }

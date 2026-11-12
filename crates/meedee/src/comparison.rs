@@ -1,6 +1,6 @@
 //! Streaming same-format record comparison. No alignment or resynchronization.
 use crate::messages::Message;
-use crate::{archive, clip, events, file_io, inspection::Format, smf, sysex, ump};
+use crate::{archive, clip, events, file_io, inspection::Format, smf, ump};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, BufReader, Read};
 
@@ -139,7 +139,7 @@ impl Report {
 enum Records<R> {
     Archive(archive::Reader<BufReader<R>>),
     Smf(smf::Reader<BufReader<R>>),
-    Syx(sysex::Reader<BufReader<R>>),
+    Syx(file_io::syx::Reader<BufReader<R>>),
     Clip(clip::Reader<BufReader<R>>),
 }
 enum Record {
@@ -159,7 +159,7 @@ impl<R: Read> Records<R> {
                 o.preserve_unknown,
             )?),
             Format::Smf => Self::Smf(smf::Reader::new(source, o.payload_limit)?),
-            Format::Syx => Self::Syx(sysex::Reader::new(source, o.payload_limit)?),
+            Format::Syx => Self::Syx(file_io::syx::Reader::new(source, o.payload_limit)?),
             Format::Clip => Self::Clip(clip::Reader::new(source, o.preserve_unknown)?),
         })
     }

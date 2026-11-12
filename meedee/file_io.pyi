@@ -3,7 +3,7 @@
 from collections.abc import Iterator
 from os import PathLike
 from types import TracebackType
-from typing import BinaryIO
+from typing import BinaryIO, Literal
 
 from . import archive, events, messages, smf
 
@@ -60,6 +60,7 @@ class Writer:
         self,
         destination: str | PathLike[str] | BinaryIO,
         *,
+        format: Literal["mid", "midi", "syx", "meedee"] | None = None,
         payload_limit: int | str = 1_048_576,
     ) -> None: ...
     def write(

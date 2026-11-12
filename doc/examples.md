@@ -145,12 +145,14 @@ with md.Writer("song-up.mid") as writer:
         writer.write(m)
 ```
 
-`Reader` detects MIDI files and meedee archives from their contents. For a MIDI
+`Reader` detects MIDI files, SysEx streams and meedee archives from their contents. For a MIDI
 file, it yields the header first, then file events. Events expose `channel` and
 `transpose()` directly; transposition clamps note numbers to 0..127 and preserves
-all other file data. `Writer` chooses the format from `.mid`, `.midi` or `.meedee`
+all other file data. `Writer` chooses the format from `.mid`, `.midi`, `.syx` or `.meedee`
 and refuses to overwrite an existing file. The context finalizes it on success;
 an error can leave a partial output, while the source remains unchanged.
+For a stream destination, use `Writer(stream, format="syx")` for SysEx;
+the default for streams remains an archive. Empty input is an empty SysEx stream.
 
 ## 8. Back up and restore SysEx
 
@@ -163,7 +165,10 @@ import meedee as md
 
 recording = md.Input().record(30, output="backup.meedee")
 print(recording)
-md.sysex.write("backup.syx", (m for m in recording if isinstance(m, md.SysEx)))
+with md.Writer("backup.syx") as writer:
+    for m in recording:
+        if isinstance(m, md.SysEx):
+            writer.write(m)
 ```
 
 Replay the recording, preserving its timing:
@@ -182,18 +187,20 @@ Successful handoff does not prove the instrument accepted the dump.
 import meedee as md
 
 with md.Output() as output:
-    print(output.send(md.events.with_gap(md.sysex.Reader("backup.syx"), 0.1)))
+    print(output.send(md.events.with_gap(md.Reader("backup.syx"), 0.1)))
 ```
 
 ### Request or capture an opaque instrument dump
 
 ```python
-from meedee import midi, sysex
+from meedee import file_io, midi, sysex
 
 with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
     result = sysex.dump(receiver, output)
     print(result.status, result.reason)
-    sysex.write("vl70.syx", result.messages)
+    with file_io.Writer("vl70.syx") as writer:
+        for m in result.messages:
+            writer.write(m)
 ```
 
 The call sends an identity request and requires exactly one supported reply
@@ -230,8 +237,6 @@ unselected keys use NoChange. Send it with the restore example when the receivin
 synth supports these features and is configured for that device ID.
 
 ```python
-from pathlib import Path
-
 from ufor.tuning import RatioTable, Tuning
 
 import meedee as md
@@ -246,8 +251,8 @@ dump = md.tuning.bulk_dump(
     name="Just three",
     preserve_unmapped=True,
 )
-with Path("just-three.syx").open("xb") as stream:
-    md.sysex.write(stream, [md.SysEx(data=md.codecs.encode(dump)[1:-1])])
+with md.Writer("just-three.syx") as writer:
+    writer.write(dump)
 ```
 
 After the instrument has loaded it, select the tuning with
@@ -510,7 +515,7 @@ an observation produced by the UMP assembler.
 ```python
 import meedee as md
 
-message = next(md.sysex.Reader("tuning.syx"))
+message = next(md.Reader("tuning.syx"))
 print(md.tuning.decode(message))
 print(md.tuning.Decoder().feed(message))
 ```
@@ -677,7 +682,7 @@ GM mode changes, controller destinations, key controls and global parameters:
 ```python
 import meedee as md
 
-with md.sysex.Reader("backup.syx") as dump:
+with md.Reader("backup.syx") as dump:
     for message in dump:
         if (decoded := md.gm.decode(message)) is not None:
             print(decoded)

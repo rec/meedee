@@ -36,6 +36,7 @@ mod sysex;
 mod tuning;
 mod ump;
 mod units;
+mod universal;
 
 #[cfg(all(test, target_os = "macos"))]
 mod transport_tests;
@@ -47,6 +48,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
     module.add_function(wrap_pyfunction!(drivers::run_sysex_dump, module)?)?;
+    module.add_function(wrap_pyfunction!(drivers::run_identify, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
@@ -82,7 +84,8 @@ fn populate_gm(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 #[pyfunction]
 fn populate_universal(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    profiles::register_universal(module)
+    profiles::register_universal(module)?;
+    universal::register(module)
 }
 #[pyfunction]
 fn populate_mpe(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -211,7 +214,6 @@ fn populate_smf(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 #[pyfunction]
 fn populate_sysex(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    files::register_sysex(module)?;
     sysex::register(module)
 }
 #[pyfunction]

@@ -49,7 +49,7 @@ Hardware qualification remains a separate explicitly authorized activity.
 - `messages.SysEx` retains MIDI 1 payload bytes; `codecs` handles framing.
 - `Input.start()` / `Input.stop()` and `archive.Recorder` provide the shared
   recording lifecycle. `Input.record(duration)` uses that same recorder.
-- `Output.send`, generic `events.with_gap`, `sysex.Reader` and `sysex.write` already
+- `Output.send`, generic `events.with_gap` and `file_io.Reader`/`Writer` already
   provide transport and concatenated `.syx` storage.
 - The tuning query implementation already demonstrates reply matching,
   caller-driven deadlines and uncertain-send reporting. Reuse suitable existing

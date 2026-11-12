@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 
-from meedee import clip, messages, smf, sysex, ump
+from meedee import clip, file_io, messages, smf, ump
 
 SMF = bytes.fromhex(
     "4d546864000000060000000101e04d54726b0000001300ff510307a12000903c6483603c0000ff2f00"
@@ -49,13 +49,15 @@ def test_smf_fidelity_tracks_and_borrowed_stream_ownership() -> None:
 
 def test_syx_limits_and_file_records_are_not_implicitly_live_messages() -> None:
     output = BytesIO()
-    sysex.write(output, [messages.SysEx(data=b"\x7d\x01"), messages.SysEx(data=b"")])
+    with file_io.Writer(output, format="syx") as writer:
+        writer.write(messages.SysEx(data=b"\x7d\x01"))
+        writer.write(messages.SysEx(data=b""))
     assert output.getvalue() == b"\xf0\x7d\x01\xf7\xf0\xf7"
-    assert len(list(sysex.Reader(BytesIO(output.getvalue())))) == 2
+    assert len(list(file_io.Reader(BytesIO(output.getvalue())))) == 2
     with pytest.raises(OSError, match="limit"):
-        list(sysex.Reader(BytesIO(output.getvalue()), payload_limit=1))
+        list(file_io.Reader(BytesIO(output.getvalue()), payload_limit=1))
     with pytest.raises(TypeError):
-        sysex.write(BytesIO(), [smf.Meta(kind=47, data=b"")])  # ty: ignore[invalid-argument-type]
+        file_io.Writer(BytesIO(), format="syx").write(smf.Meta(kind=47, data=b""))  # ty: ignore[invalid-argument-type]
     fragment = smf.SysExFragment(status=247, data=b"\x90\xff\x00")
     assert fragment.data == b"\x90\xff\x00"
     assert not isinstance(fragment, messages.Message)
@@ -99,7 +101,8 @@ class FullDisk(BytesIO):
 
 def test_short_writes_are_completed_and_disk_failures_are_reported() -> None:
     output = ShortWriter()
-    sysex.write(output, [messages.SysEx(data=b"\x7d")])
+    with file_io.Writer(output, format="syx") as writer:
+        writer.write(messages.SysEx(data=b"\x7d"))
     assert output.getvalue() == b"\xf0\x7d\xf7"
     with pytest.raises(OSError, match="disk full"):
-        sysex.write(FullDisk(), [messages.SysEx(data=b"\x7d")])
+        file_io.Writer(FullDisk(), format="syx").write(messages.SysEx(data=b"\x7d"))

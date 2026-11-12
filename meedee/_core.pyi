@@ -1,8 +1,19 @@
 from collections.abc import Callable
 from types import ModuleType
 
-from . import ci, events, inspection, sysex, topology, tuning
+from . import ci, events, inspection, sysex, topology, tuning, universal
 
+def run_identify(
+    receiver: object,
+    output: object,
+    device_id: int,
+    timeout: float | str,
+    message_limit: int,
+    byte_limit: int | str,
+    payload_limit: int | str,
+    cancel: events.Cancellation,
+    now: Callable[[], int],
+) -> universal.IdentityReport: ...
 def run_monitor(
     monitor: inspection.Monitor,
     receiver: object,

@@ -199,12 +199,17 @@ writer.finish()?;
 
 This preserves the header, tracks, ticks, tempo, SysEx fragments and other file
 records. Notes on channel 10 are unchanged; other note numbers are transposed
-and clamped to 0..127. The reader detects MIDI files and meedee archives from
+and clamped to 0..127. The reader detects MIDI files, SysEx streams and meedee archives from
 contents, yielding a `file_io::Record` for each value. MIDI files yield their
-header first. The writer selects `.mid`, `.midi` or `.meedee` from the destination
+header first. SysEx messages use `Record::Archive(archive::Record::Event(...))`.
+The writer selects `.mid`, `.midi`, `.syx` or `.meedee` from the destination
 name and refuses overwrite. Call `finish()` to validate and finalize the file;
 an earlier error can leave a partial output without changing the source.
 Format-specific readers and writers remain available for detailed control.
+The SysEx codec is internal; use the generic file API for `.syx` files.
+For streams use `Writer::new(stream, "syx", limit)`; empty input is an empty
+SysEx stream. `Writer::write` accepts `WriteRecord` values, including file
+records and typed primitive messages such as a tuning `BulkDump`.
 
 ## 7. Handle input diagnostics explicitly
 
@@ -350,46 +355,48 @@ Initiate a dump on the instrument during a ten-second recording. Save its SysEx
 messages separately; `recording.records` also retains timing and diagnostics.
 
 ```rust
-use meedee::{midi::Input, sysex, archive::Record, events::Payload, messages::AnyMessage};
-use std::{fs::OpenOptions, time::Duration};
+use meedee::{midi::Input, file_io, archive::Record, events::Payload, messages::AnyMessage};
+use std::time::Duration;
 
 let recording = Input::new().record(Duration::from_secs(10))?;
 println!("{:?}", recording.records);
-let mut file = OpenOptions::new().write(true).create_new(true).open("backup.syx")?;
+let mut writer = file_io::Writer::create("backup.syx")?;
 for record in &recording.records {
     if let Record::Event(message) = record {
         if let Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() {
-            sysex::write(&mut file, message, 1_048_576)?;
+            writer.write(message)?;
         }
     }
 }
+writer.finish()?;
 ```
 
 Run this separately to restore the backup. Choose the wait duration from the
 instrument's documentation. Sending a dump can replace sounds or settings.
 
 ```rust
-use meedee::{events, midi::Output, sysex};
+use meedee::{events, file_io, midi::Output};
 use std::time::Duration;
 
 let mut output = Output::new();
-println!("{:?}", output.send(events::with_gap(sysex::Reader::open("backup.syx")?, Duration::from_millis(100)))?);
+println!("{:?}", output.send(events::with_gap(file_io::Reader::open("backup.syx")?, Duration::from_millis(100)))?);
 output.close()?;
 ```
 
 ### Request or capture an opaque instrument dump
 
 ```rust
-use meedee::{midi::{Input, Output}, sysex};
+use meedee::{file_io, midi::{Input, Output}, sysex};
 
 let mut receiver = Input::new().with_port("VL70")?;
 let mut output = Output::new().with_port("VL70")?;
 let result = sysex::dump(&mut receiver, Some(&mut output), None, &Default::default())?;
 println!("{}: {:?}", result.status, result.reason);
-let mut file = std::fs::File::create("vl70.syx")?;
+let mut writer = file_io::Writer::create("vl70.syx")?;
 for message in &result.messages {
-    sysex::write(&mut file, message, 1_048_576)?;
+    writer.write(message)?;
 }
+writer.finish()?;
 ```
 
 The call sends an identity request and requires exactly one supported reply
@@ -399,6 +406,26 @@ an explicit model such as `Some("moog/subsequent-37")`. The call leaves connecti
 open. Manual completion remains unverified. `DumpOptions`
 controls scope, device ID, deadlines, retention limits and cancellation. See
 [model coverage and scope limits](sysex-dumps.md).
+
+To inquire about identities independently of dump support, use existing
+connections and collect every raw reply through the bounded window:
+
+```rust
+use meedee::universal;
+
+let identities = universal::identify(&mut receiver, &mut output, &Default::default())?;
+println!("{}: {:?}", identities.status, identities.reason);
+for reply in &identities.messages {
+    println!("{:02x?}", reply.data());
+}
+```
+
+`IdentityOptions` controls device ID (default 127, broadcast), timeout (one
+second), event/byte/payload limits and cancellation. `IdentityReport` retains
+duplicates and nonstandard reply layouts; it never chooses a model. Use
+`universal::decode` for standard typed replies. `completed` means the collection
+window ended cleanly, and `timed_out` means no reply; cancellation, failure and
+limit reports retain any admitted reply prefix.
 
 To restore the in-memory capture with its observed relative message timing,
 run this separately after checking the capture report and deciding to restore:
@@ -492,8 +519,7 @@ Unselected keys are preserved. This uses the same `bulk_dump` builder as Python;
 Rust supplies frequencies directly instead of using Python's optional uFor adapter.
 
 ```rust
-use meedee::{messages::PrimitiveMessage, tuning};
-use std::{fs::OpenOptions, io::Write};
+use meedee::{file_io, tuning};
 
 let pitches = [(69, 440.0), (70, 660.0), (71, 880.0)]
     .into_iter()
@@ -504,8 +530,9 @@ let pitches = [(69, 440.0), (70, 660.0), (71, 880.0)]
     })
     .collect::<Result<Vec<_>, _>>()?;
 let dump = tuning::bulk_dump(&pitches, 0, 2, "Just three".into(), None, true)?;
-OpenOptions::new().write(true).create_new(true).open("just-three.syx")?
-    .write_all(&dump.encode()?)?;
+let mut writer = file_io::Writer::create("just-three.syx")?;
+writer.write(&dump)?;
+writer.finish()?;
 println!("{dump:?}");
 ```
 
@@ -835,11 +862,12 @@ Read a saved dump without opening a MIDI port. One decoder recognizes GM mode
 changes, controller destinations, key controls and global parameters:
 
 ```rust
-use meedee::{gm, sysex};
-use std::fs::File;
+use meedee::{archive, events::Payload, file_io, gm, messages::AnyMessage};
 
-for message in sysex::Reader::new(File::open("backup.syx")?, 1_048_576)? {
-    if let Some(decoded) = gm::decode(&message?, 1024)? {
+for record in file_io::Reader::open("backup.syx")? {
+    let file_io::Record::Archive(archive::Record::Event(message)) = record? else { continue; };
+    let Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() else { continue; };
+    if let Some(decoded) = gm::decode(message, 1024)? {
         println!("{decoded:?}");
     }
 }

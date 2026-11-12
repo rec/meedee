@@ -1,5 +1,8 @@
 //! Bounded file I/O with byte locations. No native MIDI initialization.
+use crate::messages::{Message, PrimitiveMessage};
 use std::io::{self, Read, Write};
+
+pub(crate) mod syx;
 
 pub const DEFAULT_LIMIT: usize = 1_048_576;
 pub fn invalid(offset: u64, reason: impl std::fmt::Display) -> io::Error {
@@ -125,13 +128,14 @@ impl Record {
     }
 }
 
-type Prefixed<R> = std::io::Chain<std::io::Cursor<[u8; 4]>, R>;
+type Prefixed<R> = std::io::Chain<std::io::Cursor<Vec<u8>>, R>;
 enum Input<R> {
     Archive(crate::archive::Reader<Prefixed<R>>),
     Smf(crate::smf::Reader<Prefixed<R>>),
+    Syx(syx::Reader<Prefixed<R>>),
 }
 
-/// Detect MIDI files and meedee archives from their contents, regardless of name.
+/// Detect MIDI files, SysEx streams and meedee archives from their contents.
 /// Use format-specific readers for other formats and detailed codec control.
 pub struct Reader<R = std::io::BufReader<std::fs::File>> {
     input: Input<R>,
@@ -156,11 +160,23 @@ impl<R: Read> Reader<R> {
         recover: bool,
         preserve_unknown: bool,
     ) -> io::Result<Self> {
-        let mut prefix = [0; 4];
-        inner.read_exact(&mut prefix)?;
-        let smf = prefix == *b"MThd";
+        let mut prefix = Vec::new();
+        (&mut inner).take(1).read_to_end(&mut prefix)?;
+        let syx = prefix.is_empty() || prefix[0] == 240;
+        if !syx {
+            (&mut inner).take(3).read_to_end(&mut prefix)?;
+        }
+        let smf = prefix == b"MThd";
         let inner = std::io::Cursor::new(prefix).chain(inner);
-        let (input, header) = if smf {
+        let (input, header) = if syx {
+            if recover || preserve_unknown {
+                return Err(invalid(
+                    0,
+                    "archive recovery options do not apply to SysEx files",
+                ));
+            }
+            (Input::Syx(syx::Reader::new(inner, limit)?), None)
+        } else if smf {
             if recover || preserve_unknown {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -218,6 +234,22 @@ impl<R: Read> Iterator for Reader<R> {
                 }
                 result
             }
+            Input::Syx(reader) => {
+                let result = reader.next().map(|v| {
+                    v.map(|m| {
+                        Record::Archive(crate::archive::Record::Event(Box::new(
+                            crate::events::Payload::Midi1(crate::messages::AnyMessage::SysEx(m)),
+                        )))
+                    })
+                });
+                if let Some(Err(error)) = &result {
+                    self.problem = Some(error.to_string());
+                }
+                if result.is_none() && self.problem.is_none() {
+                    self.complete = true;
+                }
+                result
+            }
         }
     }
 }
@@ -226,8 +258,9 @@ enum Output<W> {
     Archive(crate::archive::Writer<W>),
     AwaitingHeader(W),
     Smf(crate::smf::Writer<W>),
+    Syx(W),
 }
-/// Choose the output format from .mid/.midi or .meedee; creation is exclusive.
+/// Choose the output format from .mid/.midi, .syx or .meedee; creation is exclusive.
 /// Call finish() to validate completion and report final write errors.
 pub struct Writer<W = std::fs::File> {
     output: Option<Output<W>>,
@@ -247,10 +280,10 @@ impl Writer {
 }
 fn validate_extension(extension: &str) -> io::Result<()> {
     match extension.to_ascii_lowercase().as_str() {
-        "mid" | "midi" | "meedee" => Ok(()),
+        "mid" | "midi" | "meedee" | "syx" => Ok(()),
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected .mid, .midi or .meedee destination",
+            "expected .mid, .midi, .syx or .meedee destination",
         )),
     }
 }
@@ -263,6 +296,8 @@ impl<W: Write + std::io::Seek> Writer<W> {
         }
         let output = if extension.eq_ignore_ascii_case("meedee") {
             Output::Archive(crate::archive::Writer::new(inner, limit)?)
+        } else if extension.eq_ignore_ascii_case("syx") {
+            Output::Syx(inner)
         } else {
             Output::AwaitingHeader(inner)
         };
@@ -271,8 +306,22 @@ impl<W: Write + std::io::Seek> Writer<W> {
             limit,
         })
     }
-    pub fn write(&mut self, record: &Record) -> io::Result<()> {
+    pub fn write(&mut self, record: &(impl WriteRecord + ?Sized)) -> io::Result<()> {
+        record.write_to(self)
+    }
+    fn write_record(&mut self, record: &Record) -> io::Result<()> {
         match (self.output.as_mut(), record) {
+            (
+                Some(Output::Syx(writer)),
+                Record::Archive(crate::archive::Record::Event(message)),
+            ) => {
+                let crate::events::Payload::Midi1(crate::messages::AnyMessage::SysEx(message)) =
+                    message.as_ref()
+                else {
+                    return Err(invalid(0, "SYX accepts only SysEx messages"));
+                };
+                syx::write(writer, message, self.limit)
+            }
             (Some(Output::Archive(writer)), Record::Archive(record)) => writer.write(record),
             (Some(Output::Smf(writer)), Record::Event(event)) => writer.write(event),
             (Some(Output::AwaitingHeader(_)), Record::Header(header)) => {
@@ -305,6 +354,12 @@ impl<W: Write + std::io::Seek> Writer<W> {
                 }
                 writer.finish()?;
             }
+            Some(Output::Syx(writer)) => {
+                if !complete || !reason.is_empty() {
+                    return Err(invalid(0, "completion status applies only to archives"));
+                }
+                writer.flush()?;
+            }
             Some(Output::AwaitingHeader(_)) => {
                 return Err(invalid(0, "MIDI header must be written first"))
             }
@@ -312,5 +367,39 @@ impl<W: Write + std::io::Seek> Writer<W> {
         }
         self.output = None;
         Ok(())
+    }
+}
+
+/// Values accepted by the generic writer: file records and primitive messages.
+pub trait WriteRecord {
+    fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()>;
+}
+impl WriteRecord for Record {
+    fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()> {
+        writer.write_record(self)
+    }
+}
+impl<T: PrimitiveMessage> WriteRecord for T {
+    fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()> {
+        let wire = self.encode().map_err(|e| invalid(0, e))?;
+        let mut decoder = crate::codecs::Decoder::new(writer.limit).map_err(|e| invalid(0, e))?;
+        let mut values = decoder.feed(&wire);
+        values.extend(decoder.finish());
+        if values.len() != 1 {
+            return Err(invalid(0, "expected one complete MIDI 1 message"));
+        }
+        let crate::codecs::DecodeItem::Message(message) = values.pop().expect("one value") else {
+            return Err(invalid(0, "invalid MIDI 1 message"));
+        };
+        let message = if let Some(metadata) = self.metadata() {
+            message
+                .with_metadata(metadata.clone())
+                .map_err(|e| invalid(0, e))?
+        } else {
+            message
+        };
+        writer.write_record(&Record::Archive(crate::archive::Record::Event(Box::new(
+            crate::events::Payload::Midi1(message),
+        ))))
     }
 }

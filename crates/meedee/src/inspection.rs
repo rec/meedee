@@ -4,7 +4,7 @@ pub use crate::comparison::{
 };
 pub use crate::inspection_timing::{TimingDiagnostic, TimingSegment};
 use crate::messages::Message;
-use crate::{archive, clip, events, messages, smf, sysex, ump};
+use crate::{archive, clip, events, file_io, messages, smf, ump};
 use std::collections::BTreeMap;
 use std::io::{self, BufReader, Read};
 
@@ -331,7 +331,7 @@ impl Report {
                 }
             }
             Format::Syx => {
-                for record in sysex::Reader::new(source, limit)? {
+                for record in file_io::syx::Reader::new(source, limit)? {
                     record?;
                     self.records += 1;
                     self.count("SysEx");

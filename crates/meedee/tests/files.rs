@@ -1,7 +1,38 @@
 use meedee::messages::{AnyMessage, NoteOn};
-use meedee::{clip, smf, sysex, ump};
+use meedee::{clip, file_io, smf, ump};
 use std::io::{self, Cursor, Write};
 const SMF:&[u8]=b"MThd\0\0\0\x06\0\0\0\x01\x01\xe0MTrk\0\0\0\x13\0\xff\x51\x03\x07\xa1\x20\0\x90\x3c\x64\x83\x60\x3c\0\0\xff\x2f\0";
+
+#[test]
+fn unified_writer_accepts_structured_tuning_and_short_syx_streams() {
+    use meedee::messages::PrimitiveMessage;
+    use meedee::tuning;
+    let pitches = [tuning::NoteTuning::new(
+        69,
+        tuning::TuningValue::Pitch(tuning::Pitch::from_frequency(440.0).unwrap().pitch),
+    )
+    .unwrap()];
+    let dump = tuning::bulk_dump(&pitches, 0, 2, "A".into(), None, true).unwrap();
+    let mut bytes = Cursor::new(vec![]);
+    let mut writer = file_io::Writer::new(&mut bytes, "syx", 1024).unwrap();
+    writer.write(&dump).unwrap();
+    writer.finish().unwrap();
+    drop(writer);
+    assert_eq!(bytes.into_inner(), dump.encode().unwrap());
+    for (wire, count) in [(&b""[..], 0), (&b"\xf0\xf7"[..], 1)] {
+        let mut reader = file_io::Reader::new(wire, 1024, false, false).unwrap();
+        assert_eq!(
+            reader
+                .by_ref()
+                .collect::<io::Result<Vec<_>>>()
+                .unwrap()
+                .len(),
+            count
+        );
+        assert!(reader.complete());
+        assert!(reader.problem().is_none());
+    }
+}
 #[test]
 fn smf_streaming_preserves_running_status_ticks_and_unknown_records() {
     let mut r = smf::Reader::new(Cursor::new(SMF), 1024).unwrap();
@@ -110,22 +141,29 @@ fn smf_fragments_meta_and_independent_tracks_roundtrip() {
 }
 #[test]
 fn syx_limits_and_interruption_never_return_partial_dump() {
-    let v = sysex::Reader::new(Cursor::new(b"\xf0\x7d\x01\xf7\xf0\xf7"), 10)
+    let v = file_io::Reader::new(Cursor::new(b"\xf0\x7d\x01\xf7\xf0\xf7"), 10, false, false)
         .unwrap()
         .collect::<io::Result<Vec<_>>>()
         .unwrap();
     assert_eq!(v.len(), 2);
-    assert_eq!(v[0].data(), [125, 1]);
+    let file_io::Record::Archive(meedee::archive::Record::Event(message)) = &v[0] else {
+        panic!("expected SysEx event")
+    };
+    let meedee::events::Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() else {
+        panic!("expected SysEx")
+    };
+    assert_eq!(message.data(), [125, 1]);
     for b in [&b"\xf0\x7d"[..], &b"\xf0\x90\xf7"[..], &b"\x90"[..]] {
-        assert!(sysex::Reader::new(Cursor::new(b), 10)
-            .unwrap()
-            .collect::<io::Result<Vec<_>>>()
+        assert!(file_io::Reader::new(Cursor::new(b), 10, false, false)
+            .and_then(|r| r.collect::<io::Result<Vec<_>>>())
             .is_err());
     }
-    assert!(sysex::Reader::new(Cursor::new(b"\xf0\x01\x02\xf7"), 1)
-        .unwrap()
-        .collect::<io::Result<Vec<_>>>()
-        .is_err());
+    assert!(
+        file_io::Reader::new(Cursor::new(b"\xf0\x01\x02\xf7"), 1, false, false)
+            .unwrap()
+            .collect::<io::Result<Vec<_>>>()
+            .is_err()
+    );
 }
 #[test]
 fn clip_requires_timing_start_end_and_exact_big_endian_packets() {
@@ -176,9 +214,17 @@ impl Write for FullDisk {
         Ok(())
     }
 }
+impl io::Seek for FullDisk {
+    fn seek(&mut self, _: io::SeekFrom) -> io::Result<u64> {
+        unreachable!("SYX does not seek")
+    }
+}
 #[test]
 fn disk_errors_propagate() {
     assert!(clip::Writer::new(FullDisk).is_err());
     let v = meedee::messages::SysEx::new(vec![125]).unwrap();
-    assert!(sysex::write(&mut FullDisk, &v, 10).is_err());
+    assert!(file_io::Writer::new(FullDisk, "syx", 10)
+        .unwrap()
+        .write(&v)
+        .is_err());
 }

@@ -4,12 +4,14 @@ Use existing connections. Supplying an output requests a dump; omitting it
 captures a dump you start on the instrument. The payload remains opaque.
 
 ```python
-from meedee import midi, sysex
+from meedee import file_io, midi, sysex
 
 with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
     result = sysex.dump(receiver, output)
     print(result.status, result.reason)
-    sysex.write("vl70.syx", result.messages)
+    with file_io.Writer("vl70.syx") as writer:
+        for m in result.messages:
+            writer.write(m)
 ```
 
 For a manual dump, start capture first and then trigger the instrument's dump:
@@ -17,7 +19,9 @@ For a manual dump, start capture first and then trigger the instrument's dump:
 ```python
 with midi.Input(port="Subsequent") as receiver:
     result = sysex.dump(receiver, model="moog/subsequent-37")
-    sysex.write("subsequent.syx", result.messages)
+    with file_io.Writer("subsequent.syx") as writer:
+        for m in result.messages:
+            writer.write(m)
 ```
 
 The equivalent Rust API uses an optional output and options with defaults:
@@ -45,12 +49,37 @@ No program selection, parameter writes or restores are sent.
 
 ## Model detection
 
+Identity inquiry is independently available as `universal.identify(receiver,
+output)`. It returns an `IdentityReport` containing all raw reply `messages`,
+`status`, `uncertain_send`, `ignored_events` and `reason`. It keeps duplicate and
+nonstandard replies without selecting a device. Standard messages can be decoded
+with `universal.decode`; this decoder still rejects nonstandard layouts.
+Status `completed` means the collection window ended without observed failure,
+not that exactly one device replied. No replies yields `timed_out`. Failure,
+cancellation and limit reports retain any admitted reply prefix. Connections
+remain open and buffered input is discarded before the inquiry.
+
+```python
+from meedee import universal
+
+identities = universal.identify(receiver, output)
+print(identities.status, identities.reason)
+for reply in identities.messages:
+    print(reply.data.hex())
+```
+
 With an output and no `model`, the operation sends one broadcast Universal
 Non-Realtime Identity Request (`F0 7E 7F 06 01 F7`). It collects replies for
 `identity_timeout` (default one second), within the overall timeout, before
 sending any dump request. It requires exactly one reply with a documented
 manufacturer/family/member combination. Revision bytes are accepted without
 using them to guess another model.
+
+Dump capture reuses the universal inquiry and applies its own model-recipe
+matching and ambiguity rules to the collected messages. Standalone inquiry
+defaults to device ID 127 (broadcast), one second, 4096 observed events, 8 MiB
+of retained wire bytes and 1 MiB per payload. `device_id` can target one address;
+timeouts, limits and cancellation are explicit in Python and Rust.
 
 | Detected model | Family bytes | Member bytes | Dump addressing |
 | --- | --- | --- | --- |

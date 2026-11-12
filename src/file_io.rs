@@ -88,23 +88,29 @@ struct Writer {
 #[pymethods]
 impl Writer {
     #[new]
-    #[pyo3(signature=(destination,*,payload_limit=1_048_576))]
+    #[pyo3(signature=(destination,*,format=None,payload_limit=1_048_576))]
     fn new(
         destination: &Bound<'_, PyAny>,
+        format: Option<&str>,
         #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         let extension = if destination.hasattr("write")? {
-            "meedee".to_owned()
+            format.unwrap_or("meedee").to_ascii_lowercase()
         } else {
+            if format.is_some() {
+                return Err(PyValueError::new_err(
+                    "format applies only to stream destinations; use the filename extension",
+                ));
+            }
             let path = destination.extract::<PathBuf>()?;
             path.extension()
                 .and_then(|v| v.to_str())
                 .unwrap_or("")
                 .to_ascii_lowercase()
         };
-        if !matches!(extension.as_str(), "mid" | "midi" | "meedee") {
+        if !matches!(extension.as_str(), "mid" | "midi" | "meedee" | "syx") {
             return Err(PyValueError::new_err(
-                "expected .mid, .midi or .meedee destination",
+                "expected .mid, .midi, .syx or .meedee destination",
             ));
         }
         if payload_limit == 0 {
@@ -127,7 +133,25 @@ impl Writer {
         } else if let Ok(event) = record.extract::<PyRef<'_, crate::files::Event>>() {
             model::Record::Event(event.value.clone())
         } else {
-            model::Record::Archive(crate::archive::extract(record)?)
+            match crate::archive::extract(record) {
+                Ok(value) => model::Record::Archive(value),
+                Err(_) if record.is_instance_of::<crate::messages::Message>() => {
+                    let wire = crate::messages::encode_message(record)?;
+                    if wire.first() != Some(&240) || wire.last() != Some(&247) {
+                        return Err(PyValueError::new_err("expected a structured SysEx message"));
+                    }
+                    let message = meedee::messages::SysEx::new(wire[1..wire.len() - 1].to_vec())
+                        .map_err(|e| PyValueError::new_err(e.to_string()))?;
+                    let payload = crate::event_values::with_metadata(
+                        record,
+                        meedee::events::Payload::Midi1(meedee::messages::AnyMessage::SysEx(
+                            message,
+                        )),
+                    )?;
+                    model::Record::Archive(meedee::archive::Record::Event(Box::new(payload)))
+                }
+                Err(error) => return Err(error),
+            }
         };
         let writer = self.value.as_mut().ok_or_else(closed)?;
         py.detach(|| writer.write(&record)).map_err(os_error)

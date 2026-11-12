@@ -1,4 +1,4 @@
-"""Lossless MIDI-file and meedee-archive reading and writing."""
+"""MIDI-file, SysEx-stream and meedee-archive reading and writing."""
 
 import sys
 

@@ -83,7 +83,7 @@ native message validation. Device, bank and program identifiers use MTS values
 Construction opens no ports and sends nothing.
 
 Use `bulk_dump` directly to build the typed dump. Its encoded wire bytes can be
-wrapped as a SysEx message for `sysex.write` or `Output.send`; use
+passed directly to `file_io.Writer` for `.syx` export, or explicitly encoded for `Output.send`; use
 `events.with_gap` for explicit waits. No transfer plan or
 separate execution object is needed. The former bulk_plan helper is removed.
 

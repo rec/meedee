@@ -8,7 +8,7 @@ from typing import cast
 
 import pytest
 
-from meedee import events, messages, midi, sysex, testing
+from meedee import events, file_io, messages, midi, sysex, testing, universal
 
 
 class Input:
@@ -87,7 +87,9 @@ def test_documented_requests_retain_opaque_replies(
     assert output.sent == requests and report.ignored_events == 1
     assert report.wire_bytes == sum(len(r) + 2 for r in replies)
     saved = BytesIO()
-    sysex.write(saved, report.messages)
+    with file_io.Writer(saved, format="syx") as writer:
+        for m in report.messages:
+            writer.write(m)
     assert saved.getvalue() == b"".join(b"\xf0" + r + b"\xf7" for r in replies)
 
 
@@ -529,6 +531,88 @@ def test_discovery_failures_prevent_dump_requests(
         "cancel": "cancelled",
         "limit": "limit_reached",
     }.get(failure, "failed")
+    assert report.uncertain_send == (failure == "send")
+    assert output.snapshot().accepted == (0 if failure == "cancel" else 1)
+    output.close()
+
+
+def test_universal_inquiry_collects_all_raw_replies_without_guessing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(universal, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    raw = [bytes.fromhex(v[1]) for v in identities()]
+    raw += [
+        raw[0],
+        bytes.fromhex("7e0006027d0000000000000000"),
+        bytes.fromhex("7e00060243"),
+    ]
+    output = Output(receiver, [bytes.fromhex("7e7f0601")], [raw[0]])
+    receiver.scheduled = [messages.SysEx(r).replace(stream="s") for r in raw[1:]]
+    report = universal.identify(cast(midi.Input, receiver), cast(midi.Output, output))
+    assert report.status == "completed" and report.reason is None
+    assert [m.data for m in report.messages] == raw
+    assert clock.now_ns == 1_000_000_000 and len(output.sent) == 1
+    assert not report.uncertain_send
+    assert isinstance(universal.decode(report.messages[0]), universal.IdentityReply)
+
+
+def test_directed_identity_ignores_other_addresses_and_stale_replies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(universal, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    raw = bytes.fromhex("7e0306024300410c0200000002")
+    receiver.items.append(messages.SysEx(raw).replace(stream="s"))
+    receiver.scheduled = [
+        messages.SysEx(bytes.fromhex("7e00060243")).replace(stream="s")
+    ]
+    output = Output(receiver, [bytes.fromhex("7e030601")], [raw])
+    report = universal.identify(
+        cast(midi.Input, receiver),
+        cast(midi.Output, output),
+        device_id=3,
+        timeout="10 ms",
+    )
+    assert report.status == "completed" and [m.data for m in report.messages] == [raw]
+    assert report.ignored_events == 2 and clock.now_ns == 10_000_000
+
+
+@pytest.mark.parametrize("failure", ["timeout", "loss", "cancel", "send", "limit"])
+def test_universal_inquiry_reports_failures_and_retains_admitted_replies(
+    failure: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = testing.ManualClock()
+    monkeypatch.setattr(universal, "monotonic_ns", lambda: clock.now_ns)
+    receiver = Input(clock)
+    reply = messages.SysEx(bytes.fromhex("7e0006024300410c0200000002")).replace(
+        stream="s"
+    )
+    if failure == "loss":
+        receiver.on_receive = lambda: setattr(receiver, "dropped_packets", 1)
+    elif failure == "limit":
+        receiver.scheduled = [reply, reply]
+    cancel = events.Cancellation()
+    if failure == "cancel":
+        cancel.cancel()
+    output = testing.Output(protocol="midi1")
+    if failure == "send":
+        output.fail_next_send(accepted=True)
+    report = universal.identify(
+        cast(midi.Input, receiver),
+        cast(midi.Output, output),
+        cancel=cancel,
+        message_limit=1 if failure == "limit" else 4096,
+    )
+    assert report.status == {
+        "timeout": "timed_out",
+        "cancel": "cancelled",
+        "limit": "limit_reached",
+    }.get(failure, "failed")
+    assert report.messages == ([reply] if failure == "limit" else [])
     assert report.uncertain_send == (failure == "send")
     assert output.snapshot().accepted == (0 if failure == "cancel" else 1)
     output.close()

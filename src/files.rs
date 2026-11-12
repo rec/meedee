@@ -1,6 +1,6 @@
 //! Python stream adapters and Rust file codecs. Caller-owned streams stay open.
 use crate::messages;
-use meedee::{clip, smf, sysex};
+use meedee::{clip, smf};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -325,58 +325,7 @@ impl Writer {
 pub fn closed() -> PyErr {
     PyValueError::new_err("file codec is closed")
 }
-#[pyclass(name = "Reader", module = "meedee.sysex")]
-struct SysexReader {
-    value: Option<sysex::Reader<Stream>>,
-}
-#[pymethods]
-impl SysexReader {
-    #[new]
-    #[pyo3(signature=(source,*,payload_limit=1_048_576))]
-    fn new(
-        source: &Bound<'_, PyAny>,
-        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
-    ) -> PyResult<Self> {
-        Ok(Self {
-            value: Some(
-                sysex::Reader::new(Stream::input(source)?, payload_limit).map_err(os_error)?,
-            ),
-        })
-    }
-    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
-        slf
-    }
-    fn __next__(&mut self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
-        let value = self.value.as_mut().ok_or_else(closed)?;
-        py.detach(|| value.next().transpose())
-            .map_err(os_error)?
-            .map(|v| messages::to_python(py, meedee::messages::AnyMessage::SysEx(v)))
-            .transpose()
-    }
-    fn close(&mut self) {
-        self.value = None;
-    }
-}
-#[pyfunction]
-#[pyo3(signature=(destination,messages,*,payload_limit=1_048_576))]
-fn write_sysex(
-    destination: &Bound<'_, PyAny>,
-    messages: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
-) -> PyResult<()> {
-    let mut stream = Stream::output(destination)?;
-    for v in messages.try_iter()? {
-        let v = messages::extract_primitive(&v?)?;
-        let meedee::messages::AnyMessage::SysEx(v) = v else {
-            return Err(PyTypeError::new_err("SYX accepts only SysEx"));
-        };
-        destination
-            .py()
-            .detach(|| sysex::write(&mut stream, &v, payload_limit))
-            .map_err(os_error)?;
-    }
-    destination.py().detach(|| stream.flush()).map_err(os_error)
-}
+
 #[pyclass(name = "Entry", frozen, module = "meedee.clip")]
 pub(crate) struct ClipEntry {
     pub(crate) value: clip::Entry,
@@ -470,11 +419,6 @@ pub fn register_smf(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Event>()?;
     m.add_class::<Reader>()?;
     m.add_class::<Writer>()
-}
-pub fn register_sysex(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add("Reader", m.py().get_type::<SysexReader>())?;
-    m.add("write", wrap_pyfunction!(write_sysex, m)?)?;
-    Ok(())
 }
 pub fn register_clip(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("Entry", m.py().get_type::<ClipEntry>())?;

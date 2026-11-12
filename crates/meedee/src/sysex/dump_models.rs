@@ -2,7 +2,7 @@
 use crate::drivers;
 use crate::messages::SysEx;
 use crate::midi;
-use crate::universal::{self, UniversalMessage};
+use crate::universal::{self, is_identity_reply, UniversalMessage};
 
 pub(super) struct Recipe {
     pub steps: Vec<Step>,
@@ -23,10 +23,6 @@ enum Checksum {
     None,
     Yamaha,
     Roland,
-}
-
-pub(super) fn is_identity_reply(data: &[u8]) -> bool {
-    data.first() == Some(&0x7e) && data.get(2..4) == Some(&[6, 2])
 }
 
 /// Exact identity signatures and address relationships from the model manuals.

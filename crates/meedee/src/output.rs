@@ -1158,7 +1158,9 @@ mod tests {
     #[test]
     fn with_gap_schedules_fallible_sysex_and_a_trailing_wait() {
         let mut fixture = Fixture::new();
-        let source = crate::sysex::Reader::new(&b"\xf0\x7d\xf7\xf0\x7d\xf7"[..], 1024).unwrap();
+        let source =
+            crate::file_io::Reader::new(&b"\xf0\x7d\xf7\xf0\x7d\xf7"[..], 1024, false, false)
+                .unwrap();
         let report = fixture
             .output
             .send(crate::events::with_gap(source, Duration::from_millis(100)))
@@ -1174,7 +1176,8 @@ mod tests {
     #[test]
     fn with_gap_preserves_source_errors_before_sending() {
         let mut fixture = Fixture::new();
-        let source = crate::sysex::Reader::new(&b"\xf0\x7d\xf7\xf0\x7d"[..], 1024).unwrap();
+        let source =
+            crate::file_io::Reader::new(&b"\xf0\x7d\xf7\xf0\x7d"[..], 1024, false, false).unwrap();
         let failure = fixture
             .output
             .send(crate::events::with_gap(source, Duration::ZERO))

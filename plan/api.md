@@ -1285,7 +1285,7 @@ The helper neither sends nor sleeps nor validates values. Sources remain lazy
 and keep their original items and errors.
 
 Pass the result to ordinary `Output.send` to schedule untimestamped messages and
-waits. Rust accepts fallible items such as `sysex::Reader` without discarding
+waits. Rust accepts fallible items such as `file_io::Reader` without discarding
 errors. Output prepares untimestamped sequences before sending; invalid input
 fails before sending that sequence. Gaps use the cumulative sequence timeline,
 not a pause measured after each handoff or wire completion. Timestamped recordings
@@ -1294,13 +1294,30 @@ the ordinary playback report and confirmed progress, without automatic retries
 or inferred device acknowledgement. Python exceptions carry report/completed_events;
 Rust returns playback::Failure.
 
-`sysex.Reader` and `sysex.write` retain the strict `.syx` file helpers. The CLI retains
+`file_io.Reader` and `file_io.Writer` own strict `.syx` reading/writing. The CLI retains
 `transfer-preview SOURCE --gap N` and `transfer-send SOURCE --gap N --port NAME`,
 validating the complete file and message/byte/payload bounds before discovery.
 The preview's gap is prospective sending policy, never file metadata. The CLI
 reports confirmed handoffs separately from known send uncertainty. Exit status
 is 0 for successful preview/send, 1 for interruption, and 2 for malformed input,
 setup, send or close failure. No compatibility transfer namespace is retained.
+
+## Universal identity inquiry
+
+Python `universal.identify(receiver, output, *, device_id=127, timeout=1, ...)`
+and Rust `universal::identify(&mut receiver, &mut output, &IdentityOptions)` send
+one request and collect raw identity replies for the full bounded window.
+`identify_with` is the Rust explicit I/O/clock driver. Connections stay open,
+buffered input is discarded before sending, and no request is retried.
+
+`IdentityReport` contains messages, status, uncertain_send, ignored_events and
+reason. Replies keep their exact bytes and receive metadata, including duplicates,
+unknown manufacturers and nonstandard layouts. Use universal.decode for standard
+typed replies. No device or model is selected by this operation. completed means
+the full window ended without observed loss/failure; no replies means timed_out.
+cancelled, failed and limit_reached retain the admitted reply prefix. Defaults
+are one second, 4096 observed events, 8 MiB retained wire bytes and 1 MiB per
+payload. Directed requests ignore replies with another device address.
 
 ## Opaque SysEx dump requests
 
@@ -1489,7 +1506,7 @@ unchanged.
 ## Passive MIDI 1 SysEx capture
 
 Use `Input.record(duration)` to retain MIDI messages with their timestamps and
-receive diagnostics, then select SysEx messages for `sysex.write`. Recording remains
+receive diagnostics, then select SysEx messages for `file_io.Writer`. Recording remains
 duration-only; there is no expected-count stopping rule. Receive queue and decoder
 limits still apply; the returned recording grows with received traffic and has
 no independent total recording-memory budget.
@@ -1993,24 +2010,36 @@ tracking without opening devices. Public-symbols.txt remains uncommitted.
 ## Unified file editing
 
 The package-root Reader and Writer live in file_io in both languages. Reader
-sniffs file contents for Standard MIDI Files and meedee archives. MIDI-file
+sniffs file contents for Standard MIDI Files, SysEx streams and meedee archives.
+Empty input is an empty SysEx stream, and a leading F0 selects strict SysEx
+parsing, including messages shorter than four bytes. MIDI-file
 iteration yields the original smf.Header followed by smf.Event values, preserving
 track order, ticks, metadata, unknown chunks and fragmented SysEx. SMF events
 expose channel (None for non-channel records) and transpose(semitones), which
 preserves file context and uses the shared clamping message transformation.
 Rust file_io::Record distinguishes Header, Event and Archive variants and offers
 the same channel/transpose operations. Archive iteration retains existing Python
-record types. Format-specific codecs remain available unchanged.
+record types. SysEx streams yield raw messages in Python and Archive(Event)
+records in Rust. The format-specific SysEx codec is internal; its former public
+Reader/write interface is removed.
 
-Writer selects .mid/.midi or .meedee from the destination filename and exclusively
+Writer selects .mid/.midi, .syx or .meedee from the destination filename and exclusively
 creates it. MIDI output requires the header first. Python borrowed output streams
-retain the previous archive default; Rust Writer::new accepts an explicit file
+retain the previous archive default and accept format="syx" (or another supported
+format) explicitly. Format applies only to stream destinations; paths use their
+suffix. Rust Writer::new accepts an explicit file
 extension for stream destinations. Borrowed streams remain open. Python context
 exit finalizes on success and abandons on an exception; Rust requires finish().
 Neither abandonment nor object destruction certifies completion. Errors may leave
 partial output, and never overwrite an existing destination. Reader archive
-recovery/preserve_unknown options are rejected for MIDI files. Archive completion
+recovery/preserve_unknown options are rejected for MIDI and SysEx files. Archive completion
 and problem information remain readable after Python close.
+
+SysEx writers accept structured SysEx messages directly, including MTS dumps,
+without caller-side encoding or opaque wrapping. Rust Writer::write accepts
+WriteRecord values (file records or primitive messages). SysEx rejects other
+message types, headers, archive metadata and non-archive completion status.
+It preserves message bytes but does not store timestamps or completion reports.
 
 
 ## Shared Rust subprocess transport

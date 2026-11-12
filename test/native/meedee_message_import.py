@@ -17,6 +17,7 @@ def main() -> None:
             codecs,
             controls,
             events,
+            file_io,
             gm,
             inspection,
             messages,
@@ -25,7 +26,6 @@ def main() -> None:
             notes,
             routing,
             smf,
-            sysex,
             testing,
             timecode,
             topology,
@@ -145,7 +145,7 @@ def main() -> None:
         assert ci.Header(source_muid=1, destination_muid=2).version == 2
         assert ci.Address.channel(channel=16).channel_number == 16
         assert smf.Header(format=0, tracks=1, division=480).division == 480
-        assert sysex.Reader.__module__ == "meedee.sysex"
+        assert file_io.Reader.__module__ == "meedee.file_io"
         assert clip.Reader.__module__ == "meedee.clip"
         assert inspection.inspect_file(BytesIO(b"\xf0\x7d\xf7"), format="syx").complete
         assert inspection.compare_files(
@@ -173,7 +173,7 @@ def main() -> None:
         assert router.snapshot().admitted == 1
         tracker = topology.Tracker()
         assert tracker.observe([]).generation == 1
-        assert list(sysex.Reader(BytesIO(b"\xf0\x7d\xf7")))[0].data == b"\x7d"
+        assert list(file_io.Reader(BytesIO(b"\xf0\x7d\xf7")))[0].data == b"\x7d"
         assert list(events.with_gap(iter(["item"]), 0.1)) == ["item", 0.1]
         from meedee import discovery
 

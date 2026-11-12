@@ -1,15 +1,17 @@
 """SysEx preview, paced sending and duration-based recording commands."""
 
-from . import archive, events, messages, sysex
+from . import archive, events, file_io, messages
 from ._cli import SysexReceive, TransferPreview, TransferSend, emit
 
 
 def run_transfer(config: TransferPreview) -> int:
     values: list[messages.SysEx] = []
     wire_bytes = 0
-    reader = sysex.Reader(config.source, payload_limit=config.payload_limit)
+    reader = file_io.Reader(config.source, payload_limit=config.payload_limit)
     try:
         for m in reader:
+            if not isinstance(m, messages.SysEx):
+                raise ValueError("transfer requires complete SysEx messages")
             wire_bytes += len(m.data) + 2
             if len(values) == config.message_limit or wire_bytes > config.byte_limit:
                 raise ValueError("transfer message or byte limit exceeded")
@@ -149,8 +151,11 @@ def run_receive(config: SysexReceive) -> int:
                 ignored += 1
         if not values:
             raise ValueError("recording contained no SysEx messages")
-        with config.destination.open("xb") as destination:
-            sysex.write(destination, values, payload_limit=config.payload_limit)
+        with file_io.Writer(
+            config.destination, payload_limit=config.payload_limit
+        ) as destination:
+            for m in values:
+                destination.write(m)
         exported = True
     except KeyboardInterrupt:
         interrupted = True

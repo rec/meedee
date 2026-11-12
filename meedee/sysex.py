@@ -1,4 +1,4 @@
-"""Rust-owned streaming SYX file codecs."""
+"""Opaque instrument dump requests and capture."""
 
 from __future__ import annotations
 

@@ -1,6 +1,31 @@
-"""Pure universal values backed by the shared Rust toolkit."""
+"""Universal MIDI values, codecs and bounded identity inquiry."""
 
-from . import events, messages
+from . import events, messages, midi
+from .messages import SysEx
+
+class IdentityReport:
+    @property
+    def messages(self) -> list[SysEx]: ...
+    @property
+    def status(self) -> str: ...
+    @property
+    def uncertain_send(self) -> bool: ...
+    @property
+    def ignored_events(self) -> int: ...
+    @property
+    def reason(self) -> str | None: ...
+
+def identify(
+    receiver: midi.Input,
+    output: midi.Output,
+    *,
+    device_id: int = 127,
+    timeout: float | str = 1.0,
+    message_limit: int = 4096,
+    byte_limit: int | str = 8_388_608,
+    payload_limit: int | str = 1_048_576,
+    cancel: events.Cancellation | None = None,
+) -> IdentityReport: ...
 
 class IdentityRequest(messages.Message):
     def __init__(self, *, device_id: int) -> None: ...

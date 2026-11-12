@@ -1,12 +1,13 @@
 //! Opaque dump capture. Only transport envelopes are interpreted.
-use super::dump_models::{identify, is_identity_reply, recipe, Recipe};
+use super::dump_models::{identify, recipe, Recipe};
 use crate::archive::{Record, Recorder};
 use crate::drivers::{self, Receiver, Sender};
 use crate::events::Payload;
 use crate::live::Item;
-use crate::messages::{AnyMessage, Message, PrimitiveMessage, SysEx};
+use crate::messages::{AnyMessage, Message, SysEx};
 use crate::midi;
 use crate::playback::{Cancellation, MonotonicClock, PlaybackClock};
+use crate::universal::{self, is_identity_reply};
 use std::collections::BTreeSet;
 use std::time::Duration;
 
@@ -148,24 +149,26 @@ pub fn dump_with(
         autodetected: false,
     };
     let baseline = receiver.dropped_packets()?;
-    // A finite drain establishes the boundary before any request. Stale traffic
-    // never enters the recorder or satisfies a request.
-    loop {
-        if capture.check(receiver, options, baseline, clock, deadline) {
-            return capture.finish();
-        }
-        match receiver.receive(Duration::ZERO) {
-            Ok(Some(_)) => {
-                capture.report.ignored_events += 1;
-                if capture.report.ignored_events >= options.message_limit {
-                    capture.end("limit_reached", "input did not become quiet before capture");
+    // Discovery establishes its own boundary. Explicit selection and manual
+    // capture drain here so stale traffic never enters the recorder.
+    if selected.is_some() {
+        loop {
+            if capture.check(receiver, options, baseline, clock, deadline) {
+                return capture.finish();
+            }
+            match receiver.receive(Duration::ZERO) {
+                Ok(Some(_)) => {
+                    capture.report.ignored_events += 1;
+                    if capture.report.ignored_events >= options.message_limit {
+                        capture.end("limit_reached", "input did not become quiet before capture");
+                        return capture.finish();
+                    }
+                }
+                Ok(None) => break,
+                Err(error) => {
+                    capture.error(&error);
                     return capture.finish();
                 }
-            }
-            Ok(None) => break,
-            Err(error) => {
-                capture.error(&error);
-                return capture.finish();
             }
         }
     }
@@ -292,95 +295,62 @@ impl Capture {
         if self.check(receiver, options, baseline, clock, deadline) {
             return Ok(None);
         }
-        self.report.uncertain_send = true;
-        let request = crate::universal::IdentityRequest::new(127)?;
-        let wire = request.encode()?;
-        if let Err(error) = output.send(Payload::Midi1(AnyMessage::SysEx(SysEx::new(
-            wire[1..wire.len() - 1].to_vec(),
-        )?))) {
-            self.error(&error);
-            return Ok(None);
-        }
-        self.report.uncertain_send = false;
-        let until = clock
-            .now_ns()
-            .checked_add(nanos(options.identity_timeout)?)
-            .ok_or_else(|| drivers::invalid("identity deadline overflow"))?
-            .min(deadline);
-        let mut seen = 0;
-        let mut replied = false;
-        let mut candidate = None;
-        while clock.now_ns() < until {
-            if self.check(receiver, options, baseline, clock, deadline) {
-                return Ok(None);
-            }
-            let item = match receiver.receive(drivers::remaining(clock, until)) {
-                Ok(Some(item)) => item,
-                Ok(None) => continue,
-                Err(error) => {
-                    self.error(&error);
-                    return Ok(None);
-                }
-            };
-            seen += 1;
-            if seen > options.message_limit {
-                self.end(
-                    "limit_reached",
-                    "identity reply collection exceeded its event limit; specify model explicitly",
-                );
-                return Ok(None);
-            }
-            match item {
-                Item::Diagnostic(d) if d.stream == stream => {
-                    self.end("failed", &d.reason);
-                    return Ok(None);
-                }
-                Item::Message(m) if m.stream() == Some(stream) => {
-                    if let Payload::Midi1(AnyMessage::SysEx(reply)) = m.as_ref() {
-                        if is_identity_reply(reply.data()) {
-                            if replied {
-                                self.end("failed", "multiple identity replies; specify model and device_id explicitly instead of guessing");
-                                return Ok(None);
-                            }
-                            replied = true;
-                            if reply.data().len() > options.payload_limit
-                                || reply.data().len() + 2 > options.byte_limit
-                            {
-                                self.end(
-                                    "limit_reached",
-                                    "identity reply exceeds dump limits; specify model explicitly",
-                                );
-                                return Ok(None);
-                            }
-                            match identify(reply) {
-                                Ok(value) => candidate = value,
-                                Err(reason) => {
-                                    self.end("failed", reason);
-                                    return Ok(None);
-                                }
-                            }
-                            continue;
-                        }
-                    }
-                    self.report.ignored_events += 1;
-                }
-                _ => self.report.ignored_events += 1,
-            }
-        }
+        let inquiry = universal::identify_with(
+            receiver,
+            output,
+            stream,
+            &universal::IdentityOptions {
+                timeout: options.identity_timeout.min(Duration::from_nanos(
+                    deadline.saturating_sub(clock.now_ns()),
+                )),
+                message_limit: options.message_limit,
+                byte_limit: options.byte_limit,
+                payload_limit: options.payload_limit,
+                cancel: options.cancel.clone(),
+                ..Default::default()
+            },
+            clock,
+        )?;
+        self.report.ignored_events += inquiry.ignored_events;
+        self.report.uncertain_send = inquiry.uncertain_send;
         if self.check(receiver, options, baseline, clock, deadline) {
             return Ok(None);
         }
-        if candidate.is_none() {
+        if inquiry.status != "completed" {
             self.end(
-                "failed",
-                if replied {
-                    "unrecognized or unsupported identity; specify model explicitly"
+                if inquiry.status == "timed_out" {
+                    "failed"
                 } else {
-                    "no identity reply within identity_timeout; specify model explicitly"
+                    inquiry.status
                 },
+                &format!(
+                    "{}; specify model explicitly",
+                    inquiry
+                        .reason
+                        .as_deref()
+                        .unwrap_or("identity inquiry failed")
+                ),
             );
+            return Ok(None);
         }
-        Ok(candidate)
+        if inquiry.messages.len() != 1 {
+            self.end("failed","multiple identity replies; specify model and device_id explicitly instead of guessing");
+            return Ok(None);
+        }
+        match identify(&inquiry.messages[0]) {
+            Ok(Some(value)) => Ok(Some(value)),
+            Ok(None) => {
+                self.end(
+                    "failed",
+                    "unrecognized or unsupported identity; specify model explicitly",
+                );
+                Ok(None)
+            }
+            Err(reason) => {
+                self.end("failed", reason);
+                Ok(None)
+            }
+        }
     }
     fn end(&mut self, status: &'static str, reason: &str) {
         self.report.status = status;

@@ -1,5 +1,11 @@
-//! Selected universal MIDI 1.0 messages. Explicit device addressing, no I/O.
+//! Universal MIDI 1.0 values, codecs and bounded identity inquiry.
 use crate::messages::{PrimitiveMessage, SysEx, ValueError};
+mod identity;
+pub use identity::{identify, identify_with, IdentityOptions, IdentityReport};
+
+pub(crate) fn is_identity_reply(data: &[u8]) -> bool {
+    data.first() == Some(&0x7e) && data.get(2..4) == Some(&[6, 2])
+}
 
 macro_rules! device_messages {
     ($($name:ident { $($field:ident : $ty:ty = $low:literal ..= $high:literal),* };)*) => {$(

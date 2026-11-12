@@ -183,6 +183,60 @@ impl PlaybackClock for Clock<'_, '_> {
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+pub(crate) fn run_identify(
+    py: Python<'_>,
+    receiver: Bound<'_, PyAny>,
+    output: Bound<'_, PyAny>,
+    device_id: u8,
+    #[pyo3(from_py_with=crate::units::duration)] timeout: u64,
+    #[pyo3(from_py_with=crate::files::limit)] message_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
+    cancel: Bound<'_, PyAny>,
+    now: Bound<'_, PyAny>,
+) -> PyResult<crate::universal::IdentityReport> {
+    let stream = receiver.getattr("stream")?.extract::<String>()?;
+    let token = cancel
+        .extract::<PyRef<'_, crate::playback::Cancellation>>()?
+        .value
+        .clone();
+    let calls = Calls::new(py);
+    let mut receiver = Input {
+        calls: &calls,
+        object: receiver,
+    };
+    let mut output = Output {
+        calls: &calls,
+        object: output,
+    };
+    let mut clock = Clock {
+        calls: &calls,
+        now,
+        cancel,
+        last: 0,
+    };
+    let result = meedee::universal::identify_with(
+        &mut receiver,
+        &mut output,
+        &stream,
+        &meedee::universal::IdentityOptions {
+            device_id,
+            timeout: Duration::from_nanos(timeout),
+            message_limit,
+            byte_limit,
+            payload_limit,
+            cancel: token,
+        },
+        &mut clock,
+    );
+    calls.finish(
+        result.map(|value| crate::universal::IdentityReport { value }),
+        false,
+    )
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_sysex_dump(
     py: Python<'_>,
     receiver: Bound<'_, PyAny>,
