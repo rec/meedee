@@ -444,7 +444,7 @@ settings. They open no ports and send nothing. Omitted bulk keys or explicit
 `NoChange` values require `preserve_unmapped=True`. See the
 [bridge contract](plan/ufor-tuning.md).
 
-meedee supports Python 3.13 only, including patch releases. Ordinary installs
+meedee supports Python 3.13 and newer. Ordinary installs
 use reccy for unit-aware Python inputs; uFor remains an optional extra.
 
 ### Units in Python inputs
@@ -786,9 +786,9 @@ Python, subinterpreters and forking with imported/live MIDI state are unsupporte
 private `meedee._core` extension. Rust use requires no Python. Both languages
 use the same libremidi implementation; midir has been removed.
 
-Source builds require Rust 1.87+, CMake 3.22+, a C++20 toolchain and CPython 3.13.
-Both the package metadata and .python-version select Python 3.13; newer minor
-versions are not implicitly supported. To recreate the development environment
+Source builds require Rust 1.87+, CMake 3.22+, a C++20 toolchain and CPython 3.13+.
+Package metadata requires Python >=3.13; .python-version selects Python 3.13
+for local development. To recreate the development environment
 with all optional dependencies, run `uv sync --locked --all-extras`.
 Native libremidi sources are pinned and statically linked with no production
 build-time download. macOS requires Command Line Tools and macOS 11+; Windows

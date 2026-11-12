@@ -135,8 +135,8 @@ These are proposed product decisions, not requirements supplied by the user:
 
 - Distribution name: `meedee`, subject to package-index name availability.
 - Use PyO3 for the extension and maturin as the Python build backend.
-- Use standard, GIL-enabled CPython 3.13 only, per the 2026-10-29 version decision.
-  Declare only the versions actually exercised by CI.
+- Support standard, GIL-enabled CPython 3.13 and newer. Keep Python 3.13 as the
+  local development interpreter and minimum syntax/type-checking target.
 - Support the default desktop backends: CoreMIDI on macOS, ALSA on Linux, and
   WinMM on Windows. Start development on macOS; gate each platform's advertised
   support on its own build and runtime evidence.
