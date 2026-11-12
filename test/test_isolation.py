@@ -520,7 +520,7 @@ def test_connection_is_the_resource_and_close_is_terminal(
 def test_invalid_deadlines_are_rejected_before_starting_a_worker(
     timeout: float, workers: None
 ) -> None:
-    with pytest.raises(ValueError, match="positive and finite"):
+    with pytest.raises(ValueError, match="timeout"):
         output_client("invalid", timeout=timeout)
     assert not workers
 
@@ -751,7 +751,7 @@ def test_typed_input_exposes_receive_drops_without_another_packet(
         assert connection.dropped_packets == 7
         assert connection.failure is None
         assert connection.receive(timeout=0) is None
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValueError, match="frozen"):
             connection.dropped_packets = 0  # ty: ignore[invalid-assignment]
     assert connection.dropped_packets == 7
 

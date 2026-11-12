@@ -283,9 +283,9 @@ def test_port_selection_supports_shell_character_classes(
 
 
 def test_empty_port_patterns_are_rejected_before_discovery() -> None:
-    with pytest.raises(ValueError, match="empty"):
+    with pytest.raises(ValueError, match="port"):
         midi.Input(port="")
-    with pytest.raises(ValueError, match="empty"):
+    with pytest.raises(ValueError, match="port"):
         midi.Output(port="")
 
 

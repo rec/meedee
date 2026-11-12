@@ -327,8 +327,8 @@ retain the full files or change either source.
 
 ### Optional command-line tools
 
-Install `meedee[cli]` (in this checkout: `uv sync --extra cli`). The optional
-Tyro/Pydantic dependency set does not change ordinary library installations.
+Install `meedee[cli]` (in this checkout: `uv sync --extra cli`). The extra adds
+Tyro; Pydantic is also used by the ordinary library's resource configuration.
 
 ```sh
 meedee inspect take.meedee --format archive
@@ -487,6 +487,15 @@ settings. They open no ports and send nothing. Omitted bulk keys or explicit
 
 meedee supports Python 3.13 and newer. Ordinary installs
 use reccy for unit-aware Python inputs; uFor remains an optional extra.
+
+`Input`, `Output` and `discovery.Poller` are frozen Pydantic configuration models.
+Their existing keyword constructors, units and lazy connection behavior remain.
+Invalid settings raise `pydantic.ValidationError` (a `ValueError`), including
+strict type failures that previously raised `TypeError`. `model_dump()` returns
+configuration fields, excluding locks, native handles and processing state.
+Instances compare by identity. Copying, deep copying, `model_copy()` and pickling
+are rejected; construct a fresh instance from settings instead. Runtime state in
+subclasses belongs in private attributes. Input iteration still yields messages.
 
 ### Units in Python inputs
 

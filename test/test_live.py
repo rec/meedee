@@ -9,6 +9,7 @@ from threading import Thread
 from typing import Self
 
 import pytest
+from pydantic import PrivateAttr
 
 from meedee import _native, archive, events, messages, midi, ump
 
@@ -129,15 +130,17 @@ def test_clock_mapping_and_rounding_require_explicit_policy() -> None:
 
 
 class Sink(midi.Output):
+    _sent: list[messages.Message] = PrivateAttr(default_factory=list)
+    _fail_at: int | None = PrivateAttr(default=None)
+
     def __init__(self, fail_at: int | None = None) -> None:
         super().__init__()
-        self.sent: list[messages.Message] = []
-        self.fail_at = fail_at
+        self._fail_at = fail_at
 
     def _send(self, message: messages.Message) -> None:
-        if len(self.sent) == self.fail_at:
+        if len(self._sent) == self._fail_at:
             raise midi.SendError("device failed")
-        self.sent.append(message)
+        self._sent.append(message)
 
     def __enter__(self) -> Self:
         return self
@@ -150,7 +153,7 @@ def test_playback_cancellation_and_partial_failure_do_not_send_cleanup() -> None
             [event(0), event(0), event(0)],
             origin=events.Timestamp(ticks=0, clock=clock()),
         )
-    assert error.value.completed_events == 1 and len(sink.sent) == 1
+    assert error.value.completed_events == 1 and len(sink._sent) == 1
     assert isinstance(error.value, midi.SendError)
     cancel = events.Cancellation()
     cancel.cancel()
@@ -174,7 +177,7 @@ def test_playback_cancellation_and_partial_failure_do_not_send_cleanup() -> None
     cancel.cancel()
     worker.join(2)
     assert not worker.is_alive() and reports[0].cancelled
-    assert len(sink.sent) <= 1
+    assert len(sink._sent) <= 1
 
 
 def test_recording_preserves_verified_events_and_reports_observed_loss(
@@ -625,7 +628,7 @@ def test_input_iteration_drains_then_reports_terminal_overflow(
 
 @pytest.mark.parametrize("channel", [0, 17, [1, 17]])
 def test_input_rejects_invalid_channel_selection(channel: int | list[int]) -> None:
-    with pytest.raises(ValueError, match="1..16"):
+    with pytest.raises(ValueError, match="channel"):
         midi.Input(channel=channel, run_in_subprocess=False)
 
 

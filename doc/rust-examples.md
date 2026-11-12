@@ -1017,3 +1017,10 @@ connect. Callbacks stay in the parent. Native-operation timeouts, child exits an
 terminal errors invalidate the worker; operations are never retried automatically.
 The default deadline is five seconds. Parent callbacks must return on their own.
 Python's interpreter bootstrap and direct Rust launcher use this same engine.
+
+Python's `Input`, `Output` and discovery poller use frozen Pydantic configuration
+models and report invalid settings with `ValidationError`. Rust continues to use
+the builders and options shown above, with typed validation errors. Units,
+defaults, lazy opening, terminal closure and resource ownership are unchanged.
+Python copying/pickling is rejected, and Rust input/output owners remain
+non-`Clone`; a new resource is constructed from configuration.

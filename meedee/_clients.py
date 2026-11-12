@@ -16,150 +16,152 @@ from queue import Empty, Full
 from threading import Lock, RLock, Thread
 from time import monotonic
 from types import TracebackType
-from typing import Literal, cast
+from typing import Annotated, Literal, Self, cast
 from uuid import uuid4
+
+from pydantic import (
+    BeforeValidator,
+    Field,
+    PrivateAttr,
+    field_validator,
+    model_validator,
+)
 
 from . import _native, _units, archive, codecs, events, gm, messages, midi
 from ._errors import CompoundSendError
+from ._resource import ResourceModel
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, ReceiveQueue
 from .events import Clock
 
 
-class Input[T = messages.Message | events.StreamDiagnostic]:
-    __slots__ = (
-        "_native",
-        "_settings",
-        "_initialization",
-        "_run_in_subprocess",
-        "_subprocess_worker",
-        "_subprocess_executable",
-        "_failure",
-        "_timeout",
-        "_protocol",
-        "_raw_mode",
-        "_event_limit",
-        "_sysex_limit",
-        "_byte_limit",
-        "_channels",
-        "_port",
-        "_connection",
-        "_closed",
-        "__weakref__",
-    )
+class _Client(ResourceModel, frozen=True):
+    protocol: midi.Protocol = Field(default_factory=lambda: midi.Protocol.Midi1)
+    backend: midi.Backend | None = None
+    port: str | None = Field(default=None, min_length=1)
+    run_in_subprocess: bool = False
+    subprocess_worker: Literal["python", "rust"] = "python"
+    subprocess_executable: str | None = None
+    timeout: float = Field(default=5.0, gt=0, allow_inf_nan=False)
 
-    def __init__(
-        self,
-        *,
-        raw: bool = False,
-        channel: int | Iterable[int] | None = None,
-        port: str | None = None,
-        event_limit: int = 128,
-        sysex_limit: int | str = 1_048_576,
-        protocol: midi.Protocol = midi.Protocol.Midi1,
-        backend: midi.Backend | None = None,
-        timestamps: midi.TimestampMode = midi.TimestampMode.Absolute,
-        run_in_subprocess: bool = False,
-        subprocess_worker: Literal["python", "rust"] = "python",
-        subprocess_executable: str | PathLike[str] | None = None,
-        timeout: float | str = 5.0,
-        receive_byte_limit: int | str = DEFAULT_RECEIVE_BYTE_LIMIT,
-    ) -> None:
-        timeout = _units.real(timeout, "second")
-        validate_settings(protocol, backend, run_in_subprocess, timeout)
-        if subprocess_worker not in ("python", "rust"):
-            raise ValueError("subprocess_worker must be python or rust")
-        if subprocess_executable is not None:
-            subprocess_executable = str(Path(subprocess_executable))
-        if not isinstance(timestamps, midi.TimestampMode):
-            raise TypeError("timestamps must be TimestampMode")
-        receive_byte_limit = _units.integer(receive_byte_limit, "byte")
-        if type(receive_byte_limit) is not int:
-            raise TypeError("receive_byte_limit must be a built-in integer")
-        if receive_byte_limit <= 0:
-            raise ValueError("receive_byte_limit must be positive")
-        if type(raw) is not bool:
-            raise TypeError("raw must be a boolean")
-        sysex_limit = _units.integer(sysex_limit, "byte")
-        for n in (event_limit, sysex_limit):
-            if type(n) is not int:
-                raise TypeError("event_limit and sysex_limit must be built-in integers")
-            if n <= 0:
-                raise ValueError("event_limit and sysex_limit must be positive")
-        if channel is None:
-            channels = None
-        else:
-            values = [channel] if isinstance(channel, int) else list(channel)
-            for c in values:
-                if type(c) is not int:
-                    raise TypeError("channels must be built-in integers")
-                if not 1 <= c <= 16:
-                    raise ValueError("channels must be in 1..16")
-            channels = frozenset(values)
-        if raw and channels is not None:
+    _settings: dict[str, object] = PrivateAttr(default_factory=dict)
+    _initialization: LockType = PrivateAttr(default_factory=Lock)
+    _closed: bool = PrivateAttr(default=False)
+    _failure: Exception | None = PrivateAttr(default=None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _control_thread(cls, value: object) -> object:
+        _native.check_thread()
+        return value
+
+    @field_validator("timeout", mode="before")
+    @classmethod
+    def _seconds(cls, value: object) -> object:
+        if type(value) not in (int, float, str):
+            raise ValueError("timeout must be seconds or a unit expression")
+        return _units.real(cast(float | str, value), "second")
+
+    @field_validator("subprocess_executable", mode="before")
+    @classmethod
+    def _executable(cls, value: object) -> object:
+        return str(Path(value)) if isinstance(value, (str, PathLike)) else value
+
+
+def _builtin_integer(value: object) -> object:
+    if type(value) is not int:
+        raise ValueError("expected a built-in integer")
+    return value
+
+
+_Channel = Annotated[int, BeforeValidator(_builtin_integer), Field(ge=1, le=16)]
+
+
+class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True):
+    raw: bool = False
+    channel: _Channel | list[_Channel] | None = None
+    event_limit: int = Field(default=128, gt=0)
+    sysex_limit: int = Field(default=1_048_576, gt=0)
+    timestamps: midi.TimestampMode = Field(
+        default_factory=lambda: midi.TimestampMode.Absolute
+    )
+    receive_byte_limit: int = Field(default=DEFAULT_RECEIVE_BYTE_LIMIT, gt=0)
+
+    _native_client: _native.Input | None = PrivateAttr(default=None)
+    _connection: _InputState[T] | None = PrivateAttr(default=None)
+    _channels: frozenset[int] | None = PrivateAttr(default=None)
+
+    @field_validator("channel", mode="before")
+    @classmethod
+    def _channel_values(cls, value: object) -> object:
+        if value is None or isinstance(value, int):
+            return value
+        return list(value) if isinstance(value, Iterable) else value
+
+    @field_validator("event_limit", mode="before")
+    @classmethod
+    def _events(cls, value: object) -> object:
+        return _builtin_integer(value)
+
+    @field_validator("sysex_limit", "receive_byte_limit", mode="before")
+    @classmethod
+    def _bytes(cls, value: object) -> object:
+        return _builtin_integer(
+            _units.integer(value, "byte") if isinstance(value, str) else value
+        )
+
+    @model_validator(mode="after")
+    def _decoded_channels(self) -> Self:
+        if self.raw and self.channel is not None:
             raise ValueError("channel filtering requires decoded input (raw=False)")
-        if port is not None and not isinstance(port, str):
-            raise TypeError("port must be a name pattern or None")
-        if port == "":
-            raise ValueError("port pattern must not be empty")
-        self._port = port
-        self._initialization = Lock()
-        self._closed = False
-        self._channels = channels
-        self._connection: _InputState[T] | None = None
-        self._protocol = protocol
-        self._raw_mode = raw
-        self._event_limit = event_limit
-        self._sysex_limit = sysex_limit
-        self._byte_limit = receive_byte_limit
-        settings: dict[str, object] = {
+        return self
+
+    def model_post_init(self, context: object) -> None:
+        if self.channel is not None:
+            self._channels = frozenset(
+                [self.channel] if isinstance(self.channel, int) else self.channel
+            )
+        self._settings = {
             "identity": uuid4().hex,
-            "protocol": protocol,
-            "backend": backend,
-            "timestamps": timestamps,
-            "receive_byte_limit": receive_byte_limit,
+            "protocol": self.protocol,
+            "backend": self.backend,
+            "timestamps": self.timestamps,
+            "receive_byte_limit": self.receive_byte_limit,
         }
-        self._settings = settings
-        self._subprocess_worker = subprocess_worker
-        self._subprocess_executable = subprocess_executable
-        self._failure: Exception | None = None
-        self._run_in_subprocess = run_in_subprocess
-        self._timeout = timeout
-        self._native = None
 
     def _initialize(self) -> None:
         _native.check_thread()
         with self._initialization:
             if self._closed:
                 raise midi.StateError("client is closed")
-            if self._native is not None:
+            if self._native_client is not None:
                 return
             settings: dict[str, object] = dict(self._settings)
-            if self._run_in_subprocess:
+            if self.run_in_subprocess:
                 settings.update(
-                    worker_program=self._subprocess_executable
+                    worker_program=self.subprocess_executable
                     or (
                         sys.executable
-                        if self._subprocess_worker == "python"
+                        if self.subprocess_worker == "python"
                         else "meedee-worker"
                     ),
                     worker_args=["-m", "meedee._worker"]
-                    if self._subprocess_worker == "python"
+                    if self.subprocess_worker == "python"
                     else [],
-                    worker_timeout=self._timeout,
+                    worker_timeout=self.timeout,
                 )
-            self._native = _native.Input(**settings)
+            self._native_client = _native.Input(**settings)
 
     def ports(self) -> list[midi.Port]:
         if self._closed or self._connection is not None:
             raise midi.StateError("client is connected or closed")
         self._initialize()
-        assert self._native is not None
-        return self._native.ports()
+        assert self._native_client is not None
+        return self._native_client.ports()
 
     @property
     def worker_failure(self) -> Exception | None:
-        if self._native is not None and self._run_in_subprocess:
-            return self._native.worker_failure
+        if self._native_client is not None and self.run_in_subprocess:
+            return self._native_client.worker_failure
         return self._failure
 
     def connect(
@@ -187,14 +189,16 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         if name is None and not isinstance(port, midi.Port):
             raise TypeError("port must be a discovery snapshot")
         self._initialize()
-        assert self._native is not None
+        assert self._native_client is not None
         identity = uuid4().hex
         connection = _InputState[T]._create(self, callback)
         transport = _InputTransport[T]._create(self)
         transport._native = (
-            self._native.connect(cast(midi.Port, port), connection._deliver, identity)
+            self._native_client.connect(
+                cast(midi.Port, port), connection._deliver, identity
+            )
             if name is None
-            else self._native.create_virtual(name, connection._deliver, identity)
+            else self._native_client.create_virtual(name, connection._deliver, identity)
         )
         transport._closed = False
         connection._raw = transport
@@ -219,7 +223,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         seconds = _units.real(duration, "second")
         if not math.isfinite(seconds) or seconds < 0:
             raise ValueError("duration must be finite and nonnegative")
-        if self._raw_mode:
+        if self.raw:
             raise midi.StateError("recording requires decoded input (raw=False)")
         if self._connection is not None and self._connection._bridge is not None:
             raise midi.StateError("recording is unavailable in callback mode")
@@ -258,7 +262,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         if self._closed or (self._connection is not None and self._connection._closing):
             raise midi.StateError("input is closed")
         if self._connection is None:
-            self.connect(_native.select_port(self.ports(), self._port, "input"))
+            self.connect(_native.select_port(self.ports(), self.port, "input"))
         return self
 
     def __exit__(
@@ -312,7 +316,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
                 self._connection.close()
         finally:
             self._failure = self.worker_failure
-            self._native = None
+            self._native_client = None
 
     def receive(
         self,
@@ -338,7 +342,7 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
         byte_limit: int | str = 8_388_608,
         metrics: bool = False,
     ) -> archive.Recorder:
-        if self._raw_mode:
+        if self.raw:
             raise midi.StateError("recording requires decoded input (raw=False)")
         self.__enter__()
         assert self._connection is not None
@@ -403,110 +407,69 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
             print(error, file=sys.stderr)
 
 
-class Output:
+class Output(_Client, frozen=True):
     """Discover MIDI destinations and open message/packet output connections."""
 
-    __slots__ = (
-        "_native",
-        "_settings",
-        "_initialization",
-        "_run_in_subprocess",
-        "_subprocess_worker",
-        "_subprocess_executable",
-        "_failure",
-        "_timeout",
-        "_protocol",
-        "_channel",
-        "_port",
-        "_connection",
-        "_closed",
-        "__weakref__",
-        "_beat_period",
-    )
+    channel: _Channel | None = None
+    bpm: int | float | None = Field(default=None, gt=0)
 
-    def __init__(
-        self,
-        *,
-        channel: int | None = None,
-        bpm: int | float | None = None,
-        port: str | None = None,
-        protocol: midi.Protocol = midi.Protocol.Midi1,
-        backend: midi.Backend | None = None,
-        run_in_subprocess: bool = False,
-        subprocess_worker: Literal["python", "rust"] = "python",
-        subprocess_executable: str | PathLike[str] | None = None,
-        timeout: float | str = 5.0,
-    ) -> None:
-        timeout = _units.real(timeout, "second")
-        validate_settings(protocol, backend, run_in_subprocess, timeout)
-        if subprocess_worker not in ("python", "rust"):
-            raise ValueError("subprocess_worker must be python or rust")
-        if subprocess_executable is not None:
-            subprocess_executable = str(Path(subprocess_executable))
-        messages.NoteOn(0, channel=channel)
-        if port is not None and not isinstance(port, str):
-            raise TypeError("port must be a name pattern or None")
-        if port == "":
-            raise ValueError("port pattern must not be empty")
-        if bpm is not None:
-            if type(bpm) not in (int, float):
-                raise TypeError("bpm must be a number")
-            if not math.isfinite(bpm) or bpm <= 0:
-                raise ValueError("bpm must be positive and finite")
-        self._beat_period = None if bpm is None else Fraction(60) / Fraction(str(bpm))
-        self._initialization = Lock()
-        self._closed = False
-        self._channel = channel
-        self._port = port
-        self._connection: _OutputState | None = None
-        self._protocol = protocol
-        settings: dict[str, object] = {
+    _native_client: _native.Output | None = PrivateAttr(default=None)
+    _connection: _OutputState | None = PrivateAttr(default=None)
+    _beat_period: Fraction | None = PrivateAttr(default=None)
+
+    @field_validator("bpm", mode="before")
+    @classmethod
+    def _numeric_bpm(cls, value: object) -> object:
+        if value is not None and type(value) not in (int, float):
+            raise ValueError("bpm must be a number")
+        if isinstance(value, (int, float)) and not math.isfinite(value):
+            raise ValueError("bpm must be positive and finite")
+        return value
+
+    def model_post_init(self, context: object) -> None:
+        self._beat_period = (
+            None if self.bpm is None else Fraction(60) / Fraction(str(self.bpm))
+        )
+        self._settings = {
             "identity": uuid4().hex,
-            "protocol": protocol,
-            "backend": backend,
+            "protocol": self.protocol,
+            "backend": self.backend,
         }
-        self._settings = settings
-        self._subprocess_worker = subprocess_worker
-        self._subprocess_executable = subprocess_executable
-        self._failure: Exception | None = None
-        self._run_in_subprocess = run_in_subprocess
-        self._timeout = timeout
-        self._native = None
 
     def _initialize(self) -> None:
         _native.check_thread()
         with self._initialization:
             if self._closed:
                 raise midi.StateError("client is closed")
-            if self._native is not None:
+            if self._native_client is not None:
                 return
             settings: dict[str, object] = dict(self._settings)
-            if self._run_in_subprocess:
+            if self.run_in_subprocess:
                 settings.update(
-                    worker_program=self._subprocess_executable
+                    worker_program=self.subprocess_executable
                     or (
                         sys.executable
-                        if self._subprocess_worker == "python"
+                        if self.subprocess_worker == "python"
                         else "meedee-worker"
                     ),
                     worker_args=["-m", "meedee._worker"]
-                    if self._subprocess_worker == "python"
+                    if self.subprocess_worker == "python"
                     else [],
-                    worker_timeout=self._timeout,
+                    worker_timeout=self.timeout,
                 )
-            self._native = _native.Output(**settings)
+            self._native_client = _native.Output(**settings)
 
     def ports(self) -> list[midi.Port]:
         if self._closed or self._connection is not None:
             raise midi.StateError("client is connected or closed")
         self._initialize()
-        assert self._native is not None
-        return self._native.ports()
+        assert self._native_client is not None
+        return self._native_client.ports()
 
     @property
     def worker_failure(self) -> Exception | None:
-        if self._native is not None and self._run_in_subprocess:
-            return self._native.worker_failure
+        if self._native_client is not None and self.run_in_subprocess:
+            return self._native_client.worker_failure
         return self._failure
 
     def connect(self, port: midi.Port) -> Output:
@@ -517,8 +480,8 @@ class Output:
             raise TypeError("port must be a discovery snapshot")
         self._initialize()
         connection = _OutputState._create(self)
-        assert self._native is not None
-        connection._native = self._native.connect(port)
+        assert self._native_client is not None
+        connection._native = self._native_client.connect(port)
         connection._closed = False
         self._connection = connection
         return self
@@ -529,8 +492,8 @@ class Output:
         validate_open(name)
         self._initialize()
         connection = _OutputState._create(self)
-        assert self._native is not None
-        connection._native = self._native.create_virtual(name)
+        assert self._native_client is not None
+        connection._native = self._native_client.create_virtual(name)
         connection._closed = False
         self._connection = connection
         return self
@@ -687,20 +650,20 @@ class Output:
                 if end > 2**64 - 1:
                     raise ValueError("delay exceeds scheduler range")
                 if isinstance(v, messages.Note):
-                    channel = self._channel or v.channel or 1
+                    channel = self.channel or v.channel or 1
                     attack = messages.NoteOn(v.note, v.velocity, channel)
                     release = messages.NoteOff(v.note, channel=channel)
                     timeline.append(
                         (
                             deadline,
-                            _native.prepare_output(self._protocol, attack),
+                            _native.prepare_output(self.protocol, attack),
                             rounded,
                         )
                     )
                     timeline.append(
                         (
                             end,
-                            _native.prepare_output(self._protocol, release),
+                            _native.prepare_output(self.protocol, release),
                             (elapsed * 1_000_000_000).denominator != 1,
                         )
                     )
@@ -721,9 +684,9 @@ class Output:
                         messages.NrpnSet,
                         messages.ParameterStep,
                     ),
-                ) and (self._channel is not None or v.channel is None):
-                    v = v.replace(channel=self._channel or 1)
-                prepared = _native.prepare_output(self._protocol, v)
+                ) and (self.channel is not None or v.channel is None):
+                    v = v.replace(channel=self.channel or 1)
+                prepared = _native.prepare_output(self.protocol, v)
                 timeline.append(
                     (deadline, v if isinstance(prepared, tuple) else prepared, rounded)
                 )
@@ -734,7 +697,7 @@ class Output:
         if self._closed:
             raise midi.StateError("output is closed")
         if self._connection is None:
-            self.connect(_native.select_port(self.ports(), self._port, "output"))
+            self.connect(_native.select_port(self.ports(), self.port, "output"))
         return self
 
     def __exit__(
@@ -764,7 +727,7 @@ class Output:
                 self._connection.close()
         finally:
             self._failure = self.worker_failure
-            self._native = None
+            self._native_client = None
 
     def __del__(self) -> None:
         try:
@@ -858,10 +821,10 @@ class _OutputState:
     def _create(cls, client: Output) -> _OutputState:
         connection = object.__new__(cls)
         connection._failure = None
-        connection._run_in_subprocess = client._run_in_subprocess
+        connection._run_in_subprocess = client.run_in_subprocess
         connection._state = _native.OutputState()
-        connection._protocol = client._protocol
-        connection._channel = client._channel
+        connection._protocol = client.protocol
+        connection._channel = client.channel
         connection._beat_period = client._beat_period
         connection._native = cast(_native.OutputConnection | None, None)
         connection._closed = True
@@ -983,18 +946,18 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
         connection._stream = uuid4().hex
         connection._decoder = (
             None
-            if client._raw_mode
+            if client.raw
             else events.PacketDecoder(
                 stream=connection._stream,
-                protocol=client._protocol,
-                sysex_limit=client._sysex_limit,
+                protocol=client.protocol,
+                sysex_limit=client.sysex_limit,
             )
         )
         connection._bridge = (
             None if callback is None else _native.CallbackBridge(callback)
         )
         connection._queue = ReceiveQueue[T](
-            client._byte_limit, capacity=client._event_limit, size_of=input_size
+            client.receive_byte_limit, capacity=client.event_limit, size_of=input_size
         )
         connection._lock = Lock()
         connection._closing = False
@@ -1403,25 +1366,6 @@ def close_context(close: Callable[[], None], body_error: BaseException | None) -
         raise BaseExceptionGroup(
             "MIDI context body and close both failed", [body_error, close_error]
         ) from None
-
-
-def validate_settings(
-    protocol: midi.Protocol,
-    backend: midi.Backend | None,
-    run_in_subprocess: bool,
-    timeout: float,
-) -> None:
-    _native.check_thread()
-    if not isinstance(protocol, midi.Protocol):
-        raise TypeError("protocol must be Protocol")
-    if backend is not None and not isinstance(backend, midi.Backend):
-        raise TypeError("backend must be Backend or None")
-    if type(run_in_subprocess) is not bool:
-        raise TypeError("run_in_subprocess must be a boolean")
-    if not isinstance(timeout, (int, float)) or isinstance(timeout, bool):
-        raise TypeError("timeout must be a number")
-    if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError("timeout must be positive and finite")
 
 
 def validate_open(

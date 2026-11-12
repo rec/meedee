@@ -825,3 +825,21 @@ Native operations default to a five-second deadline, configured by `timeout`;
 this is separate from an input's receive timeout. Child failure invalidates that
 client, without retries or automatic reconnection. A subprocess cannot isolate
 an instrument's state from other applications, or cancel a running parent callback.
+
+## Inspect connection settings
+
+Python `Input`, `Output` and `discovery.Poller` use frozen Pydantic configuration
+models. Construction still opens no MIDI ports. Inspect settings directly:
+
+```python
+import meedee as md
+
+output = md.Output(channel=2, bpm=120)
+print(output.model_dump())
+output.close()
+```
+
+Invalid settings raise `pydantic.ValidationError`, a `ValueError`. Configuration
+fields are read-only; native handles and mutable runtime state are private.
+Copying and pickling a resource is rejected. Create a fresh connection from its
+settings when needed; message iteration and normal context cleanup are unchanged.

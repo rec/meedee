@@ -43,6 +43,7 @@ mod transport_tests;
 /// One private binary. Public loaders select which definitions to register.
 #[pymodule]
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    lifecycle::validate_interpreter(module.py())?;
     module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
     module.add_function(wrap_pyfunction!(drivers::run_sysex_dump, module)?)?;
@@ -128,7 +129,6 @@ fn populate_events(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    lifecycle::validate_interpreter(module.py())?;
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
     packets::register_transport(module)?;
     let py = module.py();

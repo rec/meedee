@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Self
 
 import pytest
+from pydantic import PrivateAttr
 
 from meedee import archive, events, messages, metrics, midi
 
@@ -57,15 +58,17 @@ def test_delivery_uses_host_window_time_and_rejects_regressing_observations() ->
 
 
 class Sink(midi.Output):
+    _sent: int = PrivateAttr(default=0)
+    _fail: bool = PrivateAttr(default=False)
+
     def __init__(self, fail: bool = False) -> None:
         super().__init__()
-        self.sent = 0
-        self.fail = fail
+        self._fail = fail
 
     def _send(self, message: messages.Message) -> None:
-        if self.fail and self.sent == 1:
+        if self._fail and self._sent == 1:
             raise midi.SendError("simulated send failure")
-        self.sent += 1
+        self._sent += 1
 
     def __enter__(self) -> Self:
         return self

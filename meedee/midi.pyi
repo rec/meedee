@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import ClassVar, Literal, overload
 
 from . import archive, events, messages
+from ._resource import ResourceModel
 
 __version__: str
 
@@ -79,7 +80,21 @@ class Port:
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]
 
-class Input[T = messages.Message | events.StreamDiagnostic]:
+class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
+    raw: bool
+    channel: int | list[int] | None
+    port: str | None
+    event_limit: int
+    sysex_limit: int
+    protocol: Protocol
+    backend: Backend | None
+    timestamps: TimestampMode
+    run_in_subprocess: bool
+    subprocess_worker: Literal["python", "rust"]
+    subprocess_executable: str | None
+    timeout: float
+    receive_byte_limit: int
+
     @overload
     def __init__(
         self: Input[events.ReceivedPacket],
@@ -214,7 +229,17 @@ class Input[T = messages.Message | events.StreamDiagnostic]:
     def stop(self, *, timeout: float | str = 5.0) -> archive.RecordingReport: ...
     def close(self) -> None: ...
 
-class Output:
+class Output(ResourceModel):
+    channel: int | None
+    bpm: int | float | None
+    port: str | None
+    protocol: Protocol
+    backend: Backend | None
+    run_in_subprocess: bool
+    subprocess_worker: Literal["python", "rust"]
+    subprocess_executable: str | None
+    timeout: float
+
     def __init__(
         self,
         *,

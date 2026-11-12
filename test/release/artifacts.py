@@ -100,20 +100,24 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             requirements = [
                 Requirement(r) for r in metadata.get_all("Requires-Dist", [])
             ]
-            assert {r.name for r in requirements} == {"ufor", "pydantic", "tyro"}
+            assert {r.name for r in requirements} == {
+                "ufor",
+                "pydantic",
+                "tyro",
+                "reccy",
+            }
             assert set(metadata.get_all("Provides-Extra", [])) == {"ufor", "cli"}
             for python in ["3.11", "3.13", "3.15"]:
-                assert not any(
-                    r.marker is None
-                    or r.marker.evaluate(
-                        {
-                            "extra": "",
-                            "python_version": python,
-                            "python_full_version": f"{python}.0",
-                        }
-                    )
+                environment = {
+                    "extra": "",
+                    "python_version": python,
+                    "python_full_version": f"{python}.0",
+                }
+                assert {
+                    r.name
                     for r in requirements
-                )
+                    if r.marker is None or r.marker.evaluate(environment)
+                } == {"pydantic", "reccy"}
                 ufor = next(r for r in requirements if r.name == "ufor")
                 assert ufor.marker is not None
                 assert ufor.marker.evaluate(
@@ -124,14 +128,16 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
                     }
                 ) == (python != "3.11")
                 for r in requirements:
-                    assert r.marker is not None
-                    assert r.marker.evaluate(
-                        {
-                            "extra": "cli",
-                            "python_version": python,
-                            "python_full_version": f"{python}.0",
-                        }
-                    ) == (r.name in {"tyro", "pydantic"})
+                    assert (
+                        r.marker is None
+                        or r.marker.evaluate(
+                            {
+                                "extra": "cli",
+                                "python_version": python,
+                                "python_full_version": f"{python}.0",
+                            }
+                        )
+                    ) == (r.name in {"tyro", "pydantic", "reccy"})
             assert metadata["License-Expression"] == "MIT"
             assert any(n.endswith("/licenses/LICENSE") for n in names)
             assert any(
