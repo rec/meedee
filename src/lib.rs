@@ -39,6 +39,7 @@ mod tuning;
 mod ump;
 mod units;
 mod universal;
+mod universe;
 
 #[cfg(all(test, target_os = "macos"))]
 mod transport_tests;
@@ -55,6 +56,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_universe, module)?)?;
     module.add_function(wrap_pyfunction!(populate_translation, module)?)?;
     module.add_function(wrap_pyfunction!(populate_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ci, module)?)?;
@@ -79,6 +81,11 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(populate_archive, module)?)?;
     module.add_function(wrap_pyfunction!(populate_file_io, module)?)?;
     Ok(())
+}
+
+#[pyfunction]
+fn populate_universe(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    universe::register(module)
 }
 
 #[pyfunction]

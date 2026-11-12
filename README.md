@@ -639,6 +639,24 @@ or source registry.
 Rust exposes the same values and state machine; its common Message marker has
 PrimitiveMessage and Command subtraits for encoding and expansion.
 
+## Universe state cache
+
+`meedee.universe.Universe` tracks one ordered input source, including its UMP
+groups. Feed received messages and loss diagnostics into it. Full retention is
+the default. Typed lookups and `snapshot()` expose observed values, including
+partial RPN and NRPN components.
+
+`CacheOptions` resolves an application default, a universe override and category
+overrides. `Retention.Minimum` omits optional snapshots while retaining decoder
+state, including values needed after arbitrary parameter reselection.
+Rust exposes the same operations in `meedee::universe`.
+
+Timecode uses a one-second timeout and a local monotonic clock. For replay, supply
+`now_ns` consistently to `feed` and `poll`. Configure MPE explicitly with
+`configure_mpe`. Examples for both languages are in `doc/examples.md` and
+`doc/rust-examples.md`. The inventory and memory measurements are in
+`plan/caching.md`.
+
 ## UMP and MIDI 2.0
 
 ```python

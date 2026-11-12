@@ -80,7 +80,9 @@ impl Context {
         if clock.is_some() {
             self.clock = clock;
         }
-        self.markers.insert(index, Marker { first, last });
+        if first.is_some() || last.is_some() {
+            self.markers.insert(index, Marker { first, last });
+        }
         Ok((index, changed))
     }
     fn boundary(&mut self, d: &Diagnostic) -> io::Result<()> {
@@ -197,6 +199,31 @@ pub struct ControlInterpreter {
     group: Option<u8>,
 }
 impl ControlInterpreter {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.context.index = index;
+        self.state.set_index(index);
+    }
+    pub(crate) fn selections(
+        &self,
+    ) -> Vec<(
+        u8,
+        Option<controls::ParameterFamily>,
+        [controls::ParameterState; 2],
+    )> {
+        self.state.selections()
+    }
+    pub(crate) fn coarse_values(&self) -> Vec<(u8, u8, u8)> {
+        self.state.coarse_values()
+    }
+    pub(crate) fn invalidate(&mut self) {
+        self.state.reset();
+        self.context.prune(vec![]);
+    }
+    pub(crate) fn parameter_snapshot(
+        &self,
+    ) -> Vec<(u8, controls::ParameterFamily, u16, controls::ParameterState)> {
+        self.state.snapshot()
+    }
     /// Read cached components without selecting a parameter or changing source state.
     pub fn parameter_state(
         &self,
@@ -289,6 +316,13 @@ pub struct VelocityInterpreter {
     group: Option<u8>,
 }
 impl VelocityInterpreter {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.context.index = index;
+        self.state.set_index(index);
+    }
+    pub(crate) fn invalidate(&mut self) {
+        self.state.reset();
+    }
     pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
         View::feed(self, message, None)
     }
@@ -366,6 +400,12 @@ pub struct Mpe {
     group: Option<u8>,
 }
 impl Mpe {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.context.index = index;
+    }
+    pub(crate) fn invalidate(&mut self) {
+        self.state.reset();
+    }
     pub fn configure(&mut self, zone: mpe::ZoneConfiguration) {
         self.state.configure(zone);
         self.context.reset();
@@ -437,6 +477,10 @@ pub struct Ump {
     state: ump::AssemblyState,
 }
 impl Ump {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.context.index = index;
+        self.state.set_index(index);
+    }
     pub fn retained_bytes(&self) -> usize {
         self.state.retained_bytes()
     }
@@ -519,6 +563,9 @@ pub struct Tuning {
     group: Option<u8>,
 }
 impl Tuning {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.context.index = index;
+    }
     pub fn feed(&mut self, message: &Payload) -> io::Result<Vec<Observation>> {
         View::feed(self, message, None)
     }
@@ -609,6 +656,26 @@ pub struct Timecode {
     group: Option<u8>,
 }
 impl Timecode {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.context.index = index;
+    }
+    pub(crate) fn assembled(
+        &mut self,
+        source: &Observation,
+        sysex: &SysEx,
+        now: u64,
+    ) -> io::Result<Option<Observation>> {
+        let Some(full) = timecode::decode(sysex).map_err(|e| invalid(0, e))? else {
+            return Ok(None);
+        };
+        let value = self.state.relocate(&full, now).map_err(|e| invalid(0, e))?;
+        let mut observation = source.clone();
+        observation.value = Value::Timecode(value);
+        Ok(Some(observation))
+    }
+    pub(crate) fn invalidate(&mut self) {
+        self.state.reset();
+    }
     pub fn locked(&self) -> bool {
         self.state.locked()
     }

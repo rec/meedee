@@ -17,6 +17,7 @@ pub mod transport;
 pub mod tuning;
 pub mod ump;
 pub mod universal;
+pub mod universe;
 mod velocity;
 
 pub mod archive;

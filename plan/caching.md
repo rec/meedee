@@ -49,3 +49,76 @@ Apply channel resets to the state covered by that message. Preserve existing vie
 ## Additional work beyond the prompt
 
 None.
+
+## Implemented API and state inventory
+
+The public owner is an explicit `universe.Universe` in Python and
+`universe::Universe` in Rust. It consumes received primitives and loss
+diagnostics. Typed point lookups and a typed snapshot expose the same values.
+Configuration is copied at construction. The application default is a supplied
+`CacheOptions.default`, with `universe` and `categories` overrides.
+
+Timecode defaults to one second. Feed and poll use a local monotonic clock, with
+an explicit nanosecond override for replay. Use one clock domain consistently.
+MPE requires an explicit zone configuration per group. Timecode timeout changes
+are accepted before feeding, including after an explicit reset.
+
+| Input or state | Address and retention | Clear or replace operation |
+| --- | --- | --- |
+| MIDI 1 generic paired controls | Group, channel, controller. Coarse contributors are mandatory. Full mode also retains fine-only and raw controller values. | Fresh coarse clears paired fine. CC 121 clears the channel's controls. |
+| RPN/NRPN selectors and components | Group, channel, family, parameter. Mandatory in both modes, read from the control interpreter. | Null deselects. Relative steps invalidate the selected absolute value. |
+| MIDI 2 controls and parameters | Group, protocol, channel, controller or family and parameter. Optional full snapshot. | An absolute event replaces the value. A relative parameter event invalidates an absolute snapshot. |
+| Bank and program | Group, protocol, channel. Optional. Pending bank and applied program bank are separate fields. | Bank select updates pending fields. Program change captures the applied bank. |
+| Bend and channel pressure | Group, protocol, channel. Optional. | New value replaces the old value. CC 121 invalidates the channel's performance snapshot. |
+| Key events, poly pressure and per-note controls | Group, protocol, channel, note. Optional. Velocity prefix interpretation remains mandatory. | Release and all-notes-off change observed key state. All-sound-off leaves key evidence intact. Per-note reset invalidates expression knowledge. |
+| Transport, song and position | Group and protocol. Optional. | Start establishes running and position zero. Continue and stop establish running state. Song events replace their fields. |
+| Universal master volume and tuning | Group and device ID. Optional. | Each recognized master control replaces that device's observed value. |
+| Timecode | Group. Assembly state is mandatory. Latest decoded position is optional. | Decoder discontinuity and timeout invalidate the position snapshot. |
+| MTS programs and channel scale offsets | Group, device, bank, program or channel. Optional. | Changes merge note pitches. Scale changes replace the relevant scale. Requests supply no value. |
+| Configured MPE | Group and channel. Tracker state is mandatory once configured. | Existing tracker reset and zone configuration rules apply. |
+
+System Reset and recognized GM mode resets clear the affected group's optional
+snapshot alongside the existing decoders. Clock generation changes and stream
+loss invalidate all groups. Explicit reset releases source binding. Observation
+indexes count accepted primitive events across the entire universe, including
+other groups. Diagnostics preserve the existing boundary convention and do not
+advance primitive indexes. Contributor timestamps come from the original input.
+MIDI 2 values retain native precision.
+
+Fragmented UMP SysEx7 uses the existing bounded assembler with its standard
+1 MiB message, 8 MiB total and 64-stream limits. Completed MTS and full-frame
+timecode values update the appropriate state. Unrecognized SysEx, requests,
+individual timing pulses and other message forms with no defined snapshot
+operation supply no generic cached value. The universe tracks observed keys;
+the MPE tracker exposes its existing held, sustained and ambiguous note state.
+
+## Memory qualification
+
+`crates/meedee/tests/universe_memory.rs` measures live delegated allocator bytes
+plus the universe value itself, excluding allocator metadata. It uses an
+isolated test binary. These are macOS arm64 development-build measurements.
+
+| Workload | Full bytes | Minimum bytes |
+| --- | --- | --- |
+| Idle universe | 720 | 720 |
+| Program and all 128 note numbers on all 16 channels | 180776 | 16712 |
+| 1024 distinct NRPN values followed by a coarse control | 133616 | 133456 |
+
+The parameter workload retains decoder components and provenance in both modes.
+Memory savings depend on optional state in the workload. There is no parameter
+eviction. MPE tracker and UMP assembly allocations are lazy.
+
+These workloads omit timestamps. Timestamped contributors require additional
+storage in both modes. Events without timestamps allocate no timestamp markers.
+
+## Verification
+
+The complete Python suite passes with 653 tests. The focused Rust suites for
+controls, event views, universe behavior and allocation accounting pass with
+24 tests. Ruff checking and formatting, Python type checking and pyupgrade
+checks pass.
+
+Workspace Clippy passes with warnings denied and explicit allowances for
+existing `needless_borrow`, `too_many_arguments` and deprecation warnings in
+untouched code. The existing warnings are in `file_timing.rs`, binding
+`input.rs` and `lifecycle.rs`. No dependencies or tool versions changed.

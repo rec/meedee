@@ -2,6 +2,35 @@
 
 A graded series of examples.
 
+## Inspect one input universe
+
+```python
+from meedee import controls, messages, universe
+
+options = universe.CacheOptions(
+    default=universe.Retention.Minimum,
+    universe=universe.Retention.Full,
+    categories={universe.Category.Notes: universe.Retention.Minimum},
+)
+cache = universe.Universe(options=options)
+for controller, value in [(99, 1), (98, 2), (6, 10), (38, 5)]:
+    cache.feed(messages.ControlChange(controller, value, channel=1))
+
+state = cache.parameter_state(
+    universe.Scope(), 1, controls.ParameterFamily.Nrpn, 130
+)
+assert state is not None and state.components is not None
+assert (state.components.coarse, state.components.fine) == (10, 5)
+snapshot = cache.snapshot()
+cache.reset()
+assert len(snapshot.parameters) == 1
+```
+
+Each instance binds to its first event's source identity, including an anonymous
+source. Reset before feeding another source. Pass received primitives to
+`feed`, including `StreamDiagnostic` loss events. Snapshots hold independent
+copies. A category in minimum mode can still expose mandatory decoder state.
+
 For the Rust API, see the [practical Rust examples](rust-examples.md).
 
 ## 1. Play middle C for half a second

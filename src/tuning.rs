@@ -572,7 +572,10 @@ fn boolean(py: Python<'_>, value: bool) -> PyResult<Bound<'_, PyAny>> {
 fn string<'py>(py: Python<'py>, value: &str) -> PyResult<Bound<'py, PyAny>> {
     Ok(PyString::new(py, value).into_any())
 }
-fn pitch_object(py: Python<'_>, value: model::TuningValue) -> PyResult<Bound<'_, PyAny>> {
+pub(crate) fn pitch_object(
+    py: Python<'_>,
+    value: model::TuningValue,
+) -> PyResult<Bound<'_, PyAny>> {
     match value {
         model::TuningValue::Pitch(value) => {
             Ok(Py::new(py, Pitch { value })?.into_bound(py).into_any())
@@ -610,7 +613,7 @@ fn table_object<'py>(py: Python<'py>, value: &model::TuningTable) -> PyResult<Bo
     .into_bound(py)
     .into_any())
 }
-fn offsets_object<'py>(
+pub(crate) fn offsets_object<'py>(
     py: Python<'py>,
     value: &model::ScaleOffsets,
 ) -> PyResult<Bound<'py, PyAny>> {

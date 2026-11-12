@@ -150,6 +150,9 @@ pub(crate) struct AssemblyState {
     completed_start: Option<usize>,
 }
 impl AssemblyState {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.next_index = index;
+    }
     pub fn new(
         message_limit: usize,
         total_limit: usize,

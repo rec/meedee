@@ -64,7 +64,7 @@ impl Observation {
         ))
     }
 }
-fn value_object(py: Python<'_>, v: Value) -> PyResult<Py<PyAny>> {
+pub(crate) fn value_object(py: Python<'_>, v: Value) -> PyResult<Py<PyAny>> {
     match v {
         Value::Control(v) => Ok(crate::controls::to_python(py, vec![v])?.remove(0)),
         Value::Tuning(v) => crate::tuning::decoded_object(py, *v),

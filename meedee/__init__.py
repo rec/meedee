@@ -120,6 +120,7 @@ __all__: list[str] = [
     "tuning",
     "ump",
     "universal",
+    "universe",
 ]
 
 from . import (
@@ -149,6 +150,7 @@ from . import (
     tuning,
     ump,
     universal,
+    universe,
 )
 from .archive import Recorder, RecordingReport
 from .codecs import Decoder

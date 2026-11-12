@@ -1,5 +1,40 @@
 # Practical Rust MIDI examples
 
+## Inspect one input universe
+
+```rust
+use meedee::controls::ParameterFamily;
+use meedee::events::Payload;
+use meedee::messages::{AnyMessage, ControlChange};
+use meedee::universe::{CacheOptions, Category, Retention, Scope, Universe};
+
+let mut options = CacheOptions {
+    default: Retention::Minimum,
+    universe: Some(Retention::Full),
+    ..Default::default()
+};
+options.categories.insert(Category::Notes, Retention::Minimum);
+let mut cache = Universe::new(options);
+for (controller, value) in [(99, 1), (98, 2), (6, 10), (38, 5)] {
+    let event = Payload::Message(AnyMessage::ControlChange(
+        ControlChange::new(controller, value)?.with_channel(1)?
+    ));
+    cache.feed(&event, None)?;
+}
+let state = cache.parameter_state(Scope::new(None, 1)?, 1, ParameterFamily::Nrpn, 130)?
+    .expect("observed parameter");
+let components = state.components.expect("MIDI 1 components");
+assert_eq!((components.coarse, components.fine), (Some(10), Some(5)));
+let snapshot = cache.snapshot();
+cache.reset();
+assert_eq!(snapshot.parameters.len(), 1);
+```
+
+Use one instance per source. `feed(&event, None)` and `poll(None)` use the local
+monotonic clock. Supply `Some(now_ns)` consistently for deterministic replay.
+`set_timecode_timeout` accepts a positive `Duration` before feeding events.
+`configure_mpe` accepts an explicit zone configuration.
+
 These examples use the `meedee` Rust crate. Each block is an independent function
 body; put it inside a function returning `Result<(), Box<dyn std::error::Error>>`
 and finish with `Ok(())`. The `?` operator propagates a checked error.

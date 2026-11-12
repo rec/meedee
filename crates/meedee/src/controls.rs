@@ -113,6 +113,58 @@ pub(crate) struct ControlState {
 }
 
 impl ControlState {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.next_index = index;
+    }
+    pub(crate) fn selections(&self) -> Vec<(u8, Option<ParameterFamily>, [ParameterState; 2])> {
+        self.channels
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.selectors.iter().flatten().any(Option::is_some))
+            .map(|(channel, s)| {
+                (
+                    channel as u8 + 1,
+                    s.family,
+                    s.selectors.map(|v| ParameterState {
+                        coarse: v[0].map(|b| b.value),
+                        fine: v[1].map(|b| b.value),
+                    }),
+                )
+            })
+            .collect()
+    }
+    pub(crate) fn coarse_values(&self) -> Vec<(u8, u8, u8)> {
+        self.channels
+            .iter()
+            .enumerate()
+            .flat_map(|(channel, s)| {
+                s.coarse
+                    .iter()
+                    .enumerate()
+                    .filter_map(move |(controller, v)| {
+                        v.map(|b| (channel as u8 + 1, controller as u8, b.value))
+                    })
+            })
+            .collect()
+    }
+    pub(crate) fn snapshot(&self) -> Vec<(u8, ParameterFamily, u16, ParameterState)> {
+        let mut values = Vec::new();
+        for (channel, state) in self.channels.iter().enumerate() {
+            for (&(family, parameter), data) in &state.data {
+                values.push((
+                    channel as u8 + 1,
+                    family,
+                    parameter,
+                    ParameterState {
+                        coarse: data.coarse.map(|v| v.value),
+                        fine: data.fine.map(|v| v.value),
+                    },
+                ));
+            }
+        }
+        values.sort_by_key(|(channel, family, parameter, _)| (*channel, *family as u8, *parameter));
+        values
+    }
     pub fn new() -> Self {
         Self::default()
     }

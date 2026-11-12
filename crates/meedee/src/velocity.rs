@@ -20,6 +20,9 @@ pub(crate) struct VelocityState {
     next_index: usize,
 }
 impl VelocityState {
+    pub(crate) fn set_index(&mut self, index: usize) {
+        self.next_index = index;
+    }
     pub fn new() -> Self {
         Self::default()
     }
