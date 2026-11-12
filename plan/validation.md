@@ -774,12 +774,15 @@ surface. Rust's approved common Message marker now has PrimitiveMessage and
 Command subtraits; free primitive encoding retains its behavior.
 
 The 2026-11-12 selector update supersedes the fresh-halves input policy above:
-single-half edits retain the other half within the same family. Every selector
-message still clears cached Data Entry, and family changes require fresh halves.
+single-half edits retain the other half within the same family. Selector messages
+retain cached Data Entry only when the complete selection is unchanged;
+family changes require fresh halves.
 Matching Rust and Python regressions cover edits to either half for both families,
 observation indexes, missing coarse data and family-switch invalidation.
-Validation: 600 Python tests pass on Python 3.13.12 with the virtual environment's
-site-packages on `PYTHONPATH` for embedded Python callback tests. The seven Rust
+Repeated-selector regressions also verify retained coarse data and its source
+range, and that changing away and back cannot restore stale data.
+Validation: 603 Python tests pass on Python 3.13.12 with the virtual environment's
+site-packages on `PYTHONPATH` for embedded Python callback tests. The nine Rust
 controls tests and four event-view tests pass, as do Clippy, Rust formatting,
 Ruff, `ty check meedee`, the changed Python test's type check and pyupgrade.
 

@@ -215,6 +215,30 @@ fn selector_edits_retain_the_other_half_but_not_data() {
 }
 
 #[test]
+fn repeated_selectors_preserve_data_and_its_source_range() {
+    for (family, msb, lsb) in [
+        (ParameterFamily::Nrpn, 99, 98),
+        (ParameterFamily::Rpn, 101, 100),
+    ] {
+        let mut interpreter = ControlInterpreter::new(None).unwrap();
+        cc(&mut interpreter, 1, msb, 1);
+        cc(&mut interpreter, 1, lsb, 2);
+        cc(&mut interpreter, 1, 6, 10);
+        for (controller, value, first, last) in [(msb, 1, 1, 4), (lsb, 2, 2, 6)] {
+            assert!(cc(&mut interpreter, 1, controller, value).is_empty());
+            assert!(
+                matches!(&cc(&mut interpreter, 1, 38, 3)[0], Observation::Parameter(v) if v.family == family && v.parameter == 130 && v.value == 1283 && v.resolution == 14 && v.first_index == first && v.last_index == last)
+            );
+        }
+        cc(&mut interpreter, 1, lsb, 3);
+        cc(&mut interpreter, 1, lsb, 2);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 3)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+    }
+}
+
+#[test]
 fn relative_updates_are_direction_only_and_invalidate_absolute_context() {
     let mut interpreter = ControlInterpreter::new(None).unwrap();
     cc(&mut interpreter, 1, 101, 0);

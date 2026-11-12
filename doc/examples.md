@@ -445,9 +445,9 @@ Move a high-resolution controller or send RPN/NRPN changes from the first input.
 The interpreter combines the contributing MIDI 1 messages and reports what was
 observed. It also accepts plain messages without source or timing metadata.
 For example, CC 99=1 and CC 98=2 select NRPN 130. A later CC 98=3
-selects NRPN 131 using the retained MSB. Send a fresh CC 6 before CC 38;
-selector messages clear cached Data Entry. Switching to RPN requires both
-RPN selector halves.
+selects NRPN 131 using the retained MSB and clears cached Data Entry, so send
+a fresh CC 6 before CC 38. Repeating selectors for the same complete selection
+preserves cached Data Entry. Switching to RPN requires both RPN selector halves.
 
 ```python
 import meedee as md

@@ -187,6 +187,7 @@ impl Channel {
         let byte = IndexedByte { value, index };
         match controller {
             98..=101 => {
+                let previous = self.selected();
                 let family = if controller >= 100 {
                     ParameterFamily::Rpn
                 } else {
@@ -207,7 +208,6 @@ impl Channel {
                     ));
                 }
                 self.family = Some(family);
-                self.data = None;
                 if controller == 99 || controller == 101 {
                     self.selector_msb = Some(byte);
                 } else {
@@ -217,6 +217,9 @@ impl Channel {
                     self.family = None;
                     self.selector_msb = None;
                     self.selector_lsb = None;
+                }
+                if previous.is_none() || self.selected() != previous {
+                    self.data = None;
                 }
                 result
             }
@@ -253,11 +256,15 @@ impl Channel {
                         last_index: index,
                     })];
                 }
-                let (value, resolution) = if controller == 6 {
+                let (value, resolution, first_index) = if controller == 6 {
                     self.data = Some(byte);
-                    (u16::from(value), 7)
+                    (u16::from(value), 7, first_index)
                 } else if let Some(coarse) = self.data {
-                    ((u16::from(coarse.value) << 7) | u16::from(value), 14)
+                    (
+                        (u16::from(coarse.value) << 7) | u16::from(value),
+                        14,
+                        first_index.min(coarse.index),
+                    )
                 } else {
                     return vec![diagnostic(
                         DiagnosticKind::MissingCoarse,

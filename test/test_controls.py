@@ -317,6 +317,41 @@ def test_selector_edits_retain_the_other_half_but_not_data(
     )
 
 
+@pytest.mark.parametrize(
+    ("family", "msb", "lsb"),
+    ((controls.ParameterFamily.Nrpn, 99, 98), (controls.ParameterFamily.Rpn, 101, 100)),
+)
+def test_repeated_selectors_preserve_data_and_its_source_range(
+    family: controls.ParameterFamily, msb: int, lsb: int
+) -> None:
+    interpreter = controls.ControlInterpreter()
+    for controller, value in ((msb, 1), (lsb, 2), (6, 10)):
+        interpreter.feed(messages.ControlChange(controller, value, channel=1))
+    for controller, value, first_index, last_index in ((msb, 1, 1, 4), (lsb, 2, 2, 6)):
+        assert (
+            interpreter.feed(messages.ControlChange(controller, value, channel=1)) == []
+        )
+        observation = interpreter.feed(messages.ControlChange(38, 3, channel=1))[
+            0
+        ].value
+        assert isinstance(observation, controls.ParameterObservation)
+        assert (
+            observation.family,
+            observation.parameter,
+            observation.value,
+            observation.resolution,
+        ) == (family, 130, 1283, 14)
+        assert (observation.first_index, observation.last_index) == (
+            first_index,
+            last_index,
+        )
+    for value in (3, 2):
+        interpreter.feed(messages.ControlChange(lsb, value, channel=1))
+    missing = interpreter.feed(messages.ControlChange(38, 3, channel=1))[0].value
+    assert isinstance(missing, controls.Diagnostic)
+    assert missing.kind == controls.DiagnosticKind.MissingCoarse
+
+
 def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() -> None:
     interpreter = controls.ControlInterpreter()
     for controller, value in ((101, 0), (100, 1), (6, 2)):

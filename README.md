@@ -617,7 +617,8 @@ The optional interpreter returns frozen, indexed observations and diagnostics
 alongside your retained raw stream. It never fabricates a missing fine value or
 an absolute value from a relative step. A new coarse CC forgets old fine state;
 repeated fine updates can use that known coarse value. RPN/NRPN selector edits
-retain the other half within the same family and clear cached Data Entry.
+retain the other half within the same family. Cached Data Entry is retained
+when the complete selection is unchanged and cleared otherwise.
 Switching families requires both selector halves afresh. Bank Select and Data
 Entry are not presented as generic knobs. Reset after known loss/reconnect; SystemReset and
 Reset All Controllers invalidate the applicable local state automatically.

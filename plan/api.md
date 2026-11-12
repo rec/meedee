@@ -336,7 +336,10 @@ the new absolute value is unknown. Observation ranges include selector context
 for parameters and the contributing coarse/fine inputs for generic controls.
 
 Selector halves may arrive in either order. Editing one half retains the other
-half within the same family. Every selector message clears cached Data Entry.
+half within the same family. Selector messages retain cached Data Entry only
+when the complete family and parameter selection is unchanged. Changing,
+incomplete or released selections clear it. Fine observation ranges include
+the retained coarse message even when both selectors were repeated later.
 Switching families clears both selector halves and emits SelectionInvalidated,
 so both halves must be observed afresh. Data received while selection is
 missing/partial yields MissingSelection/IncompleteSelection; a fine value without

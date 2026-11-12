@@ -83,7 +83,8 @@ state complete expected CC bytes, including meedee's selected release policy.
 Tests distinguish valid NRPN 16383 from RPN-null and preserve seven-bit coarse
 observations instead of inventing an observed fine zero. Single-half selector
 edits retain the other half within the same family; switching families requires
-both halves afresh. Selector messages clear cached Data Entry.
+both halves afresh. Selector messages retain cached Data Entry only when the
+complete selection is unchanged.
 Physical instrument responses and cross-platform native qualification remain
 separate from wire layout/state-machine validation.
 
