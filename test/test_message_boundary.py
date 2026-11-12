@@ -9,6 +9,7 @@ from meedee import (
     Writer,
     archive,
     codecs,
+    events,
     messages,
     midi,
     testing,
@@ -74,3 +75,123 @@ def test_legacy_files_require_explicit_group_removal() -> None:
         with pytest.raises(OSError, match="group"):
             writer.write(messages.SysEx(b"abc", group=3))
     assert destination.getvalue() == b""
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        (0x2F9F3C7F,),
+        (0x4F9F3C00, 0xFFFF0000),
+        (0,),
+        (0x3F037D01, 0x02000000),
+        (0xB0000000, 1, 2),
+    ],
+)
+def test_opaque_archives_keep_raw_identity_even_for_known_messages(
+    words: tuple[int, ...],
+) -> None:
+    value = ump.OpaquePacket(words=words).replace(stream="keys")
+    destination = BytesIO()
+    with Writer(destination) as writer:
+        writer.write(archive.Stream(id="keys", label="keyboard"))
+        writer.write(value)
+    for preserve in (False, True):
+        with Reader(
+            BytesIO(destination.getvalue()), preserve_unknown=preserve
+        ) as reader:
+            restored = [v for v in reader if isinstance(v, messages.Message)]
+            assert reader.complete
+        assert len(restored) == 1
+        assert type(restored[0]) is ump.OpaquePacket
+        assert restored[0].words == words and restored[0].stream == "keys"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        messages.NoteOn(60, 40000, 2, version=2, group=9),
+        messages.NoteOff(60, 40000, 2, version=2, group=9),
+        messages.PolyPressure(60, 123456, 2, version=2, group=9),
+        messages.ControlChange(7, 123456, 2, version=2, group=9),
+        messages.ProgramChange(3, 2, version=2, group=9),
+        messages.ChannelPressure(123456, 2, version=2, group=9),
+        messages.PitchBend(-123456, 2, version=2, group=9),
+    ],
+)
+def test_midi2_group_removal_never_redirects_to_the_default(
+    value: messages.NoteOn
+    | messages.NoteOff
+    | messages.PolyPressure
+    | messages.ControlChange
+    | messages.ProgramChange
+    | messages.ChannelPressure
+    | messages.PitchBend,
+) -> None:
+    with pytest.raises(ValueError, match="MIDI 2 requires a group"):
+        value.replace(group=None)
+    assert value.group == 9 and value.version == 2
+    assert value.replace().group == 9
+    assert value.replace(group=3).group == 3
+
+
+@pytest.mark.parametrize(
+    "value,words",
+    [
+        (messages.ControlChange(7, 90, 2, group=3), (0x22B1075A,)),
+        (
+            messages.ControlChange(7, 10000, 2, group=3, resolution=14),
+            (0x22B1074E, 0x22B12710),
+        ),
+        (
+            messages.ControlChange(7, 0xFEDCBA98, 2, group=3, version=2),
+            (0x42B10700, 0xFEDCBA98),
+        ),
+    ],
+)
+def test_ump_controller_encoding_preserves_native_resolution(
+    value: messages.ControlChange,
+    words: tuple[int, ...],
+) -> None:
+    assert ump.encode(value) == words
+    assert value.version == (2 if value.resolution == 32 else 1)
+    if value.resolution == 14:
+        with pytest.raises(ValueError):
+            codecs.encode(value.replace(group=None))
+
+
+def test_complete_sysex7_translation_keeps_archive_provenance() -> None:
+    clock = events.Clock(identity="clock")
+    timestamp = events.Timestamp(ticks=9, clock=clock)
+    span = events.SourceSpan(
+        first_packet=2,
+        last_packet=3,
+        first_timestamp=timestamp,
+        last_timestamp=timestamp,
+    )
+    packet = ump.SysEx7Packet(group=9, format=0, data=b"abc").replace(
+        stream="keys",
+        timestamp=timestamp,
+        span=span,
+    )
+    report = translation.to_midi1(packet)
+    assert report.status == translation.TranslationStatus.Exact and report.group == 9
+    assert len(report.messages) == 1
+    value = report.messages[0]
+    assert value == messages.SysEx(b"abc")
+    assert (value.stream, value.timestamp, value.span) == ("keys", timestamp, span)
+    destination = BytesIO()
+    with Writer(destination) as writer:
+        writer.write(clock)
+        writer.write(
+            archive.Stream(id="keys", label="keyboard", clock_identity="clock")
+        )
+        writer.write(value)
+    with Reader(BytesIO(destination.getvalue())) as reader:
+        restored = [v for v in reader if isinstance(v, messages.Message)]
+        assert reader.complete
+    assert restored == [value]
+    assert (restored[0].stream, restored[0].timestamp, restored[0].span) == (
+        "keys",
+        timestamp,
+        span,
+    )

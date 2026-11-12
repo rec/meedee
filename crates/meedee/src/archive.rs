@@ -422,6 +422,10 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
                     out.push(4);
                     out.extend(ump::words_to_bytes(&v.encode_words()?, false));
                 }
+                Payload::Ump(ump::PacketValue::Opaque(v)) => {
+                    out.push(5);
+                    out.extend(ump::words_to_bytes(v.words(), false));
+                }
                 Payload::Ump(v) => {
                     out.push(2);
                     out.extend(ump::words_to_bytes(&v.encode_words()?, false));
@@ -645,6 +649,12 @@ fn decode(body: &[u8], registry: &Registry, preserve: bool) -> io::Result<Record
                     }
                     value
                 }
+                5 => Payload::Ump(ump::PacketValue::Opaque(
+                    ump::OpaquePacket::new(
+                        ump::bytes_to_words(&data, false).map_err(|e| invalid(0, e))?,
+                    )
+                    .map_err(|e| invalid(0, e))?,
+                )),
                 3 => match data
                     .split_first()
                     .ok_or_else(|| invalid(0, "missing command group"))

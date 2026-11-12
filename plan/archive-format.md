@@ -59,10 +59,17 @@ A long-running capture that exhausts these bounds must start another archive.
 
 1. Group byte (0 means absent, otherwise 1..16), then one complete primitive MIDI 1 message, including status and SysEx F0/F7
    framing. It is not a running-status stream or a sequence of commands.
-2. Exactly one UMP packet value (one to four words), serialized big endian. Channel and system messages use semantic representations 1/4. Opaque UMPs can
-   be preserved when explicitly requested, without asserting semantic validity.
+2. Exactly one UMP packet value (one to four words), serialized big endian.
+   Channel and system messages use semantic representations 1/4. Unknown packet
+   layouts can fall back to opaque values with `preserve_unknown`; explicitly
+   opaque values use representation 5.
 3. Group byte (0 means absent, otherwise 1..16), then semantic command ID u16 followed by its fixed-order signed i64 fields.
 4. One semantic MIDI 2 message, stored as its two native UMP words in big endian order.
+5. Explicit opaque UMP: exactly one structurally complete packet (one to four
+   big endian words), without typed decoding. The opaque category is retained
+   even when the words also describe a known message. This known representation
+   is accepted without `preserve_unknown`; that option still controls unknown
+   record kinds and representations and fallback decoding of representation 2.
 
 Representation 1 retains a complete SysEx value, including an optional group,
 as a single logical event. Representation 2 retains individual SysEx7/SysEx8

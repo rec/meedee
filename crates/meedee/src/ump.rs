@@ -794,7 +794,7 @@ macro_rules! channel_encoding {
         impl UmpValue for crate::messages::$name {
             fn encode_words(&$v) -> Result<Vec<u32>, ValueError> {
                 if $v.version() == 1 {
-                    return encode_midi1(&AnyMessage::$name($v.clone()));
+                    return AnyMessage::$name($v.clone()).encode_words();
                 }
                 let head = channel_header($v.version(), $v.group(), $v.channel(), $status)?;
                 Ok(vec![head | $first, $second])
@@ -835,7 +835,10 @@ impl UmpValue for AnyMessage {
     fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
         match self {
             Self::SysEx(v) => v.encode_words(),
-            v if v.version() == 1 => encode_midi1(v),
+            v if v.version() == 1 => match Payload::from(v.clone()) {
+                Payload::Message(v) => encode_midi1(&v),
+                v => v.encode_words(),
+            },
             v => {
                 macro_rules! channels { ($($name:ident),*) => { match v {
                     $(Self::$name(v) => v.encode_words(),)*

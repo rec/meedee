@@ -194,6 +194,9 @@ macro_rules! versioned_message {
             }
             #[pyo3(signature=(**changes))]
             fn replace<'py>(slf:PyRef<'py,Self>, changes:Option<&Bound<'py,PyDict>>) -> PyResult<Bound<'py,PyAny>> {
+                if slf.value.version() == 2 && changes.map(|c| c.get_item("group")).transpose()?.flatten().is_some_and(|v| v.is_none()) {
+                    return Err(PyValueError::new_err("MIDI 2 requires a group"));
+                }
                 if let Some(v) = changes.map(|c| c.get_item("version")).transpose()?.flatten() {
                     if integer(&v,"version")? != i64::from(slf.value.version()) { return Err(PyValueError::new_err("version cannot change through replace; convert explicitly")); }
                 }
@@ -359,6 +362,15 @@ impl ControlChange {
         slf: PyRef<'py, Self>,
         changes: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        if slf.value.version() == 2
+            && changes
+                .map(|c| c.get_item("group"))
+                .transpose()?
+                .flatten()
+                .is_some_and(|v| v.is_none())
+        {
+            return Err(PyValueError::new_err("MIDI 2 requires a group"));
+        }
         if let Some(v) = changes
             .map(|c| c.get_item("version"))
             .transpose()?

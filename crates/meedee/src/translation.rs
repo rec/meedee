@@ -198,7 +198,10 @@ pub fn to_midi1(
                 TranslationStatus::Exact,
                 "complete SysEx7 payload retained",
                 Some(v.group()),
-                vec![AnyMessage::SysEx(m::SysEx::new(v.data().to_vec())?)],
+                crate::messages::inherit_metadata(
+                    v,
+                    vec![AnyMessage::SysEx(m::SysEx::new(v.data().to_vec())?)],
+                )?,
                 false,
             ));
         }
