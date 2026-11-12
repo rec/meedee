@@ -2,8 +2,8 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use meedee::messages::PrimitiveMessage;
-use meedee::tuning as model;
+use middi::messages::PrimitiveMessage;
+use middi::tuning as model;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
@@ -12,7 +12,7 @@ use pyo3::IntoPyObjectExt;
 use crate::files::{os_error, Stream};
 use crate::messages::{integer, Message};
 
-#[pyclass(frozen, skip_from_py_object, module = "meedee.tuning")]
+#[pyclass(frozen, skip_from_py_object, module = "middi.tuning")]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct NoChange;
 #[pymethods]
@@ -36,7 +36,7 @@ impl NoChange {
 // checked replacement, annotations and pattern matching for all frozen values.
 macro_rules! value_classes {
     ($($name:ident { $($field:ident : $read:ident => $write:ident : $annotation:ty),* } {$($method:item)*};)*) => {$(
-        #[pyclass(frozen, module = "meedee.tuning")]
+        #[pyclass(frozen, module = "middi.tuning")]
         struct $name { value: model::$name }
         #[pymethods]
         impl $name {
@@ -111,7 +111,7 @@ value_classes! {
         }
     };
 }
-#[pyclass(frozen, module = "meedee.tuning")]
+#[pyclass(frozen, module = "middi.tuning")]
 struct PitchConversion {
     value: model::PitchConversion,
 }
@@ -155,7 +155,7 @@ impl PitchConversion {
         Ok(fields)
     }
 }
-#[pyclass(frozen, module = "meedee.tuning")]
+#[pyclass(frozen, module = "middi.tuning")]
 struct ScaleConversion {
     value: model::ScaleConversion,
 }
@@ -216,7 +216,7 @@ fn optional_number(py: Python<'_>, value: Option<u8>) -> PyResult<Bound<'_, PyAn
 macro_rules! message_classes {
     ($($name:ident { $($field:ident : $read:ident => $write:ident : $annotation:ty),* } {$($constructor:item)*};)*) => {
         $(
-            #[pyclass(frozen, extends = Message, module = "meedee.tuning")]
+            #[pyclass(frozen, extends = Message, module = "middi.tuning")]
             struct $name { value: model::$name }
             #[pymethods]
             impl $name {
@@ -319,14 +319,14 @@ message_classes! {
         }
     };
 }
-#[pyclass(eq, frozen, from_py_object, module = "meedee.tuning")]
+#[pyclass(eq, frozen, from_py_object, module = "middi.tuning")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ChecksumStatus {
     NotPresent,
     Matches,
     LegacyMismatch,
 }
-#[pyclass(frozen, module = "meedee.tuning")]
+#[pyclass(frozen, module = "middi.tuning")]
 struct Decoded {
     value: model::Decoded,
 }
@@ -367,7 +367,7 @@ fn decode(message: &Bound<'_, PyAny>) -> PyResult<Option<Decoded>> {
         .map_err(value_error)?
         .map(|value| Decoded { value }))
 }
-#[pyclass(eq, frozen, from_py_object, module = "meedee.tuning")]
+#[pyclass(eq, frozen, from_py_object, module = "middi.tuning")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RequestStatus {
     Pending,
@@ -385,7 +385,7 @@ impl From<model::RequestStatus> for RequestStatus {
         }
     }
 }
-#[pyclass(module = "meedee.tuning")]
+#[pyclass(module = "middi.tuning")]
 struct ReplyTracker {
     value: model::ReplyTracker,
 }
@@ -507,7 +507,7 @@ fn note_changes(
     .map(|m| message_object(py, m))
     .collect()
 }
-fn value_error(error: meedee::messages::ValueError) -> PyErr {
+fn value_error(error: middi::messages::ValueError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 fn selection(value: &Bound<'_, PyAny>) -> PyResult<Vec<model::NoteTuning>> {
@@ -742,7 +742,7 @@ pub(crate) fn decoded_object(py: Python<'_>, value: model::Decoded) -> PyResult<
     Ok(Py::new(py, Decoded { value })?.into_any())
 }
 
-#[pyclass(frozen, module = "meedee.tuning")]
+#[pyclass(frozen, module = "middi.tuning")]
 pub(crate) struct QueryReport {
     pub(crate) value: model::QueryReport,
 }
@@ -777,7 +777,7 @@ impl QueryReport {
         self.value
             .reply
             .as_ref()
-            .map(|v| crate::messages::to_python(py, meedee::messages::AnyMessage::SysEx(v.clone())))
+            .map(|v| crate::messages::to_python(py, middi::messages::AnyMessage::SysEx(v.clone())))
             .transpose()
     }
     #[getter]
@@ -789,7 +789,7 @@ impl QueryReport {
             .transpose()
     }
 }
-#[pyclass(module = "meedee.tuning")]
+#[pyclass(module = "middi.tuning")]
 pub(crate) struct Query {
     pub(crate) value: model::Query,
 }
@@ -814,7 +814,7 @@ impl Query {
     ) -> PyResult<Py<PyAny>> {
         crate::messages::to_python(
             py,
-            meedee::messages::AnyMessage::SysEx(self.value.prepare(now_ns).map_err(value_error)?),
+            middi::messages::AnyMessage::SysEx(self.value.prepare(now_ns).map_err(value_error)?),
         )
     }
     fn confirm(
@@ -835,9 +835,9 @@ impl Query {
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
         let item = if let Ok(e) = crate::event_values::extract(&item) {
-            meedee::events::InputItem::Message(Box::new(e))
+            middi::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            meedee::events::InputItem::Diagnostic(d.value.clone())
+            middi::events::InputItem::Diagnostic(d.value.clone())
         } else {
             return Err(PyTypeError::new_err("expected Message or StreamDiagnostic"));
         };

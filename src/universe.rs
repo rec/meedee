@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use meedee::universe as model;
+use middi::universe as model;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
@@ -12,7 +12,7 @@ fn error(e: std::io::Error) -> PyErr {
 
 macro_rules! enums {
     ($($name:ident { $($variant:ident),* };)*) => {$(
-        #[pyclass(eq,hash,frozen,from_py_object,module="meedee.universe")]
+        #[pyclass(eq,hash,frozen,from_py_object,module="middi.universe")]
         #[derive(Clone,Copy,PartialEq,Eq,Hash)]
         enum $name { $($variant),* }
         impl From<$name> for model::$name { fn from(v:$name)->Self { match v { $($name::$variant=>Self::$variant),* } } }
@@ -21,7 +21,7 @@ macro_rules! enums {
 }
 enums! { Retention { Full, Minimum }; Category { Controls, Performance, Notes, System }; }
 
-#[pyclass(frozen, skip_from_py_object, module = "meedee.universe")]
+#[pyclass(frozen, skip_from_py_object, module = "middi.universe")]
 #[derive(Clone)]
 struct Scope {
     value: model::Scope,
@@ -50,7 +50,7 @@ impl Scope {
     }
 }
 
-#[pyclass(frozen, module = "meedee.universe")]
+#[pyclass(frozen, module = "middi.universe")]
 struct CacheOptions {
     value: model::CacheOptions,
 }
@@ -87,7 +87,7 @@ impl CacheOptions {
 
 macro_rules! states {
     ($($name:ident {$($field:ident:$ty:ty),*} {$($extra:item)*});* $(;)?) => {$(
-        #[pyclass(frozen,module="meedee.universe")]
+        #[pyclass(frozen,module="middi.universe")]
         struct $name { value:model::$name }
         #[pymethods]
         impl $name {
@@ -166,12 +166,12 @@ states! {
         #[getter]
         fn timecode(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
             self.value.timecode.clone().map(|observation| {
-                let value = meedee::timecode::AssemblyResult {
+                let value = middi::timecode::AssemblyResult {
                     observation: Some(observation),
                     diagnostic: None,
                 };
                 let result = crate::event_views::value_object(
-                    py, meedee::events::ObservationValue::Timecode(value),
+                    py, middi::events::ObservationValue::Timecode(value),
                 )?;
                 Ok(result.bind(py).getattr("observation")?.unbind())
             }).transpose()
@@ -200,18 +200,18 @@ states! {
         }
     }
 }
-fn family(py: Python<'_>, v: meedee::controls::ParameterFamily) -> PyResult<Py<PyAny>> {
+fn family(py: Python<'_>, v: middi::controls::ParameterFamily) -> PyResult<Py<PyAny>> {
     let name = match v {
-        meedee::controls::ParameterFamily::Rpn => "Rpn",
-        meedee::controls::ParameterFamily::Nrpn => "Nrpn",
+        middi::controls::ParameterFamily::Rpn => "Rpn",
+        middi::controls::ParameterFamily::Nrpn => "Nrpn",
     };
     Ok(py
-        .import("meedee.controls")?
+        .import("middi.controls")?
         .getattr("ParameterFamily")?
         .getattr(name)?
         .unbind())
 }
-#[pyclass(frozen, module = "meedee.universe")]
+#[pyclass(frozen, module = "middi.universe")]
 struct Snapshot {
     value: model::Snapshot,
 }
@@ -238,7 +238,7 @@ snapshot_fields!(
     fn mpe(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let values = self.value.mpe.iter().map(|(group, state)| {
             let value = crate::event_views::value_object(
-                py, meedee::events::ObservationValue::Mpe(state.clone()),
+                py, middi::events::ObservationValue::Mpe(state.clone()),
             )?;
             Ok((*group, value))
         }).collect::<PyResult<Vec<_>>>()?;
@@ -246,7 +246,7 @@ snapshot_fields!(
     }
 );
 
-#[pyclass(module = "meedee.universe")]
+#[pyclass(module = "middi.universe")]
 struct Universe {
     value: model::Universe,
 }
@@ -281,7 +281,7 @@ impl Universe {
     fn configure_mpe(&mut self, zone: &Bound<'_, PyAny>) -> PyResult<()> {
         let command = crate::profiles::extract_command(zone)?
             .ok_or_else(|| PyValueError::new_err("MPE ZoneConfiguration required"))?;
-        let meedee::messages::AnyCommand::ZoneConfiguration(zone) = command else {
+        let middi::messages::AnyCommand::ZoneConfiguration(zone) = command else {
             return Err(PyValueError::new_err("MPE ZoneConfiguration required"));
         };
         self.value.configure_mpe(zone).map_err(error)
@@ -393,7 +393,7 @@ impl Universe {
         self.value
             .mpe_state(group, channel)
             .map_err(error)?
-            .map(|v| crate::event_views::value_object(py, meedee::events::ObservationValue::Mpe(v)))
+            .map(|v| crate::event_views::value_object(py, middi::events::ObservationValue::Mpe(v)))
             .transpose()
     }
     fn channel_tuning_state(

@@ -1,8 +1,8 @@
 # uFor note conversion and MTS message construction
 
-`meedee.tuning.convert(source, note)` converts one note from an existing uFor
+`middi.tuning.convert(source, note)` converts one note from an existing uFor
 `Tuning` into the native `NoteTuning` value containing its MIDI key and MTS pitch.
-uFor evaluates the tuning; meedee quantizes and encodes the resulting frequency.
+uFor evaluates the tuning; middi quantizes and encodes the resulting frequency.
 There is no intermediate report or batch conversion API.
 
 ## Installation
@@ -21,7 +21,7 @@ not re-export these symbols.
 
 ```python
 from ufor.tuning import RatioTable, Tuning
-from meedee import tuning
+from middi import tuning
 
 source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
 note = tuning.convert(source, 70)
@@ -89,11 +89,11 @@ separate execution object is needed. The former bulk_plan helper is removed.
 
 ## Offline file export
 
-With `meedee[cli,ufor]` installed:
+With `middi[cli,ufor]` installed:
 
 ```bash
-meedee ufor-export tuning.json dump.syx --source-format tuning-json --device-id 1 --program 2 --name "My tuning"
-meedee ufor-export scale.scl scale.syx --source-format scala --root-note 69 --root-frequency 440 --device-id 1 --program 2 --name "My scale"
+middi ufor-export tuning.json dump.syx --source-format tuning-json --device-id 1 --program 2 --name "My tuning"
+middi ufor-export scale.scl scale.syx --source-format scala --root-note 69 --root-frequency 440 --device-id 1 --program 2 --name "My scale"
 ```
 
 The command converts each selected note and writes a bulk dump. `tuning-json`

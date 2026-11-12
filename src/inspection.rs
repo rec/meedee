@@ -1,11 +1,11 @@
 //! Python inspection reports. Parsing and aggregation stay in the Rust toolkit.
 use crate::files::{limit, os_error, Stream};
-use meedee::inspection;
+use middi::inspection;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
-#[pyclass(frozen, module = "meedee.inspection")]
+#[pyclass(frozen, module = "middi.inspection")]
 struct Report {
     value: inspection::Report,
 }
@@ -161,7 +161,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(inspect_file, module)?)
 }
 
-#[pyclass(module = "meedee.inspection")]
+#[pyclass(module = "middi.inspection")]
 struct Observer {
     value: inspection::Observer,
 }
@@ -197,9 +197,9 @@ impl Observer {
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
         let item = if let Ok(e) = crate::event_values::extract(&item) {
-            meedee::events::InputItem::Message(Box::new(e))
+            middi::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            meedee::events::InputItem::Diagnostic(d.value.clone())
+            middi::events::InputItem::Diagnostic(d.value.clone())
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(
                 "expected Message or StreamDiagnostic",
@@ -231,9 +231,9 @@ pub fn parse_format(format: &str) -> PyResult<inspection::Format> {
     }
 }
 
-#[pyclass(frozen, module = "meedee.inspection")]
+#[pyclass(frozen, module = "middi.inspection")]
 struct TimingSegment {
-    value: meedee::inspection::TimingSegment,
+    value: middi::inspection::TimingSegment,
 }
 #[pymethods]
 impl TimingSegment {
@@ -278,9 +278,9 @@ impl TimingSegment {
         self.value.regressions
     }
 }
-#[pyclass(frozen, module = "meedee.inspection")]
+#[pyclass(frozen, module = "middi.inspection")]
 struct TimingDiagnostic {
-    value: meedee::inspection::TimingDiagnostic,
+    value: middi::inspection::TimingDiagnostic,
 }
 #[pymethods]
 impl TimingDiagnostic {
@@ -298,7 +298,7 @@ impl TimingDiagnostic {
     }
 }
 
-#[pyclass(module = "meedee.inspection")]
+#[pyclass(module = "middi.inspection")]
 pub(crate) struct Monitor {
     pub(crate) value: inspection::Monitor,
 }
@@ -317,8 +317,8 @@ impl Monitor {
         #[pyo3(from_py_with=limit)] detail_limit: usize,
     ) -> PyResult<Self> {
         let encoding = match encoding {
-            "bytes" => meedee::transport::Encoding::Bytes,
-            "ump" => meedee::transport::Encoding::Ump,
+            "bytes" => middi::transport::Encoding::Bytes,
+            "ump" => middi::transport::Encoding::Ump,
             _ => return Err(PyValueError::new_err("encoding must be bytes or ump")),
         };
         let options = inspection::MonitorOptions {
@@ -335,9 +335,9 @@ impl Monitor {
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<Option<MonitorEntry>> {
         let item = if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            meedee::events::InputItem::Diagnostic(d.value.clone())
+            middi::events::InputItem::Diagnostic(d.value.clone())
         } else {
-            meedee::events::InputItem::Message(Box::new(crate::event_values::extract(item)?))
+            middi::events::InputItem::Message(Box::new(crate::event_values::extract(item)?))
         };
         self.value
             .feed(&item)
@@ -355,7 +355,7 @@ impl Monitor {
         }
     }
 }
-#[pyclass(frozen, module = "meedee.inspection")]
+#[pyclass(frozen, module = "middi.inspection")]
 pub(crate) struct MonitorEntry {
     pub(crate) value: inspection::MonitorEntry,
 }
@@ -422,7 +422,7 @@ impl MonitorEntry {
         format!("MonitorEntry(kind={:?})", self.kind())
     }
 }
-#[pyclass(frozen, module = "meedee.inspection")]
+#[pyclass(frozen, module = "middi.inspection")]
 pub(crate) struct MonitorReport {
     pub(crate) value: inspection::MonitorReport,
 }

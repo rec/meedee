@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 
-from meedee import archive, clip, events, inspection, messages, smf, ump
+from middi import archive, clip, events, inspection, messages, smf, ump
 
 
 def take(source: str, clock_id: str, tick: int) -> BytesIO:

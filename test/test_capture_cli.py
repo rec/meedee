@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from meedee import archive, cli, messages, midi
+from middi import archive, cli, messages, midi
 
 
 def invoke(path: Path, *args: str) -> int:

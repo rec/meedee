@@ -235,7 +235,7 @@ is the completion criterion for this batch.
 
 The remaining representations were checked at their Rust definitions, Python
 stubs and binding conversions, then exercised by the existing device-free suites.
-The table names test files under crates/meedee/tests/ and test/ unless a core
+The table names test files under crates/middi/tests/ and test/ unless a core
 unit-test location is stated. These checks establish the listed operations and
 boundaries, not an exhaustive method-by-method audit or physical-device support.
 
@@ -338,7 +338,7 @@ language-specific behavior.
 - Full Python suite: 561 passed after rebuilding the extension.
 - Rust workspace: 226 passed, five opt-in tests ignored, using the current compiler.
 - All 33 Rust guide snippets compiled with no_run wrappers; no guide I/O executed.
-- Strict core Clippy, cargo fmt, Python Ruff, 3.13 pyupgrade and ty check meedee passed.
+- Strict core Clippy, cargo fmt, Python Ruff, 3.13 pyupgrade and ty check middi passed.
 - Strict documentation build: no issues.
 - Superseded GM decoder/result names and timestamp_seconds have no remaining
   source, example or test callers.
@@ -376,7 +376,7 @@ Final verification:
 - Full Python suite: 567 passed without warnings.
 - Rust workspace: 233 passed, 5 opt-in tests ignored, using the current compiler.
 - All 35 Rust guide snippets compiled with no_run wrappers; no guide I/O executed.
-- Strict core Clippy, cargo fmt, Python Ruff, 3.13 pyupgrade and ty check meedee passed.
+- Strict core Clippy, cargo fmt, Python Ruff, 3.13 pyupgrade and ty check middi passed.
 - Strict documentation build: no issues.
 - Concurrency regressions cover exception normalization outside native callback
   locks, overlapping automatic/explicit close, and callable-destructor reentry.

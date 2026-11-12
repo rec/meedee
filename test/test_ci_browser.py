@@ -7,7 +7,7 @@ from typing import Self, cast
 
 import pytest
 
-from meedee import ci, codecs, events, messages, midi, ump
+from middi import ci, codecs, events, messages, midi, ump
 
 
 def identity() -> ci.Identity:
@@ -259,7 +259,7 @@ def test_cli_requires_identity_and_explicit_ump_group_before_transport(
 ) -> None:
     pytest.importorskip("tyro")
     pytest.importorskip("pydantic")
-    from meedee import cli
+    from middi import cli
 
     def forbidden(**kwargs: object) -> None:
         pytest.fail("transport constructed for invalid CLI configuration")
@@ -299,7 +299,7 @@ def test_cli_uses_fresh_muid_and_closes_both_connections(
 ) -> None:
     pytest.importorskip("tyro")
     pytest.importorskip("pydantic")
-    from meedee import _ci_cli, cli
+    from middi import _ci_cli, cli
 
     clock = [0]
     monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])

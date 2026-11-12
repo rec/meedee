@@ -25,30 +25,30 @@ pub fn failed_error() -> pyo3::PyErr {
 
 /// Diagnostics must not turn cleanup failures into another unwind.
 pub fn report_failure(message: &str) {
-    let _ = writeln!(io::stderr().lock(), "meedee: {message}");
+    let _ = writeln!(io::stderr().lock(), "middi: {message}");
 }
 
 create_exception!(
-    meedee.midi,
+    middi.midi,
     MidiError,
     PyException,
     "A native MIDI operation failed."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     InitError,
     MidiError,
     "The MIDI backend could not initialize."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     CapabilityError,
     MidiError,
     "The requested transport capability is unavailable."
 );
 
-pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3::PyErr {
-    use meedee::transport::Error;
+pub fn transport_error(error: middi::transport::Error, operation: &str) -> pyo3::PyErr {
+    use middi::transport::Error;
     match error {
         Error::Capability(message) => CapabilityError::new_err(message),
         Error::Invalid(message) => pyo3::exceptions::PyValueError::new_err(message),
@@ -62,7 +62,7 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
             total_messages,
             cause,
         } => Python::attach(|py| {
-            match PyModule::import(py, "meedee.midi")
+            match PyModule::import(py, "middi.midi")
                 .and_then(|module| module.getattr("CompoundSendError"))
                 .and_then(|class| {
                     class.call1((cause.to_string(), completed_messages, total_messages))
@@ -85,56 +85,56 @@ pub fn transport_error(error: meedee::transport::Error, operation: &str) -> pyo3
     }
 }
 create_exception!(
-    meedee.midi,
+    middi.midi,
     PortInfoError,
     MidiError,
     "Port information could not be retrieved."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     ConnectError,
     MidiError,
     "A MIDI connection could not be opened."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     SendError,
     MidiError,
     "A MIDI message could not be sent."
 );
 
 create_exception!(
-    meedee.midi,
+    middi.midi,
     StateError,
     PyRuntimeError,
     "MIDI ownership state prevents this operation."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     CallbackThreadError,
     PyRuntimeError,
     "A blocking MIDI operation was attempted from a callback."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     NativePanicError,
     PyRuntimeError,
     "A recoverable native MIDI panic occurred."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     ResourceError,
     PyRuntimeError,
     "MIDI lifecycle resources could not be allocated."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     WorkerError,
     PyRuntimeError,
     "The MIDI worker exited or communication failed."
 );
 create_exception!(
-    meedee.midi,
+    middi.midi,
     WorkerTimeoutError,
     PyTimeoutError,
     "A MIDI worker operation exceeded its deadline."

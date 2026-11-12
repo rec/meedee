@@ -1,8 +1,8 @@
 //! Python views of the pure Rust profile engines.
 use super::{hash, int, mpe, object, timecode, value_error};
 use crate::messages::{self, Message};
-use meedee::messages::PrimitiveMessage;
-use meedee::{controls as velocity, gm as gm_model, mpe as mpe_model, timecode as tc};
+use middi::messages::PrimitiveMessage;
+use middi::{controls as velocity, gm as gm_model, mpe as mpe_model, timecode as tc};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList, PyTuple};
@@ -20,7 +20,7 @@ macro_rules! frozen {
         }
     };
 }
-#[pyclass(frozen,extends=Message,module="meedee.gm")]
+#[pyclass(frozen,extends=Message,module="middi.gm")]
 struct ControllerDestination {
     value: gm_model::ControllerDestination,
     max_entries: usize,
@@ -80,7 +80,7 @@ fn replace<'py>(slf:PyRef<'py,Self>,changes:Option<&Bound<'py,PyDict>>)->PyResul
 let py=slf.py();super::replacement(slf.into_pyobject(py)?.as_any(),&["device_id","channel","source","controller","entries","max_entries"],changes)
 }
 });
-#[pyclass(frozen,extends=Message,module="meedee.gm")]
+#[pyclass(frozen,extends=Message,module="middi.gm")]
 struct KeyBasedControl {
     value: gm_model::KeyBasedControl,
     max_entries: usize,
@@ -130,7 +130,7 @@ fn replace<'py>(slf:PyRef<'py,Self>,changes:Option<&Bound<'py,PyDict>>)->PyResul
 let py=slf.py();super::replacement(slf.into_pyobject(py)?.as_any(),&["device_id","channel","note","entries","max_entries"],changes)
 }
 });
-#[pyclass(frozen,extends=Message,module="meedee.gm")]
+#[pyclass(frozen,extends=Message,module="middi.gm")]
 struct GlobalParameterControl {
     value: gm_model::GlobalParameterControl,
     max_entries: usize,
@@ -291,7 +291,7 @@ pub(super) fn encode_message(value: &Bound<'_, PyAny>) -> Option<Vec<u8>> {
     }
     None
 }
-#[pyclass(frozen, module = "meedee.mpe")]
+#[pyclass(frozen, module = "middi.mpe")]
 struct Voice {
     value: mpe_model::Voice,
 }
@@ -316,11 +316,11 @@ frozen!(Voice;id,channel,note,velocity;{
     fn note_on(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         messages::to_python(
             py,
-            meedee::messages::AnyMessage::NoteOn(self.value.note_on()),
+            middi::messages::AnyMessage::NoteOn(self.value.note_on()),
         )
     }
 });
-#[pyclass(module = "meedee.mpe")]
+#[pyclass(module = "middi.mpe")]
 struct Allocator {
     value: mpe_model::Allocator,
 }
@@ -355,7 +355,7 @@ impl Allocator {
     ) -> PyResult<Py<PyAny>> {
         messages::to_python(
             py,
-            meedee::messages::AnyMessage::NoteOff(
+            middi::messages::AnyMessage::NoteOff(
                 self.value
                     .release(unsigned(voice_id)?, int(velocity)?)
                     .map_err(value_error)?,
@@ -367,14 +367,14 @@ impl Allocator {
         let enabled = boolean(enabled)?;
         messages::to_python(
             py,
-            meedee::messages::AnyMessage::ControlChange(self.value.set_sustain(enabled)),
+            middi::messages::AnyMessage::ControlChange(self.value.set_sustain(enabled)),
         )
     }
     fn reset(&mut self) {
         self.value.reset();
     }
 }
-#[pyclass(frozen, module = "meedee.mpe")]
+#[pyclass(frozen, module = "middi.mpe")]
 struct NoteState {
     value: mpe_model::NoteState,
 }
@@ -392,7 +392,7 @@ frozen!(NoteState;note,held,sustained;{
         self.value.sustained
     }
 });
-#[pyclass(frozen, module = "meedee.mpe")]
+#[pyclass(frozen, module = "middi.mpe")]
 struct ChannelState {
     value: mpe_model::ChannelState,
 }
@@ -439,7 +439,7 @@ pub(super) fn register_mpe(module: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-#[pyclass(frozen, module = "meedee.controls")]
+#[pyclass(frozen, module = "middi.controls")]
 struct VelocityObservation {
     value: velocity::VelocityObservation,
 }
@@ -474,7 +474,7 @@ pub(super) fn register_controls(module: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-#[pyclass(frozen, module = "meedee.timecode")]
+#[pyclass(frozen, module = "middi.timecode")]
 struct Position {
     value: tc::Position,
 }
@@ -538,7 +538,7 @@ frozen!(Position;rate,hours,minutes,seconds,frames;{
         )
     }
 });
-#[pyclass(eq, frozen, from_py_object, module = "meedee.timecode")]
+#[pyclass(eq, frozen, from_py_object, module = "middi.timecode")]
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum AssemblyDiagnostic {
     Discontinuity,
@@ -558,7 +558,7 @@ impl From<tc::AssemblyDiagnostic> for AssemblyDiagnostic {
         }
     }
 }
-#[pyclass(frozen, module = "meedee.timecode")]
+#[pyclass(frozen, module = "middi.timecode")]
 struct TimecodeObservation {
     value: tc::TimecodeObservation,
 }
@@ -584,7 +584,7 @@ frozen!(TimecodeObservation;encoded,compensated,direction,locked;{
         self.value.locked
     }
 });
-#[pyclass(frozen, module = "meedee.timecode")]
+#[pyclass(frozen, module = "middi.timecode")]
 struct AssemblyResult {
     value: tc::AssemblyResult,
 }
@@ -653,16 +653,16 @@ fn pairs(value: &Bound<'_, PyAny>, max: usize) -> PyResult<Vec<(i64, i64)>> {
 
 pub(crate) fn view_value(
     py: Python<'_>,
-    value: meedee::events::ObservationValue,
+    value: middi::events::ObservationValue,
 ) -> PyResult<Py<PyAny>> {
     match value {
-        meedee::events::ObservationValue::Velocity(value) => {
+        middi::events::ObservationValue::Velocity(value) => {
             Ok(Py::new(py, VelocityObservation { value })?.into_any())
         }
-        meedee::events::ObservationValue::Mpe(value) => {
+        middi::events::ObservationValue::Mpe(value) => {
             Ok(Py::new(py, ChannelState { value })?.into_any())
         }
-        meedee::events::ObservationValue::Timecode(value) => {
+        middi::events::ObservationValue::Timecode(value) => {
             Ok(Py::new(py, AssemblyResult { value })?.into_any())
         }
         _ => Err(PyTypeError::new_err("profile view value expected")),

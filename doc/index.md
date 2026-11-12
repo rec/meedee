@@ -1,6 +1,6 @@
-# meedee
+# middi
 
-meedee is a Rust MIDI toolkit with Python bindings for sending, receiving,
+middi is a Rust MIDI toolkit with Python bindings for sending, receiving,
 recording and processing MIDI on macOS, Windows and Linux. It supports MIDI 1
 and MIDI 2.0/UMP, with tools for playback, routing, SysEx transfers and tuning.
 
@@ -11,4 +11,4 @@ transferring instrument dumps and discovering MIDI-CI devices.
 
 Browse the API Reference for module, class and function details. For installation
 and source-build requirements, see the
-[project README](https://github.com/rec/meedee/blob/main/README.md).
+[project README](https://github.com/rec/middi/blob/main/README.md).

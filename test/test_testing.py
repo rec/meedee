@@ -2,7 +2,7 @@
 
 import pytest
 
-from meedee import (
+from middi import (
     ci,
     codecs,
     events,

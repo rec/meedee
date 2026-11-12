@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("tyro", reason="install meedee[cli] for CLI tests")
-pytest.importorskip("pydantic", reason="install meedee[cli] for CLI tests")
+pytest.importorskip("tyro", reason="install middi[cli] for CLI tests")
+pytest.importorskip("pydantic", reason="install middi[cli] for CLI tests")
 
-from meedee import archive, cli, events, messages
+from middi import archive, cli, events, messages
 
 
 def test_route_preview_is_offline_and_labels_simulated_deliveries(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "capture.meedee"
+    path = tmp_path / "capture.middi"
     writer = archive.Writer(path)
     writer.write(archive.Stream(id="s", label=""))
     writer.write(

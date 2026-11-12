@@ -4,15 +4,15 @@ import sys
 from pathlib import Path
 from subprocess import run
 
-from native import meedee_messages
+from native import middi_messages
 
-from meedee import messages
+from middi import messages
 
 
 def test_midi2_controller_families_preserve_values_and_per_note_validation() -> None:
     import pytest
 
-    from meedee import events, ump
+    from middi import events, ump
 
     stamp = events.Timestamp(ticks=3, clock=events.Clock(identity="controller"))
     for registered in [
@@ -49,7 +49,7 @@ def test_midi2_controller_families_preserve_values_and_per_note_validation() -> 
 def test_program_changes_preserve_bank_pairs_and_derive_midi2_bank_validity() -> None:
     import pytest
 
-    from meedee import codecs, events, ump
+    from middi import codecs, events, ump
 
     plain = messages.ProgramChange(34, 2)
     banked = plain.replace(bank_msb=0, bank_lsb=8)
@@ -79,7 +79,7 @@ def test_program_changes_preserve_bank_pairs_and_derive_midi2_bank_validity() ->
 def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
     import pytest
 
-    from meedee import codecs, events, translation, ump
+    from middi import codecs, events, translation, ump
 
     pairs = [
         (messages.NoteOn(60, 127, 1), messages.NoteOn(60, 65535, 1, version=2)),
@@ -136,18 +136,18 @@ def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
 
 
 def test_public_messages_preserve_the_frozen_representation_contract() -> None:
-    meedee_messages.verify(messages)
+    middi_messages.verify(messages)
 
 
 def test_message_import_does_not_initialize_midi_runtime() -> None:
-    fixture = Path(__file__).parent / "native" / "meedee_message_import.py"
+    fixture = Path(__file__).parent / "native" / "middi_message_import.py"
     run([sys.executable, str(fixture)], check=True, timeout=10)
 
 
 def test_unassigned_messages_preserve_identity_until_resolved() -> None:
     import pytest
 
-    from meedee import codecs
+    from middi import codecs
 
     note = messages.NoteOn(60)
     assert note.channel is None and note.velocity == 90
@@ -206,7 +206,7 @@ def test_note_transposition_clamps_and_preserves_channel_and_velocity() -> None:
 
 
 def test_transformations_preserve_metadata_and_payload_identity() -> None:
-    from meedee import codecs, events
+    from middi import codecs, events
 
     clock = events.Clock(identity="capture")
     timestamp = events.Timestamp(ticks=12, clock=clock)
@@ -246,7 +246,7 @@ def test_transformations_preserve_metadata_and_payload_identity() -> None:
 def test_metadata_rejects_empty_source_and_inconsistent_span() -> None:
     import pytest
 
-    from meedee import events
+    from middi import events
 
     clock = events.Clock(identity="one")
     other = events.Clock(identity="two")
@@ -265,7 +265,7 @@ def test_metadata_rejects_empty_source_and_inconsistent_span() -> None:
 
 
 def test_transpose_defaults_to_the_same_message_object() -> None:
-    from meedee import events, ump
+    from middi import events, ump
 
     timestamp = events.Timestamp(ticks=12, clock=events.Clock(identity="source"))
     for m in [
@@ -283,7 +283,7 @@ def test_transpose_defaults_to_the_same_message_object() -> None:
 
 
 def test_transpose_shifts_all_note_addresses_and_preserves_other_fields() -> None:
-    from meedee import events
+    from middi import events
 
     timestamp = events.Timestamp(ticks=12, clock=events.Clock(identity="source"))
     span = events.SourceSpan(first_packet=1, last_packet=2)

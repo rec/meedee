@@ -6,7 +6,7 @@ import pytest
 import tyro
 from reccy.configuration import units
 
-from meedee import (
+from middi import (
     ci,
     codecs,
     controls,
@@ -18,7 +18,7 @@ from meedee import (
     tuning,
     ump,
 )
-from meedee._cli import WatchPorts
+from middi._cli import WatchPorts
 
 
 def test_configuration_retains_authored_units_and_normalizes_cli() -> None:

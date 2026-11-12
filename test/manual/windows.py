@@ -4,8 +4,8 @@ import sys
 
 import pytest
 
-from meedee import midi
-from meedee.events import ReceivedPacket
+from middi import midi
+from middi.events import ReceivedPacket
 
 
 @pytest.mark.parametrize("run_in_subprocess", [True, False])

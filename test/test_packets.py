@@ -4,9 +4,9 @@ import inspect
 
 import pytest
 
-from meedee import midi
-from meedee._native import prepare_send
-from meedee.events import Clock, ReceivedPacket
+from middi import midi
+from middi._native import prepare_send
+from middi.events import Clock, ReceivedPacket
 
 
 def test_ump_owns_words_and_preserves_every_bit() -> None:

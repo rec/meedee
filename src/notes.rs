@@ -1,11 +1,11 @@
 //! Python values over the shared, caller-driven note observer.
-use meedee::messages::Message;
+use middi::messages::Message;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 
-#[pyclass(module = "meedee.notes")]
+#[pyclass(module = "middi.notes")]
 struct Tracker {
-    value: meedee::notes::Tracker,
+    value: middi::notes::Tracker,
     stream: String,
     detail_limit: usize,
 }
@@ -21,7 +21,7 @@ impl Tracker {
             return Err(PyValueError::new_err("stream must not be empty"));
         }
         Ok(Self {
-            value: meedee::notes::Tracker::default(),
+            value: middi::notes::Tracker::default(),
             stream,
             detail_limit,
         })
@@ -57,9 +57,9 @@ impl Tracker {
     }
 }
 
-#[pyclass(frozen, module = "meedee.notes")]
+#[pyclass(frozen, module = "middi.notes")]
 pub struct Report {
-    pub value: meedee::notes::Report,
+    pub value: middi::notes::Report,
 }
 #[pymethods]
 impl Report {
@@ -81,9 +81,9 @@ impl Report {
     }
 }
 
-#[pyclass(frozen, module = "meedee.notes")]
+#[pyclass(frozen, module = "middi.notes")]
 pub struct ChannelState {
-    pub value: meedee::notes::ChannelState,
+    pub value: middi::notes::ChannelState,
 }
 #[pymethods]
 impl ChannelState {
@@ -128,9 +128,9 @@ impl ChannelState {
         self.value.uncertain
     }
 }
-#[pyclass(frozen, module = "meedee.notes")]
+#[pyclass(frozen, module = "middi.notes")]
 struct NoteState {
-    value: meedee::notes::NoteState,
+    value: middi::notes::NoteState,
 }
 #[pymethods]
 impl NoteState {

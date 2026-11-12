@@ -8,14 +8,14 @@ from uuid import uuid4
 import pytest
 from measure import emit
 
-from meedee import archive, messages, midi
+from middi import archive, messages, midi
 
 
 @pytest.mark.parametrize(
     "run_in_subprocess", [False, True], ids=["in_process", "isolated"]
 )
 def test_roundtrip(run_in_subprocess: bool, tmp_path: Path) -> None:
-    name = f"meedee-qualification-{uuid4().hex}"
+    name = f"middi-qualification-{uuid4().hex}"
     start = perf_counter_ns()
     with midi.Input(run_in_subprocess=run_in_subprocess).create_virtual(
         name
@@ -37,7 +37,7 @@ def test_roundtrip(run_in_subprocess: bool, tmp_path: Path) -> None:
                 child_cpu_measured=False,
             )
             samples = []
-            receiver.start(tmp_path / "loopback.meedee")
+            receiver.start(tmp_path / "loopback.middi")
             for n in range(256):
                 value = messages.ControlChange(channel=1, controller=7, value=n % 128)
                 start = perf_counter_ns()
@@ -48,7 +48,7 @@ def test_roundtrip(run_in_subprocess: bool, tmp_path: Path) -> None:
                 samples.append(perf_counter_ns() - start)
             report = receiver.stop()
             assert report.complete and report.gap_records == 0, report.failure
-            reader = archive.Reader(tmp_path / "loopback.meedee")
+            reader = archive.Reader(tmp_path / "loopback.middi")
             try:
                 assert sum(isinstance(e, messages.Message) for e in reader) == 256
                 assert reader.complete

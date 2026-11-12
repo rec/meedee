@@ -1,7 +1,7 @@
 //! Pure profile bindings; the public loaders select their own namespace.
 use crate::messages::{integer, Message};
 use crate::tuning::{render, replacement};
-use meedee::messages::PrimitiveMessage;
+use middi::messages::PrimitiveMessage;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyInt, PyString, PyTuple};
@@ -56,7 +56,7 @@ macro_rules! entry_annotation {
 }
 macro_rules! entries {
     ($($name:ident { $($field:ident : $ty:ty => $annotation:ident),* };)*)=>{$(
-        #[pyclass(frozen,module="meedee.gm")]
+        #[pyclass(frozen,module="middi.gm")]
         pub(super) struct $name {value:model::$name}
         #[pymethods]
         impl $name {
@@ -71,8 +71,8 @@ macro_rules! entries {
 }
 mod gm {
     use super::*;
-    use meedee::gm as model;
-    #[pyclass(frozen, extends=Message, module="meedee.gm")]
+    use middi::gm as model;
+    #[pyclass(frozen, extends=Message, module="middi.gm")]
     pub(super) struct GmMode {
         pub(super) value: model::GmMode,
     }
@@ -235,8 +235,8 @@ mod gm {
 }
 mod mpe {
     use super::*;
-    use meedee::mpe as model;
-    #[pyclass(frozen, extends=Message, module="meedee.mpe")]
+    use middi::mpe as model;
+    #[pyclass(frozen, extends=Message, module="middi.mpe")]
     pub(super) struct ZoneConfiguration {
         pub(super) value: model::ZoneConfiguration,
     }
@@ -320,8 +320,8 @@ mod mpe {
 }
 mod universal {
     use super::*;
-    use meedee::universal as model;
-    classes! {"meedee.universal";
+    use middi::universal as model;
+    classes! {"middi.universal";
         IdentityRequest {device_id:int=>number:PyInt};
         IdentityReply {device_id:int=>number:PyInt,manufacturer:manufacturer=>integer_tuple:PyTuple,family:int=>number:PyInt,model:int=>number:PyInt,revision:revision=>integer_tuple:PyTuple};
         MasterVolume {device_id:int=>number:PyInt,value:int=>number:PyInt};
@@ -362,8 +362,8 @@ mod universal {
 }
 mod timecode {
     use super::*;
-    use meedee::timecode as model;
-    #[pyclass(eq, frozen, from_py_object, module = "meedee.timecode")]
+    use middi::timecode as model;
+    #[pyclass(eq, frozen, from_py_object, module = "middi.timecode")]
     #[derive(Clone, Copy, PartialEq, Eq)]
     enum FrameRate {
         Fps24,
@@ -395,7 +395,7 @@ mod timecode {
         .into_bound(py)
         .into_any())
     }
-    classes! {"meedee.timecode"; FullFrame {device_id:int=>number:PyInt,rate:rate=>rate_object:FrameRate,hours:int=>number:PyInt,minutes:int=>number:PyInt,seconds:int=>number:PyInt,frames:int=>number:PyInt};}
+    classes! {"middi.timecode"; FullFrame {device_id:int=>number:PyInt,rate:rate=>rate_object:FrameRate,hours:int=>number:PyInt,minutes:int=>number:PyInt,seconds:int=>number:PyInt,frames:int=>number:PyInt};}
     #[pyfunction]
     fn decode(py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<Option<Py<PyAny>>> {
         let raw = message.extract::<PyRef<'_, crate::messages::SysEx>>()?;
@@ -444,18 +444,18 @@ primitives!(
 );
 pub fn extract_command(
     command: &Bound<'_, PyAny>,
-) -> PyResult<Option<meedee::messages::AnyCommand>> {
+) -> PyResult<Option<middi::messages::AnyCommand>> {
     if let Ok(value) = command.extract::<PyRef<'_, mpe::ZoneConfiguration>>() {
-        return Ok(Some(meedee::messages::AnyCommand::ZoneConfiguration(
+        return Ok(Some(middi::messages::AnyCommand::ZoneConfiguration(
             value.value.clone(),
         )));
     }
     Ok(None)
 }
 pub fn command_wire(
-    command: &meedee::messages::AnyCommand,
+    command: &middi::messages::AnyCommand,
 ) -> (String, std::collections::HashMap<String, i64>) {
-    use meedee::messages::AnyCommand;
+    use middi::messages::AnyCommand;
     match command {
         AnyCommand::ZoneConfiguration(value) => (
             "ZoneConfiguration".into(),
@@ -480,7 +480,7 @@ where
     )?
     .into_any())
 }
-fn value_error(error: meedee::messages::ValueError) -> PyErr {
+fn value_error(error: middi::messages::ValueError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 fn int(value: &Bound<'_, PyAny>) -> PyResult<i64> {

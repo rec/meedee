@@ -3,10 +3,10 @@
 ## Inspect one input universe
 
 ```rust
-use meedee::controls::ParameterFamily;
-use meedee::events::Payload;
-use meedee::messages::{AnyMessage, ControlChange};
-use meedee::universe::{CacheOptions, Category, Retention, Scope, Universe};
+use middi::controls::ParameterFamily;
+use middi::events::Payload;
+use middi::messages::{AnyMessage, ControlChange};
+use middi::universe::{CacheOptions, Category, Retention, Scope, Universe};
 
 let mut options = CacheOptions {
     default: Retention::Minimum,
@@ -35,7 +35,7 @@ monotonic clock. Supply `Some(now_ns)` consistently for deterministic replay.
 `set_timecode_timeout` accepts a positive `Duration` before feeding events.
 `configure_mpe` accepts an explicit zone configuration.
 
-These examples use the `meedee` Rust crate. Each block is an independent function
+These examples use the `middi` Rust crate. Each block is an independent function
 body; put it inside a function returning `Result<(), Box<dyn std::error::Error>>`
 and finish with `Ok(())`. The `?` operator propagates a checked error.
 
@@ -49,8 +49,8 @@ and velocities are 0..127, and program numbers are 1..128.
 ## 1. Play one note
 
 ```rust
-use meedee::messages::Note;
-use meedee::midi::Output;
+use middi::messages::Note;
+use middi::midi::Output;
 use std::time::Duration;
 
 Output::new().send(Note::new(Duration::from_millis(500), 60)?)?;
@@ -62,12 +62,12 @@ sends the attack and release. The temporary output closes when the statement end
 ## 2. Play a tune in beats
 
 ```rust
-use meedee::messages::{Beats, Note, Rest};
-use meedee::midi::Output;
+use middi::messages::{Beats, Note, Rest};
+use middi::midi::Output;
 
 let mut out = Output::new().with_bpm(120)?;
 out.send([
-    meedee::midi::OutputValue::from(Note::new(Beats::from(1), 60)?),
+    middi::midi::OutputValue::from(Note::new(Beats::from(1), 60)?),
     Note::new(Beats::new(1, 2)?, 62)?.with_velocity(70)?.into(),
     Note::new(Beats::new(1, 2)?, 64)?.with_velocity(100)?.into(),
     Rest::new(Beats::from(1)).into(),
@@ -86,7 +86,7 @@ support `*`, `?`, `[abc]`, `[a-z]` and `[!abc]`, just as in Python. Empty patter
 are rejected. To choose from discovery, use:
 
 ```rust
-use meedee::midi::Output;
+use middi::midi::Output;
 
 let mut output = Output::new();
 let ports = output.ports()?;
@@ -104,7 +104,7 @@ create a new object to reconnect. Python `connect()` returns the same object; Ru
 ## 3. Print incoming messages
 
 ```rust
-use meedee::midi::Input;
+use middi::midi::Input;
 
 for message in Input::new() {
     println!("{message:?}");
@@ -119,9 +119,9 @@ system messages and diagnostics still pass through.
 ## 4. Transpose a keyboard
 
 ```rust
-use meedee::midi::{Input, Output};
-use meedee::events::Payload;
-use meedee::messages::AnyMessage;
+use middi::midi::{Input, Output};
+use middi::events::Payload;
+use middi::messages::AnyMessage;
 
 let mut out = Output::new();
 for message in Input::new() {
@@ -142,9 +142,9 @@ separate timing wrappers.
 ## 5. Split a keyboard between two sounds
 
 ```rust
-use meedee::midi::{Input, Output};
-use meedee::events::Payload;
-use meedee::messages::{AnyMessage, ProgramChange};
+use middi::midi::{Input, Output};
+use middi::events::Payload;
+use middi::messages::{AnyMessage, ProgramChange};
 
 let mut low = Output::new().with_channel(2)?;
 let mut high = Output::new().with_channel(3)?;
@@ -184,7 +184,7 @@ leave its channel unset and use message builders such as `.with_channel(2)?`.
 ## 6. Record and replay
 
 ```rust
-use meedee::midi::{Input, Output};
+use middi::midi::{Input, Output};
 use std::time::Duration;
 
 Output::new().send(Input::new().record(Duration::from_secs(10))?)?;
@@ -197,12 +197,12 @@ To retain the result, bind it to a variable and print the whole recording.
 To save and read the capture:
 
 ```rust
-use meedee::midi::{Input, Output};
-use meedee::Reader;
+use middi::midi::{Input, Output};
+use middi::Reader;
 use std::time::Duration;
 
-Input::new().record_to(Duration::from_secs(10), "rec.meedee", true)?;
-let report = Output::new().send(Reader::open("rec.meedee")?)?;
+Input::new().record_to(Duration::from_secs(10), "rec.middi", true)?;
+let report = Output::new().send(Reader::open("rec.middi")?)?;
 println!("{report:?}");
 ```
 
@@ -219,7 +219,7 @@ rounding permission, cancellation and metrics are configured with `Output::with_
 ## Transpose a MIDI file
 
 ```rust
-use meedee::{Reader, Writer};
+use middi::{Reader, Writer};
 
 let mut writer = Writer::create("song-up.mid")?;
 for record in Reader::open("song.mid")? {
@@ -234,10 +234,10 @@ writer.finish()?;
 
 This preserves the header, tracks, ticks, tempo, SysEx fragments and other file
 records. Notes on channel 10 are unchanged; other note numbers are transposed
-and clamped to 0..127. The reader detects MIDI files, SysEx streams and meedee archives from
+and clamped to 0..127. The reader detects MIDI files, SysEx streams and middi archives from
 contents, yielding a `file_io::Record` for each value. MIDI files yield their
 header first. SysEx messages use `Record::Archive(archive::Record::Event(...))`.
-The writer selects `.mid`, `.midi`, `.syx` or `.meedee` from the destination
+The writer selects `.mid`, `.midi`, `.syx` or `.middi` from the destination
 name and refuses overwrite. Call `finish()` to validate and finalize the file;
 an earlier error can leave a partial output without changing the source.
 Format-specific readers and writers remain available for detailed control.
@@ -249,8 +249,8 @@ records and typed primitive messages such as a tuning `BulkDump`.
 ## 7. Handle input diagnostics explicitly
 
 ```rust
-use meedee::midi::Input;
-use meedee::events::InputItem;
+use middi::midi::Input;
+use middi::events::InputItem;
 
 let mut input = Input::new();
 for item in input.with_errors() {
@@ -270,14 +270,14 @@ queue and SysEx limits; `with_transport` configures backend admission separately
 ## 8. Overlap notes and send a compound command
 
 ```rust
-use meedee::midi::Output;
-use meedee::messages::{NoteOn, ParameterSet};
+use middi::midi::Output;
+use middi::messages::{NoteOn, ParameterSet};
 use std::time::Duration;
 
 let mut out = Output::new();
 out.send(ParameterSet::new(0, 2 << 7)?)?; // Pitch-bend sensitivity: two semitones.
 out.send([
-    meedee::midi::OutputValue::from(NoteOn::new(60)?),
+    middi::midi::OutputValue::from(NoteOn::new(60)?),
     Duration::from_millis(300).into(),
     NoteOn::new(64)?.into(),
     Duration::from_millis(300).into(),
@@ -303,9 +303,9 @@ failed transport can prevent cleanup.
 ## 9. Preserve provenance while editing a message
 
 ```rust
-use meedee::midi::{Input, Output};
-use meedee::events::Payload;
-use meedee::messages::{AnyMessage, Message};
+use middi::midi::{Input, Output};
+use middi::events::Payload;
+use middi::messages::{AnyMessage, Message};
 
 let mut out = Output::new();
 for message in Input::new() {
@@ -328,9 +328,9 @@ resolves an unassigned channel for you.
 ## 10. Send native MIDI 2 messages
 
 ```rust
-use meedee::midi::Output;
-use meedee::transport::{OutputOptions, Encoding};
-use meedee::messages::{ControllerFamily, NoteOff, NoteOn, ParameterController};
+use middi::midi::Output;
+use middi::transport::{OutputOptions, Encoding};
+use middi::messages::{ControllerFamily, NoteOff, NoteOn, ParameterController};
 use std::time::Duration;
 
 let mut out = Output::new().with_transport(OutputOptions {
@@ -338,7 +338,7 @@ let mut out = Output::new().with_transport(OutputOptions {
     ..OutputOptions::default()
 })?;
 out.send([
-    meedee::midi::OutputValue::from(NoteOn::new_midi2(60)?.with_velocity(40_000)?),
+    middi::midi::OutputValue::from(NoteOn::new_midi2(60)?.with_velocity(40_000)?),
     Duration::from_millis(500).into(),
     NoteOff::new_midi2(60)?.into(),
 ])?;
@@ -357,7 +357,7 @@ their own addressing. The `translation` module provides explicit conversion when
 MIDI 1 UMP uses the same message types, with a group and native MIDI 1 values:
 
 ```rust
-use meedee::{messages::{AnyMessage, NoteOn, PerNotePitchBend, SysEx}, events::Payload, translation, ump};
+use middi::{messages::{AnyMessage, NoteOn, PerNotePitchBend, SysEx}, events::Payload, translation, ump};
 
 let legacy = NoteOn::new(60)?.with_velocity(90)?.with_channel(2)?.with_group(3)?;
 assert_eq!(ump::encode(&legacy)?, [0x22913c5a]);
@@ -380,11 +380,11 @@ These operations open files, not MIDI ports. Reports keep capture quality separa
 from structural completeness.
 
 ```rust
-use meedee::inspection::{self, ComparisonOptions, Format, Options};
+use middi::inspection::{self, ComparisonOptions, Format, Options};
 
-println!("{:?}", inspection::inspect_file("rec.meedee", Format::Archive, &Options::default())?);
+println!("{:?}", inspection::inspect_file("rec.middi", Format::Archive, &Options::default())?);
 println!("{:?}", inspection::compare_files(
-    "rec.meedee", "other.meedee", Format::Archive, &ComparisonOptions::default(),
+    "rec.middi", "other.middi", Format::Archive, &ComparisonOptions::default(),
 )?);
 ```
 
@@ -392,14 +392,14 @@ For playback diagnostics, configure the output once. The options apply to each
 subsequent `send()` call; ordinary playback needs no options.
 
 ```rust
-use meedee::archive::Reader;
-use meedee::midi::{Output, PlaybackOptions};
+use middi::archive::Reader;
+use middi::midi::{Output, PlaybackOptions};
 
 let mut out = Output::new().with_playback(PlaybackOptions {
     metrics: true,
     ..Default::default()
 });
-println!("{:?}", out.send(Reader::open("rec.meedee")?)?);
+println!("{:?}", out.send(Reader::open("rec.middi")?)?);
 out.close()?;
 ```
 
@@ -413,7 +413,7 @@ Initiate a dump on the instrument during a ten-second recording. Save its SysEx
 messages separately; `recording.records` also retains timing and diagnostics.
 
 ```rust
-use meedee::{midi::Input, file_io, archive::Record, events::Payload, messages::AnyMessage};
+use middi::{midi::Input, file_io, archive::Record, events::Payload, messages::AnyMessage};
 use std::time::Duration;
 
 let recording = Input::new().record(Duration::from_secs(10))?;
@@ -433,7 +433,7 @@ Run this separately to restore the backup. Choose the wait duration from the
 instrument's documentation. Sending a dump can replace sounds or settings.
 
 ```rust
-use meedee::{events, file_io, midi::Output};
+use middi::{events, file_io, midi::Output};
 use std::time::Duration;
 
 let mut output = Output::new();
@@ -444,7 +444,7 @@ output.close()?;
 ### Request or capture an opaque instrument dump
 
 ```rust
-use meedee::{file_io, midi::{Input, Output}, sysex};
+use middi::{file_io, midi::{Input, Output}, sysex};
 
 let mut receiver = Input::new().with_port("VL70")?;
 let mut output = Output::new().with_port("VL70")?;
@@ -469,7 +469,7 @@ To inquire about identities independently of dump support, use existing
 connections and collect every raw reply through the bounded window:
 
 ```rust
-use meedee::universal;
+use middi::universal;
 
 let identities = universal::identify(&mut receiver, &mut output, &Default::default())?;
 println!("{}: {:?}", identities.status, identities.reason);
@@ -509,7 +509,7 @@ This asks device 0 for tuning program 2 through the first input/output pair.
 The final report includes a matching reply, timeout or failure with known progress.
 
 ```rust
-use meedee::{midi::{Input, Output}, tuning};
+use middi::{midi::{Input, Output}, tuning};
 
 let mut input = Input::new();
 let mut output = Output::new();
@@ -532,7 +532,7 @@ Each call performs one complete discovery scan. A failed or oversized scan stops
 the poller and retains its last complete snapshot.
 
 ```rust
-use meedee::{discovery::Poller, midi::Encoding};
+use middi::{discovery::Poller, midi::Encoding};
 
 let mut poller = Poller::new(Encoding::Bytes)?;
 println!("{:?}", poller.poll()?);
@@ -552,7 +552,7 @@ MUID. Choose a fresh unused MUID for a real scan. Python's example generates one
 with `secrets`; Rust leaves that choice to the application's random-number source.
 
 ```rust
-use meedee::{ci, midi::{Input, Output}};
+use middi::{ci, midi::{Input, Output}};
 
 let mut input = Input::new();
 let mut output = Output::new();
@@ -577,7 +577,7 @@ Unselected keys are preserved. This uses the same `bulk_dump` builder as Python;
 Rust supplies frequencies directly instead of using Python's optional uFor adapter.
 
 ```rust
-use meedee::{file_io, tuning};
+use middi::{file_io, tuning};
 
 let pitches = [(69, 440.0), (70, 660.0), (71, 880.0)]
     .into_iter()
@@ -607,7 +607,7 @@ preserving unmapped keys and explicit `NoChange` entries.
 The same managed route forwards ten seconds of channel messages, remapped to channel 2:
 
 ```rust
-use meedee::{midi::{Input, Output, Encoding}, routing};
+use middi::{midi::{Input, Output, Encoding}, routing};
 use std::{collections::BTreeMap, time::Duration};
 
 let mut input = Input::new();
@@ -639,7 +639,7 @@ continues or fails.
 This is the same ten-second passive monitor, with native typed entries:
 
 ```rust
-use meedee::{inspection, midi::Input};
+use middi::{inspection, midi::Input};
 use std::time::Duration;
 
 let mut input = Input::new();
@@ -667,7 +667,7 @@ host delivery metrics. The library retains no payload history or formatted text.
 ## Select a program and bank
 
 ```rust
-use meedee::{GmMode, Output, ProgramChange, gm};
+use middi::{GmMode, Output, ProgramChange, gm};
 use std::time::Duration;
 
 println!("{:?}", gm::program(34, None)?);
@@ -682,7 +682,7 @@ out.close()?;
 ```
 
 ```rust
-use meedee::{Output, ProgramChange};
+use middi::{Output, ProgramChange};
 
 let mut out = Output::new();
 out.send(ProgramChange::new(34)?)?;
@@ -693,7 +693,7 @@ out.close()?;
 ## Change a tuning note
 
 ```rust
-use meedee::{Output, tuning::{NoteChange, NoteTuning, Pitch, TuningValue}};
+use middi::{Output, tuning::{NoteChange, NoteTuning, Pitch, TuningValue}};
 
 let pitch = NoteTuning::new(69, TuningValue::Pitch(Pitch::new(69, 0)?))?;
 let mut out = Output::new();
@@ -704,7 +704,7 @@ out.close()?;
 ## Send controller values
 
 ```rust
-use meedee::{ControlChange, Output};
+use middi::{ControlChange, Output};
 
 let mut out = Output::new();
 out.send(ControlChange::new(1, 90)?)?;
@@ -715,7 +715,7 @@ out.close()?;
 ## Step an RPN or NRPN parameter
 
 ```rust
-use meedee::{Output, ParameterFamily, ParameterSet};
+use middi::{Output, ParameterFamily, ParameterSet};
 
 let mut out = Output::new();
 out.send(ParameterSet::new(0, 2 << 7)?)?; // Pitch-bend range: 2 semitones.
@@ -726,7 +726,7 @@ out.close()?;
 Use the same single-step command with typed family and direction builders:
 
 ```rust
-use meedee::{controls::{ParameterFamily, StepDirection}, messages::ParameterStep, midi::Output};
+use middi::{controls::{ParameterFamily, StepDirection}, messages::ParameterStep, midi::Output};
 
 let mut out = Output::new();
 out.send(ParameterStep::new(7)?)?;
@@ -746,7 +746,7 @@ UMP encoding returns `Result`, just like MIDI 1 encoding. Propagate encoding
 errors instead of assuming every value is ready to send:
 
 ```rust
-use meedee::ump;
+use middi::ump;
 
 let packet = ump::Noop::new()?;
 let words = ump::encode(&packet)?;
@@ -773,9 +773,9 @@ clears the applicable cache; the sparse cache otherwise grows with observed para
 Inspect the cache without changing the selection or consuming an input:
 
 ```rust
-use meedee::controls::{ControlInterpreter, ParameterFamily, ParameterState};
-use meedee::events::Payload;
-use meedee::messages::{AnyMessage, ControlChange};
+use middi::controls::{ControlInterpreter, ParameterFamily, ParameterState};
+use middi::events::Payload;
+use middi::messages::{AnyMessage, ControlChange};
 
 let mut view = ControlInterpreter::new(None)?;
 for (controller, value) in [(99, 1), (98, 2), (38, 5)] {
@@ -801,9 +801,9 @@ The lookup returns an owned snapshot, or `None` for no cached data. Missing
 components use `None` independently. A new coarse input clears the previous fine.
 
 ```rust
-use meedee::controls::ControlInterpreter;
-use meedee::events::InputItem;
-use meedee::midi::Input;
+use middi::controls::ControlInterpreter;
+use middi::events::InputItem;
+use middi::midi::Input;
 
 let mut interpreter = ControlInterpreter::new(None)?;
 let mut input = Input::new();
@@ -833,7 +833,7 @@ require `reset()`. Clock changes report `StateReset`, and `feed_diagnostic` clea
 pending state while retaining the original loss report.
 
 ```rust
-use meedee::{events::Payload, messages::AnyMessage, mpe, tuning, ump};
+use middi::{events::Payload, messages::AnyMessage, mpe, tuning, ump};
 
 let zone = mpe::ZoneConfiguration::new(1, 2)?;
 let mut tracker = mpe::Tracker::new(zone.clone(), None)?;
@@ -841,11 +841,11 @@ println!("{:?}", tracker.snapshot(2)?);
 tracker.configure(zone); // Clears notes, source binding and timing context.
 
 let mut assembler = ump::Assembler::new(1_048_576, 8_388_608, 64)?;
-let packets = ump::packetize_sysex7(&meedee::messages::SysEx::new((0..20).collect())?.with_group(2)?)?;
+let packets = ump::packetize_sysex7(&middi::messages::SysEx::new((0..20).collect())?.with_group(2)?)?;
 assembler.feed(&Payload::Ump(ump::PacketValue::SysEx7(packets[0].clone())))?;
 println!("{:?}", assembler.finish());
 
-let sysex = meedee::messages::SysEx::new(vec![127, 1, 8, 2, 0, 1, 60, 60, 0, 0])?;
+let sysex = middi::messages::SysEx::new(vec![127, 1, 8, 2, 0, 1, 60, 60, 0, 0])?;
 println!("{:?}", tuning::decode(&sysex)?);
 let mut decoder = tuning::Decoder::new(None)?;
 println!("{:?}", decoder.feed(&Payload::Message(AnyMessage::SysEx(sysex)))?);
@@ -869,7 +869,7 @@ Python now exposes the existing Rust `smf::Timeline`, `clip::Timeline`,
 `ump::word_count` and `smf::validate_meta` operations directly.
 
 ```rust
-use meedee::{smf, ump};
+use middi::{smf, ump};
 
 let header = smf::Header::new(0, 1, 480, vec![])?;
 let mut timeline = smf::Timeline::new(header, "performance".into(), None, 1_048_576)?;
@@ -889,13 +889,13 @@ Create a software source and receive its messages using the ordinary MIDI types.
 The backend must support virtual ports.
 
 ```rust
-use meedee::messages::{NoteOff, NoteOn};
-use meedee::midi::{Input, Output};
+use middi::messages::{NoteOff, NoteOn};
+use middi::midi::{Input, Output};
 use std::time::Duration;
 
-let mut output = Output::new().create_virtual("meedee-example")?;
+let mut output = Output::new().create_virtual("middi-example")?;
 let mut input = Input::new();
-let port = input.ports()?.into_iter().find(|p| p.name() == "meedee-example").unwrap();
+let port = input.ports()?.into_iter().find(|p| p.name() == "middi-example").unwrap();
 let mut input = input.connect(&port)?;
 output.send(NoteOn::new(60)?)?;
 println!("{:?}", input.receive(Some(Duration::from_secs(1)), None)?);
@@ -918,7 +918,7 @@ nanosecond timestamps. MIDI 1 packets may contain fragments or multiple messages
 Rust infers `Input<ReceivedPacket>` from `raw()`.
 
 ```rust
-use meedee::midi::Input;
+use middi::midi::Input;
 
 for packet in Input::new().raw()?.take(10) {
     println!("{packet:?}");
@@ -938,14 +938,14 @@ Create a software destination and wait up to ten seconds for its first delivery.
 Use `connect(&port)` for a physical input. The same builder works after `raw()`.
 
 ```rust
-use meedee::midi::Input;
+use middi::midi::Input;
 use std::sync::mpsc;
 use std::time::Duration;
 
 let (sender, receiver) = mpsc::channel();
 let mut input = Input::new()
     .with_callback(move |item| { let _ = sender.send(item); })?
-    .create_virtual("meedee-callback")?;
+    .create_virtual("middi-callback")?;
 println!("{:?}", receiver.recv_timeout(Duration::from_secs(10)));
 input.close()?;
 ```
@@ -971,9 +971,9 @@ when cleanup fails. Opened input retains its stream, clock, dropped-packet count
 and first terminal failure for inspection after close.
 
 ```rust
-use meedee::midi::Input;
+use middi::midi::Input;
 
-let mut input = Input::new().create_virtual("meedee-diagnostics")?;
+let mut input = Input::new().create_virtual("middi-diagnostics")?;
 input.close()?;
 println!("closed = {}", input.closed());
 println!("dropped packets = {}", input.dropped_packets());
@@ -1000,7 +1000,7 @@ Read a saved dump without opening a MIDI port. One decoder recognizes GM mode
 changes, controller destinations, key controls and global parameters:
 
 ```rust
-use meedee::{archive, events::Payload, file_io, gm, messages::AnyMessage};
+use middi::{archive, events::Payload, file_io, gm, messages::AnyMessage};
 
 for record in file_io::Reader::open("backup.syx")? {
     let file_io::Record::Archive(archive::Record::Event(message)) = record? else { continue; };
@@ -1022,9 +1022,9 @@ Timestamp::seconds() returns an exact Rational value, corresponding to Python's
 Timestamp.seconds property. Recorded tick units are preserved until conversion:
 
 ```rust
-use meedee::{archive, messages::Message};
+use middi::{archive, messages::Message};
 
-for record in archive::Reader::open("rec.meedee")? {
+for record in archive::Reader::open("rec.middi")? {
     if let archive::Record::Event(message) = record? {
         if let Some(timestamp) = message.timestamp() {
             println!("{:?}", timestamp.seconds()?);
@@ -1051,11 +1051,11 @@ Attach the existing archive recorder while retaining normal input access.
 Recording runs independently of receive calls and also supports callback inputs.
 
 ```rust
-use meedee::midi::{Input, RecordingOptions};
+use middi::midi::{Input, RecordingOptions};
 use std::time::Duration;
 
 let mut input = Input::new();
-input.start(Some("rec.meedee"), &RecordingOptions::default())?;
+input.start(Some("rec.middi"), &RecordingOptions::default())?;
 println!("{:?}", input.receive(Some(Duration::from_secs(10)), None)?);
 println!("{:?}", input.stop(Duration::from_secs(5))?);
 input.close()?;
@@ -1069,7 +1069,7 @@ Python's existing recorder: starting a recording creates or truncates the path.
 For unbounded memory capture, pass no path and read the records after stopping:
 
 ```rust
-use meedee::midi::{Input, RecordingOptions};
+use middi::midi::{Input, RecordingOptions};
 use std::path::Path;
 use std::time::Duration;
 
@@ -1100,7 +1100,7 @@ close; an unfinished stop does not invent a report.
 Share Cancellation with another thread to interrupt a receive:
 
 ```rust
-use meedee::{events::Cancellation, midi::Input};
+use middi::{events::Cancellation, midi::Input};
 use std::time::Duration;
 
 let cancel = Cancellation::default();
@@ -1136,12 +1136,12 @@ returns a playback Report, including immediate sends and empty sequences.
 A tuple concatenates independent sources without collecting a reader in memory:
 
 ```rust
-use meedee::{archive::Reader, messages::Note, midi::Output};
+use middi::{archive::Reader, messages::Note, midi::Output};
 use std::time::Duration;
 
 let report = Output::new().send((
     Note::new(Duration::from_millis(500), 60)?,
-    Reader::open("rec.meedee")?,
+    Reader::open("rec.middi")?,
     Note::new(Duration::from_millis(500), 67)?,
 ))?;
 println!("{report:?}");
@@ -1161,12 +1161,12 @@ open no ports. A cancelled note may remain active until release or normal cleanu
 
 ## Run MIDI in a subprocess
 
-Install `meedee-worker` on PATH, for example with
-`cargo install --path crates/meedee --bin meedee-worker` from this checkout.
+Install `middi-worker` on PATH, for example with
+`cargo install --path crates/middi --bin middi-worker` from this checkout.
 Rust applications use the worker without Python:
 
 ```rust
-use meedee::{Note, Output};
+use middi::{Note, Output};
 use std::time::Duration;
 
 let mut out = Output::new().with_run_in_subprocess(true)?;
@@ -1178,7 +1178,7 @@ To select another executable, arguments or native-operation deadline, configure
 `SubprocessOptions` before discovery or connection:
 
 ```rust
-use meedee::{Output, SubprocessOptions};
+use middi::{Output, SubprocessOptions};
 use std::time::Duration;
 
 let mut out = Output::new()

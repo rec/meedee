@@ -7,10 +7,10 @@ from types import SimpleNamespace
 
 import pytest
 
-pytest.importorskip("tyro", reason="install meedee[cli]")
-pytest.importorskip("pydantic", reason="install meedee[cli]")
+pytest.importorskip("tyro", reason="install middi[cli]")
+pytest.importorskip("pydantic", reason="install middi[cli]")
 
-from meedee import cli, codecs, messages, midi
+from middi import cli, codecs, messages, midi
 
 
 class Connection:

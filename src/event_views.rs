@@ -2,12 +2,12 @@
 use crate::event_values::Timestamp;
 use crate::files::{limit, uint};
 use crate::live::StreamDiagnostic;
-use meedee::events::{ObservationValue as Value, View};
+use middi::events::{ObservationValue as Value, View};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
-#[pyclass(frozen, module = "meedee.events")]
+#[pyclass(frozen, module = "middi.events")]
 pub struct Observation {
-    pub(crate) value: meedee::events::Observation,
+    pub(crate) value: middi::events::Observation,
 }
 #[pymethods]
 impl Observation {
@@ -85,7 +85,7 @@ fn selected(v: Option<&Bound<'_, PyAny>>) -> PyResult<Option<u8>> {
         })
         .transpose()
 }
-fn output(values: Vec<meedee::events::Observation>) -> Vec<Observation> {
+fn output(values: Vec<middi::events::Observation>) -> Vec<Observation> {
     values
         .into_iter()
         .map(|value| Observation { value })
@@ -105,11 +105,11 @@ fn feed(
         if wire.first() != Some(&240) || wire.last() != Some(&247) {
             return Err(error);
         }
-        let sysex = meedee::messages::SysEx::new(wire[1..wire.len() - 1].to_vec())
+        let sysex = middi::messages::SysEx::new(wire[1..wire.len() - 1].to_vec())
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         crate::event_values::with_metadata(
             value,
-            meedee::events::Payload::Message(meedee::messages::AnyMessage::SysEx(sysex)),
+            middi::events::Payload::Message(middi::messages::AnyMessage::SysEx(sysex)),
         )
     });
     let values = if let Ok(e) = message {
@@ -124,14 +124,14 @@ fn feed(
 macro_rules! view_methods{($name:ident, $profiles:expr;{$($ctor:item)*})=>{
 #[pymethods]impl $name{$($ctor)* fn feed(&mut self,value:&Bound<'_,PyAny>)->PyResult<Vec<Observation>>{feed(&mut self.value,value,None,$profiles)}fn reset(&mut self){self.value.reset();}}
 };}
-#[pyclass(name = "ControlInterpreter", module = "meedee.controls")]
+#[pyclass(name = "ControlInterpreter", module = "middi.controls")]
 struct Controls {
-    value: meedee::controls::ControlInterpreter,
+    value: middi::controls::ControlInterpreter,
 }
 view_methods!(Controls, true;{
     #[new]
     #[pyo3(signature=(*,group=None))]
-    fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::ControlInterpreter::new(selected(group)?).map_err(error)?})}
+    fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:middi::controls::ControlInterpreter::new(selected(group)?).map_err(error)?})}
 
     fn parameter_state(
         &self,
@@ -153,41 +153,41 @@ view_methods!(Controls, true;{
             .transpose()
     }
 });
-#[pyclass(name = "VelocityInterpreter", module = "meedee.controls")]
+#[pyclass(name = "VelocityInterpreter", module = "middi.controls")]
 struct Velocity {
-    value: meedee::controls::VelocityInterpreter,
+    value: middi::controls::VelocityInterpreter,
 }
-view_methods!(Velocity, true;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::controls::VelocityInterpreter::new(selected(group)?).map_err(error)?})}});
-#[pyclass(name = "Tracker", module = "meedee.mpe")]
+view_methods!(Velocity, true;{#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:middi::controls::VelocityInterpreter::new(selected(group)?).map_err(error)?})}});
+#[pyclass(name = "Tracker", module = "middi.mpe")]
 struct Mpe {
-    value: meedee::mpe::Tracker,
+    value: middi::mpe::Tracker,
 }
 view_methods!(Mpe, true;{
-#[pyo3(signature=(*,zone))] fn configure(&mut self, zone: &Bound<'_,PyAny>) -> PyResult<()> { let meedee::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)? else { return Err(PyTypeError::new_err("ZoneConfiguration required")); }; self.value.configure(zone); Ok(()) }
+#[pyo3(signature=(*,zone))] fn configure(&mut self, zone: &Bound<'_,PyAny>) -> PyResult<()> { let middi::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)? else { return Err(PyTypeError::new_err("ZoneConfiguration required")); }; self.value.configure(zone); Ok(()) }
 
-#[new]#[pyo3(signature=(*,zone,group=None))]fn new(zone:&Bound<'_,PyAny>,group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{let meedee::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)?else{return Err(PyTypeError::new_err("ZoneConfiguration required"));};Ok(Self{value:meedee::mpe::Tracker::new(zone,selected(group)?).map_err(error)?})}
+#[new]#[pyo3(signature=(*,zone,group=None))]fn new(zone:&Bound<'_,PyAny>,group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{let middi::messages::AnyCommand::ZoneConfiguration(zone)=crate::messages::extract_command(zone)?else{return Err(PyTypeError::new_err("ZoneConfiguration required"));};Ok(Self{value:middi::mpe::Tracker::new(zone,selected(group)?).map_err(error)?})}
 #[pyo3(signature=(*,channel))]fn snapshot(&self,py:Python<'_>,channel:&Bound<'_,PyAny>)->PyResult<Py<PyAny>>{value_object(py,Value::Mpe(self.value.snapshot(crate::messages::integer(channel,"channel")?).map_err(|e|PyValueError::new_err(e.to_string()))?))}
 });
-#[pyclass(name = "Assembler", module = "meedee.ump")]
+#[pyclass(name = "Assembler", module = "middi.ump")]
 struct Ump {
-    value: meedee::ump::Assembler,
+    value: middi::ump::Assembler,
 }
 view_methods!(Ump, false;{
 #[getter] fn retained_bytes(&self)->usize {self.value.retained_bytes()}
 #[getter] fn active_streams(&self)->usize {self.value.active_streams()}
 fn finish(&mut self)->Vec<Observation> {output(self.value.finish())}
-#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:meedee::ump::Assembler::new(message_limit,total_limit,max_streams).map_err(error)?})}});
-#[pyclass(name = "Decoder", module = "meedee.tuning")]
+#[new]#[pyo3(signature=(*,message_limit=1_048_576,total_limit=8_388_608,max_streams=64))]fn new(#[pyo3(from_py_with=crate::units::bytes)]message_limit:usize,#[pyo3(from_py_with=crate::units::bytes)]total_limit:usize,#[pyo3(from_py_with=limit)]max_streams:usize)->PyResult<Self>{Ok(Self{value:middi::ump::Assembler::new(message_limit,total_limit,max_streams).map_err(error)?})}});
+#[pyclass(name = "Decoder", module = "middi.tuning")]
 struct Tuning {
-    value: meedee::tuning::Decoder,
+    value: middi::tuning::Decoder,
 }
 view_methods!(Tuning, false;{
-#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:meedee::tuning::Decoder::new(selected(group)?).map_err(error)?})}
+#[new]#[pyo3(signature=(*,group=None))]fn new(group:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:middi::tuning::Decoder::new(selected(group)?).map_err(error)?})}
 fn feed_assembled(&mut self,observation:PyRef<'_,Observation>)->PyResult<Vec<Observation>>{Ok(output(self.value.feed_assembled(&observation.value).map_err(error)?))}
 });
-#[pyclass(name = "Assembler", module = "meedee.timecode")]
+#[pyclass(name = "Assembler", module = "middi.timecode")]
 struct Timecode {
-    value: meedee::timecode::Assembler,
+    value: middi::timecode::Assembler,
 }
 #[pymethods]
 impl Timecode {
@@ -199,7 +199,7 @@ impl Timecode {
     #[pyo3(signature=(*,timeout,group=None))]
     fn new(timeout: &Bound<'_, PyAny>, group: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
         Ok(Self {
-            value: meedee::timecode::Assembler::new(
+            value: middi::timecode::Assembler::new(
                 crate::units::duration(timeout)?,
                 selected(group)?,
             )

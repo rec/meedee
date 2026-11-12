@@ -6,7 +6,7 @@ from typing import Self
 import pytest
 from pydantic import PrivateAttr
 
-from meedee import archive, events, messages, metrics, midi
+from middi import archive, events, messages, metrics, midi
 
 
 def event() -> messages.Message:
@@ -100,11 +100,11 @@ def test_recording_metrics_are_opt_in_and_retain_capacity_rejections(
     tmp_path: Path,
 ) -> None:
     off = archive.Recorder(
-        tmp_path / "off.meedee", clock=events.Clock(identity="source"), stream="s"
+        tmp_path / "off.middi", clock=events.Clock(identity="source"), stream="s"
     )
     assert off.pressure is None and off.stop().pressure is None
     on = archive.Recorder(
-        tmp_path / "on.meedee",
+        tmp_path / "on.middi",
         clock=events.Clock(identity="source"),
         stream="s",
         metrics=True,
@@ -121,7 +121,7 @@ def test_recording_metrics_are_opt_in_and_retain_capacity_rejections(
     assert report.pressure is not None and report.pressure.accepted_records == 1
     assert report.pressure.capacity_rejections == 0
     rejected = archive.Recorder(
-        tmp_path / "rejected.meedee",
+        tmp_path / "rejected.middi",
         clock=events.Clock(identity="source"),
         stream="s",
         byte_limit=1,

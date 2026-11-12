@@ -8,7 +8,7 @@ from typing import cast
 
 import pytest
 
-from meedee import events, file_io, messages, midi, sysex, testing, universal
+from middi import events, file_io, messages, midi, sysex, testing, universal
 
 
 class Input:
@@ -54,7 +54,7 @@ class Output:
 
 
 def cases() -> list[list[str]]:
-    path = Path(__file__).parents[1] / "crates/meedee/tests/fixtures/sysex-dumps.txt"
+    path = Path(__file__).parents[1] / "crates/middi/tests/fixtures/sysex-dumps.txt"
     return [
         r.split("|")
         for r in path.read_text().splitlines()
@@ -377,7 +377,7 @@ def test_documented_negative_reply_is_retained(monkeypatch: pytest.MonkeyPatch) 
 
 def identities() -> list[list[str]]:
     path = (
-        Path(__file__).parents[1] / "crates/meedee/tests/fixtures/sysex-identities.txt"
+        Path(__file__).parents[1] / "crates/middi/tests/fixtures/sysex-identities.txt"
     )
     return [
         r.split("|")

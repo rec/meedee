@@ -121,10 +121,10 @@ jobs:
             printf '::error title=Python tests::%s\n' "$report"
           fi
           exit "$test_status"
-      - run: uv run --no-sync ruff check --select B,E,F,I meedee test
-      - run: uv run --no-sync ruff format --check meedee test
+      - run: uv run --no-sync ruff check --select B,E,F,I middi test
+      - run: uv run --no-sync ruff format --check middi test
       - name: Type check the selected Python surface
-        run: uv run --no-sync ty check --python-version '${{ matrix.python }}' meedee test
+        run: uv run --no-sync ty check --python-version '${{ matrix.python }}' middi test
       - name: Build wheel from sdist
         uses: PyO3/maturin-action@3e2bdf6ba6453a61e649744019b8a2d906c7eb38 # v1.51.0
         with:
@@ -137,11 +137,11 @@ jobs:
             dnf install -y alsa-lib-devel
       - name: Install and test wheel outside checkout
         run: |
-          uv venv "$RUNNER_TEMP/meedee-wheel" --python '${{ matrix.python }}'
+          uv venv "$RUNNER_TEMP/middi-wheel" --python '${{ matrix.python }}'
           if [[ "$RUNNER_OS" == Windows ]]; then
-            wheel_python="$RUNNER_TEMP/meedee-wheel/Scripts/python.exe"
+            wheel_python="$RUNNER_TEMP/middi-wheel/Scripts/python.exe"
           else
-            wheel_python="$RUNNER_TEMP/meedee-wheel/bin/python"
+            wheel_python="$RUNNER_TEMP/middi-wheel/bin/python"
           fi
           uv pip install --python "$wheel_python" dist/*.whl pytest
           uv export --frozen --extra cli --extra ufor --no-emit-project --no-dev --no-hashes --output-file target/wheel-optional-requirements.txt
@@ -171,5 +171,5 @@ jobs:
       - run: uv run --no-sync pytest test/release/artifacts.py -v
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: meedee-${{ matrix.os }}-cp${{ matrix.python }}
+          name: middi-${{ matrix.os }}-cp${{ matrix.python }}
           path: dist/*

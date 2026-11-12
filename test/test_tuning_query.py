@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import codecs, events, messages, testing, tuning
+from middi import codecs, events, messages, testing, tuning
 
 
 def query(bank: int | None = None) -> tuning.Query:
@@ -152,7 +152,7 @@ def test_fault_at_final_receive_or_during_send_cannot_complete_a_query(
     fault: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from meedee import midi
+    from middi import midi
 
     class Receiver:
         dropped_packets = 0

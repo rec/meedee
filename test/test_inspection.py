@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import archive, events, inspection, messages, midi, smf, testing
+from middi import archive, events, inspection, messages, midi, smf, testing
 
 
 def capture(*, complete: bool = True, opaque: bool = False) -> bytes:

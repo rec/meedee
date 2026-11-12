@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 
-from meedee import clip, events, messages, smf, translation, ump
+from middi import clip, events, messages, smf, translation, ump
 
 
 def song(format: int = 1, division: int = 480) -> bytes:

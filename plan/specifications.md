@@ -59,11 +59,11 @@ states the F1 `0nnndddd` bit layout. QuarterFrame implements only that raw
 layout, not the separately specified MTC sequence or full-frame interpretation.
 
 Independent compact fixtures are in
-`crates/meedee/tests/fixtures/midi1.txt`, consumed by Rust and Python tests.
+`crates/middi/tests/fixtures/midi1.txt`, consumed by Rust and Python tests.
 They state expected wire bytes directly, including channel/program boundaries,
 signed bend conversion and preserved zero-velocity NoteOn. Parser tests cover
 running status, reserved statuses, real-time interleaving and malformed streams.
-These are meedee regression vectors derived from the cited layouts, not an
+These are middi regression vectors derived from the cited layouts, not an
 official MIDI certification suite or copied full specification tables.
 
 ## Slice 4 control and parameter evidence, 2026-10-14
@@ -78,8 +78,8 @@ Decrement 96/97 (data N/A), and the RPN 127/127 release affecting both families.
 The implementation uses those raw protocol assignments. It does not implement
 RP-018's parameter-specific receiver response/units or profile-specific scaling.
 
-The shared independent vectors in `crates/meedee/tests/fixtures/commands.txt`
-state complete expected CC bytes, including meedee's selected release policy.
+The shared independent vectors in `crates/middi/tests/fixtures/commands.txt`
+state complete expected CC bytes, including middi's selected release policy.
 Tests distinguish valid NRPN 16383 from RPN-null and preserve seven-bit coarse
 observations instead of inventing an observed fine zero. Single-half selector
 edits retain the other half, with independent selector history for each family
@@ -101,7 +101,7 @@ banked real-time/non-real-time note changes and scale/octave dumps. Pages 6–8
 define both scale/octave resolutions and channel bitmap order/reserved bits.
 These are MIDI 1.0 SysEx encodings, not MIDI 2.0 per-note-pitch semantics.
 
-`crates/meedee/tests/fixtures/tuning.txt` states independent compact vectors for
+`crates/middi/tests/fixtures/tuning.txt` states independent compact vectors for
 all implemented families and real-time alternatives, consumed by Rust/Python.
 The fixed checksum bytes are independently stated rather than computed with the
 implementation under test. Tests cover exact pitches, sentinels, signed scale
@@ -159,7 +159,7 @@ identifies modulation-depth RPN 5 without guaranteeing a universal physical
 response. Bend-sensitivity cents remain seven-bit values; modulation-depth fine
 units instead divide a semitone by 128.
 
-`crates/meedee/tests/fixtures/profiles.txt` contains independent compact vectors
+`crates/middi/tests/fixtures/profiles.txt` contains independent compact vectors
 for bank/program ordering, MPE RPN 6, GM modes, identity request, master controls
 and full-frame MTC. Rust and Python consume the same expected bytes, stated
 independently of the encoder. Additional tests cover both identity manufacturer
@@ -195,7 +195,7 @@ values. CA-023 excludes bank/data-entry/parameter selectors and channel modes,
 while redefining 120/121 for key tuning. CA-031 consumes one prefix per matching
 channel note event, permits intervening messages and excludes zero-velocity
 NoteOn from fine-velocity interpretation. Compact independent vectors in
-`crates/meedee/tests/fixtures/profile-engines.txt` are checked in both languages.
+`crates/middi/tests/fixtures/profile-engines.txt` are checked in both languages.
 MPE sections 2.2/2.3 and appendix A distinguish member expression on Active Notes
 from manager expression on Sounding Notes; a pure tracker cannot infer release
 envelopes. The allocator's explicit no-sharing/no-stealing policy is narrower
@@ -221,7 +221,7 @@ Min-Center-Max scaling and truncating downscaling relative to the UMP appendix.
 bit-scaling.pdf 839e75ba465ab178486c263ce8ae57d9f0cdad25adf19828cc7d6ddfe32e7ef2
 ```
 
-The 31 compact independent vectors in `crates/meedee/tests/fixtures/ump.txt`
+The 31 compact independent vectors in `crates/middi/tests/fixtures/ump.txt`
 cover all implemented packet families, upper-bound addressing/wide fields,
 groupless utility/stream headers, native signed fields, bank options, SysEx8
 byte counts/abort, MDS headers, Flex setup fields and endpoint discovery/info.
@@ -279,7 +279,7 @@ ci.pdf  f3c3c63d768f049a387c79998081da284a1baf8605ca10d246e9a52258056e6f
 
 Reviewed base sections 3–5: addressing, reserved MUID range, discovery deadlines,
 legacy/future format handling, management messages and collision recovery.
-crates/meedee/tests/fixtures/ci.txt contains independently specified vectors for
+crates/middi/tests/fixtures/ci.txt contains independently specified vectors for
 tables 5/6/8/9/11/12/13/15, shared by Rust/Python. The UMP 1.1.2 Function Block
 number range (section Function Block Info Notification) supplies the 0..31 bound.
 No document is redistributed. The owner has no full Profiles 1.1 or Property

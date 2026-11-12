@@ -3,9 +3,9 @@ requires = ["maturin==1.15.0"]
 build-backend = "maturin"
 
 [project]
-name = "meedee"
+name = "middi"
 dynamic = ["version"]
-description = "Python bindings for the meedee Rust MIDI toolkit"
+description = "Python bindings for the middi Rust MIDI toolkit"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["pydantic>=2", "reccy>=0.2.0"]
@@ -26,11 +26,11 @@ cli = [
 ]
 
 [project.urls]
-Repository = "https://github.com/rec/meedee"
-Issues = "https://github.com/rec/meedee/issues"
+Repository = "https://github.com/rec/middi"
+Issues = "https://github.com/rec/middi/issues"
 
 [project.scripts]
-meedee = "meedee.cli:main"
+middi = "middi.cli:main"
 
 [dependency-groups]
 dev = [
@@ -47,7 +47,7 @@ reccy = { git = "https://github.com/rec/reccy.git", branch = "main" }
 
 [tool.maturin]
 python-source = "."
-module-name = "meedee._core"
+module-name = "middi._core"
 locked = true
 
 [tool.uv]
@@ -58,11 +58,11 @@ cache-keys = [
     { file = "src/**/*.rs" },
     { file = "crates/**/*.rs" },
     { file = "crates/**/Cargo.toml" },
-    { file = "crates/meedee/native/**/*" },
+    { file = "crates/middi/native/**/*" },
     { file = "third_party/libremidi/**/*" },
-    { file = "meedee/*.py" },
-    { file = "meedee/*.pyi" },
-    { file = "meedee/py.typed" },
+    { file = "middi/*.py" },
+    { file = "middi/*.pyi" },
+    { file = "middi/py.typed" },
     { file = "README.md" },
 ]
 

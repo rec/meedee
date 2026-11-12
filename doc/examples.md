@@ -5,7 +5,7 @@ A graded series of examples.
 ## Inspect one input universe
 
 ```python
-from meedee import controls, messages, universe
+from middi import controls, messages, universe
 
 options = universe.CacheOptions(
     default=universe.Retention.Minimum,
@@ -36,7 +36,7 @@ For the Rust API, see the [practical Rust examples](rust-examples.md).
 ## 1. Play middle C for half a second
 
 ```python
-import meedee as md
+import middi as md
 
 md.Output().send(md.Note("500 ms", 60))
 ```
@@ -44,7 +44,7 @@ md.Output().send(md.Note("500 ms", 60))
 ## 2. Play a tune in 120 bpm
 
 ```python
-import meedee as md
+import middi as md
 
 md.Output(bpm=120).send(
     md.Note(duration=1, note=60, velocity=90),  # 1 beat
@@ -58,7 +58,7 @@ md.Output(bpm=120).send(
 ## 3. Listen to an input
 
 ```python
-import meedee as md
+import middi as md
 
 for message in md.Input():
     print(message)
@@ -67,7 +67,7 @@ for message in md.Input():
 ## 4. Transpose a keyboard up an octave
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Input() as input, md.Output() as output:
     for m in input:
@@ -79,7 +79,7 @@ Errors are printed on the console. To handle them yourself, use `md.Input.with_e
 ```python
 import sys
 
-import meedee as md
+import middi as md
 
 with md.Input() as input, md.Output() as output:
     for m in input.with_errors():
@@ -100,7 +100,7 @@ Other channel messages, such as sustain and pitch bend, go to both channels.
 MIDI messages without channels, like sysexes, are passed through
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Input(channel=1) as input, md.Output() as out:
     out.send(md.ProgramChange(34, channel=2))
@@ -120,7 +120,7 @@ with md.Input(channel=1) as input, md.Output() as out:
 Another way.
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Input() as input, md.Output(channel=2) as o2, md.Output(channel=3) as o3:
     o2.send(md.ProgramChange(34))
@@ -142,7 +142,7 @@ with md.Input() as input, md.Output(channel=2) as o2, md.Output(channel=3) as o3
 Record ten seconds in memory, then replay it.
 
 ```python
-import meedee as md
+import middi as md
 
 md.Output().send(md.Input().record(10))
 ```
@@ -150,9 +150,9 @@ md.Output().send(md.Input().record(10))
 Or save the recording and play it later:
 
 ```python
-import meedee as md
+import middi as md
 
-filename = "rec.meedee"
+filename = "rec.middi"
 md.Input().record(10, output=filename, overwrite=True)
 
 # Later:
@@ -165,7 +165,7 @@ Read `song.mid` and write `song-up.mid`, preserving tracks, timing and metadata.
 Channel 10 is left unchanged under the GM drum convention. This opens no ports.
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Writer("song-up.mid") as writer:
     for m in md.Reader("song.mid"):
@@ -174,10 +174,10 @@ with md.Writer("song-up.mid") as writer:
         writer.write(m)
 ```
 
-`Reader` detects MIDI files, SysEx streams and meedee archives from their contents. For a MIDI
+`Reader` detects MIDI files, SysEx streams and middi archives from their contents. For a MIDI
 file, it yields the header first, then file events. Events expose `channel` and
 `transpose()` directly; transposition clamps note numbers to 0..127 and preserves
-all other file data. `Writer` chooses the format from `.mid`, `.midi`, `.syx` or `.meedee`
+all other file data. `Writer` chooses the format from `.mid`, `.midi`, `.syx` or `.middi`
 and refuses to overwrite an existing file. The context finalizes it on success;
 an error can leave a partial output, while the source remains unchanged.
 For a stream destination, use `Writer(stream, format="syx")` for SysEx;
@@ -190,9 +190,9 @@ recording with timing, then export its SysEx messages to a new `.syx` file.
 The recording's diagnostics remain available for checking loss or failure.
 
 ```python
-import meedee as md
+import middi as md
 
-recording = md.Input().record(30, output="backup.meedee")
+recording = md.Input().record(30, output="backup.middi")
 print(recording)
 with md.Writer("backup.syx") as writer:
     for m in recording:
@@ -203,9 +203,9 @@ with md.Writer("backup.syx") as writer:
 Replay the recording, preserving its timing:
 
 ```python
-import meedee as md
+import middi as md
 
-print(md.Output().send(md.Reader("backup.meedee")))
+print(md.Output().send(md.Reader("backup.middi")))
 ```
 
 Alternatively, restore an untimed `.syx` file with explicit waits in the sequence.
@@ -213,7 +213,7 @@ Use the instrument's documented pause; restoration can replace sounds/settings.
 Successful handoff does not prove the instrument accepted the dump.
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output() as output:
     print(output.send(md.events.with_gap(md.Reader("backup.syx"), 0.1)))
@@ -222,7 +222,7 @@ with md.Output() as output:
 ### Request or capture an opaque instrument dump
 
 ```python
-from meedee import file_io, midi, sysex
+from middi import file_io, midi, sysex
 
 with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
     result = sysex.dump(receiver, output)
@@ -268,7 +268,7 @@ synth supports these features and is configured for that device ID.
 ```python
 from ufor.tuning import RatioTable, Tuning
 
-import meedee as md
+import middi as md
 
 source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
 pitches = [md.tuning.convert(source, n) for n in [69, 70, 71]]
@@ -301,7 +301,7 @@ This configures an MPE lower zone on channels 2 and 3 with a 48-semitone bend
 range. Use an MPE synth and reserve these channels; the configuration remains.
 
 ```python
-import meedee as md
+import middi as md
 
 zone = md.ZoneConfiguration(manager_channel=1, members=2)
 allocator = md.mpe.Allocator(zone=zone)
@@ -347,7 +347,7 @@ not identify a commercial product. A fresh local MUID is generated for each scan
 ```python
 from secrets import randbelow
 
-import meedee as md
+import middi as md
 
 identity = md.ci.Identity(
     manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
@@ -369,8 +369,8 @@ Exchange or instrument configuration writes. An empty inventory does not prove
 the device is offline. For native UMP, set both clients' encoding to
 `md.Encoding.Ump` and set `group=1` on the route; backend support is required.
 
-See the [API contract](https://github.com/rec/meedee/blob/main/plan/api.md) and
-[MIDI-CI contract](https://github.com/rec/meedee/blob/main/plan/ci.md) for ownership,
+See the [API contract](https://github.com/rec/middi/blob/main/plan/api.md) and
+[MIDI-CI contract](https://github.com/rec/middi/blob/main/plan/ci.md) for ownership,
 bounds and failure behavior.
 
 ## Live routing with progress reports
@@ -379,7 +379,7 @@ For a managed route, forward ten seconds from the first input to the first outpu
 remapping channel messages to channel 2:
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Input() as source, md.Output() as destination:
     router = md.Router(routes=[md.Route(
@@ -403,7 +403,7 @@ Inspect ten seconds of input without forwarding it. The callback receives typed
 entries; this example prints each message, diagnostic or loss-counter total.
 
 ```python
-import meedee as md
+import middi as md
 
 
 def show(entry: md.inspection.MonitorEntry) -> None:
@@ -429,7 +429,7 @@ history. Metrics use host delivery times, independently of source timestamps.
 ## Select a program and bank
 
 ```python
-import meedee as md
+import middi as md
 
 print(md.gm.program(program=34))
 print(md.gm.program(program=6, bank_lsb=4))
@@ -440,7 +440,7 @@ with md.Output() as out:
 ```
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output() as out:
     out.send(md.ProgramChange(34))
@@ -450,7 +450,7 @@ with md.Output() as out:
 ## Change a tuning note
 
 ```python
-import meedee as md
+import middi as md
 
 pitch = md.NoteTuning(note=69, pitch=md.Pitch(semitone=69, fraction=0))
 with md.Output() as out:
@@ -460,7 +460,7 @@ with md.Output() as out:
 ## Send controller values
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output() as out:
     out.send(md.ControlChange(1, 90))
@@ -470,7 +470,7 @@ with md.Output() as out:
 ## Step an RPN or NRPN parameter
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output() as out:
     out.send(md.ParameterSet(0, 2 << 7))  # Pitch-bend range: 2 semitones.
@@ -481,7 +481,7 @@ Increment registered parameter 7 once, then decrement non-registered parameter 7
 once. Choose parameter numbers supported by your instrument.
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output() as out:
     out.send(md.ParameterStep(7))
@@ -495,7 +495,7 @@ is a separate observation returned when interpreting incoming controller message
 ## Send native MIDI 2 messages
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output(encoding=md.Encoding.Ump) as out:
     out.send(md.messages.ParameterController(
@@ -507,7 +507,7 @@ The same channel-message classes support MIDI 2 with `version=2`. Group defaults
 to 1, and output resolves the channel. Values use their native MIDI 2 widths:
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output(encoding=md.Encoding.Ump) as out:
     out.send(md.NoteOn(60, 40_000, version=2), "500 ms", md.NoteOff(60, version=2))
@@ -525,7 +525,7 @@ UMP also carries MIDI 1 values. Set a group on an ordinary message to package
 its existing native values, without scaling or upgrading it:
 
 ```python
-import meedee as md
+import middi as md
 
 legacy = md.NoteOn(60, 90, channel=2, group=3)
 assert md.ump.encode(legacy) == (0x22913C5A,)
@@ -563,7 +563,7 @@ clears the applicable cache; the sparse cache otherwise grows with observed para
 Inspect the cache without changing the selection or consuming an input:
 
 ```python
-from meedee import controls, messages
+from middi import controls, messages
 
 view = controls.ControlInterpreter()
 for controller, value in ((99, 1), (98, 2), (38, 5)):
@@ -582,7 +582,7 @@ Snapshots are frozen. Missing cached data returns `None`; missing components use
 `None` independently. A new coarse input clears the previous fine component.
 
 ```python
-import meedee as md
+import middi as md
 
 interpreter = md.ControlInterpreter()
 with md.Input() as source:
@@ -608,7 +608,7 @@ Track the first input using a lower MPE zone. The tracker reports observations
 with optional source/timing metadata; `snapshot()` returns current channel state.
 
 ```python
-import meedee as md
+import middi as md
 
 tracker = md.mpe.Tracker(zone=md.ZoneConfiguration(manager_channel=1, members=2))
 for message in md.Input():
@@ -625,7 +625,7 @@ reports truncation, including group and contributor indexes/timestamps when know
 It clears pending fragments and leaves the assembler reusable.
 
 ```python
-import meedee as md
+import middi as md
 
 assembler = md.ump.Assembler()
 packets = md.ump.packetize_sysex7(md.SysEx(bytes(range(20)), group=2))
@@ -640,7 +640,7 @@ observation lists with source/timing metadata, including `feed_assembled()` for
 an observation produced by the UMP assembler.
 
 ```python
-import meedee as md
+import middi as md
 
 message = next(md.Reader("tuning.syx"))
 print(md.tuning.decode(message))
@@ -658,7 +658,7 @@ silence, and `locked` reports whether a continuous running sequence was observed
 ```python
 from time import monotonic_ns
 
-import meedee as md
+import middi as md
 
 assembler = md.timecode.Assembler(timeout="100 ms")
 for message in md.Input():
@@ -679,7 +679,7 @@ Use a timeline when records come from your own parsing or editing workflow.
 For ordinary playback from a file, `md.smf.TimedReader` performs both steps for you.
 
 ```python
-import meedee as md
+import middi as md
 
 reader = md.smf.MergedReader("performance.mid")
 timeline = md.smf.Timeline(reader.header, stream="performance")
@@ -692,7 +692,7 @@ print(timeline.finish())
 For a UMP Clip file, use the corresponding entry converter:
 
 ```python
-import meedee as md
+import middi as md
 
 timeline = md.clip.Timeline(stream="performance")
 for entry in md.clip.Reader("performance.clip"):
@@ -709,7 +709,7 @@ messages with `include_configuration=True`.
 ## Inspect packet framing and validate MIDI-file metadata
 
 ```python
-import meedee as md
+import middi as md
 
 print(md.ump.word_count(0x40903C00))  # Two 32-bit words in this UMP packet.
 md.smf.validate_meta(81, b"\x07\xa1\x20")  # Valid tempo: 500,000 microseconds/beat.
@@ -727,10 +727,10 @@ On a backend with virtual-port support, create a software source and receive
 its messages through the ordinary input API.
 
 ```python
-import meedee as md
+import middi as md
 
-with md.Output().create_virtual("meedee-example") as out:
-    with md.Input(port="meedee-example") as source:
+with md.Output().create_virtual("middi-example") as out:
+    with md.Input(port="middi-example") as source:
         out.send(md.NoteOn(60))
         print(source.receive(timeout=1))
         out.send(md.NoteOff(60))
@@ -749,7 +749,7 @@ Use `with_errors()` to handle diagnostics explicitly.
 ```python
 from itertools import islice
 
-import meedee as md
+import middi as md
 
 for packet in islice(md.Input(raw=True), 10):
     print(packet)
@@ -765,10 +765,10 @@ Create a software destination and wait up to ten seconds for its first delivery.
 ```python
 from queue import Queue
 
-import meedee as md
+import middi as md
 
 received = Queue()
-with md.Input().create_virtual("meedee-callback", callback=received.put):
+with md.Input().create_virtual("middi-callback", callback=received.put):
     print(received.get(timeout=10))
 ```
 
@@ -784,9 +784,9 @@ Opened inputs retain their stream, clock, dropped-packet count and terminal
 failure after close. This works even when close raises a cleanup error.
 
 ```python
-import meedee as md
+import middi as md
 
-with md.Input().create_virtual("meedee-diagnostics") as source:
+with md.Input().create_virtual("middi-diagnostics") as source:
     print(source.clock)
 print(source.closed)
 print(source.dropped_packets)
@@ -807,7 +807,7 @@ Inspect a saved SysEx dump without opening a MIDI port. The same decoder handles
 GM mode changes, controller destinations, key controls and global parameters:
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Reader("backup.syx") as dump:
     for message in dump:
@@ -825,9 +825,9 @@ Rust returns the corresponding GmMessage enum from the same decoding operation.
 clock's original tick units. This prints the times attached to a saved performance:
 
 ```python
-import meedee as md
+import middi as md
 
-with md.Reader("rec.meedee") as capture:
+with md.Reader("rec.middi") as capture:
     for message in capture:
         if isinstance(message, md.Message) and message.timestamp is not None:
             print(message.timestamp.seconds)
@@ -851,10 +851,10 @@ then finalizes the file. Recording also works with callbacks and does not depend
 on calls to receive.
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Input() as source:
-    source.start("rec.meedee")
+    source.start("rec.middi")
     print(source.receive(timeout=10))
     print(source.stop())
 ```
@@ -868,7 +868,7 @@ decoded archive recorder.
 Omit the destination to capture in memory, with no total retention limit:
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Input() as source:
     recorder = source.start()
@@ -891,7 +891,7 @@ the last finalized report after close.
 A cancellation token can be shared with another thread to interrupt a wait:
 
 ```python
-import meedee as md
+import middi as md
 
 cancel = md.Cancellation()
 with md.Input() as source:
@@ -922,10 +922,10 @@ are not callable. Every successful call returns a PlaybackReport; simple example
 can ignore it.
 
 ```python
-import meedee as md
+import middi as md
 
 with md.Output() as out:
-    print(out.send(md.Note("500 ms", 60), md.Reader("rec.meedee"), md.Note("500 ms", 67)))
+    print(out.send(md.Note("500 ms", 60), md.Reader("rec.middi"), md.Note("500 ms", 67)))
 ```
 
 Each argument follows the previous argument. A direct message sends immediately,
@@ -951,16 +951,16 @@ The default runs MIDI in your Python process. To put the native MIDI connection
 in a child process, use:
 
 ```python
-import meedee as md
+import middi as md
 
 md.Output(run_in_subprocess=True).send(md.Note("500 ms", 60))
 ```
 
 The default child is a Python interpreter bootstrapping the shared Rust worker.
-With `meedee-worker` installed on PATH, launch the Rust executable directly:
+With `middi-worker` installed on PATH, launch the Rust executable directly:
 
 ```python
-import meedee as md
+import middi as md
 
 md.Output(run_in_subprocess=True, subprocess_worker="rust").send(md.Note("500 ms", 60))
 ```
@@ -978,7 +978,7 @@ Python `Input`, `Output` and `discovery.Poller` use frozen Pydantic configuratio
 models. Construction still opens no MIDI ports. Inspect settings directly:
 
 ```python
-import meedee as md
+import middi as md
 
 output = md.Output(channel=2, bpm=120)
 print(output.model_dump())

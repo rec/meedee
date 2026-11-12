@@ -8,7 +8,7 @@ from time import perf_counter_ns, process_time_ns
 def main() -> None:
     start = perf_counter_ns()
     cpu = process_time_ns()
-    from meedee import archive, ci, codecs, messages, midi, tuning, ump
+    from middi import archive, ci, codecs, messages, midi, tuning, ump
 
     elapsed = perf_counter_ns() - start
     cpu_elapsed = process_time_ns() - cpu

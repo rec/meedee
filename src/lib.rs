@@ -170,7 +170,7 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
         "WorkerTimeoutError",
         py.get_type::<errors::WorkerTimeoutError>(),
     )?;
-    let native = PyModule::new(py, "meedee._native")?;
+    let native = PyModule::new(py, "middi._native")?;
     for name in [
         "MidiError",
         "InitError",
@@ -203,15 +203,15 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     playback::register_native(&native)?;
     PyModule::import(py, "sys")?
         .getattr("modules")?
-        .set_item("meedee._native", native)?;
-    let clients = PyModule::import(py, "meedee._clients")?;
+        .set_item("middi._native", native)?;
+    let clients = PyModule::import(py, "middi._clients")?;
     for name in ["Input", "Output"] {
         let class = clients.getattr(name)?;
-        class.setattr("__module__", "meedee.midi")?;
+        class.setattr("__module__", "middi.midi")?;
         module.add(name, class)?;
     }
-    let error = PyModule::import(py, "meedee._errors")?.getattr("CompoundSendError")?;
-    error.setattr("__module__", "meedee.midi")?;
+    let error = PyModule::import(py, "middi._errors")?.getattr("CompoundSendError")?;
+    error.setattr("__module__", "middi.midi")?;
     module.add("CompoundSendError", error)?;
     Ok(())
 }
@@ -285,6 +285,6 @@ fn populate_file_io(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 fn run_subprocess_worker(py: Python<'_>) -> PyResult<()> {
-    py.detach(meedee::transport::subprocess::serve)
+    py.detach(middi::transport::subprocess::serve)
         .map_err(|e| errors::transport_error(e, "worker"))
 }

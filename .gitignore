@@ -4,6 +4,6 @@
 __pycache__/
 /.pytest_cache/
 /.ruff_cache/
-/meedee/*.so
-/meedee/*.pyd
+/middi/*.so
+/middi/*.pyd
 /site/

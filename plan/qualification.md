@@ -6,7 +6,11 @@ None.
 
 ## Status and boundaries
 
-meedee targets **macOS, Windows and Linux**, with qualification organized by OS,
+Historical qualification logs have project names and paths normalized to `middi`
+as part of the rename. Their recorded measurements and outcomes are unchanged;
+the rename does not constitute a new native qualification run.
+
+middi targets **macOS, Windows and Linux**, with qualification organized by OS,
 architecture and MIDI backend. Raspberry Pi is simply one possible Linux host;
 there is no required model, board-specific milestone or dependency on its
 availability.
@@ -76,7 +80,7 @@ git rev-parse HEAD > target/qualification/revision.txt
 git status --short > target/qualification/worktree.txt
 rustc -vV > target/qualification/rust.txt
 cmake --version > target/qualification/cmake.txt
-cargo build --locked --release -p meedee --examples
+cargo build --locked --release -p middi --examples
 # On Windows the executable has an .exe suffix.
 target/release/examples/qualification > target/qualification/rust.jsonl
 uv run --frozen pytest -q -s test/qualification/measure.py -k 'not native' \
@@ -164,7 +168,7 @@ in both Python modes. It checks accepted-record/sample counts, capacity rejectio
 peak reservations and consistency with the existing maximum-lateness report.
 It sets no performance threshold and makes no physical latency claim.
 
-The `sysex` supervisor case runs `test/native/meedee_sysex_loopback.py` under the
+The `sysex` supervisor case runs `test/native/middi_sysex_loopback.py` under the
 same 30-second process deadline. In isolated and in-process mode it transfers and
 captures two SysEx messages (including a 4,097-byte payload), verifies exact SYX export,
 and exchanges ordinary, banked key-based and banked scale/octave MTS dumps through
@@ -196,7 +200,7 @@ cannot qualify that backend without an independently arranged loopback route.
 Do not silently choose a hardware endpoint or install a virtual driver. Agree a
 Windows endpoint and test separately when a Windows host is available. Likewise,
 ALSA raw is not qualified by sequencer loopback. The `ump_ci` supervisor case uses
-test/native/meedee_ci_loopback.py; MIDI 1 measurements alone do not qualify live
+test/native/middi_ci_loopback.py; MIDI 1 measurements alone do not qualify live
 MIDI 2. A successful CoreMIDI UMP loopback does not qualify other backends or
 physical MIDI 2 equipment.
 
@@ -251,7 +255,7 @@ a native call that blocks a loop. Compilation has a separate 30-second limit.
 Per-wait notification storage is bounded at 128 destination changes. Logs identify
 the process role, cycle, notification IDs, endpoint handles and checked unique-ID
 query results, without logging hardware names. Keep results separate from the
-meedee transport qualification.
+middi transport qualification.
 
 This replaces the earlier short-run-loop diagnostic modes, whose failures are
 preserved in validation.md. It tests continuous event servicing in both processes

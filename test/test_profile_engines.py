@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import codecs, controls, gm, messages, mpe, timecode
+from middi import codecs, controls, gm, messages, mpe, timecode
 
 
 def test_extended_sysex_preserves_unknown_ids_order_and_mixed_endianness() -> None:
@@ -44,7 +44,7 @@ def test_extended_sysex_preserves_unknown_ids_order_and_mixed_endianness() -> No
     ]
     fixture = (
         Path(__file__).resolve().parents[1]
-        / "crates/meedee/tests/fixtures/profile-engines.txt"
+        / "crates/middi/tests/fixtures/profile-engines.txt"
     )
     expected_values = [
         bytes.fromhex(x.split("|", 1)[1])

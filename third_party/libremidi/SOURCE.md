@@ -96,7 +96,7 @@ The fork fixes are separate commits:
   and uncreated zero clients are not disposed. The small keeper state has no
   static destructor or application callback context. Its client is reclaimed by
   OS process cleanup, not counted as an application connection. There is one
-  extra native client per meedee MIDI-using process; other loaded MIDI libraries
+  extra native client per middi MIDI-using process; other loaded MIDI libraries
   may have their own clients. It does not recover a keeper after server failure.
   The sanitized coremidi_keeper_test covers creation failure/retry, concurrent
   MIDI 1/UMP creation and reopening, observers and borrowed-context ownership.

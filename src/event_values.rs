@@ -1,12 +1,12 @@
 //! Native timing values and message conversion shared by files and transport.
 use crate::files::{frozen, uint};
 use crate::packets::Clock;
-use meedee::events as model;
-use meedee::messages::Message;
+use middi::events as model;
+use middi::messages::Message;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyInt, PyTuple};
-#[pyclass(frozen, skip_from_py_object, module = "meedee.events")]
+#[pyclass(frozen, skip_from_py_object, module = "middi.events")]
 #[derive(Clone)]
 pub struct Timestamp {
     pub value: model::Timestamp,
@@ -15,7 +15,7 @@ frozen!(Timestamp;ticks,clock;{
 #[new]#[pyo3(signature=(*,ticks,clock))]fn new(ticks:&Bound<'_,PyAny>,clock:PyRef<'_,Clock>)->PyResult<Self>{let value=model::Timestamp{ticks:crate::messages::integer(&crate::units::normalize(ticks,"tick","integer")?,"ticks")?,clock:clock.value.clone()};if value.clock.mode()==Some(false){return Err(PyValueError::new_err("disabled clock has no timestamps"));}Ok(Self{value})}
 #[getter]fn ticks(&self)->i64{self.value.ticks}#[getter]fn clock(&self)->Clock{Clock{value:self.value.clock.clone()}}#[getter]fn seconds(&self)->PyResult<Rational>{Ok(Rational{value:self.value.seconds().map_err(value_error)?})}
 });
-#[pyclass(frozen, skip_from_py_object, module = "meedee.events")]
+#[pyclass(frozen, skip_from_py_object, module = "middi.events")]
 #[derive(Clone)]
 pub struct SourceSpan {
     pub value: model::SourceSpan,
@@ -36,7 +36,7 @@ pub(crate) fn with_metadata(
         .extract::<PyRef<'_, crate::messages::Message>>()?
         .metadata();
     let value = payload
-        .with_metadata(meedee::messages::Metadata {
+        .with_metadata(middi::messages::Metadata {
             stream: metadata.stream,
             timestamp: metadata.timestamp,
             span: metadata.span,
@@ -64,8 +64,8 @@ pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
         model::Payload::Command(v) => {
             let (name, kwargs) = crate::messages::command_wire(py, &v)?;
             let module = match name.as_str() {
-                "ZoneConfiguration" => "meedee.mpe",
-                _ => "meedee.messages",
+                "ZoneConfiguration" => "middi.mpe",
+                _ => "middi.messages",
             };
             Ok(PyModule::import(py, module)?
                 .getattr(name)?
@@ -83,7 +83,7 @@ pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
         })?;
     Ok(object)
 }
-#[pyclass(frozen, module = "meedee.events")]
+#[pyclass(frozen, module = "middi.events")]
 pub struct Rational {
     pub value: model::Rational,
 }

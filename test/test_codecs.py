@@ -7,12 +7,12 @@ from typing import cast
 
 import pytest
 
-from meedee import codecs, messages
+from middi import codecs, messages
 
 
 def wire_vectors() -> Iterator[tuple[messages.Message, bytes]]:
     fixture = (
-        Path(__file__).resolve().parents[1] / "crates/meedee/tests/fixtures/midi1.txt"
+        Path(__file__).resolve().parents[1] / "crates/middi/tests/fixtures/midi1.txt"
     )
     for line in fixture.read_text().splitlines():
         if not line or line.startswith("#"):
@@ -61,7 +61,7 @@ def test_new_messages_preserve_the_frozen_field_and_replacement_contract() -> No
         constructor = getattr(messages, type(m).__name__)
         fields = {n: constructor.__annotations__[n] for n in constructor.__match_args__}
         assert isinstance(m, messages.Message)
-        assert constructor.__module__ == "meedee.messages"
+        assert constructor.__module__ == "middi.messages"
         assert isinstance(constructor.__match_args__, tuple)
         assert constructor.__match_args__ == tuple(fields)
         assert not hasattr(m, "__dict__")

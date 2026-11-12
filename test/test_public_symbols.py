@@ -31,22 +31,22 @@ def test_rust_inventory_follows_reexports_and_aliases_without_recursing_cycles(
 ) -> None:
     (tmp_path / "nested").mkdir()
     (tmp_path / "index.html").write_text(
-        '<a class="mod" href="nested/index.html" title="mod meedee::nested">nested</a>'
-        '<a class="mod" href="nested/index.html" title="mod meedee::nested">alias</a>'
+        '<a class="mod" href="nested/index.html" title="mod middi::nested">nested</a>'
+        '<a class="mod" href="nested/index.html" title="mod middi::nested">alias</a>'
         '<a class="struct" href="nested/struct.Value.html"'
-        ' title="struct meedee::nested::Value">Root<wbr>Value</a>'
+        ' title="struct middi::nested::Value">Root<wbr>Value</a>'
         '<a class="struct" href="../dependency/struct.Foreign.html"'
         ' title="struct dependency::Foreign">Foreign</a>'
-        '<a class="trait" href="trait.Trait.html" title="trait meedee::Trait">Trait</a>'
+        '<a class="trait" href="trait.Trait.html" title="trait middi::Trait">Trait</a>'
     )
     (tmp_path / "nested/index.html").write_text(
-        '<a class="mod" href="../index.html" title="mod meedee::cycle">cycle</a>'
+        '<a class="mod" href="../index.html" title="mod middi::cycle">cycle</a>'
         '<a class="struct" href="struct.Value.html"'
-        ' title="struct meedee::nested::Value">Value</a>'
+        ' title="struct middi::nested::Value">Value</a>'
         '<a class="enum" href="enum.Kind.html"'
-        ' title="enum meedee::nested::Kind">Kind</a>'
+        ' title="enum middi::nested::Kind">Kind</a>'
         '<a class="fn" href="fn.convert.html"'
-        ' title="fn meedee::nested::convert">convert</a>'
+        ' title="fn middi::nested::convert">convert</a>'
     )
     assert rust_symbols(tmp_path / "index.html") == {
         "RootValue": "S",

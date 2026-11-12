@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from meedee import messages, translation, ump
+from middi import messages, translation, ump
 
 
 def vectors() -> list[tuple[str, tuple[int, ...]]]:
     fixture = (
-        Path(__file__).resolve().parents[1] / "crates/meedee/tests/fixtures/ump.txt"
+        Path(__file__).resolve().parents[1] / "crates/middi/tests/fixtures/ump.txt"
     )
     return [
         (n, tuple(int(v, 16) for v in w.split()))
@@ -25,7 +25,7 @@ def test_shared_vectors_preserve_every_family_and_frozen_native_values() -> None
         value = ump.decode(words)
         assert isinstance(value, messages.Message)
         assert ump.encode(value) == words
-        namespace = ump if type(value).__module__ == "meedee.ump" else messages
+        namespace = ump if type(value).__module__ == "middi.ump" else messages
         assert type(value).__module__ == namespace.__name__
         constructor = getattr(namespace, type(value).__name__)
         fields = inspect.signature(constructor).parameters

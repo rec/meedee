@@ -116,7 +116,7 @@ Additional work beyond the prompt: None.
 
 | Requirement | Authoritative implementation and verification |
 | --- | --- |
-| Typed Duration/Beats, Note/Rest defaults and exact beat arithmetic | src/sequence.rs and tests/sequence.rs in crates/meedee; fractional accumulation and invalid tempo/unit tests pass. |
+| Typed Duration/Beats, Note/Rest defaults and exact beat arithmetic | src/sequence.rs and tests/sequence.rs in crates/middi; fractional accumulation and invalid tempo/unit tests pass. |
 | Replace MIDI 1 constructors and migrate callers | messages.rs, gm.rs and repository callers; full workspace compilation/tests and rebuilt Python regressions pass. byte_codec.rs checks defaults, unset-channel encoding, builders, expansion and clamped transpose. |
 | Preserve optional provenance; ignore it in message equality/hash | Message trait and metadata macros in messages.rs; message_metadata.rs tests builders, transpose, multiple message families and expanded commands. Archive/comparison tests retain occurrence equality. |
 | Remove generic Event while retaining SMF records | events.rs exposes metadata-bearing Payload, with live Item::Message and direct archive/playback consumers. Source review finds no generic events.Event export; smf.Event and archive Record::Event remain for their specified low-level roles. |

@@ -2,7 +2,7 @@
 
 Pinned Rust dependency license texts for the supported build targets follow.
 Dual-licensed dependencies are used under their MIT option where available.
-Build-only dependencies are included for completeness. meedee's own MIT license
+Build-only dependencies are included for completeness. middi's own MIT license
 is in LICENSE.
 
 Vendored libremidi sources are pinned to fork revision

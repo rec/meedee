@@ -8,15 +8,15 @@ transport through its native bindings; the former Python pickle pipe engine and
 worker service are removed.
 
 Python Input/Output keep run_in_subprocess=False and timeout=5 seconds by default.
-subprocess_worker="python" starts the current interpreter with -m meedee._worker;
+subprocess_worker="python" starts the current interpreter with -m middi._worker;
 that module only enters the Rust service. subprocess_worker="rust" launches the
-meedee-worker executable. subprocess_executable optionally selects the interpreter
+middi-worker executable. subprocess_executable optionally selects the interpreter
 or binary, with no implicit fallback. CLI commands expose the corresponding flags.
 The existing CLI/discovery subprocess defaults remain unchanged.
 
 Rust Input and Output expose with_run_in_subprocess(bool) and
 with_subprocess_options(SubprocessOptions). The typed options contain program,
-args and a Duration timeout; defaults are meedee-worker on PATH, no arguments and
+args and a Duration timeout; defaults are middi-worker on PATH, no arguments and
 five seconds. Configuration is validated before discovery or connection. The
 standalone binary is part of the Rust crate and needs no Python runtime. Python
 wheels need only their ordinary extension and the interpreter bootstrap.

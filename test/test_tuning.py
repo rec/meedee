@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import codecs, controls, messages, tuning
+from middi import codecs, controls, messages, tuning
 
 
 def test_bank_absence_is_distinct_from_zero_and_note_change_realtime_is_checked() -> (
@@ -41,7 +41,7 @@ def test_tuning_values_and_message_generation_do_not_require_ufor() -> None:
     subprocess.run(
         [
             sys.executable,
-            str(Path(__file__).parent / "native/meedee_tuning_without_ufor.py"),
+            str(Path(__file__).parent / "native/middi_tuning_without_ufor.py"),
         ],
         check=True,
         timeout=15,
@@ -52,7 +52,7 @@ def tuning_vectors() -> Iterator[tuple[messages.Message, bytes]]:
     table = tuning.TuningTable(values=[tuning.NoChange()] * 128)
     changes = [tuning.NoteTuning(note=69, pitch=tuning.Pitch(semitone=69, fraction=0))]
     fixture = (
-        Path(__file__).resolve().parents[1] / "crates/meedee/tests/fixtures/tuning.txt"
+        Path(__file__).resolve().parents[1] / "crates/middi/tests/fixtures/tuning.txt"
     )
     for line in fixture.read_text().splitlines():
         if not line or line.startswith("#"):
@@ -150,7 +150,7 @@ def test_frozen_keyword_values_have_checked_replacement_and_matching() -> None:
         fields = cls.__annotations__
         v = cls(**{k: getattr(original, k) for k in fields})
         assert v == original
-        assert cls.__module__ == "meedee.tuning"
+        assert cls.__module__ == "middi.tuning"
         assert not hasattr(v, "__dict__")
         replace = v.replace
         assert v == replace()

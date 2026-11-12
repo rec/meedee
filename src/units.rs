@@ -10,7 +10,7 @@ pub fn normalize<'py>(
     if value.is_instance_of::<PyString>() {
         value
             .py()
-            .import("meedee._units")?
+            .import("middi._units")?
             .getattr(kind)?
             .call1((value, unit))
     } else {
@@ -34,7 +34,7 @@ pub fn tempo(value: &Bound<'_, PyAny>) -> PyResult<u64> {
     crate::files::uint(
         &value
             .py()
-            .import("meedee._units")?
+            .import("middi._units")?
             .getattr("tempo")?
             .call1((value, 1_000_000))?,
     )
@@ -46,7 +46,7 @@ pub fn duration(value: &Bound<'_, PyAny>) -> PyResult<u64> {
     crate::files::uint(
         &value
             .py()
-            .import("meedee._units")?
+            .import("middi._units")?
             .getattr("duration")?
             .call1((value,))?,
     )

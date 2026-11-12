@@ -1,6 +1,6 @@
 from pathlib import Path
 import re
-source=Path('crates/meedee/src/ump_values.rs').read_text()
+source=Path('crates/middi/src/ump_values.rs').read_text()
 result=['"""Pure UMP words and immutable MIDI 2.0 values; no transport initialization."""','from enum import Enum','from . import messages','']
 for name,body in re.findall(r'(\w+) \[0x[0-9a-f]+,0\] \{([^}]*)\};',source):
     fields=re.findall(r'(\w+):\w+ =',body)
@@ -9,4 +9,4 @@ for name,body in re.findall(r'(\w+) \[0x[0-9a-f]+,0\] \{([^}]*)\};',source):
     result.append('    def __init__(self'+(', *, '+params if fields else '')+') -> None: ...')
     for field in fields:result.extend(['    @property',f'    def {field}(self) -> int: ...'])
     result.append(f'    def replace(self, **changes: object) -> {name}: ...\n')
-Path('meedee/ump.pyi').write_text('\n'.join(result)+'\n')
+Path('middi/ump.pyi').write_text('\n'.join(result)+'\n')

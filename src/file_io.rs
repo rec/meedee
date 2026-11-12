@@ -1,11 +1,11 @@
 //! Unified file API; format detection, validation and transformation stay in Rust.
 use crate::files::{closed, os_error, Stream};
-use meedee::file_io as model;
+use middi::file_io as model;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::path::PathBuf;
 
-#[pyclass(module = "meedee.file_io")]
+#[pyclass(module = "middi.file_io")]
 struct Reader {
     value: Option<model::Reader<Stream>>,
     complete: bool,
@@ -81,7 +81,7 @@ impl Reader {
     }
 }
 
-#[pyclass(module = "meedee.file_io")]
+#[pyclass(module = "middi.file_io")]
 struct Writer {
     value: Option<model::Writer<Stream>>,
 }
@@ -95,7 +95,7 @@ impl Writer {
         #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     ) -> PyResult<Self> {
         let extension = if destination.hasattr("write")? {
-            format.unwrap_or("meedee").to_ascii_lowercase()
+            format.unwrap_or("middi").to_ascii_lowercase()
         } else {
             if format.is_some() {
                 return Err(PyValueError::new_err(
@@ -108,9 +108,9 @@ impl Writer {
                 .unwrap_or("")
                 .to_ascii_lowercase()
         };
-        if !matches!(extension.as_str(), "mid" | "midi" | "meedee" | "syx") {
+        if !matches!(extension.as_str(), "mid" | "midi" | "middi" | "syx") {
             return Err(PyValueError::new_err(
-                "expected .mid, .midi, .syx or .meedee destination",
+                "expected .mid, .midi, .syx or .middi destination",
             ));
         }
         if payload_limit == 0 {
@@ -140,15 +140,15 @@ impl Writer {
                     if wire.first() != Some(&240) || wire.last() != Some(&247) {
                         return Err(PyValueError::new_err("expected a structured SysEx message"));
                     }
-                    let message = meedee::messages::SysEx::new(wire[1..wire.len() - 1].to_vec())
+                    let message = middi::messages::SysEx::new(wire[1..wire.len() - 1].to_vec())
                         .map_err(|e| PyValueError::new_err(e.to_string()))?;
                     let payload = crate::event_values::with_metadata(
                         record,
-                        meedee::events::Payload::Message(meedee::messages::AnyMessage::SysEx(
+                        middi::events::Payload::Message(middi::messages::AnyMessage::SysEx(
                             message,
                         )),
                     )?;
-                    model::Record::Archive(meedee::archive::Record::Event(Box::new(payload)))
+                    model::Record::Archive(middi::archive::Record::Event(Box::new(payload)))
                 }
                 Err(error) => return Err(error),
             }

@@ -2,7 +2,7 @@
 
 import pytest
 
-from meedee import controls, events, messages, midi, mpe, tuning, ump, universe
+from middi import controls, events, messages, midi, mpe, tuning, ump, universe
 
 
 def cc(controller: int, value: int, channel: int = 1) -> messages.ControlChange:

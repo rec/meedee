@@ -458,11 +458,11 @@ defect; the native initialization failure's cause remains undiagnosed. Native
 MIDI I/O under 3.15, Linux/Windows 3.15 builds, and cross-platform 3.15 fault
 behavior remain unvalidated. No hardware was accessed.
 
-## Project rename to meedee, 2026-10-13
+## Project rename to middi, 2026-10-13
 
 The Python distribution, package/import paths, Cargo package, native class and
 exception module names, worker entry point, test fixtures, and release artifact
-names now use `meedee`. The toolkit plan is `plan/meedee.md`. Existing GitHub
+names now use `middi`. The toolkit plan is `plan/middi.md`. Existing GitHub
 URLs and historical wheel names remain accurate records of the original project.
 No dependency versions or backend implementation changed.
 
@@ -530,8 +530,8 @@ passes the focused target. Provenance, retained license texts and omissions are
 recorded in `third_party/libremidi/SOURCE.md`. The ASCII input-name conversion
 is deliberately unchanged; it was not one of the two requested fixes.
 
-This source import does not yet link libremidi into meedee or remove midir.
-Meedee's `.git/index.lock` initially prevented the source-import commit.
+This source import does not yet link libremidi into middi or remove midir.
+Middi's `.git/index.lock` initially prevented the source-import commit.
 The permission was corrected on 2026-10-13; the fork commits were already pushed.
 
 ## Slice 2: checked native input teardown, 2026-10-13
@@ -554,9 +554,9 @@ normal and sanitizer tests pass after this correction.
 
 ## Slice 2: independent Rust values
 
-`cargo test --locked -p meedee` passes the two boundary/payload tests without
-Python. `cargo tree -p meedee` contains only the toolkit itself; it has no external
-dependencies. `cargo clippy --locked -p meedee --all-targets -- -D warnings` and
+`cargo test --locked -p middi` passes the two boundary/payload tests without
+Python. `cargo tree -p middi` contains only the toolkit itself; it has no external
+dependencies. `cargo clippy --locked -p middi --all-targets -- -D warnings` and
 `cargo fmt --all --check` pass. The Python representation contract passes on
 Python 3.11 using the extracted Rust values. The existing Python suite passes
 all 129 tests after rebuilding. No dependency versions changed in Cargo.lock.
@@ -564,7 +564,7 @@ The production transport still uses midir pending the rest of slice 2.
 
 ## Slice 2: private extension and public messages
 
-The binary is now `meedee._core`. Public `meedee.messages` and `meedee.midi`
+The binary is now `middi._core`. Public `middi.messages` and `middi.midi`
 loaders register native definitions; message import does not initialize cleanup,
 import transport clients, or create MIDI resources. NoteOn/SysEx wrappers use the
 shared Rust values and the existing frozen representation fixture. Python 3.11
@@ -680,7 +680,7 @@ this separate path; Windows compilation alone would not certify it.
 
 Remaining slice-2 work includes Python transport replacement, real macOS I/O,
 Windows/Services and Linux qualification. The completion
-reminder to submit fork patches upstream remains in plan/meedee.md.
+reminder to submit fork patches upstream remains in plan/middi.md.
 
 ## Python transport replacement, 2026-10-14
 
@@ -796,7 +796,7 @@ input clears the cached fine component; incomplete fine input remains inspectabl
 Validation: 621 Python tests pass on Python 3.13.12 with the virtual environment's
 site-packages on `PYTHONPATH` for embedded Python callback tests. The thirteen Rust
 controls tests and five event-view tests pass, as do core-crate Clippy, Rust formatting,
-Ruff, `ty check meedee`, the changed Python test's type check and pyupgrade.
+Ruff, `ty check middi`, the changed Python test's type check and pyupgrade.
 Workspace-wide Clippy reports existing unused imports, needless borrows and a
 too-many-arguments warning in untouched Python binding files.
 
@@ -913,7 +913,7 @@ formatting, ty, pyupgrade and whitespace checks pass. The release workflow adds
 the installed profile tests while retaining published-release-only execution
 and Python endpoints 3.11/3.15. No release or CI run was triggered.
 
-The approved deferrals are recorded in meedee.md and api.md. No hardware or new
+The approved deferrals are recorded in middi.md and api.md. No hardware or new
 native-service flow was run. Windows/Services, physical device behavior, real
 macOS I/O and Linux qualification remain open. GM2 message completeness,
 MPE voice/expression engines, quarter-frame locking and instrument timing or
@@ -1026,7 +1026,7 @@ and native virtual integration checks follow after slice 10.
 
 ## Slices 8–10 file timing, typed live integration and capture/replay, 2026-10-15
 
-Implemented the approved Rust file codecs, `.meedee` archive and typed live
+Implemented the approved Rust file codecs, `.middi` archive and typed live
 adapters, exposed through focused Python modules. Exact rational file clocks,
 SMF track merging and tempo/SMPTE conversion, Clip timing and explicit export
 reports complete the selected slice 8 scope. Stream-clock links and optionally
@@ -1069,7 +1069,7 @@ Checked cleanup reported retention rather than releasing potentially active
 resources. No hardware endpoint was selected, and no tuning/reset message was
 sent. Successful native capture/replay, in-process loopback, physical behavior,
 Windows/Linux native backends and live UMP qualification remain open.
-The opt-in fixture is test/native/meedee_typed_loopback.py. Software/fault and
+The opt-in fixture is test/native/middi_typed_loopback.py. Software/fault and
 packaging results do not substitute for those native/platform gates.
 
 ## Slice 11 MIDI-CI management, 2026-10-15
@@ -1078,7 +1078,7 @@ The owner selected the pure caller-driven API, explicit local identities/routes,
 bounded transactions and conservative recovery, then deferred Profiles and
 Property Exchange because their full normative documents are unavailable. The
 accessible MIDI-CI 1.2.1 base supports management only: Discovery/Reply, Endpoint
-Inquiry/Reply, Invalidate MUID and ACK/NAK. Rust ci/ci and Python meedee.ci
+Inquiry/Reply, Invalidate MUID and ACK/NAK. Rust ci/ci and Python middi.ci
 share the implementation. Session declarations advertise zero optional-category
 bits. No JSON/compression dependencies or unimplemented property/profile stubs
 are added. See ci.md and specifications.md for the contract and document hash.
@@ -1100,7 +1100,7 @@ checks pass. Clippy uses the existing local atomic-deprecation exception. The
 release workflow adds installed CI tests and retains its published-release-only
 trigger and Python 3.11/3.15 matrix. No release or workflow was triggered.
 
-The supervised opt-in fixture test/native/meedee_ci_loopback.py attempted a
+The supervised opt-in fixture test/native/middi_ci_loopback.py attempted a
 native UMP SysEx7 discovery/reply exchange between two exclusively test-owned
 virtual endpoints, using randomized test MUIDs and zero optional capabilities.
 CoreMIDI rejected creation of the first UMP client with **268435459**. Checked
@@ -1218,7 +1218,7 @@ Python 3.11 and 3.15.
 ## Native access and WinMM discovery follow-up, 2026-10-15
 
 A standalone C++ program calls Apple's MIDIClientCreate directly, bypassing both
-meedee and libremidi. From the agent execution context it returns **268435459**
+middi and libremidi. From the agent execution context it returns **268435459**
 (**0x10000003**, MACH_SEND_INVALID_DEST in the installed Mach headers) and leaves
 the zero-initialized client reference unchanged. This reproduces the first-call
 failure without either wrapper and does not identify the underlying service or
@@ -1257,7 +1257,7 @@ Duplicate suffixes use only successful snapshots from the same enumeration,
 removing additional native queries and their disappearance race. The error hook
 has a nonblocking atomic reentrancy/concurrency guard; nested/concurrent error
 notifications may be suppressed while a hook is active, but failed records remain
-omitted. meedee's existing sticky native-error diagnostics can reject the whole
+omitted. middi's existing sticky native-error diagnostics can reject the whole
 enumeration rather than returning libremidi's successful subset.
 
 The original sibling checkout was clean but had two unpushed commits diverging
@@ -1727,7 +1727,7 @@ pass. Static checks pass with the existing local Clippy deprecation exception.
 
 ## Optional offline CLI, 2026-10-19
 
-Slice 3 adds the optional `meedee` command with Pydantic/Tyro inspect, validate
+Slice 3 adds the optional `middi` command with Pydantic/Tyro inspect, validate
 and compare models, text/JSON presentation and the approved 0/1/2 statuses.
 The CLI dependencies remain an optional extra, committed separately without
 upgrading existing packages. Inspect is detailed; validate is a compact quality
@@ -2132,10 +2132,10 @@ and no sibling file was changed. Existing sibling evidence is linked rather than
 claiming their complete test suites were rerun here.
 
 Environment: macOS 14.5 (23F79), arm64; Python 3.11.7 and 3.15.0; Rust 1.99.0;
-CMake 4.4.4. The meedee base was `90572591b359ea8e8e15542bdf5c58aeb185e548`
+CMake 4.4.4. The middi base was `90572591b359ea8e8e15542bdf5c58aeb185e548`
 with this batch's uncommitted fixture/documentation changes during verification.
 Python used the current editable extension; the standalone Rust qualification
-examples were rebuilt with `cargo build --locked --release -p meedee --examples`.
+examples were rebuilt with `cargo build --locked --release -p middi --examples`.
 Debug Python and release Rust timing values are not equivalent-work benchmarks.
 No performance acceptance budgets or hard latency claims are inferred.
 
@@ -2237,7 +2237,7 @@ route and workload choices remain to be agreed before native platform qualificat
 The owner authorized four local slices: correct scope/status documentation,
 review archive v1, verify Rust 1.87 release artifacts on the available Mac and
 prepare later qualification. The earlier preparation incorrectly made a Pi 5
-a project target. The owner clarified that meedee targets macOS, Windows and
+a project target. The owner clarified that middi targets macOS, Windows and
 Linux; a Pi is merely one possible Linux host. No host connection or provisioning
 was attempted. The correction below supersedes that hardware-specific plan.
 
@@ -2293,9 +2293,9 @@ fixtures did not change afterward. Local artifacts are:
 
 | File in dist/ | Bytes | SHA-256 |
 | --- | --- | --- |
-| meedee-0.2.0-cp311-cp311-macosx_11_0_arm64.whl | 1971360 | 3bcc169cb4223759602c4517b30da13d84c84af764ee6db4462893222cb838bd |
-| meedee-0.2.0-cp315-cp315-macosx_11_0_arm64.whl | 1943901 | c051d2ddd2fcf754f5373d2153d7dea017aeaad094617dd3449cb28f7fb39f09 |
-| meedee-0.2.0.tar.gz | 883314 | 649f1a3120010d247bf3d8956e2ff0aaa62da65b99158c8489d5e26795a27bd5 |
+| middi-0.2.0-cp311-cp311-macosx_11_0_arm64.whl | 1971360 | 3bcc169cb4223759602c4517b30da13d84c84af764ee6db4462893222cb838bd |
+| middi-0.2.0-cp315-cp315-macosx_11_0_arm64.whl | 1943901 | c051d2ddd2fcf754f5373d2153d7dea017aeaad094617dd3449cb28f7fb39f09 |
+| middi-0.2.0.tar.gz | 883314 | 649f1a3120010d247bf3d8956e2ff0aaa62da65b99158c8489d5e26795a27bd5 |
 
 Build, source/installed test logs, toolchain details, installed locations,
 dynamic-library reports and checksums were originally retained under ignored
@@ -2363,7 +2363,7 @@ for this cleanup, and no manifest, dependency or CI configuration changed.
 The owner authorized removing the remaining temporary Python environments and
 old version-specific Rust build caches. Removed all 13 target/ environments:
 api-python315, python-3.12/3.13/3.14, ufor-py313/py315, inspection-wheel311/315,
-ufor-wheel311/315, meedee-wheel-env, qualification-wheel and wheel-check. Also
+ufor-wheel311/315, middi-wheel-env, qualification-wheel and wheel-check. Also
 removed the separate check-3.12, check-3.13 and check-3.14 Rust build trees.
 Their combined directory footprint before removal was approximately 1.15 GiB.
 

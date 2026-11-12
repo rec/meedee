@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from meedee import discovery, midi
+from middi import discovery, midi
 
 
 class Client:
@@ -118,9 +118,9 @@ def test_ports_cli_passes_subprocess_choice_to_both_clients(
     expected: tuple[bool, str, Path | None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    pytest.importorskip("tyro", reason="install meedee[cli]")
-    pytest.importorskip("pydantic", reason="install meedee[cli]")
-    from meedee import cli
+    pytest.importorskip("tyro", reason="install middi[cli]")
+    pytest.importorskip("pydantic", reason="install middi[cli]")
+    from middi import cli
 
     choices: list[tuple[object, object, object]] = []
 
@@ -145,9 +145,9 @@ def test_ports_cli_passes_subprocess_choice_to_both_clients(
 def test_watch_cli_is_quiet_for_unchanged_scans_and_stops_at_duration(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    pytest.importorskip("tyro", reason="install meedee[cli]")
-    pytest.importorskip("pydantic", reason="install meedee[cli]")
-    from meedee import _topology_cli, cli
+    pytest.importorskip("tyro", reason="install middi[cli]")
+    pytest.importorskip("pydantic", reason="install middi[cli]")
+    from middi import _topology_cli, cli
 
     inputs = Client([[port("keys")], [port("keys")], [port("renamed")]])
     outputs = Client([[]])
@@ -191,9 +191,9 @@ def test_watch_cli_is_quiet_for_unchanged_scans_and_stops_at_duration(
 def test_ports_cli_reports_scan_failure_without_claiming_empty_discovery(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    pytest.importorskip("tyro", reason="install meedee[cli]")
-    pytest.importorskip("pydantic", reason="install meedee[cli]")
-    from meedee import cli
+    pytest.importorskip("tyro", reason="install middi[cli]")
+    pytest.importorskip("pydantic", reason="install middi[cli]")
+    from middi import cli
 
     install(monkeypatch, Client([midi.PortInfoError("scan failed")]), Client([[]]))
     with pytest.raises(SystemExit) as result:
@@ -207,9 +207,9 @@ def test_ports_cli_reports_scan_failure_without_claiming_empty_discovery(
 def test_watch_interrupt_keeps_its_baseline_without_inventing_changes(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    pytest.importorskip("tyro", reason="install meedee[cli]")
-    pytest.importorskip("pydantic", reason="install meedee[cli]")
-    from meedee import _topology_cli, cli
+    pytest.importorskip("tyro", reason="install middi[cli]")
+    pytest.importorskip("pydantic", reason="install middi[cli]")
+    from middi import _topology_cli, cli
 
     inputs, outputs = Client([[port("keys")]]), Client([[]])
     install(monkeypatch, inputs, outputs)

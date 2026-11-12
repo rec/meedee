@@ -2,7 +2,7 @@
 
 import pytest
 
-from meedee import events, messages, midi, notes
+from middi import events, messages, midi, notes
 
 
 def event(

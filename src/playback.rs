@@ -2,21 +2,21 @@
 use crate::event_values::{Rational, Timestamp};
 use crate::files::{frozen, os_error};
 use crate::packets::Clock;
-use meedee::events as model;
+use middi::events as model;
 use pyo3::exceptions::PyException;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 pyo3::create_exception!(_core, PlaybackError, PyException);
-#[pyclass(frozen, module = "meedee.events")]
+#[pyclass(frozen, module = "middi.events")]
 pub(crate) struct ClockMapping {
     pub(crate) value: model::ClockMapping,
 }
 frozen!(ClockMapping;source,target,rate,offset,uncertainty;{
-#[new]#[pyo3(signature=(*,source,target,rate=None,offset=None,uncertainty=None))]fn new(source:PyRef<'_,Clock>,target:PyRef<'_,Clock>,rate:Option<PyRef<'_,Rational>>,offset:Option<PyRef<'_,Rational>>,uncertainty:Option<PyRef<'_,Rational>>)->PyResult<Self>{Ok(Self{value:model::ClockMapping::new(source.value.clone(),target.value.clone(),rate.map_or(meedee::events::Rational::new(1,1).expect("constant"),|v|v.value),offset.map_or(meedee::events::Rational::new(0,1).expect("constant"),|v|v.value),uncertainty.map(|v|v.value)).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
+#[new]#[pyo3(signature=(*,source,target,rate=None,offset=None,uncertainty=None))]fn new(source:PyRef<'_,Clock>,target:PyRef<'_,Clock>,rate:Option<PyRef<'_,Rational>>,offset:Option<PyRef<'_,Rational>>,uncertainty:Option<PyRef<'_,Rational>>)->PyResult<Self>{Ok(Self{value:model::ClockMapping::new(source.value.clone(),target.value.clone(),rate.map_or(middi::events::Rational::new(1,1).expect("constant"),|v|v.value),offset.map_or(middi::events::Rational::new(0,1).expect("constant"),|v|v.value),uncertainty.map(|v|v.value)).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
 #[getter]fn source(&self)->Clock{Clock{value:self.value.source.clone()}}#[getter]fn target(&self)->Clock{Clock{value:self.value.target.clone()}}#[getter]fn rate(&self)->Rational{Rational{value:self.value.rate}}#[getter]fn offset(&self)->Rational{Rational{value:self.value.offset}}#[getter]fn uncertainty(&self)->Option<Rational>{self.value.uncertainty.map(|value|Rational{value})}
 fn map_time(&self,timestamp:PyRef<'_,Timestamp>)->PyResult<Rational>{Ok(Rational{value:self.value.map(&timestamp.value).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
 });
-#[pyclass(frozen, module = "meedee.events")]
+#[pyclass(frozen, module = "middi.events")]
 struct PlannedEvent {
     value: model::PlannedEvent,
 }
@@ -33,7 +33,7 @@ impl PlannedEvent {
         }
     }
 }
-#[pyclass(module = "meedee.events")]
+#[pyclass(module = "middi.events")]
 struct PlaybackPlan {
     value: model::PlaybackPlan,
 }
@@ -65,7 +65,7 @@ impl PlaybackPlan {
         })
     }
 }
-#[pyclass(frozen, module = "meedee.events")]
+#[pyclass(frozen, module = "middi.events")]
 pub(crate) struct Cancellation {
     pub(crate) value: model::Cancellation,
 }
@@ -89,7 +89,7 @@ impl Cancellation {
         self.value.cancelled()
     }
 }
-#[pyclass(frozen, module = "meedee.events")]
+#[pyclass(frozen, module = "middi.events")]
 pub(crate) struct PlaybackReport {
     pub(crate) value: model::PlaybackReport,
 }
@@ -141,7 +141,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Cancellation>()?;
     m.add_class::<PlaybackReport>()?;
     let error = m.py().get_type::<PlaybackError>();
-    error.setattr("__module__", "meedee.events")?;
+    error.setattr("__module__", "middi.events")?;
     m.add("PlaybackError", error)
 }
 /// Execute scalar and recorded segments on one caller-thread clock.
@@ -158,7 +158,7 @@ fn output_sequence(
     crate::callback::check_thread()?;
     let cancel = cancel.map_or_else(model::Cancellation::default, |v| v.value.clone());
     let mut clock = model::MonotonicClock::default();
-    let mut histogram = metrics.then(meedee::metrics::Histogram::default);
+    let mut histogram = metrics.then(middi::metrics::Histogram::default);
     let mut report = model::PlaybackReport {
         lateness: histogram.as_ref().map(|h| Box::new(h.snapshot())),
         ..model::PlaybackReport::default()

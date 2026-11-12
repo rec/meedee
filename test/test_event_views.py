@@ -2,7 +2,7 @@
 
 import pytest
 
-from meedee import controls, events, messages, midi, mpe, timecode, tuning, ump
+from middi import controls, events, messages, midi, mpe, timecode, tuning, ump
 
 
 def event(message: messages.Message, ticks: int) -> messages.Message:

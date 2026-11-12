@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("ufor", reason="install meedee[ufor]")
-pytest.importorskip("tyro", reason="install meedee[cli]")
+pytest.importorskip("ufor", reason="install middi[ufor]")
+pytest.importorskip("tyro", reason="install middi[cli]")
 
 from ufor.tuning import Computed, FrequencyTable, RatioTable, Tuning
 
-from meedee import cli, file_io, midi, tuning
+from middi import cli, file_io, midi, tuning
 
 
 def invoke(args: list[str]) -> int:

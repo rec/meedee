@@ -1,6 +1,6 @@
 //! Python stream adapters and Rust file codecs. Caller-owned streams stay open.
 use crate::messages;
-use meedee::{clip, smf};
+use middi::{clip, smf};
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyOSError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -166,7 +166,7 @@ fn __repr__(slf:PyRef<'_,Self>)->PyResult<String>{let py=slf.py();crate::tuning:
 }};}
 
 pub(crate) use frozen;
-#[pyclass(frozen, module = "meedee.smf")]
+#[pyclass(frozen, module = "middi.smf")]
 pub struct Header {
     pub(crate) value: smf::Header,
 }
@@ -174,7 +174,7 @@ frozen!(Header;format,tracks,division,extra;{
 #[new]#[pyo3(signature=(*,format,tracks,division,extra=None))]fn new(format:&Bound<'_,PyAny>,tracks:&Bound<'_,PyAny>,division:&Bound<'_,PyAny>,extra:Option<&Bound<'_,PyAny>>)->PyResult<Self>{Ok(Self{value:smf::Header::new(uint(format)?.try_into().map_err(|_|PyValueError::new_err("format out of range"))?,uint(tracks)?.try_into().map_err(|_|PyValueError::new_err("tracks out of range"))?,uint(division)?.try_into().map_err(|_|PyValueError::new_err("division out of range"))?,extra.map(|v|bytes(v,usize::MAX)).transpose()?.unwrap_or_default()).map_err(|e|PyValueError::new_err(e.to_string()))?})}
 #[getter]fn format(&self)->u8{self.value.format()}#[getter]fn tracks(&self)->u16{self.value.tracks()}#[getter]fn division(&self)->u16{self.value.division()}#[getter]fn extra<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.extra())}
 });
-#[pyclass(frozen, module = "meedee.smf")]
+#[pyclass(frozen, module = "middi.smf")]
 pub struct Meta {
     value: (u8, Vec<u8>),
 }
@@ -182,7 +182,7 @@ frozen!(Meta;kind,data;{
 #[new]#[pyo3(signature=(*,kind,data))]fn new(kind:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<Self>{let kind=uint(kind)?.try_into().map_err(|_|PyValueError::new_err("meta kind out of range"))?;let data=bytes(data,usize::MAX)?;smf::validate_meta(kind,&data,0).map_err(|e|PyValueError::new_err(e.to_string()))?;Ok(Self{value:(kind,data)})}
 #[getter]fn kind(&self)->u8{self.value.0}#[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,&self.value.1)}
 });
-#[pyclass(frozen, module = "meedee.smf")]
+#[pyclass(frozen, module = "middi.smf")]
 pub struct SysExFragment {
     value: (u8, Vec<u8>),
 }
@@ -190,7 +190,7 @@ frozen!(SysExFragment;status,data;{
 #[new]#[pyo3(signature=(*,status,data))]fn new(status:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<Self>{let status=uint(status)?;if status!=240&&status!=247{return Err(PyValueError::new_err("status must be F0 or F7"));}Ok(Self{value:(status as u8,bytes(data,usize::MAX)?)})}
 #[getter]fn status(&self)->u8{self.value.0}#[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,&self.value.1)}
 });
-#[pyclass(frozen, module = "meedee.smf")]
+#[pyclass(frozen, module = "middi.smf")]
 pub struct UnknownChunk {
     value: ([u8; 4], Vec<u8>),
 }
@@ -198,7 +198,7 @@ frozen!(UnknownChunk;id,data;{
 #[new]#[pyo3(signature=(*,id,data))]fn new(id:&Bound<'_,PyAny>,data:&Bound<'_,PyAny>)->PyResult<Self>{let id=bytes(id,4)?.try_into().map_err(|_|PyValueError::new_err("chunk id must be four bytes"))?;if id==*b"MThd"||id==*b"MTrk"{return Err(PyValueError::new_err("known chunk ID"));}Ok(Self{value:(id,bytes(data,usize::MAX)?)})}
 #[getter]fn id<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,&self.value.0)}#[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,&self.value.1)}
 });
-#[pyclass(frozen, module = "meedee.smf")]
+#[pyclass(frozen, module = "middi.smf")]
 pub struct Event {
     pub value: smf::Event,
 }
@@ -251,7 +251,7 @@ fn record_python(py: Python<'_>, r: smf::Record) -> PyResult<Py<PyAny>> {
         }
     }
 }
-#[pyclass(module = "meedee.smf")]
+#[pyclass(module = "middi.smf")]
 struct Reader {
     value: Option<smf::Reader<Stream>>,
 }
@@ -286,7 +286,7 @@ impl Reader {
         self.value = None;
     }
 }
-#[pyclass(module = "meedee.smf")]
+#[pyclass(module = "middi.smf")]
 struct Writer {
     value: Option<smf::Writer<Stream>>,
 }
@@ -326,7 +326,7 @@ pub fn closed() -> PyErr {
     PyValueError::new_err("file codec is closed")
 }
 
-#[pyclass(name = "Entry", frozen, module = "meedee.clip")]
+#[pyclass(name = "Entry", frozen, module = "middi.clip")]
 pub(crate) struct ClipEntry {
     pub(crate) value: clip::Entry,
 }
@@ -345,7 +345,7 @@ impl ClipEntry {
         crate::event_values::to_python(py, self.value.message.clone())
     }
 }
-#[pyclass(name = "Reader", module = "meedee.clip")]
+#[pyclass(name = "Reader", module = "middi.clip")]
 struct ClipReader {
     value: Option<clip::Reader<Stream>>,
 }
@@ -376,7 +376,7 @@ impl ClipReader {
         self.value = None;
     }
 }
-#[pyclass(name = "Writer", module = "meedee.clip")]
+#[pyclass(name = "Writer", module = "middi.clip")]
 struct ClipWriter {
     value: Option<clip::Writer<Stream>>,
 }

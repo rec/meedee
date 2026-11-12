@@ -6,7 +6,7 @@ int main()
 {
   MIDIClientRef client{};
   const OSStatus created = MIDIClientCreate(
-      CFSTR("meedee-access-probe"), nullptr, nullptr, &client);
+      CFSTR("middi-access-probe"), nullptr, nullptr, &client);
   std::printf("MIDIClientCreate: %d (0x%08x), client=%u\n",
               created, static_cast<unsigned>(created), client);
   if (created != noErr)

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import ci, codecs, messages, ump
+from middi import ci, codecs, messages, ump
 
 
 def identity() -> ci.Identity:
@@ -56,9 +56,7 @@ def values() -> list[messages.Message]:
 
 
 def test_management_matches_shared_vectors_and_preserves_immutable_values() -> None:
-    fixture = (
-        Path(__file__).resolve().parents[1] / "crates/meedee/tests/fixtures/ci.txt"
-    )
+    fixture = Path(__file__).resolve().parents[1] / "crates/middi/tests/fixtures/ci.txt"
     vectors = [
         bytes.fromhex(s.split("|")[1])
         for s in fixture.read_text().splitlines()

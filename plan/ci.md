@@ -6,7 +6,7 @@ None.
 
 ## Selected and deferred scope
 
-The owner approved a pure `meedee.ci` API and caller-driven Rust state machines,
+The owner approved a pure `middi.ci` API and caller-driven Rust state machines,
 explicit identities/routes/recovery, bounded transactions and immutable values.
 The full Profiles 1.1 and Property Exchange 1.2 documents are unavailable; the
 owner explicitly deferred their dependent work. Generic profile transactions,
@@ -228,7 +228,7 @@ waits of at most 50 ms; an in-flight transport call cannot be forcibly cancelled
 Operational failures propagate after progress is recorded; Ctrl-C returns a
 stopped report. Unexpected exceptions also leave the browser inspectable.
 
-`meedee ci-browse` opens one exact, unique input and output, resolves both names
+`middi ci-browse` opens one exact, unique input and output, resolves both names
 before opening either, and uses process isolation by default. It requires the
 protocol, explicit UMP group where applicable, and explicit manufacturer (three
 seven-bit hex bytes), family/model (0..16383) and revision (four seven-bit hex

@@ -2,7 +2,7 @@
 
 from io import BytesIO
 
-from meedee import archive, inspection, messages, smf
+from middi import archive, inspection, messages, smf
 
 
 def test_archive_loss_and_incomplete_tail_keep_only_observed_state() -> None:

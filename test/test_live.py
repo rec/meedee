@@ -11,7 +11,7 @@ from typing import Self
 import pytest
 from pydantic import PrivateAttr
 
-from meedee import _native, archive, events, messages, midi, ump
+from middi import _native, archive, events, messages, midi, ump
 
 
 def test_unopened_diagnostics_remain_readable_without_native_initialization(
@@ -183,7 +183,7 @@ def test_playback_cancellation_and_partial_failure_do_not_send_cleanup() -> None
 def test_recording_preserves_verified_events_and_reports_observed_loss(
     tmp_path: Path,
 ) -> None:
-    path = tmp_path / "capture.meedee"
+    path = tmp_path / "capture.middi"
     recorder = archive.Recorder(path, clock=clock(), stream="s")
     assert recorder.record(event(1))
     report = recorder.stop()
@@ -283,7 +283,7 @@ def test_memory_capture_declares_changed_clocks_and_retains_later_events(
     ]
     assert [r.note for r in records if isinstance(r, messages.NoteOn)] == [60, 62]
     assert len([r for r in records if isinstance(r, archive.Discontinuity)]) == 1
-    path = tmp_path / "changed.meedee"
+    path = tmp_path / "changed.middi"
     with path.open("wb") as destination:
         writer = archive.Writer(destination)
         for r in records:
@@ -351,7 +351,7 @@ def test_typed_capture_reports_a_final_loss_even_without_a_following_packet(
 
     monkeypatch.setattr(_native, "Input", Input)
     receiver = midi.Input(run_in_subprocess=False).create_virtual("test-only")
-    path = tmp_path / "typed.meedee"
+    path = tmp_path / "typed.middi"
     receiver.start(path)
     callback = callbacks[0]
     callback(packet(b"\x90\x3c\x64", 0, 1))
@@ -426,8 +426,8 @@ def test_unified_input_delivers_decoded_messages_or_unchanged_packets(
         if raw:
             assert observed == [first, last]
             with pytest.raises(midi.StateError, match="decoded"):
-                receiver.start(tmp_path / "raw.meedee")
-            assert not (tmp_path / "raw.meedee").exists()
+                receiver.start(tmp_path / "raw.middi")
+            assert not (tmp_path / "raw.middi").exists()
         else:
             assert len(observed) == 1
             message = observed[0]
@@ -642,7 +642,7 @@ def test_channel_selection_applies_to_callbacks_and_recordings(
 ) -> None:
     observed: list[messages.Message | events.StreamDiagnostic] = []
     client = midi.Input(channel=[1], run_in_subprocess=False)
-    path = tmp_path / "selected.meedee"
+    path = tmp_path / "selected.middi"
     with client.connect(client.ports()[0], observed.append) as receiver:
         receiver.start(path)
         iterable_input[0](packet(b"\x91\x3d\x64\x90\x3e\x64\xf8", 1, 2))
@@ -666,7 +666,7 @@ def test_channel_selection_applies_to_callbacks_and_recordings(
 def test_record_returns_memory_capture_and_file_round_trip(
     iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
 ) -> None:
-    path = tmp_path / "rec.meedee"
+    path = tmp_path / "rec.middi"
     client = midi.Input(run_in_subprocess=False)
     records = client.record(0, output=path)
     assert [r for r in records if isinstance(r, messages.Message)] == [
@@ -720,7 +720,7 @@ def test_record_uses_duration_deadline_and_retains_terminal_failure(
     iterable_input: list[Callable[[events.ReceivedPacket], object]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from meedee import _clients
+    from middi import _clients
 
     ticks = iter([100.0, 100.0, 100.0, 110.0])
     monkeypatch.setattr(_clients, "monotonic", lambda: next(ticks, 110.0))
@@ -832,12 +832,12 @@ def test_stopping_recording_can_be_retried_after_timeout_and_input_close(
     monkeypatch.setattr(archive, "Recorder", Recorder)
     source = midi.Input()
     source.__enter__()
-    recorder = source.start(tmp_path / "retry.meedee")
+    recorder = source.start(tmp_path / "retry.middi")
     with pytest.raises(TimeoutError):
         source.stop(timeout=0.001)
     assert source.recording_report is None
     with pytest.raises(midi.StateError, match="active"):
-        source.start(tmp_path / "second.meedee")
+        source.start(tmp_path / "second.middi")
     with pytest.raises(TimeoutError):
         source.close()
     assert source.closed and source.recording_report is None
@@ -902,7 +902,7 @@ def test_callback_failure_is_retained_stops_delivery_and_closes_transport(
     monkeypatch.setattr(sys, "unraisablehook", reported.append)
     source = midi.Input().create_virtual("callback-failure", callback)
     if not during_connect:
-        source.start(tmp_path / "failed-callback.meedee")
+        source.start(tmp_path / "failed-callback.middi")
         callbacks[0](packet(b"\x90\x3c\x64", 0, 1))
     assert closed.wait(2)
 
@@ -941,7 +941,7 @@ def test_raw_recording_attachment_is_rejected_without_opening_a_port(
 
     monkeypatch.setattr(_native, "Input", unexpected)
     source = midi.Input(raw=True)
-    path = tmp_path / "raw.meedee"
+    path = tmp_path / "raw.middi"
     with pytest.raises(midi.StateError, match="decoded input"):
         source.start(path)
     assert not source.closed and not path.exists()
@@ -1017,7 +1017,7 @@ def test_recorded_fragmented_sysex_exports_and_replays_with_timing(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    from meedee import file_io
+    from middi import file_io
 
     client = midi.Input()
     client.connect(client.ports()[0])

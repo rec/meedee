@@ -6,7 +6,7 @@ None.
 
 ## Scope and decisions before access
 
-meedee targets macOS, Windows and Linux. This is the Linux part of
+middi targets macOS, Windows and Linux. This is the Linux part of
 [platform/backend qualification](qualification.md), usable on an available Linux
 host. A Raspberry Pi may serve as that host, but no board model or special Pi
 milestone is required. Mac results in validation.md do not qualify Linux.
@@ -98,7 +98,7 @@ timeout --kill-after=10s 5m cargo fmt --all --check
 timeout --kill-after=10s 30m cargo clippy --locked --workspace --all-targets -- -D warnings
 timeout --kill-after=10s 30m cargo test --locked --workspace -- --test-threads=1
 timeout --kill-after=10s 30m uv run --frozen --no-sync pytest -q
-timeout --kill-after=10s 30m cargo build --locked --release -p meedee --examples
+timeout --kill-after=10s 30m cargo build --locked --release -p middi --examples
 timeout --kill-after=10s 5m target/release/examples/qualification > "$qualification_run/rust.jsonl"
 timeout --kill-after=10s 5m uv run --frozen --no-sync pytest -q -s test/qualification/measure.py -k 'not native' --junitxml="$qualification_run/python313.xml" > "$qualification_run/python313.log" 2>&1
 ```

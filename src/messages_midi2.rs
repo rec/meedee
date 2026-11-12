@@ -1,13 +1,13 @@
 //! Python views of the native MIDI 2-only musical values.
 use crate::messages::{integer, Message};
-use meedee::messages as model;
+use middi::messages as model;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyInt, PyTuple};
-include!("../crates/meedee/src/midi2_values.rs");
+include!("../crates/middi/src/midi2_values.rs");
 
 macro_rules! values {
     ($($name:ident [$first:expr,$second:expr] {$($field:ident:$ty:ty = $lo:literal ..= $hi:literal => [$word:literal,$shift:literal,$mask:literal,$bias:literal]),*};)*) => {
-        $(#[pyclass(frozen, extends=Message, module="meedee.messages")]
+        $(#[pyclass(frozen, extends=Message, module="middi.messages")]
         struct $name { value: model::$name }
         #[pymethods]
         impl $name {
@@ -85,7 +85,7 @@ fn family_name(value: model::ControllerFamily) -> &'static str {
 }
 macro_rules! family_values {
     ($($name:ident [$first:expr,$second:expr] {$($field:ident:$ty:ty = $lo:literal ..= $hi:literal => [$word:literal,$shift:literal,$mask:literal,$bias:literal]),*};)*) => {
-        $(#[pyclass(frozen, extends=Message, module="meedee.messages")]
+        $(#[pyclass(frozen, extends=Message, module="middi.messages")]
         struct $name { value:model::$name }
         #[pymethods]
         impl $name {
