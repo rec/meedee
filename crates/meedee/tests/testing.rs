@@ -3,14 +3,14 @@ use meedee::{
     events::Clock,
     events::InputItem as Item,
     testing::{Input, ManualClock, Output},
-    transport::{Error, Packet, Protocol},
+    transport::{Encoding, Error, Packet},
 };
 fn clock() -> Clock {
     Clock::new("simulation".into(), 1, 1_000_000_000, "manual".into(), None).unwrap()
 }
 #[test]
 fn dropped_new_packets_advance_sequence_and_silence_still_reports_loss() {
-    let mut i = Input::new("s".into(), Protocol::Midi1, 1, 8, 1024, 64).unwrap();
+    let mut i = Input::new("s".into(), Encoding::Bytes, 1, 8, 1024, 64).unwrap();
     assert!(i
         .inject(Packet::Bytes(vec![0x90, 60]), clock(), Some(-10))
         .unwrap());
@@ -33,7 +33,7 @@ fn dropped_new_packets_advance_sequence_and_silence_still_reports_loss() {
 }
 #[test]
 fn framing_and_overflow_are_shared_and_each_retained_stage_is_bounded() {
-    let mut i = Input::new("s".into(), Protocol::Midi1, 8, 1, 128, 64).unwrap();
+    let mut i = Input::new("s".into(), Encoding::Bytes, 8, 1, 128, 64).unwrap();
     i.inject(
         Packet::Bytes(vec![0x90, 60, 100, 61, 101]),
         clock(),
@@ -59,7 +59,7 @@ fn framing_and_overflow_are_shared_and_each_retained_stage_is_bounded() {
 }
 #[test]
 fn output_failure_can_occur_after_acceptance_and_close_preserves_evidence() {
-    let mut o = Output::new(Protocol::Midi1, 1, 3).unwrap();
+    let mut o = Output::new(Encoding::Bytes, 1, 3).unwrap();
     o.fail_next_send(true, "uncertain").unwrap();
     assert!(matches!(
         o.send(Packet::Bytes(vec![0x90, 60, 100])),
@@ -79,7 +79,7 @@ fn failure_close_capacity_and_manual_time_are_explicit() {
     c.advance(1).unwrap();
     assert!(c.advance(1).is_err());
     assert_eq!(c.now_ns(), u64::MAX);
-    let mut i = Input::new("s".into(), Protocol::Midi1, 1, 1, 2, 64).unwrap();
+    let mut i = Input::new("s".into(), Encoding::Bytes, 1, 1, 2, 64).unwrap();
     assert!(!i
         .inject(Packet::Bytes(vec![0x90, 60, 100]), clock(), None)
         .unwrap());
@@ -88,7 +88,7 @@ fn failure_close_capacity_and_manual_time_are_explicit() {
     assert!(matches!(i.receive(), Err(Error::Worker(_))));
     i.close();
     assert!(matches!(i.receive(), Err(Error::Closed)));
-    let mut o = Output::new(Protocol::Midi1, 1, 3).unwrap();
+    let mut o = Output::new(Encoding::Bytes, 1, 3).unwrap();
     o.send(Packet::Bytes(vec![0x90, 60, 100])).unwrap();
     assert!(matches!(
         o.send(Packet::Bytes(vec![0x80, 60, 0])),
@@ -99,7 +99,7 @@ fn failure_close_capacity_and_manual_time_are_explicit() {
 
 #[test]
 fn an_oversized_diagnostic_cannot_let_later_events_overtake_the_loss_boundary() {
-    let mut i = Input::new("s".into(), Protocol::Midi1, 4, 8, 4, 64).unwrap();
+    let mut i = Input::new("s".into(), Encoding::Bytes, 4, 8, 4, 64).unwrap();
     i.inject(Packet::Bytes(vec![0xf8]), clock(), None).unwrap();
     i.lose(1).unwrap();
     assert!(matches!(i.receive().unwrap(), Some(Item::Message(_))));

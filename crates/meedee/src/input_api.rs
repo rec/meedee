@@ -119,7 +119,7 @@ impl Input<Payload> {
         Self::from_core(core, Core::next_item, |item| match item {
             Item::Diagnostic(d) => d.reason.len(),
             Item::Message(p) => match p.as_ref() {
-                Payload::Midi1(p) => p.encoded_len(),
+                Payload::Message(p) => p.encoded_len(),
                 Payload::Ump(p) => {
                     use crate::ump::UmpValue;
                     p.encode_words().map_or(0, |w| w.len() * 4)

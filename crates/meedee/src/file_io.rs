@@ -99,7 +99,7 @@ impl Record {
         match self {
             Self::Event(event) => event.channel(),
             Self::Archive(archive::Record::Event(message)) => match message.as_ref() {
-                Payload::Midi1(message) => crate::smf::message_channel(message),
+                Payload::Message(message) => message.channel(),
                 Payload::Ump(message) => {
                     let words = crate::ump::encode(message).ok()?;
                     matches!(words[0] >> 28, 2 | 4).then_some(((words[0] >> 16) as u8 & 15) + 1)
@@ -237,7 +237,7 @@ impl<R: Read> Iterator for Reader<R> {
                 let result = reader.next().map(|v| {
                     v.map(|m| {
                         Record::Archive(crate::archive::Record::Event(Box::new(
-                            crate::events::Payload::Midi1(crate::messages::AnyMessage::SysEx(m)),
+                            crate::events::Payload::Message(crate::messages::AnyMessage::SysEx(m)),
                         )))
                     })
                 });
@@ -314,7 +314,7 @@ impl<W: Write + std::io::Seek> Writer<W> {
                 Some(Output::Syx(writer)),
                 Record::Archive(crate::archive::Record::Event(message)),
             ) => {
-                let crate::events::Payload::Midi1(crate::messages::AnyMessage::SysEx(message)) =
+                let crate::events::Payload::Message(crate::messages::AnyMessage::SysEx(message)) =
                     message.as_ref()
                 else {
                     return Err(invalid(0, "SYX accepts only SysEx messages"));
@@ -378,27 +378,26 @@ impl WriteRecord for Record {
         writer.write_record(self)
     }
 }
-impl<T: PrimitiveMessage> WriteRecord for T {
+impl<T: Clone + Into<crate::events::Payload>> WriteRecord for T {
     fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()> {
-        let wire = self.encode().map_err(|e| invalid(0, e))?;
-        let mut decoder = crate::codecs::Decoder::new(writer.limit).map_err(|e| invalid(0, e))?;
-        let mut values = decoder.feed(&wire);
-        values.extend(decoder.finish());
-        if values.len() != 1 {
-            return Err(invalid(0, "expected one complete MIDI 1 message"));
-        }
-        let crate::codecs::DecodeItem::Message(message) = values.pop().expect("one value") else {
-            return Err(invalid(0, "invalid MIDI 1 message"));
-        };
-        let message = if let Some(metadata) = self.metadata() {
-            message
-                .with_metadata(metadata.clone())
-                .map_err(|e| invalid(0, e))?
-        } else {
-            message
-        };
         writer.write_record(&Record::Archive(crate::archive::Record::Event(Box::new(
-            crate::events::Payload::Midi1(message),
+            self.clone().into(),
         ))))
     }
 }
+
+macro_rules! profile_records {
+    ($module:ident: $($name:ident),*) => { $(impl WriteRecord for crate::$module::$name {
+        fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()> {
+            let wire = self.encode()?;
+            let message = crate::messages::SysEx::new(wire[1..wire.len()-1].to_vec())?;
+            let message = if let Some(metadata) = self.metadata() { message.with_metadata(metadata.clone())? } else { message };
+            message.write_to(writer)
+        }
+    })* };
+}
+profile_records!(gm: Gm1On,GmOff,Gm2On);
+profile_records!(universal: IdentityRequest,IdentityReply,MasterVolume,MasterFineTuning,MasterCoarseTuning);
+profile_records!(timecode: FullFrame);
+profile_records!(ci: Management);
+profile_records!(tuning: TuningMessage,BulkDumpRequest,BankedDumpRequest,BulkDump,KeyBasedDump,ScaleOctaveDump,SingleNoteChange,BankedNoteChange,ScaleOctaveChange);

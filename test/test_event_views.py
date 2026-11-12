@@ -45,7 +45,7 @@ def test_interpreters_require_reset_between_anonymous_and_named_sources(
     )
     assert result.value.resolution == 14
 
-    decoder = events.PacketDecoder(stream="keyboard", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="keyboard", encoding=midi.Encoding.Bytes)
     loss = decoder.loss(lost=3, reason="known loss")
     interpreter.feed(prefix.replace(stream="keyboard"))
     reported = interpreter.feed(loss)[0].value
@@ -133,7 +133,7 @@ def test_inactive_parameter_selectors_retain_their_contributor_times() -> None:
         observation.first_timestamp is not None
         and observation.first_timestamp.ticks == 50
     )
-    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes)
     interpreter.feed(decoder.loss(lost=1, reason="known loss"))
     assert interpreter.parameter_state(1, controls.ParameterFamily.Nrpn, 131) is None
     assert interpreter.parameter_state(1, controls.ParameterFamily.Nrpn, 132) is None
@@ -190,34 +190,27 @@ def test_group_selection_and_reported_loss_cannot_mix_control_state() -> None:
     view = controls.ControlInterpreter(group=2)
     view.feed(
         event(
-            ump.Midi1Packet(
-                group=2,
-                message=messages.ControlChange(channel=1, controller=7, value=1),
-            ),
+            messages.ControlChange(channel=1, controller=7, value=1).replace(group=2),
             1,
         )
     )
     assert (
         view.feed(
             event(
-                ump.Midi1Packet(
-                    group=1,
-                    message=messages.ControlChange(channel=1, controller=39, value=2),
+                messages.ControlChange(channel=1, controller=39, value=2).replace(
+                    group=1
                 ),
                 2,
             )
         )
         == []
     )
-    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes)
     loss = decoder.loss(lost=1, reason="known loss")
     view.feed(loss)
     observation = view.feed(
         event(
-            ump.Midi1Packet(
-                group=2,
-                message=messages.ControlChange(channel=1, controller=39, value=2),
-            ),
+            messages.ControlChange(channel=1, controller=39, value=2).replace(group=2),
             3,
         )
     )[0]
@@ -228,7 +221,7 @@ def test_group_selection_and_reported_loss_cannot_mix_control_state() -> None:
     )
     with pytest.raises(ValueError, match="group"):
         controls.ControlInterpreter().feed(
-            event(ump.Midi1Packet(group=2, message=messages.TimingClock()), 4)
+            event(messages.TimingClock().replace(group=2), 4)
         )
 
 
@@ -253,7 +246,7 @@ def test_mpe_and_mtc_views_do_not_invent_unobserved_state_or_native_time() -> No
 
 def test_ump_assembly_and_mts_decode_keep_the_group_and_contributor_span() -> None:
     payload = messages.SysEx(data=bytes([127, 1, 8, 2, 0, 1, 60, 60, 0, 0]))
-    packets = ump.packetize_sysex7(group=2, data=payload.data)
+    packets = ump.packetize_sysex7(payload.replace(group=2))
     assembler = ump.Assembler()
     observations = [
         o for i, p in enumerate(packets) for o in assembler.feed(event(p, i + 10))
@@ -292,7 +285,7 @@ def test_ump_assembly_and_mts_decode_keep_the_group_and_contributor_span() -> No
 
 def test_ump_finish_preserves_each_truncated_stream_and_is_reusable() -> None:
     assembler = ump.Assembler()
-    packets = ump.packetize_sysex7(group=3, data=bytes(range(20)))
+    packets = ump.packetize_sysex7(messages.SysEx(bytes(range(20)), group=3))
     assembler.feed(event(packets[0], 10))
     assembler.feed(event(ump.Noop(), 15))
     assembler.feed(event(packets[1], 20))
@@ -309,7 +302,7 @@ def test_ump_finish_preserves_each_truncated_stream_and_is_reusable() -> None:
     assert (second.first_index, second.last_index) == (3, 3)
     assert assembler.active_streams == assembler.retained_bytes == 0
     assert assembler.finish() == []
-    complete = ump.packetize_sysex7(group=3, data=b"abc")[0]
+    complete = ump.packetize_sysex7(messages.SysEx(b"abc", group=3))[0]
     assert isinstance(assembler.feed(event(complete, 40))[0].value, ump.AssembledData)
 
 

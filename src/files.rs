@@ -227,7 +227,7 @@ fn extract_record(v: &Bound<'_, PyAny>) -> PyResult<smf::Record> {
             data: v.value.1.clone(),
         });
     }
-    Ok(smf::Record::Message(messages::extract_primitive(v)?))
+    Ok(smf::Record::Message(messages::extract_message(v)?))
 }
 fn record_python(py: Python<'_>, r: smf::Record) -> PyResult<Py<PyAny>> {
     match r {
@@ -342,7 +342,7 @@ impl ClipEntry {
     }
     #[getter]
     fn message(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        crate::ump::to_python(py, self.value.message.clone())
+        crate::event_values::to_python(py, self.value.message.clone())
     }
 }
 #[pyclass(name = "Reader", module = "meedee.clip")]
@@ -389,7 +389,7 @@ impl ClipWriter {
         })
     }
     fn write(&mut self, py: Python<'_>, message: &Bound<'_, PyAny>) -> PyResult<()> {
-        let message = crate::ump::extract(message)?;
+        let message = crate::event_values::extract(message)?;
         let value = self.value.as_mut().ok_or_else(closed)?;
         py.detach(|| value.write(&message)).map_err(os_error)
     }

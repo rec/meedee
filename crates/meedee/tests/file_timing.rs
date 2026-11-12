@@ -4,7 +4,7 @@ use meedee::{
     events::{Payload, Rational, Timestamp},
     messages::{AnyMessage, NoteOn},
     smf::{self, Event, Header, Record},
-    ump,
+    translation,
 };
 use std::io::{self, Cursor};
 fn file() -> Vec<u8> {
@@ -140,7 +140,7 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
     );
     let target = Header::new(0, 1, 480, vec![]).unwrap();
     let report = smf::export_event(e, &target, &timeline.origin(), 0, 500000, None, false).unwrap();
-    assert_eq!(report.status, ump::TranslationStatus::Quantized);
+    assert_eq!(report.status, translation::TranslationStatus::Quantized);
     assert!(report.events.is_empty());
     let report = smf::export_event(e, &target, &timeline.origin(), 0, 500000, None, true).unwrap();
     assert_eq!(report.events[0].tick, 961);
@@ -161,7 +161,7 @@ fn independent_sequences_smpte_and_export_rounding_are_explicit() {
         )
         .unwrap()
         .status,
-        ump::TranslationStatus::ContextRequired
+        translation::TranslationStatus::ContextRequired
     );
 }
 #[test]
@@ -199,7 +199,7 @@ fn large_escape_records_stream_and_group_routing_is_not_silently_discarded() {
         ticks: 0,
         clock: clock.clone(),
     };
-    let event = (Payload::Ump(ump::UmpMessage::NoteOn(
+    let event = (Payload::Message(meedee::messages::AnyMessage::NoteOn(
         meedee::messages::NoteOn::new_midi2(60)
             .and_then(|m| m.with_group(2))
             .and_then(|m| m.with_channel(1))
@@ -224,6 +224,9 @@ fn large_escape_records_stream_and_group_routing_is_not_silently_discarded() {
         true,
     )
     .unwrap();
-    assert_eq!(report.status, ump::TranslationStatus::ContextRequired);
+    assert_eq!(
+        report.status,
+        translation::TranslationStatus::ContextRequired
+    );
     assert!(report.reason.contains("group"));
 }

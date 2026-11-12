@@ -61,7 +61,7 @@ def event(ticks: int) -> messages.Message:
 def test_native_packet_spans_use_completion_time_without_realtime_contamination() -> (
     None
 ):
-    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes)
     assert decoder.feed(packet(b"\x90\x3c", 0, 10)) == []
     result = decoder.feed(packet(b"\xf8\x64\x3d\x65", 1, 20))
     assert len(result) == 3
@@ -95,16 +95,16 @@ def test_native_packet_spans_use_completion_time_without_realtime_contamination(
 
 
 def test_ump_framing_and_typed_send_never_downgrade_or_send_opaque_values() -> None:
-    decoder = events.PacketDecoder(stream="u", protocol=midi.Protocol.Ump)
+    decoder = events.PacketDecoder(stream="u", encoding=midi.Encoding.Ump)
     assert decoder.feed(packet(midi.UmpPacket(words=(0x40903C00,)), 0, 1)) == []
     value = decoder.feed(packet(midi.UmpPacket(words=(0xFFFF0000,)), 1, 2))[0]
     assert isinstance(value, messages.Message) and isinstance(value, messages.NoteOn)
     assert value.span is not None and value.span.first_packet == 0
     with pytest.raises(midi.CapabilityError):
-        _native.prepare_output(midi.Protocol.Midi1, value)
+        _native.prepare_output(midi.Encoding.Bytes, value)
     opaque = ump.decode((0x60000000,), preserve_unknown=True)
     with pytest.raises(midi.CapabilityError, match="opaque"):
-        _native.prepare_output(midi.Protocol.Ump, opaque)
+        _native.prepare_output(midi.Encoding.Ump, opaque)
 
 
 def test_clock_mapping_and_rounding_require_explicit_policy() -> None:

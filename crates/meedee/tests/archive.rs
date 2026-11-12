@@ -22,7 +22,7 @@ fn records() -> Vec<Record> {
             clock_identity: None,
         },
         Record::Event(Box::new(
-            (Payload::Midi1(AnyMessage::NoteOn(
+            (Payload::Message(AnyMessage::NoteOn(
                 NoteOn::new(127)
                     .and_then(|m| m.with_velocity(127))
                     .and_then(|m| m.with_channel(16))
@@ -74,7 +74,7 @@ fn fourteen_bit_controller_retains_the_existing_command_encoding_and_budget() {
         ..Metadata::default()
     };
     let message = Record::Event(Box::new(
-        Payload::Midi1(AnyMessage::ControlChange(value.clone()))
+        Payload::from(AnyMessage::ControlChange(value.clone()))
             .with_metadata(metadata.clone())
             .unwrap(),
     ));
@@ -190,8 +190,8 @@ fn rational_arithmetic_and_rounding_never_use_floating_seconds() {
 }
 
 #[test]
-fn independent_v1_vectors_validate_future_headers_and_preserve_exact_bytes() {
-    for line in include_str!("fixtures/archive-v1.txt").lines() {
+fn independent_v2_vectors_validate_future_headers_and_preserve_exact_bytes() {
+    for line in include_str!("fixtures/archive-v2.txt").lines() {
         if line.starts_with('#') {
             continue;
         }
@@ -258,7 +258,7 @@ fn parameter_steps_keep_the_existing_archive_ids_and_fields() {
         let event = Payload::Command(AnyCommand::ParameterStep(step))
             .with_stream("s")
             .unwrap();
-        let mut expected = vec![0, 3, 0, 0, 0, 1, b's', 0, 0, 3];
+        let mut expected = vec![0, 3, 0, 0, 0, 1, b's', 0, 0, 3, 0];
         expected.extend(id.to_be_bytes());
         expected.extend(2i64.to_be_bytes());
         expected.extend(7i64.to_be_bytes());

@@ -12,7 +12,7 @@ fn live_observer_reuses_timing_without_double_counting_loss_counters() {
     let c = Clock::new("c".into(), 1, 1000, "native".into(), None).unwrap();
     let mut o = Observer::new("s".into(), c, 2).unwrap();
     let e = Item::Message(Box::new(
-        (Payload::Midi1(AnyMessage::TimingClock(TimingClock::new().unwrap())))
+        (Payload::Message(AnyMessage::TimingClock(TimingClock::new().unwrap())))
             .with_metadata(crate::messages::Metadata {
                 stream: Some("s".into()),
                 timestamp: None,

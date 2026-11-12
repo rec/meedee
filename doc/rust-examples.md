@@ -91,8 +91,8 @@ use meedee::messages::AnyMessage;
 let mut out = Output::new();
 for message in Input::new() {
     match message {
-        Payload::Midi1(AnyMessage::NoteOn(note)) => out.send(note.transpose(12))?,
-        Payload::Midi1(AnyMessage::NoteOff(note)) => out.send(note.transpose(12))?,
+        Payload::Message(AnyMessage::NoteOn(note)) => out.send(note.transpose(12))?,
+        Payload::Message(AnyMessage::NoteOff(note)) => out.send(note.transpose(12))?,
         other => out.send(other)?,
     };
 }
@@ -100,7 +100,7 @@ out.close()?;
 ```
 
 `transpose` clamps to MIDI's note range and preserves timing/source metadata.
-`Payload` distinguishes MIDI 1, UMP and compound commands; `AnyMessage` identifies
+`Payload` distinguishes semantic messages, UMP packet values and compound commands; `AnyMessage` identifies
 the MIDI 1 message kind. These are enums holding the messages themselves, not
 separate timing wrappers.
 
@@ -118,14 +118,14 @@ high.send(ProgramChange::new(81)?)?;
 
 for message in Input::new().with_channel(1)? {
     let key = match &message {
-        Payload::Midi1(AnyMessage::NoteOn(note)) => Some(note.note()),
-        Payload::Midi1(AnyMessage::NoteOff(note)) => Some(note.note()),
+        Payload::Message(AnyMessage::NoteOn(note)) => Some(note.note()),
+        Payload::Message(AnyMessage::NoteOff(note)) => Some(note.note()),
         _ => None,
     };
     match key {
         Some(note) if note < 60 => low.send(message)?,
         Some(_) => high.send(message)?,
-        None if matches!(&message, Payload::Midi1(
+        None if matches!(&message, Payload::Message(
             AnyMessage::ControlChange(_) | AnyMessage::PolyPressure(_) |
             AnyMessage::ChannelPressure(_) | AnyMessage::ProgramChange(_) |
             AnyMessage::PitchBend(_)
@@ -274,7 +274,7 @@ use meedee::messages::{AnyMessage, Message};
 
 let mut out = Output::new();
 for message in Input::new() {
-    if let Payload::Midi1(AnyMessage::NoteOn(note)) = message {
+    if let Payload::Message(AnyMessage::NoteOn(note)) = message {
         let edited = note.with_velocity(70)?.transpose(12);
         println!("{:?}", edited.metadata());
         out.send(edited)?;
@@ -294,12 +294,12 @@ resolves an unassigned channel for you.
 
 ```rust
 use meedee::midi::Output;
-use meedee::transport::{OutputOptions, Protocol};
+use meedee::transport::{OutputOptions, Encoding};
 use meedee::messages::{NoteOff, NoteOn};
 use std::time::Duration;
 
 let mut out = Output::new().with_transport(OutputOptions {
-    protocol: Protocol::Ump,
+    encoding: Encoding::Ump,
     ..OutputOptions::default()
 })?;
 out.send([
@@ -314,7 +314,27 @@ This needs a native UMP backend and endpoint. Group defaults to 1; output
 resolves the channel.
 MIDI 2 velocity uses its native 16-bit range. There is no automatic protocol
 translation, full-note scheduling or cleanup for UMP. Raw packets likewise retain
-their own addressing. The `ump` module provides explicit translation when needed.
+their own addressing. The `translation` module provides explicit conversion when needed.
+
+MIDI 1 UMP uses the same message types, with a group and native MIDI 1 values:
+
+```rust
+use meedee::{messages::{AnyMessage, NoteOn, PerNotePitchBend, SysEx}, events::Payload, translation, ump};
+
+let legacy = NoteOn::new(60)?.with_velocity(90)?.with_channel(2)?.with_group(3)?;
+assert_eq!(ump::encode(&legacy)?, [0x22913c5a]);
+assert_eq!(ump::decode(&[0x22913c5a], false)?, Payload::from(legacy.clone()));
+let wide = translation::to_midi2(&AnyMessage::NoteOn(legacy), 3)?;
+assert_eq!(wide.messages[0].version(), 2);
+let per_note = PerNotePitchBend::new(3, 2, 60, 1234)?;
+let dump = SysEx::new((0..20).collect())?.with_group(3)?;
+```
+
+Send `per_note` and `dump` through an existing UMP output. Its configured channel
+overrides every channel-addressed semantic message. Complete SysEx and grouped
+MIDI 1 commands package into bounded UMP streams, with one successful handoff per
+logical value. Incoming data fragments remain separate until explicitly assembled.
+Remove a MIDI 1 value's group with `without_group()?` before byte encoding.
 
 ## 11. Inspect and compare saved captures
 
@@ -363,7 +383,7 @@ println!("{:?}", recording.records);
 let mut writer = file_io::Writer::create("backup.syx")?;
 for record in &recording.records {
     if let Record::Event(message) = record {
-        if let Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() {
+        if let Payload::Message(AnyMessage::SysEx(message)) = message.as_ref() {
             writer.write(message)?;
         }
     }
@@ -474,9 +494,9 @@ Each call performs one complete discovery scan. A failed or oversized scan stops
 the poller and retains its last complete snapshot.
 
 ```rust
-use meedee::{discovery::Poller, midi::Protocol};
+use meedee::{discovery::Poller, midi::Encoding};
 
-let mut poller = Poller::new(Protocol::Midi1)?;
+let mut poller = Poller::new(Encoding::Bytes)?;
 println!("{:?}", poller.poll()?);
 // Call poll() again when the application wants another observation.
 poller.close();
@@ -549,12 +569,12 @@ preserving unmapped keys and explicit `NoChange` entries.
 The same managed route forwards ten seconds of channel messages, remapped to channel 2:
 
 ```rust
-use meedee::{midi::{Input, Output, Protocol}, routing};
+use meedee::{midi::{Input, Output, Encoding}, routing};
 use std::{collections::BTreeMap, time::Duration};
 
 let mut input = Input::new();
 let route = routing::Route::new(
-    "keys".into(), input.stream()?.into(), "synth".into(), Protocol::Midi1,
+    "keys".into(), input.stream()?.into(), "synth".into(), Encoding::Bytes,
     None, None, Some(2), None, false,
 )?;
 let mut router = routing::Router::new(vec![route], 128, 8_388_608)?;
@@ -597,7 +617,7 @@ println!("{report:?}");
 input.close()?;
 ```
 
-`MonitorOptions` selects message type names, channel, protocol and UMP group.
+`MonitorOptions` selects message type names, channel, encoding and UMP group.
 `MonitorEntry` contains a message with semantic observations and note-state
 snapshots, a diagnostic, or a loss-counter total. Filtering still updates state;
 loss notifications are never filtered. Known loss resets interpretation and
@@ -684,18 +704,18 @@ use meedee::messages::{AnyMessage, ControlChange};
 
 let mut view = ControlInterpreter::new(None)?;
 for (controller, value) in [(99, 1), (98, 2), (38, 5)] {
-    view.feed(&Payload::Midi1(AnyMessage::ControlChange(
+    view.feed(&Payload::Message(AnyMessage::ControlChange(
         ControlChange::new(controller, value)?.with_channel(1)?,
     )))?;
 }
 assert_eq!(view.parameter_state(1, ParameterFamily::Nrpn, 130)?,
     Some(ParameterState { coarse: None, fine: Some(5) }));
-view.feed(&Payload::Midi1(AnyMessage::ControlChange(
+view.feed(&Payload::Message(AnyMessage::ControlChange(
     ControlChange::new(6, 10)?.with_channel(1)?,
 )))?;
 assert_eq!(view.parameter_state(1, ParameterFamily::Nrpn, 130)?,
     Some(ParameterState { coarse: Some(10), fine: None }));
-view.feed(&Payload::Midi1(AnyMessage::ControlChange(
+view.feed(&Payload::Message(AnyMessage::ControlChange(
     ControlChange::new(38, 6)?.with_channel(1)?,
 )))?;
 assert_eq!(view.parameter_state(1, ParameterFamily::Nrpn, 130)?,
@@ -746,14 +766,14 @@ println!("{:?}", tracker.snapshot(2)?);
 tracker.configure(zone); // Clears notes, source binding and timing context.
 
 let mut assembler = ump::Assembler::new(1_048_576, 8_388_608, 64)?;
-let packets = ump::packetize_sysex7(2, &(0..20).collect::<Vec<u8>>())?;
-assembler.feed(&Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone())))?;
+let packets = ump::packetize_sysex7(&meedee::messages::SysEx::new((0..20).collect())?.with_group(2)?)?;
+assembler.feed(&Payload::Ump(ump::PacketValue::SysEx7(packets[0].clone())))?;
 println!("{:?}", assembler.finish());
 
 let sysex = meedee::messages::SysEx::new(vec![127, 1, 8, 2, 0, 1, 60, 60, 0, 0])?;
 println!("{:?}", tuning::decode(&sysex)?);
 let mut decoder = tuning::Decoder::new(None)?;
-println!("{:?}", decoder.feed(&Payload::Midi1(AnyMessage::SysEx(sysex)))?);
+println!("{:?}", decoder.feed(&Payload::Message(AnyMessage::SysEx(sysex)))?);
 ```
 
 UMP `finish()` reports each truncated assembly's group and exact contributor range,
@@ -909,7 +929,7 @@ use meedee::{archive, events::Payload, file_io, gm, messages::AnyMessage};
 
 for record in file_io::Reader::open("backup.syx")? {
     let file_io::Record::Archive(archive::Record::Event(message)) = record? else { continue; };
-    let Payload::Midi1(AnyMessage::SysEx(message)) = message.as_ref() else { continue; };
+    let Payload::Message(AnyMessage::SysEx(message)) = message.as_ref() else { continue; };
     if let Some(decoded) = gm::decode(message, 1024)? {
         println!("{decoded:?}");
     }

@@ -27,7 +27,7 @@ from pydantic import (
     model_validator,
 )
 
-from . import _native, _units, archive, codecs, events, gm, messages, midi
+from . import _native, _units, archive, codecs, events, messages, midi
 from ._errors import CompoundSendError
 from ._resource import ResourceModel
 from ._transport import DEFAULT_RECEIVE_BYTE_LIMIT, ReceiveQueue
@@ -35,7 +35,7 @@ from .events import Clock
 
 
 class _Client(ResourceModel, frozen=True):
-    protocol: midi.Protocol = Field(default_factory=lambda: midi.Protocol.Midi1)
+    encoding: midi.Encoding = Field(default_factory=lambda: midi.Encoding.Bytes)
     backend: midi.Backend | None = None
     port: str | None = Field(default=None, min_length=1)
     run_in_subprocess: bool = False
@@ -122,7 +122,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True
             )
         self._settings = {
             "identity": uuid4().hex,
-            "protocol": self.protocol,
+            "encoding": self.encoding,
             "backend": self.backend,
             "timestamps": self.timestamps,
             "receive_byte_limit": self.receive_byte_limit,
@@ -432,7 +432,7 @@ class Output(_Client, frozen=True):
         )
         self._settings = {
             "identity": uuid4().hex,
-            "protocol": self.protocol,
+            "encoding": self.encoding,
             "backend": self.backend,
         }
 
@@ -656,35 +656,20 @@ class Output(_Client, frozen=True):
                     timeline.append(
                         (
                             deadline,
-                            _native.prepare_output(self.protocol, attack),
+                            _native.prepare_output(self.encoding, attack),
                             rounded,
                         )
                     )
                     timeline.append(
                         (
                             end,
-                            _native.prepare_output(self.protocol, release),
+                            _native.prepare_output(self.encoding, release),
                             (elapsed * 1_000_000_000).denominator != 1,
                         )
                     )
             else:
-                if isinstance(
-                    v,
-                    (
-                        gm.BankProgramSelect,
-                        messages.NoteOn,
-                        messages.NoteOff,
-                        messages.PolyPressure,
-                        messages.ControlChange,
-                        messages.ProgramChange,
-                        messages.ChannelPressure,
-                        messages.PitchBend,
-                        messages.ParameterSet,
-                        messages.ParameterStep,
-                    ),
-                ) and (self.channel is not None or v.channel is None):
-                    v = v.replace(channel=self.channel or 1)
-                prepared = _native.prepare_output(self.protocol, v)
+                v = _native.resolve_output_channel(v, self.channel)
+                prepared = _native.prepare_output(self.encoding, v)
                 timeline.append(
                     (deadline, v if isinstance(prepared, tuple) else prepared, rounded)
                 )
@@ -804,7 +789,7 @@ class _OutputState:
         "_native",
         "_closed",
         "_state",
-        "_protocol",
+        "_encoding",
         "_channel",
         "_beat_period",
         "_failure",
@@ -821,7 +806,7 @@ class _OutputState:
         connection._failure = None
         connection._run_in_subprocess = client.run_in_subprocess
         connection._state = _native.OutputState()
-        connection._protocol = client.protocol
+        connection._encoding = client.encoding
         connection._channel = client.channel
         connection._beat_period = client._beat_period
         connection._native = cast(_native.OutputConnection | None, None)
@@ -830,7 +815,7 @@ class _OutputState:
 
     def _send(self, value: object) -> None:
         _native.check_thread()
-        prepared = _native.prepare_output(self._protocol, value)
+        prepared = _native.prepare_output(self._encoding, value)
         assert self._native is not None
         if isinstance(prepared, tuple):
             total = prepared[2]
@@ -947,7 +932,7 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
             if client.raw
             else events.PacketDecoder(
                 stream=connection._stream,
-                protocol=client.protocol,
+                encoding=client.encoding,
                 sysex_limit=client.sysex_limit,
             )
         )

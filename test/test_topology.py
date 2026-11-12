@@ -7,7 +7,7 @@ from meedee import topology
 
 def endpoint(name: str = "keys") -> topology.Endpoint:
     return topology.Endpoint(
-        backend="test", protocol="midi1", direction="input", backend_id=1, name=name
+        backend="test", encoding="bytes", direction="input", backend_id=1, name=name
     )
 
 
@@ -39,7 +39,7 @@ def test_rename_is_removal_and_addition_even_with_reused_backend_id() -> None:
     assert len(report.last.changes) == 2
     assert report.ports[0].endpoint.backend_id == 1
     same_name_other_direction = topology.Endpoint(
-        backend="test", protocol="ump", direction="output", backend_id=1, name="renamed"
+        backend="test", encoding="ump", direction="output", backend_id=1, name="renamed"
     )
     report = tracker.observe([same_name_other_direction])
     assert report.last is not None and report.last.added == report.last.removed == 1

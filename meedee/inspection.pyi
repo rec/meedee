@@ -22,7 +22,7 @@ class Monitor:
         *,
         stream: str,
         clock: events.Clock,
-        protocol: Literal["midi1", "ump"] = "midi1",
+        encoding: Literal["bytes", "ump"] = "bytes",
         types: list[str] = [],
         channel: int | None = None,
         group: int | None = None,

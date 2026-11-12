@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import codecs, controls, events, messages, ump
+from meedee import codecs, controls, events, messages, translation, ump
 
 
 def test_controller_resolution_is_explicit_and_preserved() -> None:
@@ -32,10 +32,13 @@ def test_controller_resolution_is_explicit_and_preserved() -> None:
     with pytest.raises((TypeError, ValueError)):
         ump.encode(fine)
     assert ump.decode(ump.encode(native)) == native
-    converted = ump.to_midi2(fine, group=1)
+    converted = translation.to_midi2(fine, group=1)
     assert converted.messages == [
         messages.ControlChange(
-            1, ump.scale_up(value=90, source_bits=14, destination_bits=32), 2, version=2
+            1,
+            translation.scale_up(value=90, source_bits=14, destination_bits=32),
+            2,
+            version=2,
         )
     ]
     for version, resolution in [(1, 8), (1, 32), (2, 7), (2, 14)]:
@@ -125,17 +128,21 @@ def test_commands_are_frozen_positional_values_with_checked_replacement() -> Non
         )
         for f in fields:
             assert fields[f] == (
-                str if f == "family" else int | None if f == "channel" else int
+                str
+                if f == "family"
+                else int | None
+                if f in {"channel", "group"}
+                else int
             )
             assert inspect.signature(constructor).parameters[f].kind == (
                 inspect.Parameter.KEYWORD_ONLY
-                if f == "family"
+                if f in {"family", "group"}
                 else inspect.Parameter.POSITIONAL_OR_KEYWORD
             )
             with pytest.raises(AttributeError):
                 setattr(c, f, 1)
             for v in (True, 1.0, "1", None):
-                if f == "channel" and v is None:
+                if f in {"channel", "group"} and v is None:
                     continue
                 error = (
                     ValueError if f == "family" and isinstance(v, str) else TypeError

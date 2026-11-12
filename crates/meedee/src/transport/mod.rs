@@ -73,9 +73,9 @@ impl StdError for Error {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Protocol {
+pub enum Encoding {
     #[default]
-    Midi1,
+    Bytes,
     Ump,
 }
 
@@ -93,10 +93,10 @@ pub enum Backend {
 }
 
 impl Backend {
-    pub fn protocol(self) -> Protocol {
+    pub fn encoding(self) -> Encoding {
         match self {
-            Self::CoreMidi | Self::AlsaSeq | Self::AlsaRaw | Self::WinMm => Protocol::Midi1,
-            _ => Protocol::Ump,
+            Self::CoreMidi | Self::AlsaSeq | Self::AlsaRaw | Self::WinMm => Encoding::Bytes,
+            _ => Encoding::Ump,
         }
     }
 }
@@ -122,7 +122,7 @@ pub fn compiled_backends() -> Result<Vec<Backend>> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct InputOptions {
-    pub protocol: Protocol,
+    pub encoding: Encoding,
     pub backend: Option<Backend>,
     pub timestamps: TimestampMode,
     /// Bounds library-owned receive bytes, including running callbacks.
@@ -133,7 +133,7 @@ pub struct InputOptions {
 impl Default for InputOptions {
     fn default() -> Self {
         Self {
-            protocol: Protocol::Midi1,
+            encoding: Encoding::Bytes,
             backend: None,
             timestamps: TimestampMode::Absolute,
             receive_byte_limit: 8 * 1024 * 1024,
@@ -143,15 +143,15 @@ impl Default for InputOptions {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OutputOptions {
-    pub protocol: Protocol,
+    pub encoding: Encoding,
     pub backend: Option<Backend>,
 }
 
-fn resolve_backend(protocol: Protocol, selected: Option<Backend>) -> Result<Backend> {
-    let backend = selected.unwrap_or_else(|| default_backend(protocol));
-    if backend.protocol() != protocol {
+fn resolve_backend(encoding: Encoding, selected: Option<Backend>) -> Result<Backend> {
+    let backend = selected.unwrap_or_else(|| default_backend(encoding));
+    if backend.encoding() != encoding {
         return Err(Error::Capability(
-            "backend and protocol do not match".into(),
+            "backend and encoding do not match".into(),
         ));
     }
     if !compiled_backends()?.contains(&backend) {
@@ -233,7 +233,7 @@ pub struct Input {
 pub struct Output {
     failure: Arc<FailureState>,
     worker: Worker<Native>,
-    protocol: Protocol,
+    encoding: Encoding,
 }
 
 /// Owns the client until close returns it. Drop retires delivery immediately;
@@ -248,7 +248,7 @@ pub struct InputConnection {
 pub struct OutputConnection {
     failure: Arc<FailureState>,
     worker: Worker<Native>,
-    protocol: Protocol,
+    encoding: Encoding,
 }
 
 /// Read-only worker failure information, retained independently of native handles.
@@ -312,7 +312,7 @@ impl Input {
         if options.receive_byte_limit == 0 {
             return Err(Error::Invalid("receive_byte_limit must be positive".into()));
         }
-        let backend = resolve_backend(options.protocol, options.backend)?;
+        let backend = resolve_backend(options.encoding, options.backend)?;
         let clock = Clock {
             id: 0,
             backend,
@@ -336,10 +336,10 @@ impl Input {
         }
         let backend = options
             .backend
-            .unwrap_or_else(|| default_backend(options.protocol));
-        if backend.protocol() != options.protocol {
+            .unwrap_or_else(|| default_backend(options.encoding));
+        if backend.encoding() != options.encoding {
             return Err(Error::Capability(
-                "backend and protocol do not match".into(),
+                "backend and encoding do not match".into(),
             ));
         }
         let failure = Arc::new(FailureState::default());
@@ -416,7 +416,7 @@ impl Input {
         mut callback: impl FnMut(crate::live::Item) + Send + 'static,
     ) -> Result<InputConnection> {
         let mut decoder =
-            crate::live::Decoder::new(stream.clone(), self.clock.backend.protocol(), limit)
+            crate::live::Decoder::new(stream.clone(), self.clock.backend.encoding(), limit)
                 .map_err(|_| {
                     Error::Invalid("source must be nonempty and decoder limit positive".into())
                 })?;
@@ -500,12 +500,12 @@ impl Output {
     }
 
     pub fn new(options: OutputOptions) -> Result<Self> {
-        let backend = resolve_backend(options.protocol, options.backend)?;
+        let backend = resolve_backend(options.encoding, options.backend)?;
         let worker = Worker::spawn(move || Native::new(false, backend), Native::initialize)?;
         Ok(Self {
             failure: Arc::new(FailureState::default()),
             worker,
-            protocol: options.protocol,
+            encoding: options.encoding,
         })
     }
     pub fn new_subprocess(
@@ -514,10 +514,10 @@ impl Output {
     ) -> Result<Self> {
         let backend = options
             .backend
-            .unwrap_or_else(|| default_backend(options.protocol));
-        if backend.protocol() != options.protocol {
+            .unwrap_or_else(|| default_backend(options.encoding));
+        if backend.encoding() != options.encoding {
             return Err(Error::Capability(
-                "backend and protocol do not match".into(),
+                "backend and encoding do not match".into(),
             ));
         }
         let failure = Arc::new(FailureState::default());
@@ -538,7 +538,7 @@ impl Output {
         Ok(Self {
             failure,
             worker,
-            protocol: options.protocol,
+            encoding: options.encoding,
         })
     }
     pub fn ports(&self) -> Result<Vec<Port>> {
@@ -557,7 +557,7 @@ impl Output {
         Ok(OutputConnection {
             failure: self.failure,
             worker: self.worker,
-            protocol: self.protocol,
+            encoding: self.encoding,
         })
     }
 }
@@ -644,10 +644,20 @@ impl OutputConnection {
     /// close on this connection can run between its primitive messages. The
     /// failed message may have effects even when its backend returns an error.
     pub fn send_command(&self, command: &(impl crate::messages::Command + ?Sized)) -> Result<()> {
-        if self.protocol != Protocol::Midi1 {
-            return Err(Error::Capability(
-                "compound commands require MIDI 1.0 byte transport".into(),
-            ));
+        if self.encoding == Encoding::Ump {
+            use crate::ump::UmpValue;
+            let mut words = Vec::new();
+            for message in command
+                .expand()
+                .map_err(|e| Error::Invalid(e.to_string()))?
+            {
+                words.extend(
+                    message
+                        .encode_words()
+                        .map_err(|e| Error::Invalid(e.to_string()))?,
+                );
+            }
+            return self.send(&Packet::Ump(words));
         }
         let packets: Vec<Packet> = crate::codecs::expand(command)
             .map_err(|_| Error::Invalid("command channel is unassigned".into()))?
@@ -675,7 +685,7 @@ impl OutputConnection {
     /// Backend acceptance, not physical delivery. A multi-packet UMP send can
     /// fail after accepting a prefix; its error reports that word count. No retry.
     pub fn send(&self, packet: &Packet) -> Result<()> {
-        validate_packet(self.protocol, packet)?;
+        validate_packet(self.encoding, packet)?;
         let owned = match packet {
             Packet::Bytes(bytes) => Packet::Bytes(native::copy(bytes)?),
             Packet::Ump(words) => Packet::Ump(native::copy(words)?),
@@ -690,30 +700,30 @@ impl OutputConnection {
         Ok(Output {
             failure: self.failure,
             worker: self.worker,
-            protocol: self.protocol,
+            encoding: self.encoding,
         })
     }
 }
 
 /// Validate a raw send before consuming binding ownership or entering a driver.
-pub fn validate_packet(protocol: Protocol, packet: &Packet) -> Result<()> {
-    match (protocol, packet) {
-        (Protocol::Midi1, Packet::Bytes(bytes))
+pub fn validate_packet(encoding: Encoding, packet: &Packet) -> Result<()> {
+    match (encoding, packet) {
+        (Encoding::Bytes, Packet::Bytes(bytes))
             if !bytes.is_empty() && bytes.len() <= i32::MAX as usize =>
         {
             Ok(())
         }
-        (Protocol::Ump, Packet::Ump(words)) => validate_ump(words),
+        (Encoding::Ump, Packet::Ump(words)) => validate_ump(words),
         _ => Err(Error::Invalid(
             "packet encoding does not match this connection, or the packet is empty".into(),
         )),
     }
 }
 
-fn default_backend(protocol: Protocol) -> Backend {
+fn default_backend(encoding: Encoding) -> Backend {
     #[cfg(target_os = "macos")]
     {
-        if protocol == Protocol::Midi1 {
+        if encoding == Encoding::Bytes {
             Backend::CoreMidi
         } else {
             Backend::CoreMidiUmp
@@ -721,7 +731,7 @@ fn default_backend(protocol: Protocol) -> Backend {
     }
     #[cfg(target_os = "linux")]
     {
-        if protocol == Protocol::Midi1 {
+        if encoding == Encoding::Bytes {
             Backend::AlsaSeq
         } else {
             Backend::AlsaSeqUmp
@@ -729,7 +739,7 @@ fn default_backend(protocol: Protocol) -> Backend {
     }
     #[cfg(target_os = "windows")]
     {
-        if protocol == Protocol::Midi1 {
+        if encoding == Encoding::Bytes {
             Backend::WinMm
         } else {
             Backend::WindowsMidiServices
@@ -824,7 +834,7 @@ mod tests {
     #[test]
     fn protocol_mismatch_is_rejected_without_opening_a_device() {
         assert!(matches!(
-            resolve_backend(Protocol::Ump, Some(Backend::CoreMidi)),
+            resolve_backend(Encoding::Ump, Some(Backend::CoreMidi)),
             Err(Error::Capability(_))
         ));
     }

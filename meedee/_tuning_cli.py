@@ -64,14 +64,14 @@ def run_query(config: TuningPreview) -> int:
         )
         with ExitStack() as stack:
             output_client = midi.Output(
-                protocol=midi.Protocol.Midi1,
+                encoding=midi.Encoding.Bytes,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
                 subprocess_worker=config.subprocess_worker,
                 subprocess_executable=config.subprocess_executable,
             )
             input_client = midi.Input(
-                protocol=midi.Protocol.Midi1,
+                encoding=midi.Encoding.Bytes,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
                 subprocess_worker=config.subprocess_worker,

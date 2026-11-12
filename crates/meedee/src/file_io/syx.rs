@@ -54,6 +54,7 @@ impl<R: Read> Iterator for Reader<R> {
     }
 }
 pub(crate) fn write(writer: &mut impl Write, message: &SysEx, limit: usize) -> io::Result<()> {
+    crate::messages::require_ungrouped(message.group())?;
     if limit == 0 || message.data().len() > limit {
         return Err(invalid(0, "payload limit"));
     }

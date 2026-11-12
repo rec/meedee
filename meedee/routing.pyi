@@ -19,7 +19,7 @@ class Route:
         name: str,
         source: str,
         destination: str,
-        protocol: Literal["midi1", "ump"],
+        encoding: Literal["bytes", "ump"],
         channel: int | None = None,
         group: int | None = None,
         remap_channel: int | None = None,
@@ -33,7 +33,7 @@ class Route:
     @property
     def destination(self) -> str: ...
     @property
-    def protocol(self) -> str: ...
+    def encoding(self) -> str: ...
     @property
     def channel(self) -> int | None: ...
     @property

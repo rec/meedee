@@ -1,6 +1,6 @@
 //! Public Python testing transports backed by the shared deterministic core.
 use crate::files::{limit, uint};
-use crate::packets::{extract_packet, Clock, Protocol, UmpPacket};
+use crate::packets::{extract_packet, Clock, Encoding, UmpPacket};
 use meedee::{testing, transport};
 use pyo3::exceptions::{PyInterruptedError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -37,10 +37,10 @@ struct Input {
 #[pymethods]
 impl Input {
     #[new]
-    #[pyo3(signature=(*,stream,protocol,packet_limit=128,event_limit=128,byte_limit=8_388_608,sysex_limit=1_048_576))]
+    #[pyo3(signature=(*,stream,encoding,packet_limit=128,event_limit=128,byte_limit=8_388_608,sysex_limit=1_048_576))]
     fn new(
         stream: String,
-        protocol: &str,
+        encoding: &str,
         #[pyo3(from_py_with=limit)] packet_limit: usize,
         #[pyo3(from_py_with=limit)] event_limit: usize,
         #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
@@ -49,7 +49,7 @@ impl Input {
         Ok(Self {
             value: testing::Input::new(
                 stream,
-                parse_protocol(protocol)?.native(),
+                parse_encoding(encoding)?.native(),
                 packet_limit,
                 event_limit,
                 byte_limit,
@@ -200,29 +200,29 @@ impl InputReport {
 #[pyclass(module = "meedee.testing")]
 struct Output {
     value: testing::Output,
-    protocol: Protocol,
+    encoding: Encoding,
 }
 #[pymethods]
 impl Output {
     #[new]
-    #[pyo3(signature=(*,protocol,packet_limit=128,byte_limit=8_388_608))]
+    #[pyo3(signature=(*,encoding,packet_limit=128,byte_limit=8_388_608))]
     fn new(
-        protocol: &str,
+        encoding: &str,
         #[pyo3(from_py_with=limit)] packet_limit: usize,
         #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
             value: testing::Output::new(
-                parse_protocol(protocol)?.native(),
+                parse_encoding(encoding)?.native(),
                 packet_limit,
                 byte_limit,
             )
             .map_err(error)?,
-            protocol: parse_protocol(protocol)?,
+            encoding: parse_encoding(encoding)?,
         })
     }
     fn send(&mut self, py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<()> {
-        let packet = crate::live::prepare_output(py, self.protocol, value)?;
+        let packet = crate::live::prepare_output(py, self.encoding, value)?;
         if packet.bind(py).is_instance_of::<PyTuple>() {
             let command = crate::messages::extract_command(value)?;
             let packets = meedee::codecs::expand(&command)
@@ -340,10 +340,10 @@ fn error(e: transport::Error) -> PyErr {
     }
 }
 
-fn parse_protocol(value: &str) -> PyResult<Protocol> {
+fn parse_encoding(value: &str) -> PyResult<Encoding> {
     match value {
-        "midi1" => Ok(Protocol::Midi1),
-        "ump" => Ok(Protocol::Ump),
-        _ => Err(PyValueError::new_err("protocol must be midi1 or ump")),
+        "bytes" => Ok(Encoding::Bytes),
+        "ump" => Ok(Encoding::Ump),
+        _ => Err(PyValueError::new_err("encoding must be bytes or ump")),
     }
 }

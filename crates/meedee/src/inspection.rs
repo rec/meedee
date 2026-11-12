@@ -319,7 +319,7 @@ impl Report {
                             self.count(midi1_kind(&v));
                             self.notes.feed(
                                 &format!("track:{}", event.track),
-                                &events::Payload::Midi1(v),
+                                &events::Payload::Message(v),
                                 Some("smf_ticks"),
                                 detail_limit,
                             );
@@ -344,13 +344,13 @@ impl Report {
                 for entry in clip::Reader::new(source, preserve)? {
                     let entry = entry?;
                     self.records += 1;
-                    self.count_ump(&entry.message);
-                    self.notes.feed(
-                        "clip",
-                        &events::Payload::Ump(entry.message.clone()),
-                        Some("clip_ticks"),
-                        detail_limit,
-                    );
+                    match &entry.message {
+                        events::Payload::Ump(v) => self.count_ump(v),
+                        events::Payload::Message(v) => self.count(v.kind()),
+                        events::Payload::Command(v) => self.count(command_kind(v)),
+                    }
+                    self.notes
+                        .feed("clip", &entry.message, Some("clip_ticks"), detail_limit);
                     self.timing.observe(
                         "clip",
                         Some("clip_ticks"),
@@ -387,14 +387,14 @@ impl Report {
         );
         self.untimed_events += u64::from(e.timestamp().is_none());
         match e {
-            events::Payload::Midi1(v) => self.count(midi1_kind(v)),
+            events::Payload::Message(v) => self.count(midi1_kind(v)),
             events::Payload::Ump(v) => self.count_ump(v),
             events::Payload::Command(v) => self.count(command_kind(v)),
         }
     }
 
-    fn count_ump(&mut self, value: &ump::UmpMessage) {
-        if matches!(value, ump::UmpMessage::Opaque(_)) {
+    fn count_ump(&mut self, value: &ump::PacketValue) {
+        if matches!(value, ump::PacketValue::Opaque(_)) {
             self.opaque_records += 1;
         }
         // UMP counts are packet counts, including clock/configuration packets.
@@ -414,27 +414,7 @@ impl Report {
 }
 
 fn midi1_kind(value: &messages::AnyMessage) -> &'static str {
-    use messages::AnyMessage::*;
-    match value {
-        NoteOn(_) => "NoteOn",
-        NoteOff(_) => "NoteOff",
-        PolyPressure(_) => "PolyPressure",
-        ControlChange(_) => "ControlChange",
-        ProgramChange(_) => "ProgramChange",
-        ChannelPressure(_) => "ChannelPressure",
-        PitchBend(_) => "PitchBend",
-        QuarterFrame(_) => "QuarterFrame",
-        SongPosition(_) => "SongPosition",
-        SongSelect(_) => "SongSelect",
-        TuneRequest(_) => "TuneRequest",
-        TimingClock(_) => "TimingClock",
-        Start(_) => "Start",
-        Continue(_) => "Continue",
-        Stop(_) => "Stop",
-        ActiveSensing(_) => "ActiveSensing",
-        SystemReset(_) => "SystemReset",
-        SysEx(_) => "SysEx",
-    }
+    value.kind()
 }
 
 fn command_kind(value: &messages::AnyCommand) -> &'static str {
@@ -494,7 +474,7 @@ pub fn compare_files(
 /// Selection applies after interpretation. Diagnostics and loss are never filtered.
 #[derive(Clone, Debug)]
 pub struct MonitorOptions {
-    pub protocol: crate::transport::Protocol,
+    pub encoding: crate::transport::Encoding,
     pub types: Vec<String>,
     pub channel: Option<u8>,
     pub group: Option<u8>,
@@ -503,7 +483,7 @@ pub struct MonitorOptions {
 impl Default for MonitorOptions {
     fn default() -> Self {
         Self {
-            protocol: crate::transport::Protocol::Midi1,
+            encoding: crate::transport::Encoding::Bytes,
             types: Vec::new(),
             channel: None,
             group: None,
@@ -552,7 +532,7 @@ impl Monitor {
             .into_iter()
             .flatten()
             .any(|v| !(1..=16).contains(&v))
-            || options.protocol == crate::transport::Protocol::Midi1 && options.group.is_some()
+            || options.encoding == crate::transport::Encoding::Bytes && options.group.is_some()
         {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -560,7 +540,7 @@ impl Monitor {
             ));
         }
         let interpret =
-            options.protocol == crate::transport::Protocol::Midi1 || options.group.is_some();
+            options.encoding == crate::transport::Encoding::Bytes || options.group.is_some();
         Ok(Self {
             observer: Observer::new(stream, clock, options.detail_limit)?,
             controls: interpret
@@ -605,19 +585,16 @@ impl Monitor {
                     observations.extend(view.feed(message)?);
                 }
                 let kind = match message.as_ref() {
-                    events::Payload::Midi1(v) => midi1_kind(v),
+                    events::Payload::Message(v) => midi1_kind(v),
                     events::Payload::Ump(v) => v.kind(),
                     events::Payload::Command(v) => command_kind(v),
                 };
-                let inner = match message.as_ref() {
-                    events::Payload::Ump(ump::UmpMessage::Midi1(v)) => midi1_kind(v.message()),
-                    _ => kind,
-                };
+                let inner = kind;
                 let (channel, group) = match message.as_ref() {
-                    events::Payload::Ump(ump::UmpMessage::FlexData(v)) => {
+                    events::Payload::Ump(ump::PacketValue::FlexData(v)) => {
                         (v.channel(), Some(v.group()))
                     }
-                    events::Payload::Ump(ump::UmpMessage::Opaque(_)) => (None, None),
+                    events::Payload::Ump(ump::PacketValue::Opaque(_)) => (None, None),
                     _ => {
                         let info = crate::routing::classify(message).ok();
                         (
@@ -853,13 +830,13 @@ mod monitor_tests {
             .with_stream("s")
             .unwrap();
         assert!(monitor
-            .feed(&Item::Message(Box::new(events::Payload::Midi1(
+            .feed(&Item::Message(Box::new(events::Payload::Message(
                 messages::AnyMessage::NoteOn(on)
             ))))
             .unwrap()
             .is_none());
         let entry = monitor
-            .feed(&Item::Message(Box::new(events::Payload::Midi1(
+            .feed(&Item::Message(Box::new(events::Payload::Message(
                 messages::AnyMessage::NoteOff(off),
             ))))
             .unwrap()

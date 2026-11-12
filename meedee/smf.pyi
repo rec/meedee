@@ -4,7 +4,7 @@ from collections.abc import Iterator
 from os import PathLike
 from typing import BinaryIO
 
-from . import events, messages, ump
+from . import events, messages, translation
 from .events import Rational
 
 class Header:
@@ -134,7 +134,7 @@ class TimedReader:
 
 class ExportReport:
     @property
-    def status(self) -> ump.TranslationStatus: ...
+    def status(self) -> translation.TranslationStatus: ...
     @property
     def reason(self) -> str: ...
     @property

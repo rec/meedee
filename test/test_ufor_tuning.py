@@ -207,7 +207,7 @@ def test_bulk_dump_can_be_sent_as_sysex_with_library_broadcast(
     dump = tuning.bulk_dump(result, device_id=127, program=2, name="dump", bank=bank)
     wire = codecs.encode(dump)
     message = messages.SysEx(data=wire[1:-1])
-    output = Output(protocol="midi1")
+    output = Output(encoding="bytes")
     output.send(message)
     assert output.take_packet() == wire
     output.close()

@@ -74,8 +74,8 @@ def test_host_reuses_typed_decoding_and_existing_reply_matcher(
     bank: int | None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    receiver = testing.Input(stream="s", protocol="midi1")
-    output = testing.Output(protocol="midi1")
+    receiver = testing.Input(stream="s", encoding="bytes")
+    output = testing.Output(encoding="bytes")
     clock = events.Clock(identity="c")
     raw = reply(bank)
     receiver.inject(b"\xf0\x7d\xf7\xf8" + raw[:30], clock=clock)
@@ -98,8 +98,8 @@ def test_send_failure_is_uncertain_even_when_test_transport_knows_acceptance(
     accepted: bool,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    receiver = testing.Input(stream="s", protocol="midi1")
-    output = testing.Output(protocol="midi1")
+    receiver = testing.Input(stream="s", encoding="bytes")
+    output = testing.Output(encoding="bytes")
     output.fail_next_send(accepted=accepted)
     monkeypatch.setattr(tuning, "monotonic_ns", lambda: 0)
     report = tuning.query(query(), receiver, output)  # ty: ignore[invalid-argument-type]
@@ -117,8 +117,8 @@ def test_host_stops_without_export_on_input_faults_and_cancellation(
     fault: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    receiver = testing.Input(stream="s", protocol="midi1")
-    output = testing.Output(protocol="midi1")
+    receiver = testing.Input(stream="s", encoding="bytes")
+    output = testing.Output(encoding="bytes")
     token = events.Cancellation()
     if fault == "loss":
         receiver.lose(1)

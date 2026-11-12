@@ -144,7 +144,7 @@ impl Writer {
                         .map_err(|e| PyValueError::new_err(e.to_string()))?;
                     let payload = crate::event_values::with_metadata(
                         record,
-                        meedee::events::Payload::Midi1(meedee::messages::AnyMessage::SysEx(
+                        meedee::events::Payload::Message(meedee::messages::AnyMessage::SysEx(
                             message,
                         )),
                     )?;

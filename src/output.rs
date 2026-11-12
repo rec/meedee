@@ -1,10 +1,11 @@
 use crate::callback::check_blocking_thread;
 use crate::errors::{native_call, transport_error, StateError};
 use crate::lifecycle::{self, Managed, Resource};
-use crate::packets::{extract_packet, Backend, Protocol};
+use crate::packets::{extract_packet, Backend, Encoding};
 use crate::ports::Port;
 use crate::state::Client;
 use meedee::transport;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::{PyTraverseError, PyVisit};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -40,16 +41,16 @@ pub struct Output {
     identity: String,
     diagnostics: transport::WorkerDiagnostics,
     snapshot: AtomicU64,
-    protocol: Protocol,
+    encoding: Encoding,
 }
 #[pymethods]
 impl Output {
     #[new]
-    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None, worker_program=None, worker_args=None, worker_timeout=5.0))]
+    #[pyo3(signature = (*, identity, encoding=Encoding::Bytes, backend=None, worker_program=None, worker_args=None, worker_timeout=5.0))]
     fn new(
         py: Python<'_>,
         identity: String,
-        protocol: Protocol,
+        encoding: Encoding,
         backend: Option<Backend>,
         worker_program: Option<std::path::PathBuf>,
         worker_args: Option<Vec<std::ffi::OsString>>,
@@ -61,7 +62,7 @@ impl Output {
             .detach(|| {
                 native_call("create output", || {
                     let options = transport::OutputOptions {
-                        protocol: protocol.native(),
+                        encoding: encoding.native(),
                         backend: backend.map(Backend::native),
                     };
                     if let Some(program) = worker_program {
@@ -90,7 +91,7 @@ impl Output {
             state: Arc::new(Client::new(native)),
             identity,
             snapshot: AtomicU64::new(0),
-            protocol,
+            encoding,
         })
     }
     #[getter]
@@ -137,7 +138,7 @@ impl Output {
 pub struct OutputConnection {
     resource: Arc<Managed<transport::Output, transport::OutputConnection>>,
     client: Py<Output>,
-    protocol: Protocol,
+    encoding: Encoding,
 }
 #[pymethods]
 impl OutputConnection {
@@ -153,10 +154,22 @@ impl OutputConnection {
     fn send_command(&self, py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<()> {
         check_blocking_thread()?;
         let command = crate::messages::extract_command(command)?;
-        if self.protocol != Protocol::Midi1 {
-            return Err(crate::errors::CapabilityError::new_err(
-                "compound commands require MIDI 1.0 byte transport",
-            ));
+        // Validate before entering Managed::send: preparation errors must not
+        // retire a healthy connection as though a backend send had failed.
+        if self.encoding == Encoding::Ump {
+            let words = meedee::ump::encode(&meedee::events::Payload::Command(command.clone()))
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            transport::validate_packet(self.encoding.native(), &transport::Packet::Ump(words))
+                .map_err(|e| transport_error(e, "send"))?;
+        } else {
+            use meedee::messages::PrimitiveMessage;
+            for message in meedee::codecs::expand(&command)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?
+            {
+                message
+                    .encode()
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            }
         }
         let mut failure = None;
         let result =
@@ -179,7 +192,7 @@ impl OutputConnection {
     fn send(&self, py: Python<'_>, packet: &Bound<'_, PyAny>) -> PyResult<()> {
         check_blocking_thread()?;
         let packet = extract_packet(packet)?;
-        transport::validate_packet(self.protocol.native(), &packet)
+        transport::validate_packet(self.encoding.native(), &packet)
             .map_err(|e| transport_error(e, "send"))?;
         self.resource
             .native
@@ -226,7 +239,7 @@ impl OutputConnection {
             + Send,
     ) -> PyResult<Py<Self>> {
         check_blocking_thread()?;
-        let protocol = client.get().protocol;
+        let encoding = client.get().encoding;
         let resource = Arc::new(Managed::new(
             Arc::clone(&client.get().state),
             None,
@@ -239,7 +252,7 @@ impl OutputConnection {
             Self {
                 resource: Arc::clone(&resource),
                 client,
-                protocol,
+                encoding,
             },
         )?;
         lifecycle::register(resource.clone())?;
@@ -271,7 +284,7 @@ pub(crate) mod tests {
         fn send(&self, py: Python<'_>, packet: &Bound<'_, PyAny>) -> PyResult<()> {
             check_blocking_thread()?;
             let packet = extract_packet(packet)?;
-            transport::validate_packet(transport::Protocol::Midi1, &packet)
+            transport::validate_packet(transport::Encoding::Bytes, &packet)
                 .map_err(|e| transport_error(e, "send"))?;
             self.connection
                 .send(&self.client, py, &packet, |(), packet| {

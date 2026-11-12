@@ -28,7 +28,7 @@ fn dump(kind: &str) -> SysEx {
 }
 fn event(raw: SysEx) -> Item {
     Item::Message(Box::new(
-        (Payload::Midi1(meedee::messages::AnyMessage::SysEx(raw)))
+        (Payload::Message(meedee::messages::AnyMessage::SysEx(raw)))
             .with_metadata(meedee::messages::Metadata {
                 stream: Some("s".into()),
                 timestamp: None,

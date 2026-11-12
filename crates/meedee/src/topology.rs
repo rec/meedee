@@ -5,7 +5,7 @@ use std::io;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Endpoint {
     backend: String,
-    protocol: String,
+    encoding: String,
     direction: String,
     backend_id: u64,
     name: String,
@@ -13,22 +13,22 @@ pub struct Endpoint {
 impl Endpoint {
     pub fn new(
         backend: String,
-        protocol: String,
+        encoding: String,
         direction: String,
         backend_id: u64,
         name: String,
     ) -> io::Result<Self> {
         if backend.is_empty()
-            || !matches!(protocol.as_str(), "midi1" | "ump")
+            || !matches!(encoding.as_str(), "bytes" | "ump")
             || !matches!(direction.as_str(), "input" | "output")
         {
             return Err(invalid(
-                "nonempty backend, midi1/ump protocol and input/output direction required",
+                "nonempty backend, bytes/ump encoding and input/output direction required",
             ));
         }
         Ok(Self {
             backend,
-            protocol,
+            encoding,
             direction,
             backend_id,
             name,
@@ -37,8 +37,8 @@ impl Endpoint {
     pub fn backend(&self) -> &str {
         &self.backend
     }
-    pub fn protocol(&self) -> &str {
-        &self.protocol
+    pub fn encoding(&self) -> &str {
+        &self.encoding
     }
     pub fn direction(&self) -> &str {
         &self.direction

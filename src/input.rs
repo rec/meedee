@@ -8,7 +8,7 @@ use pyo3::{PyTraverseError, PyVisit};
 use crate::callback::{check_blocking_thread, Callback};
 use crate::errors::{native_call, transport_error, StateError};
 use crate::lifecycle::{self, Managed, Resource};
-use crate::packets::{Backend, Clock, Protocol, ReceivedPacket, TimestampMode};
+use crate::packets::{Backend, Clock, Encoding, ReceivedPacket, TimestampMode};
 use crate::ports::Port;
 use crate::state::Client;
 
@@ -24,11 +24,11 @@ pub struct Input {
 #[pymethods]
 impl Input {
     #[new]
-    #[pyo3(signature = (*, identity, protocol=Protocol::Midi1, backend=None, timestamps=TimestampMode::Absolute, receive_byte_limit=8_388_608, worker_program=None, worker_args=None, worker_timeout=5.0))]
+    #[pyo3(signature = (*, identity, encoding=Encoding::Bytes, backend=None, timestamps=TimestampMode::Absolute, receive_byte_limit=8_388_608, worker_program=None, worker_args=None, worker_timeout=5.0))]
     fn new(
         py: Python<'_>,
         identity: String,
-        protocol: Protocol,
+        encoding: Encoding,
         backend: Option<Backend>,
         timestamps: TimestampMode,
         receive_byte_limit: usize,
@@ -42,7 +42,7 @@ impl Input {
             .detach(|| {
                 native_call("create input", || {
                     let options = transport::InputOptions {
-                        protocol: protocol.native(),
+                        encoding: encoding.native(),
                         backend: backend.map(Backend::native),
                         timestamps: timestamps.native(),
                         receive_byte_limit,

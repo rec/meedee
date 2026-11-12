@@ -11,8 +11,8 @@ use pyo3::types::{PyBytes, PyInt, PyList, PyTuple};
 
 #[pyclass(eq, frozen, from_py_object, module = "meedee.midi")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Protocol {
-    Midi1,
+pub enum Encoding {
+    Bytes,
     Ump,
 }
 
@@ -339,11 +339,11 @@ pub fn extract_packet(value: &Bound<'_, PyAny>) -> PyResult<transport::Packet> {
     Ok(transport::Packet::Bytes(buffer.to_vec(value.py())?))
 }
 
-impl Protocol {
-    pub fn native(self) -> transport::Protocol {
+impl Encoding {
+    pub fn native(self) -> transport::Encoding {
         match self {
-            Self::Midi1 => transport::Protocol::Midi1,
-            Self::Ump => transport::Protocol::Ump,
+            Self::Bytes => transport::Encoding::Bytes,
+            Self::Ump => transport::Encoding::Ump,
         }
     }
 }
@@ -382,7 +382,7 @@ impl Backend {
     }
 }
 pub fn register_transport(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<Protocol>()?;
+    module.add_class::<Encoding>()?;
     module.add_class::<Backend>()?;
     module.add_class::<TimestampMode>()?;
     module.add_class::<UmpPacket>()?;
@@ -402,11 +402,11 @@ fn compiled_backends() -> PyResult<Vec<Backend>> {
 #[pyfunction]
 pub fn prepare_send(
     py: Python<'_>,
-    protocol: Protocol,
+    encoding: Encoding,
     packet: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
     let packet = extract_packet(packet)?;
-    transport::validate_packet(protocol.native(), &packet)
+    transport::validate_packet(encoding.native(), &packet)
         .map_err(|e| crate::errors::transport_error(e, "send"))?;
     match packet {
         transport::Packet::Bytes(bytes) => Ok(PyBytes::new(py, &bytes).into_any().unbind()),

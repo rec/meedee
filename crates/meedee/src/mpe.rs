@@ -5,10 +5,20 @@ use crate::messages::{AnyMessage, Command, ParameterSet, ValueError};
 #[derive(Clone, Debug)]
 pub struct ZoneConfiguration {
     metadata: Option<Box<crate::messages::Metadata>>,
+    group: Option<u8>,
     manager_channel: u8,
     members: u8,
 }
 impl ZoneConfiguration {
+    crate::messages::group_methods!();
+    pub fn with_channel(self, channel: i64) -> Result<Self, ValueError> {
+        let group = self.group;
+        let metadata = self.metadata;
+        let mut value = Self::new(channel, self.members.into())?;
+        value.group = group;
+        value.metadata = metadata;
+        Ok(value)
+    }
     pub fn new(manager_channel: i64, members: i64) -> Result<Self, ValueError> {
         if manager_channel != 1 && manager_channel != 16 {
             return Err(ValueError("manager_channel must be 1 or 16".into()));
@@ -18,6 +28,7 @@ impl ZoneConfiguration {
         }
         Ok(Self {
             metadata: None,
+            group: None,
             manager_channel: manager_channel as u8,
             members: members as u8,
         })
@@ -30,13 +41,15 @@ impl ZoneConfiguration {
     }
 }
 crate::messages::value_metadata!(ZoneConfiguration {
+    group,
     manager_channel,
     members
 });
 impl Command for ZoneConfiguration {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-        crate::messages::inherit_metadata(
+        crate::messages::inherit_command(
             self,
+            self.group(),
             ParameterSet::new(6, self.members.into())
                 .and_then(|m| m.with_resolution(7))
                 .and_then(|m| m.with_channel(self.manager_channel.into()))

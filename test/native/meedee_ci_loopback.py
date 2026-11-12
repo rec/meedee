@@ -11,7 +11,9 @@ def dispatch(session: ci.Session, action: ci.Action, output: midi.Output) -> Non
     assert action.route.group is not None
     wire = codecs.encode(action.message)
     try:
-        for p in ump.packetize_sysex7(group=action.route.group, data=wire[1:-1]):
+        for p in ump.packetize_sysex7(
+            messages.SysEx(wire[1:-1], group=action.route.group)
+        ):
             output.send(p)
     except midi.MidiError:
         session.report_send(token=action.token, sent=False, now_ns=monotonic_ns())
@@ -31,7 +33,7 @@ def receive(receiver: midi.Input, assembler: ump.Assembler) -> messages.SysEx:
 
 
 def connect(name: str) -> midi.Output:
-    client = midi.Output(protocol=midi.Protocol.Ump)
+    client = midi.Output(encoding=midi.Encoding.Ump)
     matches = [p for p in client.ports() if p.name == name]
     assert len(matches) == 1, "test-owned destination was not discovered uniquely"
     return client.connect(matches[0])
@@ -48,8 +50,8 @@ def main() -> None:
         manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
     )
     with (
-        midi.Input(protocol=midi.Protocol.Ump).create_virtual(names[0]) as a,
-        midi.Input(protocol=midi.Protocol.Ump).create_virtual(names[1]) as b,
+        midi.Input(encoding=midi.Encoding.Ump).create_virtual(names[0]) as a,
+        midi.Input(encoding=midi.Encoding.Ump).create_virtual(names[1]) as b,
         connect(names[1]) as a_out,
         connect(names[0]) as b_out,
     ):

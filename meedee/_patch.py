@@ -9,7 +9,7 @@ from ._routing_cli import configured_routes, routing_data
 
 
 def run_patch(config: Patch) -> int:
-    protocol = midi.Protocol.Midi1 if config.protocol == "midi1" else midi.Protocol.Ump
+    encoding = midi.Encoding.Bytes if config.encoding == "bytes" else midi.Encoding.Ump
     backend = None if config.backend is None else getattr(midi.Backend, config.backend)
     router: routing.Router | None = None
     connection: midi.Input | None = None
@@ -21,7 +21,7 @@ def run_patch(config: Patch) -> int:
             outputs: dict[str, midi.Output] = {}
             for name in config.destinations:
                 client = midi.Output(
-                    protocol=protocol,
+                    encoding=encoding,
                     backend=backend,
                     run_in_subprocess=config.run_in_subprocess,
                     subprocess_worker=config.subprocess_worker,
@@ -30,7 +30,7 @@ def run_patch(config: Patch) -> int:
                 port = select_port(client.ports(), name, direction="output")
                 outputs[name] = stack.enter_context(client.connect(port))
             client_input = midi.Input(
-                protocol=protocol,
+                encoding=encoding,
                 backend=backend,
                 run_in_subprocess=config.run_in_subprocess,
                 subprocess_worker=config.subprocess_worker,

@@ -1,4 +1,4 @@
-use meedee::{messages::*, ump::*};
+use meedee::{messages::*, translation::*, ump::*};
 
 #[test]
 fn shared_channel_values_keep_versions_defaults_and_encoding_boundaries() {
@@ -16,7 +16,7 @@ fn shared_channel_values_keep_versions_defaults_and_encoding_boundaries() {
     assert!(wide.encode().is_err());
     assert_ne!(byte, wide);
     assert!(to_midi2(&AnyMessage::NoteOn(wide.clone()), 1).is_err());
-    assert!(byte.clone().with_group(1).is_err());
+    assert_eq!(byte.clone().with_group(1).unwrap().group(), Some(1));
     assert!(byte.with_attribute_type(0).is_err());
     assert_eq!(wide.clone().with_velocity(90).unwrap().velocity(), 90);
     let attributed = wide
@@ -88,7 +88,7 @@ fn independent_packets_cover_all_families_and_preserve_native_widths() {
         [0x4fcf0001, 0x7f007903]
     );
     assert_eq!(
-        encode(&Midi2RelativeRegisteredController::new(1, 1, 127, 127, -1).unwrap()).unwrap(),
+        encode(&RelativeRegisteredController::new(1, 1, 127, 127, -1).unwrap()).unwrap(),
         [0x40407f7f, 0xffffffff]
     );
     assert_eq!(
@@ -161,7 +161,10 @@ fn framing_recovers_by_declared_lengths_and_opaque_preservation_is_explicit() {
     assert!(d.finish().is_empty());
     assert!(decode(&[0xb0000000, 1, 2], false).is_err());
     let opaque = decode(&[0xb0000000, 1, 2], true).unwrap();
-    assert!(matches!(opaque, UmpMessage::Opaque(_)));
+    assert!(matches!(
+        opaque,
+        meedee::events::Payload::Ump(PacketValue::Opaque(_))
+    ));
     assert_eq!(encode(&opaque).unwrap(), [0xb0000000, 1, 2]);
     d.feed(&[0x40903c00]);
     assert_eq!(d.finish().len(), 1);
@@ -177,13 +180,14 @@ fn framing_recovers_by_declared_lengths_and_opaque_preservation_is_explicit() {
 #[test]
 fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limits() {
     let data = (0..127).collect::<Vec<u8>>();
-    let packets = packetize_sysex7(1, &data).unwrap();
+    let packets =
+        packetize_sysex7(&SysEx::new(data.clone()).unwrap().with_group(1).unwrap()).unwrap();
     let mut a = Assembler::new(1024, 2048, 4).unwrap();
     let mut out = vec![];
     for p in packets {
         out.extend(assembly_values(
             a.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::SysEx7(p)).clone(),
+                (PacketValue::SysEx7(p)).clone(),
             ))
             .unwrap(),
         ));
@@ -197,14 +201,14 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     let s2 = packetize_sysex8(1, 2, &[128; 14]).unwrap();
     assert!(assembly_values(
         a.feed(&meedee::events::Payload::Ump(
-            (UmpMessage::SysEx8(s1[0].clone())).clone()
+            (PacketValue::SysEx8(s1[0].clone())).clone()
         ))
         .unwrap()
     )
     .is_empty());
     assert!(assembly_values(
         a.feed(&meedee::events::Payload::Ump(
-            (UmpMessage::SysEx8(s2[0].clone())).clone()
+            (PacketValue::SysEx8(s2[0].clone())).clone()
         ))
         .unwrap()
     )
@@ -213,7 +217,7 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     assert_eq!(
         assembly_values(
             a.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::SysEx8(SysEx8Packet::new(1, 3, 1, vec![], true).unwrap())).clone()
+                (PacketValue::SysEx8(SysEx8Packet::new(1, 3, 1, vec![], true).unwrap())).clone()
             ))
             .unwrap()
         ),
@@ -221,7 +225,7 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     );
     let r = assembly_values(
         a.feed(&meedee::events::Payload::Ump(
-            (UmpMessage::SysEx8(s2[1].clone())).clone(),
+            (PacketValue::SysEx8(s2[1].clone())).clone(),
         ))
         .unwrap(),
     );
@@ -229,20 +233,14 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     assert_eq!(a.active_streams(), 0);
     assembly_values(
         a.feed(&meedee::events::Payload::Ump(
-            (UmpMessage::SysEx7(SysEx7Packet::new(1, 1, vec![1]).unwrap())).clone(),
+            (PacketValue::SysEx7(SysEx7Packet::new(1, 1, vec![1]).unwrap())).clone(),
         ))
         .unwrap(),
     );
-    let clock = UmpMessage::Midi1(
-        Midi1Packet::new(1, AnyMessage::TimingClock(TimingClock::new().unwrap())).unwrap(),
-    );
-    assert!(assembly_values(
-        a.feed(&meedee::events::Payload::Ump((clock).clone()))
-            .unwrap()
-    )
-    .is_empty());
+    let clock = meedee::events::Payload::from(TimingClock::new().unwrap().with_group(1).unwrap());
+    assert!(assembly_values(a.feed(&clock).unwrap()).is_empty());
     assert_eq!(a.active_streams(), 1);
-    let on = UmpMessage::NoteOn(
+    let on = meedee::messages::AnyMessage::NoteOn(
         meedee::messages::NoteOn::new_midi2(60)
             .and_then(|m| m.with_group(1))
             .and_then(|m| m.with_channel(1))
@@ -252,11 +250,14 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
             .unwrap(),
     );
     assert_eq!(
-        assembly_values(a.feed(&meedee::events::Payload::Ump((on).clone())).unwrap()),
+        assembly_values(
+            a.feed(&meedee::events::Payload::Message(on.clone()))
+                .unwrap()
+        ),
         [AssemblyItem::Diagnostic(AssemblyDiagnostic::Interrupted)]
     );
     let mut bounded = Assembler::new(4, 4, 1).unwrap();
-    let start = UmpMessage::SysEx7(SysEx7Packet::new(1, 1, vec![1; 4]).unwrap());
+    let start = PacketValue::SysEx7(SysEx7Packet::new(1, 1, vec![1; 4]).unwrap());
     assembly_values(
         bounded
             .feed(&meedee::events::Payload::Ump((start).clone()))
@@ -267,7 +268,7 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
         assembly_values(
             bounded
                 .feed(&meedee::events::Payload::Ump(
-                    (UmpMessage::SysEx8(SysEx8Packet::new(2, 1, 0, vec![1], false).unwrap()))
+                    (PacketValue::SysEx8(SysEx8Packet::new(2, 1, 0, vec![1], false).unwrap()))
                         .clone()
                 ))
                 .unwrap()
@@ -278,7 +279,7 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
         assembly_values(
             bounded
                 .feed(&meedee::events::Payload::Ump(
-                    (UmpMessage::SysEx7(SysEx7Packet::new(1, 2, vec![1]).unwrap())).clone()
+                    (PacketValue::SysEx7(SysEx7Packet::new(1, 2, vec![1]).unwrap())).clone()
                 ))
                 .unwrap()
         ),
@@ -288,7 +289,7 @@ fn sysex_reassembly_handles_groups_streams_interruptions_abort_and_resource_limi
     assert!(assembly_values(
         bounded
             .feed(&meedee::events::Payload::Ump(
-                (UmpMessage::SysEx7(SysEx7Packet::new(1, 3, vec![]).unwrap())).clone()
+                (PacketValue::SysEx7(SysEx7Packet::new(1, 3, vec![]).unwrap())).clone()
             ))
             .unwrap()
     )
@@ -304,7 +305,7 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
     for p in packets {
         result.extend(assembly_values(
             a.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::FlexData(p)).clone(),
+                (PacketValue::FlexData(p)).clone(),
             ))
             .unwrap(),
         ));
@@ -318,7 +319,7 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
     for p in packetize_stream_text(18, Some(31), text).unwrap() {
         result.extend(assembly_values(
             a.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::Stream(p)).clone(),
+                (PacketValue::Stream(p)).clone(),
             ))
             .unwrap(),
         ));
@@ -336,7 +337,7 @@ fn utf8_text_spans_packets_and_preserves_addressing_without_inventing_a_group() 
     assert_eq!(
         assembly_values(
             a.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::FlexData(bad)).clone()
+                (PacketValue::FlexData(bad)).clone()
             ))
             .unwrap()
         ),
@@ -354,7 +355,7 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
         );
         let t = to_midi2(&original, 16).unwrap();
         assert_eq!(t.status, TranslationStatus::Exact);
-        let r = to_midi1(&t.messages[0], false).unwrap();
+        let r = to_midi1(&t.messages[0].clone().into(), false).unwrap();
         assert_eq!(r.status, TranslationStatus::Exact);
         if v != 0 {
             assert_eq!(r.messages, [original]);
@@ -365,19 +366,19 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
     assert_eq!(scale_up(64, 7, 32).unwrap(), 0x80000000);
     assert_eq!(scale_up(127, 7, 32).unwrap(), 0xffffffff);
     assert_eq!(scale_up(1, 7, 16).unwrap(), 0x200);
-    let v = UmpMessage::ControlChange(
+    let v = meedee::messages::AnyMessage::ControlChange(
         meedee::messages::ControlChange::new_midi2(7, 0x80000001)
             .and_then(|m| m.with_group(1))
             .and_then(|m| m.with_channel(1))
             .unwrap(),
     );
-    let denied = to_midi1(&v, false).unwrap();
+    let denied = to_midi1(&v.clone().into(), false).unwrap();
     assert_eq!(denied.status, TranslationStatus::Quantized);
     assert!(!denied.converted());
-    let allowed = to_midi1(&v, true).unwrap();
+    let allowed = to_midi1(&v.clone().into(), true).unwrap();
     assert!(allowed.converted());
     assert!(matches!(&allowed.messages[0],AnyMessage::ControlChange(v) if v.value()==64));
-    let attributed = UmpMessage::NoteOn(
+    let attributed = meedee::messages::AnyMessage::NoteOn(
         meedee::messages::NoteOn::new_midi2(60)
             .and_then(|m| m.with_group(1))
             .and_then(|m| m.with_channel(1))
@@ -387,10 +388,10 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
             .unwrap(),
     );
     assert_eq!(
-        to_midi1(&attributed, true).unwrap().status,
+        to_midi1(&attributed.clone().into(), true).unwrap().status,
         TranslationStatus::ProfileDependent
     );
-    let bank = UmpMessage::ProgramChange(
+    let bank = meedee::messages::AnyMessage::ProgramChange(
         meedee::messages::ProgramChange::new_midi2(128)
             .and_then(|m| m.with_group(1))
             .and_then(|m| m.with_channel(16))
@@ -400,7 +401,7 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
             .unwrap(),
     );
     assert_eq!(
-        to_midi1(&bank, false)
+        to_midi1(&bank.clone().into(), false)
             .unwrap()
             .messages
             .iter()
@@ -432,11 +433,7 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
         }
         let packet = decode(&words, true).unwrap();
         assert_eq!(encode(&packet).unwrap(), words);
-        assembly_values(
-            assembler
-                .feed(&meedee::events::Payload::Ump((packet).clone()))
-                .unwrap(),
-        );
+        assembly_values(assembler.feed(&packet).unwrap());
         assert!(assembler.retained_bytes() <= 64);
         assert!(assembler.active_streams() <= 2);
     }
@@ -447,7 +444,7 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
     let start = FlexData::new(1, 1, None, 1, 0, vec![0x61616161; 3]).unwrap();
     assembly_values(
         text.feed(&meedee::events::Payload::Ump(
-            (UmpMessage::FlexData(start)).clone(),
+            (PacketValue::FlexData(start)).clone(),
         ))
         .unwrap(),
     );
@@ -455,7 +452,7 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
     for _ in 0..31 {
         assembly_values(
             text.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::FlexData(cont.clone())).clone(),
+                (PacketValue::FlexData(cont.clone())).clone(),
             ))
             .unwrap(),
         );
@@ -464,7 +461,7 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
     assert_eq!(
         assembly_values(
             text.feed(&meedee::events::Payload::Ump(
-                (UmpMessage::FlexData(end)).clone()
+                (PacketValue::FlexData(end)).clone()
             ))
             .unwrap()
         ),
@@ -479,18 +476,20 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
         );
         let up = to_midi2(&original, 16).unwrap();
         assert_eq!(
-            to_midi1(&up.messages[0], false).unwrap().messages,
+            to_midi1(&up.messages[0].clone().into(), false)
+                .unwrap()
+                .messages,
             [original]
         );
     }
-    let null = UmpMessage::Midi2RegisteredController(
-        Midi2RegisteredController::new(1, 1, 127, 127, 0).unwrap(),
+    let null = meedee::messages::AnyMessage::RegisteredController(
+        RegisteredController::new(1, 1, 127, 127, 0).unwrap(),
     );
     assert_eq!(
-        to_midi1(&null, false).unwrap().status,
+        to_midi1(&null.clone().into(), false).unwrap().status,
         TranslationStatus::Unsupported
     );
-    let zero = UmpMessage::NoteOn(
+    let zero = meedee::messages::AnyMessage::NoteOn(
         meedee::messages::NoteOn::new_midi2(60)
             .and_then(|m| m.with_group(1))
             .and_then(|m| m.with_channel(1))
@@ -499,9 +498,9 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
             .and_then(|m| m.with_attribute_data(0))
             .unwrap(),
     );
-    assert!(!to_midi1(&zero, false).unwrap().converted());
+    assert!(!to_midi1(&zero.clone().into(), false).unwrap().converted());
     assert!(
-        matches!(&to_midi1(&zero,true).unwrap().messages[0],AnyMessage::NoteOn(v) if v.velocity()==1)
+        matches!(&to_midi1(&zero.clone().into(),true).unwrap().messages[0],AnyMessage::NoteOn(v) if v.velocity()==1)
     );
 }
 

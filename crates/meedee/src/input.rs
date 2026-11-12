@@ -285,7 +285,7 @@ impl Core {
     fn open_connection(&mut self, port: Option<&Port>, name: &str) -> io::Result<()> {
         self.client()?;
         let stream = events::fresh_identity("input")?;
-        let decoder = Decoder::new(stream.clone(), self.options.protocol, self.sysex_limit)?;
+        let decoder = Decoder::new(stream.clone(), self.options.encoding, self.sysex_limit)?;
         let queue = self.queue.clone();
         let client = self.client.take().expect("initialized input");
         let callback = move |packet: transport::ReceivedPacket| {
@@ -616,10 +616,10 @@ mod tests {
     use super::*;
     use crate::messages::{AnyMessage, Message};
 
-    fn input(protocol: transport::Protocol) -> Core {
+    fn input(encoding: transport::Encoding) -> Core {
         let mut input = Core::new();
-        input.options.protocol = protocol;
-        input.decoder = Some(Decoder::new("keyboard".into(), protocol, 1024).unwrap());
+        input.options.encoding = encoding;
+        input.decoder = Some(Decoder::new("keyboard".into(), encoding, 1024).unwrap());
         input.stream = Some("keyboard".into());
         input.clock =
             Some(Clock::new("test-clock".into(), 1, 1_000_000_000, "test".into(), None).unwrap());
@@ -634,7 +634,7 @@ mod tests {
     }
     #[test]
     fn cancellation_preserves_queued_input_and_closure_is_distinct_from_timeout() {
-        let core = input(transport::Protocol::Midi1).with_channel(2).unwrap();
+        let core = input(transport::Encoding::Bytes).with_channel(2).unwrap();
         let queue = core.queue.clone();
         let start = Instant::now();
         queue.push(packet(0, &[0x90, 60, 90, 0x91, 62, 90]));
@@ -653,7 +653,7 @@ mod tests {
             panic!("selected message");
         };
         assert!(
-            matches!(message.as_ref(), Payload::Midi1(AnyMessage::NoteOn(m)) if m.note() == 62)
+            matches!(message.as_ref(), Payload::Message(AnyMessage::NoteOn(m)) if m.note() == 62)
         );
         assert!(input.receive(Some(Duration::ZERO), None).unwrap().is_none());
         input.close().unwrap();
@@ -670,7 +670,7 @@ mod tests {
 
     #[test]
     fn attached_recording_runs_without_receiving_and_has_independent_capacity() {
-        let core = input(transport::Protocol::Midi1)
+        let core = input(transport::Encoding::Bytes)
             .with_receive_limits(1, 8192, 1024)
             .unwrap();
         let queue = core.queue.clone();
@@ -724,7 +724,7 @@ mod tests {
 
     #[test]
     fn recording_stop_accounts_for_a_lost_tail_once() {
-        let core = input(transport::Protocol::Midi1)
+        let core = input(transport::Encoding::Bytes)
             .with_receive_limits(2, 8192, 1024)
             .unwrap();
         let queue = core.queue.clone();
@@ -775,7 +775,7 @@ mod tests {
 
     #[test]
     fn input_iterates_messages_with_provenance_and_channel_filtering() {
-        let mut input = input(transport::Protocol::Midi1)
+        let mut input = input(transport::Encoding::Bytes)
             .with_channels([1, 3])
             .unwrap();
         input
@@ -784,11 +784,11 @@ mod tests {
         input.close().unwrap();
         let messages: Vec<_> = input.collect();
         assert_eq!(messages.len(), 3);
-        assert!(matches!(&messages[0],Payload::Midi1(AnyMessage::NoteOn(m)) if m.note()==60));
-        assert!(matches!(&messages[1],Payload::Midi1(AnyMessage::NoteOn(m)) if m.note()==64));
+        assert!(matches!(&messages[0],Payload::Message(AnyMessage::NoteOn(m)) if m.note()==60));
+        assert!(matches!(&messages[1],Payload::Message(AnyMessage::NoteOn(m)) if m.note()==64));
         assert!(matches!(
             &messages[2],
-            Payload::Midi1(AnyMessage::TimingClock(_))
+            Payload::Message(AnyMessage::TimingClock(_))
         ));
         for message in messages {
             assert_eq!(message.stream(), Some("keyboard"));
@@ -798,7 +798,7 @@ mod tests {
     }
     #[test]
     fn ump_channels_filter_without_dropping_system_messages() {
-        let mut input = input(transport::Protocol::Ump).with_channel(3).unwrap();
+        let mut input = input(transport::Encoding::Ump).with_channel(3).unwrap();
         for (sequence, words) in [vec![0x2090_3c5a], vec![0x2192_3e46], vec![0x10f8_0000]]
             .into_iter()
             .enumerate()
@@ -812,13 +812,11 @@ mod tests {
         input.close().unwrap();
         let messages: Vec<_> = input.collect();
         assert_eq!(messages.len(), 2);
-        assert!(
-            matches!(&messages[0],Payload::Ump(crate::ump::UmpMessage::Midi1(m)) if m.group()==2)
-        );
+        assert!(matches!(&messages[0],Payload::Message(m) if m.group()==Some(2)));
     }
     #[test]
     fn queue_loss_is_reported_during_silence_without_double_counting_next_packet() {
-        let mut input = input(transport::Protocol::Midi1)
+        let mut input = input(transport::Encoding::Bytes)
             .with_receive_limits(1, 3, 1024)
             .unwrap();
         input.queue.push(packet(0, &[0x90, 60, 90]));
@@ -841,7 +839,7 @@ mod tests {
 
     #[test]
     fn bounded_queue_reports_tail_loss_after_accepted_prefix() {
-        let mut input = input(transport::Protocol::Midi1)
+        let mut input = input(transport::Encoding::Bytes)
             .with_receive_limits(1, 3, 1024)
             .unwrap();
         input.queue.push(packet(0, &[0x90, 60, 90]));
@@ -860,7 +858,7 @@ mod tests {
     }
     #[test]
     fn gaps_reset_partial_messages_and_are_not_reported_twice_on_close() {
-        let mut input = input(transport::Protocol::Midi1).with_channel(2).unwrap();
+        let mut input = input(transport::Encoding::Bytes).with_channel(2).unwrap();
         input.queue.push(packet(0, &[0x90, 60]));
         input.queue.push(packet(2, &[90, 0x91, 64, 70]));
         input.queue.state.lock().unwrap().lost = 1;
@@ -880,7 +878,7 @@ mod tests {
             .iter()
             .filter_map(|i| match i {
                 Item::Message(m) => match m.as_ref() {
-                    Payload::Midi1(AnyMessage::NoteOn(n)) => Some(n.note()),
+                    Payload::Message(AnyMessage::NoteOn(n)) => Some(n.note()),
                     _ => None,
                 },
                 _ => None,
@@ -890,7 +888,7 @@ mod tests {
     }
     #[test]
     fn errors_iterator_retains_malformed_and_truncated_diagnostics() {
-        let mut input = input(transport::Protocol::Midi1).with_channels([]).unwrap();
+        let mut input = input(transport::Encoding::Bytes).with_channels([]).unwrap();
         input.queue.push(packet(0, &[1, 0x90, 60]));
         input.close().unwrap();
         let items: Vec<_> = input
@@ -906,7 +904,7 @@ mod tests {
     }
     #[test]
     fn drop_retires_queue_without_ownership_cycle() {
-        let input = input(transport::Protocol::Midi1);
+        let input = input(transport::Encoding::Bytes);
         let weak = Arc::downgrade(&input.queue);
         drop(input);
         assert!(weak.upgrade().is_none());
@@ -917,11 +915,11 @@ mod tests {
     }
     #[test]
     fn default_iteration_continues_after_malformed_input_from_callback_queue() {
-        let mut input = input(transport::Protocol::Midi1);
+        let mut input = input(transport::Encoding::Bytes);
         let queue = input.queue.clone();
         let producer = std::thread::spawn(move || queue.push(packet(0, &[1, 0x90, 60, 90])));
         assert!(
-            matches!(input.next(), Some(Payload::Midi1(AnyMessage::NoteOn(m))) if m.note()==60)
+            matches!(input.next(), Some(Payload::Message(AnyMessage::NoteOn(m))) if m.note()==60)
         );
         producer.join().unwrap();
         input.close().unwrap();
@@ -930,7 +928,7 @@ mod tests {
 
     #[test]
     fn memory_recording_stops_without_closing_input() {
-        let core = input(transport::Protocol::Midi1);
+        let core = input(transport::Encoding::Bytes);
         core.queue.push(packet(0, &[0x90, 60, 90]));
         let queue = core.queue.clone();
         let mut input = Input::decoded(core);
@@ -950,7 +948,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert!(
-                matches!(item, Item::Message(m) if matches!(*m, Payload::Midi1(AnyMessage::NoteOn(ref m)) if m.note() == note))
+                matches!(item, Item::Message(m) if matches!(*m, Payload::Message(AnyMessage::NoteOn(ref m)) if m.note() == note))
             );
         }
         assert_eq!(recorder.records().unwrap(), records);
@@ -960,7 +958,7 @@ mod tests {
     #[test]
     fn recording_preserves_messages_loss_and_finalization_diagnostics() {
         use crate::archive::Record;
-        let input = input(transport::Protocol::Midi1);
+        let input = input(transport::Encoding::Bytes);
         input.queue.push(packet(0, &[0x90, 60, 90]));
         input.queue.push(packet(2, &[0x90, 62]));
         let recording = Input::decoded(input).record(Duration::ZERO).unwrap();
@@ -983,7 +981,7 @@ mod tests {
 
     #[test]
     fn recording_retains_terminal_receive_failure_as_a_discontinuity() {
-        let input = input(transport::Protocol::Midi1);
+        let input = input(transport::Encoding::Bytes);
         input.queue.push(packet(u64::MAX, &[0x90, 60, 90]));
         let recording = Input::decoded(input).record(Duration::ZERO).unwrap();
         assert!(
@@ -999,7 +997,7 @@ mod tests {
 
     #[test]
     fn recording_times_out_on_silence_and_releases_the_receiver() {
-        let input = input(transport::Protocol::Midi1);
+        let input = input(transport::Encoding::Bytes);
         let queue = Arc::downgrade(&input.queue);
         let recording = Input::decoded(input)
             .record(Duration::from_millis(1))
@@ -1018,7 +1016,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let first = input(transport::Protocol::Midi1);
+        let first = input(transport::Encoding::Bytes);
         first.queue.push(packet(0, &[0x90, 60, 90, 0x80, 60, 0]));
         let recording = Input::decoded(first)
             .record_to(Duration::ZERO, &path, false)
@@ -1032,10 +1030,10 @@ mod tests {
             recording.records
         );
         assert!(
-            matches!(Input::decoded(input(transport::Protocol::Midi1)).record_to(Duration::ZERO, &path, false).unwrap_err(), crate::midi::Error::Io(e) if e.kind() == io::ErrorKind::AlreadyExists)
+            matches!(Input::decoded(input(transport::Encoding::Bytes)).record_to(Duration::ZERO, &path, false).unwrap_err(), crate::midi::Error::Io(e) if e.kind() == io::ErrorKind::AlreadyExists)
         );
         assert_eq!(std::fs::read(&path).unwrap(), original);
-        let second = Input::decoded(input(transport::Protocol::Midi1))
+        let second = Input::decoded(input(transport::Encoding::Bytes))
             .record_to(Duration::ZERO, &path, true)
             .unwrap();
         assert_eq!(
@@ -1051,7 +1049,7 @@ mod tests {
 
     #[test]
     fn terminal_decode_error_stops_iteration() {
-        let mut input = input(transport::Protocol::Midi1);
+        let mut input = input(transport::Encoding::Bytes);
         input.queue.push(packet(u64::MAX, &[0x90, 60, 90]));
         assert!(input.with_errors().next().unwrap().is_err());
         assert!(input.with_errors().next().is_none());

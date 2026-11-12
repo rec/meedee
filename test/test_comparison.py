@@ -134,7 +134,7 @@ def test_clip_tolerance_compares_cumulative_ticks_and_retains_configuration() ->
             ump.DeltaClockstamp(ticks=0),
             ump.start_of_clip(),
             ump.DeltaClockstamp(ticks=tick),
-            ump.Midi1Packet(group=1, message=messages.TimingClock()),
+            messages.TimingClock().replace(group=1),
             ump.DeltaClockstamp(ticks=0),
             ump.end_of_clip(),
         ]:

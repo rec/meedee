@@ -106,7 +106,7 @@ pub fn identify_with(
     }
     let wire = IdentityRequest::new(options.device_id.into())?.encode()?;
     report.uncertain_send = true;
-    if let Err(e) = output.send(Payload::Midi1(AnyMessage::SysEx(SysEx::new(
+    if let Err(e) = output.send(Payload::Message(AnyMessage::SysEx(SysEx::new(
         wire[1..wire.len() - 1].to_vec(),
     )?))) {
         report.error(&e);
@@ -141,7 +141,7 @@ pub fn identify_with(
                 return Ok(report);
             }
             Item::Message(m) if m.stream() == Some(stream) => {
-                if let Payload::Midi1(AnyMessage::SysEx(reply)) = m.as_ref() {
+                if let Payload::Message(AnyMessage::SysEx(reply)) = m.as_ref() {
                     if is_identity_reply(reply.data())
                         && (options.device_id == 127 || reply.data()[1] == options.device_id)
                     {

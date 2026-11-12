@@ -1,7 +1,7 @@
 #![cfg(target_os = "macos")]
 
 use meedee::transport::{
-    Error, Input, InputOptions, Output, OutputOptions, Packet, Protocol, TimestampMode,
+    Encoding, Error, Input, InputOptions, Output, OutputOptions, Packet, TimestampMode,
 };
 use meedee_coremidi_fixture::{
     emit, enable, endpoint_exists, fail_disposal, fail_query, fail_send_after,
@@ -33,13 +33,13 @@ fn unopened_diagnostics_survive_close_without_opening_native_clients() {
 fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
     use meedee::{events::InputItem, midi};
     enable();
-    for protocol in [Protocol::Midi1, Protocol::Ump] {
-        let name = format!("raw-input-{protocol:?}");
+    for encoding in [Encoding::Bytes, Encoding::Ump] {
+        let name = format!("raw-input-{encoding:?}");
         let mut input = midi::Input::new()
             .raw()
             .unwrap()
             .with_transport(InputOptions {
-                protocol,
+                encoding,
                 ..InputOptions::default()
             })
             .unwrap()
@@ -48,7 +48,7 @@ fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
             .create_virtual(&name)
             .unwrap();
         let output = Output::new(OutputOptions {
-            protocol,
+            encoding,
             ..OutputOptions::default()
         })
         .unwrap();
@@ -59,7 +59,7 @@ fn high_level_raw_input_preserves_fragments_and_reports_queue_loss() {
             .find(|p| p.name() == name)
             .unwrap();
         let output = output.connect(&port).unwrap();
-        let packet = if protocol == Protocol::Midi1 {
+        let packet = if encoding == Encoding::Bytes {
             Packet::Bytes(vec![0x90, 60])
         } else {
             Packet::Ump(vec![0x40903c00, 0xc0000000])
@@ -338,18 +338,18 @@ fn high_level_callbacks_report_native_loss_during_silence_and_close_failure() {
 fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
     use meedee::{events::InputItem, messages::Message, midi};
     enable();
-    for protocol in [Protocol::Midi1, Protocol::Ump] {
+    for encoding in [Encoding::Bytes, Encoding::Ump] {
         for virtual_input in [true, false] {
-            let name = format!("high-level-{protocol:?}-{virtual_input}");
+            let name = format!("high-level-{encoding:?}-{virtual_input}");
             let mut input = midi::Input::new()
                 .with_transport(InputOptions {
-                    protocol,
+                    encoding,
                     ..InputOptions::default()
                 })
                 .unwrap();
             let mut output = midi::Output::new()
                 .with_transport(OutputOptions {
-                    protocol,
+                    encoding,
                     ..OutputOptions::default()
                 })
                 .unwrap();
@@ -375,9 +375,9 @@ fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
             assert!(!input.closed() && !output.closed());
             let stream = input.stream().unwrap().to_owned();
             let clock = input.clock().unwrap().clone();
-            let packet = match protocol {
-                Protocol::Midi1 => Packet::Bytes(vec![0x90, 60, 100]),
-                Protocol::Ump => Packet::Ump(vec![0x40903c00, 0xc0000000]),
+            let packet = match encoding {
+                Encoding::Bytes => Packet::Bytes(vec![0x90, 60, 100]),
+                Encoding::Ump => Packet::Ump(vec![0x40903c00, 0xc0000000]),
             };
             output.send(packet.clone()).unwrap();
             let received = input
@@ -390,10 +390,12 @@ fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
             assert!(message.timestamp().is_some());
             assert_eq!(message.stream(), Some(input.stream().unwrap()));
             match message.as_ref() {
-                meedee::events::Payload::Midi1(meedee::messages::AnyMessage::NoteOn(v)) => {
+                meedee::events::Payload::Message(meedee::messages::AnyMessage::NoteOn(v))
+                    if v.version() == 1 =>
+                {
                     assert_eq!(v.velocity(), 100)
                 }
-                meedee::events::Payload::Ump(meedee::ump::UmpMessage::NoteOn(v)) => {
+                meedee::events::Payload::Message(meedee::messages::AnyMessage::NoteOn(v)) => {
                     assert_eq!(v.velocity(), 0xc000)
                 }
                 _ => panic!("unexpected decoded message"),
@@ -417,17 +419,17 @@ fn high_level_virtual_ports_preserve_messages_and_terminal_close() {
 #[test]
 fn failed_discovery_returns_no_snapshot_and_allows_explicit_rediscovery() {
     enable();
-    for protocol in [Protocol::Midi1, Protocol::Ump] {
-        let name = format!("discovery-recovery-{protocol:?}");
+    for encoding in [Encoding::Bytes, Encoding::Ump] {
+        let name = format!("discovery-recovery-{encoding:?}");
         let input = Input::new(InputOptions {
-            protocol,
+            encoding,
             ..InputOptions::default()
         })
         .unwrap()
         .create_virtual(&name, |_| {})
         .unwrap();
         let output = Output::new(OutputOptions {
-            protocol,
+            encoding,
             ..OutputOptions::default()
         })
         .unwrap();
@@ -594,17 +596,17 @@ fn simultaneous_raw_and_compound_sends_do_not_interleave_command_messages() {
 #[test]
 fn ffi_round_trip_preserves_bytes_ump_clocks_and_client_ownership() {
     enable();
-    for (protocol, packet) in [
-        (Protocol::Midi1, Packet::Bytes(vec![0x90, 60, 100])),
-        (Protocol::Ump, Packet::Ump(vec![0x40903c00, 0xc0000000])),
+    for (encoding, packet) in [
+        (Encoding::Bytes, Packet::Bytes(vec![0x90, 60, 100])),
+        (Encoding::Ump, Packet::Ump(vec![0x40903c00, 0xc0000000])),
     ] {
         for timestamps in [TimestampMode::Absolute, TimestampMode::Off] {
             let options = InputOptions {
-                protocol,
+                encoding,
                 timestamps,
                 ..InputOptions::default()
             };
-            let name = format!("fixture-{protocol:?}-{timestamps:?}");
+            let name = format!("fixture-{encoding:?}-{timestamps:?}");
             let (sender, receiver) = mpsc::channel();
             let input = Input::new(options)
                 .unwrap()
@@ -613,7 +615,7 @@ fn ffi_round_trip_preserves_bytes_ump_clocks_and_client_ownership() {
                 })
                 .unwrap();
             let output = Output::new(OutputOptions {
-                protocol: options.protocol,
+                encoding: options.encoding,
                 backend: options.backend,
             })
             .unwrap();
@@ -627,7 +629,7 @@ fn ffi_round_trip_preserves_bytes_ump_clocks_and_client_ownership() {
             drop(Input::new(options).unwrap());
             drop(
                 Output::new(OutputOptions {
-                    protocol: options.protocol,
+                    encoding: options.encoding,
                     backend: options.backend,
                 })
                 .unwrap(),
@@ -652,14 +654,14 @@ fn ffi_round_trip_preserves_bytes_ump_clocks_and_client_ownership() {
 #[test]
 fn ffi_input_connect_and_virtual_output_use_cloned_source_metadata() {
     enable();
-    for protocol in [Protocol::Midi1, Protocol::Ump] {
+    for encoding in [Encoding::Bytes, Encoding::Ump] {
         let options = InputOptions {
-            protocol,
+            encoding,
             ..InputOptions::default()
         };
-        let name = format!("fixture-source-{protocol:?}");
+        let name = format!("fixture-source-{encoding:?}");
         let output = Output::new(OutputOptions {
-            protocol: options.protocol,
+            encoding: options.encoding,
             backend: options.backend,
         })
         .unwrap()
@@ -678,7 +680,7 @@ fn ffi_input_connect_and_virtual_output_use_cloned_source_metadata() {
                 sender.send(packet).unwrap();
             })
             .unwrap();
-        let packet = if protocol == Protocol::Midi1 {
+        let packet = if encoding == Encoding::Bytes {
             Packet::Bytes(vec![0x90, 60, 100])
         } else {
             Packet::Ump(vec![0x40903c00, 0xc0000000])
@@ -737,7 +739,7 @@ fn failed_input_disposal_retains_callback_context_and_suppresses_delivery() {
 fn ump_send_reports_an_accepted_prefix_and_does_not_retry_after_failure() {
     enable();
     let options = InputOptions {
-        protocol: Protocol::Ump,
+        encoding: Encoding::Ump,
         ..InputOptions::default()
     };
     let (sender, receiver) = mpsc::channel();
@@ -749,7 +751,7 @@ fn ump_send_reports_an_accepted_prefix_and_does_not_retry_after_failure() {
         })
         .unwrap();
     let output = Output::new(OutputOptions {
-        protocol: options.protocol,
+        encoding: options.encoding,
         backend: options.backend,
     })
     .unwrap();

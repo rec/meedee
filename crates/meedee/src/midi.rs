@@ -5,7 +5,7 @@ pub use crate::input::{Input, InputErrors, Recording, RecordingOptions};
 pub use crate::output::{select_port_index, OutputState};
 pub use crate::output::{Output, OutputSource, OutputValue, PlaybackOptions};
 pub use crate::transport::subprocess::SubprocessOptions;
-pub use crate::transport::{compiled_backends, Backend, Port, Protocol, TimestampMode};
+pub use crate::transport::{compiled_backends, Backend, Encoding, Port, TimestampMode};
 
 /// A high-level operation failure, retaining the native category and cause.
 #[derive(Debug)]

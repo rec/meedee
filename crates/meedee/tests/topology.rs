@@ -56,7 +56,7 @@ fn oversized_input_scan_stops_before_discovering_outputs() {
 fn endpoint(name: &str) -> Endpoint {
     Endpoint::new(
         "test".into(),
-        "midi1".into(),
+        "bytes".into(),
         "input".into(),
         1,
         name.into(),

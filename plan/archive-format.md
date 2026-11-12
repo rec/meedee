@@ -1,4 +1,4 @@
-# meedee binary archive version 1
+# meedee binary archive version 2
 
 Approved binary format for slices 9–10. Extension: `.meedee`.
 
@@ -10,7 +10,7 @@ None.
 
 All integers and UMP words are big endian. Integers have the widths below;
 there are no host-layout structs, floats, pickles or implicit compression.
-The 12-byte header is ASCII `MEEDEE`, CR LF, version u16 `1`, reserved u16 `0`.
+The 12-byte header is ASCII `MEEDEE`, CR LF, version u16 `2`, reserved u16 `0`.
 Other headers/versions are rejected. A frame consists of payload length u32,
 that many payload bytes, then CRC u32. CRC is CRC-32/ISO-HDLC over the payload
 only: polynomial 0x04C11DB7 (reflected 0xEDB88320), initial/final XOR 0xFFFFFFFF.
@@ -57,11 +57,18 @@ A long-running capture that exhausts these bounds must start another archive.
 
 ## Message representations
 
-1. One complete primitive MIDI 1 message, including status and SysEx F0/F7
+1. Group byte (0 means absent, otherwise 1..16), then one complete primitive MIDI 1 message, including status and SysEx F0/F7
    framing. It is not a running-status stream or a sequence of commands.
-2. Exactly one UMP (one to four words), serialized big endian. Opaque UMPs can
+2. Exactly one UMP packet value (one to four words), serialized big endian. Channel and system messages use semantic representations 1/4. Opaque UMPs can
    be preserved when explicitly requested, without asserting semantic validity.
-3. Semantic command ID u16 followed by its fixed-order signed i64 fields:
+3. Group byte (0 means absent, otherwise 1..16), then semantic command ID u16 followed by its fixed-order signed i64 fields.
+4. One semantic MIDI 2 message, stored as its two native UMP words in big endian order.
+
+Representation 1 retains a complete SysEx value, including an optional group,
+as a single logical event. Representation 2 retains individual SysEx7/SysEx8
+fragments. These categories do not imply assembly or conversion during reading.
+
+Command fields:
 
 | Command ID | Value | Fields |
 | --- | --- | --- |
@@ -117,7 +124,7 @@ The review compared this layout with the Rust encoder/decoder, Python bridge,
 existing corruption/recovery checks and independent byte vectors. Header/version,
 integer widths/endianness, record/command IDs, timestamp absence, signed ticks,
 CRC framing and completion counts agree. The new shared fixture
-`crates/meedee/tests/fixtures/archive-v1.txt` is framed independently using fixed
+`crates/meedee/tests/fixtures/archive-v2.txt` is framed independently using fixed
 field values, struct packing and the standard CRC implementation, rather than
 meedee's writer. Rust and Python read the same vectors and rewrite valid inputs
 byte for byte, including all nine commands and future Event representations/IDs.

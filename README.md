@@ -349,12 +349,12 @@ regressions are quality findings. No offline command opens a MIDI client.
 ### Passive live monitoring
 
 ```sh
-meedee monitor "Exact input port name" --protocol midi1 --duration 30
-meedee monitor "Exact UMP input name" --protocol ump --group 16 --channel 1 --output json
+meedee monitor "Exact input port name" --encoding bytes --duration 30
+meedee monitor "Exact UMP input name" --encoding ump --group 16 --channel 1 --output json
 ```
 
 The name must match exactly one input in the selected backend's current discovery
-snapshot; no first-port fallback or automatic reconnect is performed. Protocol
+snapshot; no first-port fallback or automatic reconnect is performed. Encoding
 selection is required; `--backend` can select a compiled backend by its API name
 (for example `CoreMidi` or `CoreMidiUmp`). Isolation remains enabled by default.
 This command opens only input and sends no MIDI. Stop with Ctrl-C or `--duration`
@@ -605,7 +605,7 @@ directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
 identifier. Use `out.send(...)` for messages, compound commands or encoded packets.
 Use primitive `encode()` for byte encoding and `expand()` to inspect commands.
-UMP outputs reject these MIDI 1.0 commands rather than translating silently.
+On UMP outputs, give the command a group to expand it into MIDI 1 UMPs.
 
 `send` prevents interleaving on its connection. `CompoundSendError`
 reports the known completed-message prefix and total count. A failed message
@@ -642,24 +642,34 @@ PrimitiveMessage and Command subtraits for encoding and expansion.
 ## UMP and MIDI 2.0
 
 ```python
-from meedee import messages, ump
+from meedee import messages, translation, ump
 
 note = messages.NoteOn(60, 50_000, channel=1, version=2)
 words = ump.encode(note)  # Immutable tuple of 32-bit words.
 assert ump.decode(words) == note
-report = ump.to_midi1(note)
-assert report.status == ump.TranslationStatus.Quantized
+report = translation.to_midi1(note)
+assert report.status == translation.TranslationStatus.Quantized
 assert not report.converted  # Explicit allow_loss=True is needed for output.
 ```
 
-This pure module includes groupless utility/stream packets, grouped MIDI 1.0,
-all MIDI 2.0 channel-voice families, SysEx7/8 packetization and bounded assembly,
+The pure `ump` codec handles grouped MIDI 1 and native MIDI 2 values from
+`messages`, plus groupless utility/stream packets, SysEx7/8 packetization and bounded assembly,
 Mixed Data Set packets, Flex Data and endpoint/function-block message codecs.
 Groups/channels use 1–16 and programs 1–128; native-width values remain integers.
 The incremental Decoder reports malformed packets and recovers at their declared
 word boundaries. Optional OpaquePacket preservation retains complete rejected or
 unknown layouts without claiming semantic validity or safe device transmission.
 Byte conversion requires an explicit byte order. JR ticks are not host nanoseconds.
+
+For MIDI 1 over UMP, use `messages.NoteOn(60, 90, channel=2, group=3)`.
+Decoding returns that same class and native value. Remove its group explicitly
+before byte encoding. MIDI 2-only musical classes, such as
+`messages.PerNotePitchBend`, also live in `messages`. Output applies its channel
+override to all semantic channel messages. Grouped MIDI 1 commands and complete
+SysEx use one bounded UMP-stream handoff per logical value; incoming data
+fragments remain separate until explicitly assembled. The `translation` module
+owns conversion and loss reports. Archives use the current v2 layout, without
+legacy readers.
 
 Assembler defaults to 1 MiB per message, 8 MiB total retained payload and 64
 active streams. It reports interruption, abort, overflow and truncation without
@@ -698,11 +708,11 @@ or isolated workers. Discovery, explicit connection or actual I/O initializes th
 resource on first use. Empty or declaration-only playback opens no MIDI ports.
 Initialization errors therefore occur at first use. Constructors accept
 keyword-only settings. Defaults are
-`protocol=Protocol.Midi1`, `backend=None`, and `timeout=5.0`. Inputs default to
+`encoding=Encoding.Bytes`, `backend=None`, and `timeout=5.0`. Inputs default to
 `run_in_subprocess=False` and `raw=False`; outputs default to
 `run_in_subprocess=False`, `channel=None`, `port=None`, and `bpm=None`.
 Input additionally accepts `timestamps=TimestampMode.Absolute` and
-`receive_byte_limit=8_388_608`. Choose `Protocol.Ump` explicitly for UMP, and
+`receive_byte_limit=8_388_608`. Choose `Encoding.Ump` explicitly for UMP, and
 send an immutable `UmpPacket(words=[...])`. There is no automatic protocol
 selection, conversion or backend fallback. `compiled_backends()` reports build
 support, not service, driver or device health. An unavailable backend raises
@@ -735,7 +745,7 @@ packets. Both modes support callbacks or bounded `receive()` queues.
 `Output.send()` accepts unsigned-byte buffers,
 including bytearray and memoryview, or `UmpPacket`; mutable and strided buffers
 are snapshotted. Send
-validation checks protocol, size and UMP framing, not full MIDI semantics.
+validation checks encoding, size and UMP framing, not full MIDI semantics.
 Success means backend acceptance, not physical delivery. UMP batch failures
 report an accepted prefix; the failed packet may also have had effects. There
 is no automatic resend, reconnection, tuning reset or all-notes-off on close.
@@ -965,7 +975,7 @@ from meedee import events, messages, routing
 
 router = routing.Router(routes=[routing.Route(
     name="keys-to-synth", source="keys", destination="synth",
-    protocol="midi1", remap_channel=2,
+    encoding="bytes", remap_channel=2,
 )])
 router.feed((messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="keys"))
 delivery = router.peek()
@@ -977,8 +987,8 @@ delivery = router.peek()
 Install the optional CLI extra for offline archive preview or live forwarding:
 
 ```bash
-meedee route-preview capture.meedee --stream keys --protocol midi1 --destinations synth --remap-channel 2
-meedee patch "Keyboard" --protocol midi1 --destinations "Synthesizer" --remap-channel 2
+meedee route-preview capture.meedee --stream keys --encoding bytes --destinations synth --remap-channel 2
+meedee patch "Keyboard" --encoding bytes --destinations "Synthesizer" --remap-channel 2
 ```
 
 Preview opens no ports and labels simulated deliveries `planned`. Patch uses exact
@@ -1001,8 +1011,8 @@ remain unqualified. See [the routing contract](plan/api.md#static-protocol-aware
 The optional CLI can list ports or watch discovery without opening endpoints:
 
 ```bash
-meedee ports --protocol midi1 --output json
-meedee watch-ports --protocol ump --interval 1 --duration 60
+meedee ports --encoding bytes --output json
+meedee watch-ports --encoding ump --interval 1 --duration 60
 ```
 
 Watch prints an initial baseline, changes and a final bounded summary. Unchanged
@@ -1012,7 +1022,7 @@ clean completion/Ctrl-C return 0. Failed initial discovery is explicitly marked
 uninitialized rather than presented as an empty port list.
 
 `meedee.topology` provides the same pure Rust/Python snapshot/change model.
-Descriptors compare backend, protocol, direction, backend ID and name, preserving
+Descriptors compare backend, encoding, direction, backend ID and name, preserving
 duplicate counts. A rename is removal/addition, not proof of device continuity.
 `Tracker.observe(...)` accepts complete descriptor lists; the first accepted scan
 establishes a baseline without inventing arrivals.
@@ -1023,7 +1033,7 @@ the first explicit poll, reuses them, and releases its references on close:
 ```python
 from meedee.discovery import Poller
 
-with Poller(protocol="midi1") as poller:
+with Poller(encoding="bytes") as poller:
     report = poller.poll()
     if report.stopped:
         print(report.reason)
@@ -1083,11 +1093,11 @@ experimental local identity can be used during development:
 
 ```sh
 meedee ci-browse --input-port 'Exact input name' --output-port 'Exact output name' \
-  --protocol midi1 --manufacturer 7d0000 --family 1 --model 1 --revision 00000000
+  --encoding bytes --manufacturer 7d0000 --family 1 --model 1 --revision 00000000
 ```
 
 Those identity fields describe the local browser, not the device being sought.
-For UMP, use `--protocol ump --group N` with the intended group (1..16). A fresh
+For UMP, use `--encoding ump --group N` with the intended group (1..16). A fresh
 random MUID is generated for each scan. Both ports must be uniquely named;
 process isolation is enabled by default. `--output json` produces a final report.
 The default discovery window is 3 seconds, endpoint timeout 1 second and overall
@@ -1112,17 +1122,17 @@ manual clock. It opens no devices and starts no threads or MIDI lifecycle:
 from meedee import events, messages, testing
 
 clock = events.Clock(identity="test-clock", origin="manual")
-receiver = testing.Input(stream="keys", protocol="midi1")
+receiver = testing.Input(stream="keys", encoding="bytes")
 receiver.inject(b"\x90\x3c\x64", clock=clock, timestamp_ns=10)
 event = receiver.receive()  # Decoded by the production packet decoder.
 
-sink = testing.Output(protocol="midi1")
+sink = testing.Output(encoding="bytes")
 if isinstance(event, messages.Message):
     sink(event)
 assert sink.take_packet() == b"\x90\x3c\x64"
 ```
 
-Use `protocol="ump"` with UmpPacket/native UMP message values for MIDI 2 tests.
+Use `encoding="ump"` with UmpPacket/native UMP message values for MIDI 2 tests.
 Queue limits drop newest input while preserving counters and loss diagnostics;
 recorded-output capacity rejects sends without erasing evidence. Explicit
 `lose`, `fail`, `close` and `fail_next_send(accepted=True)` exercise loss,

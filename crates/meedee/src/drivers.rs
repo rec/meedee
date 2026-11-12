@@ -35,7 +35,7 @@ impl Receiver for midi::Input {
 pub trait Sender {
     fn send(&mut self, message: Payload) -> midi::Result<()>;
     fn send_management(&mut self, message: crate::ci::Management) -> midi::Result<()> {
-        self.send(Payload::Midi1(crate::messages::AnyMessage::SysEx(
+        self.send(Payload::Message(crate::messages::AnyMessage::SysEx(
             message.sysex(),
         )))
     }
@@ -137,7 +137,7 @@ pub(crate) mod tests {
     }
     pub fn sysex(data: &[u8]) -> Item {
         Item::Message(Box::new(
-            Payload::Midi1(AnyMessage::SysEx(SysEx::new(data.to_vec()).unwrap()))
+            Payload::Message(AnyMessage::SysEx(SysEx::new(data.to_vec()).unwrap()))
                 .with_stream("s")
                 .unwrap(),
         ))

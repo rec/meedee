@@ -87,23 +87,23 @@ def test_receive_time_rejects_coercion_and_overflow(value: object) -> None:
 
 def test_send_snapshots_unsigned_byte_buffers_including_strides() -> None:
     source = bytearray(b"abc")
-    packet = prepare_send(midi.Protocol.Midi1, source)
+    packet = prepare_send(midi.Encoding.Bytes, source)
     source[0] = 0
     assert packet == b"abc"
-    assert prepare_send(midi.Protocol.Midi1, memoryview(b"axbxc")[::2]) == b"abc"
+    assert prepare_send(midi.Encoding.Bytes, memoryview(b"axbxc")[::2]) == b"abc"
 
 
 @pytest.mark.parametrize(
-    "protocol, packet",
+    "encoding, packet",
     [
-        (midi.Protocol.Midi1, b""),
-        (midi.Protocol.Ump, b"\xf8"),
-        (midi.Protocol.Midi1, midi.UmpPacket(words=[0x20903C64])),
-        (midi.Protocol.Ump, midi.UmpPacket(words=[0x40903C00])),
+        (midi.Encoding.Bytes, b""),
+        (midi.Encoding.Ump, b"\xf8"),
+        (midi.Encoding.Bytes, midi.UmpPacket(words=[0x20903C64])),
+        (midi.Encoding.Ump, midi.UmpPacket(words=[0x40903C00])),
     ],
 )
 def test_send_rejects_wrong_protocol_empty_payload_and_truncated_ump(
-    protocol: midi.Protocol, packet: object
+    encoding: midi.Encoding, packet: object
 ) -> None:
     with pytest.raises(ValueError):
-        prepare_send(protocol, packet)
+        prepare_send(encoding, packet)

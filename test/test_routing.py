@@ -9,13 +9,13 @@ from meedee import archive, events, messages, midi, routing, testing, ump
 
 
 def route(
-    *, protocol: Literal["midi1", "ump"] = "midi1", include_nonchannel: bool = False
+    *, encoding: Literal["bytes", "ump"] = "bytes", include_nonchannel: bool = False
 ) -> routing.Route:
     return routing.Route(
         name="r",
         source="s",
         destination="out",
-        protocol=protocol,
+        encoding=encoding,
         remap_channel=16,
         include_nonchannel=include_nonchannel,
     )
@@ -79,7 +79,7 @@ def test_nonchannel_opt_in_and_group_selection_are_explicit() -> None:
                 name="ump",
                 source="s",
                 destination="out",
-                protocol="ump",
+                encoding="ump",
                 group=2,
                 remap_group=16,
                 channel=1,
@@ -87,24 +87,16 @@ def test_nonchannel_opt_in_and_group_selection_are_explicit() -> None:
         ]
     )
     selected.feed(
-        event(
-            ump.Midi1Packet(
-                group=1, message=messages.NoteOn(channel=1, note=60, velocity=1)
-            )
-        )
+        event(messages.NoteOn(channel=1, note=60, velocity=1).replace(group=1))
     )
     assert selected.peek() is None
     selected.feed(
-        event(
-            ump.Midi1Packet(
-                group=2, message=messages.NoteOn(channel=1, note=60, velocity=0)
-            )
-        )
+        event(messages.NoteOn(channel=1, note=60, velocity=0).replace(group=2))
     )
     delivery = selected.peek()
     assert delivery is not None
-    assert delivery.message == ump.Midi1Packet(
-        group=16, message=messages.NoteOn(channel=1, note=60, velocity=0)
+    assert delivery.message == messages.NoteOn(channel=1, note=60, velocity=0).replace(
+        group=16
     )
 
 
@@ -141,7 +133,7 @@ def test_failure_preserves_known_prefix_and_uncertain_delivery() -> None:
 
 
 def test_file_only_packets_and_commands_are_not_implicitly_sent() -> None:
-    router = routing.Router(routes=[route(protocol="ump", include_nonchannel=True)])
+    router = routing.Router(routes=[route(encoding="ump", include_nonchannel=True)])
     with pytest.raises(ValueError, match="file-only"):
         router.feed(event(ump.DeltaClockstamp(ticks=1)))
     router = routing.Router(routes=[route()])
@@ -180,7 +172,7 @@ def test_preview_bounds_examples_and_never_calls_prefix_complete() -> None:
             BytesIO(capture()),
             routes=[
                 routing.Route(
-                    name="r", source="missing", destination="out", protocol="midi1"
+                    name="r", source="missing", destination="out", encoding="bytes"
                 )
             ],
         )
@@ -189,13 +181,13 @@ def test_preview_bounds_examples_and_never_calls_prefix_complete() -> None:
 def test_route_configuration_rejects_ambiguous_identities() -> None:
     with pytest.raises(ValueError, match="unique"):
         routing.Router(routes=[route(), route()])
-    with pytest.raises(ValueError, match="protocol"):
-        routing.Route(name="r", source="s", destination="o", protocol="midi1", group=1)
+    with pytest.raises(ValueError, match="encoding"):
+        routing.Route(name="r", source="s", destination="o", encoding="bytes", group=1)
 
 
 def test_live_driver_preserves_uncertain_send_and_leaves_connections_open() -> None:
-    source = testing.Input(stream="s", protocol="midi1")
-    output = testing.Output(protocol="midi1")
+    source = testing.Input(stream="s", encoding="bytes")
+    output = testing.Output(encoding="bytes")
     source.inject(b"\x90\x3c\x5a", clock=events.Clock(identity="c"))
     output.fail_next_send(accepted=True)
     router = routing.Router(routes=[route()])

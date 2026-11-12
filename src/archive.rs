@@ -1,5 +1,5 @@
 //! Streaming Python archive bridge; schema and validation live in Rust core.
-use crate::files::{bytes, closed, frozen, limit, os_error, uint, Stream as IoStream};
+use crate::files::{bytes, closed, frozen, os_error, uint, Stream as IoStream};
 use crate::packets::Clock;
 use meedee::archive as model;
 use pyo3::exceptions::PyTypeError;

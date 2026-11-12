@@ -1,6 +1,6 @@
 //! Native pure packet decoder and typed-send preparation.
-use crate::files::{limit, os_error, uint};
-use crate::packets::{Protocol, ReceivedPacket, UmpPacket};
+use crate::files::{os_error, uint};
+use crate::packets::{Encoding, ReceivedPacket, UmpPacket};
 use meedee::{events as model, events::Payload};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -54,14 +54,14 @@ struct PacketDecoder {
 #[pymethods]
 impl PacketDecoder {
     #[new]
-    #[pyo3(signature=(*,stream,protocol,sysex_limit=1_048_576))]
+    #[pyo3(signature=(*,stream,encoding,sysex_limit=1_048_576))]
     fn new(
         stream: String,
-        protocol: Protocol,
+        encoding: Encoding,
         #[pyo3(from_py_with=crate::units::bytes)] sysex_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: model::PacketDecoder::new(stream, protocol.native(), sysex_limit)
+            value: model::PacketDecoder::new(stream, encoding.native(), sysex_limit)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
         })
     }
@@ -114,30 +114,57 @@ pub(crate) fn item(py: Python<'_>, v: model::InputItem) -> PyResult<Py<PyAny>> {
     }
 }
 #[pyfunction]
+pub fn resolve_output_channel(
+    py: Python<'_>,
+    message: &Bound<'_, PyAny>,
+    channel: Option<u8>,
+) -> PyResult<Py<PyAny>> {
+    if !message.is_instance_of::<crate::messages::Message>() {
+        return Ok(message.clone().unbind());
+    }
+    match crate::event_values::extract(message) {
+        Ok(value) => crate::event_values::to_python(
+            py,
+            value
+                .resolve_channel(channel)
+                .map_err(|e| PyValueError::new_err(e.to_string()))?,
+        ),
+        Err(e) if e.is_instance_of::<pyo3::exceptions::PyTypeError>(py) => {
+            Ok(message.clone().unbind())
+        }
+        Err(e) => Err(e),
+    }
+}
+#[pyfunction]
 pub fn prepare_output(
     py: Python<'_>,
-    protocol: Protocol,
+    encoding: Encoding,
     message: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
     if !message.is_instance_of::<crate::messages::Message>() {
-        return crate::packets::prepare_send(py, protocol, message);
+        return crate::packets::prepare_send(py, encoding, message);
     }
-    let prepared = prepare_message(py, protocol, message)?;
+    let prepared = prepare_message(py, encoding, message)?;
     if prepared.bind(py).is_instance_of::<PyTuple>() {
         Ok(prepared)
     } else {
-        crate::packets::prepare_send(py, protocol, prepared.bind(py))
+        crate::packets::prepare_send(py, encoding, prepared.bind(py))
     }
 }
 
 fn prepare_message(
     py: Python<'_>,
-    protocol: Protocol,
+    encoding: Encoding,
     message: &Bound<'_, PyAny>,
 ) -> PyResult<Py<PyAny>> {
     if let Ok(p) = crate::event_values::payload(message) {
-        match (protocol, p) {
-            (Protocol::Midi1, Payload::Midi1(v)) => {
+        match (encoding, p) {
+            (Encoding::Bytes, Payload::Message(v)) if v.version() == 2 || v.group().is_some() => {
+                return Err(crate::errors::CapabilityError::new_err(
+                    "message and transport encodings differ; translate or remove group explicitly",
+                ));
+            }
+            (Encoding::Bytes, Payload::Message(v)) => {
                 use meedee::messages::PrimitiveMessage;
                 return Ok(PyBytes::new(
                     py,
@@ -147,30 +174,30 @@ fn prepare_message(
                 .into_any()
                 .unbind());
             }
-            (Protocol::Ump, Payload::Ump(meedee::ump::UmpMessage::Opaque(_))) => {
+            (Encoding::Ump, Payload::Ump(meedee::ump::PacketValue::Opaque(_))) => {
                 return Err(crate::errors::CapabilityError::new_err(
                     "opaque UMP requires deliberate raw sending; typed support is unknown",
                 ))
             }
             (
-                Protocol::Ump,
+                Encoding::Ump,
                 Payload::Ump(
-                    meedee::ump::UmpMessage::DeltaClockstamp(_)
-                    | meedee::ump::UmpMessage::DeltaClockstampTicksPerQuarter(_),
+                    meedee::ump::PacketValue::DeltaClockstamp(_)
+                    | meedee::ump::PacketValue::DeltaClockstampTicksPerQuarter(_),
                 ),
             ) => {
                 return Err(crate::errors::CapabilityError::new_err(
                     "file timing records are not live messages",
                 ))
             }
-            (Protocol::Ump, Payload::Ump(meedee::ump::UmpMessage::Stream(v)))
+            (Encoding::Ump, Payload::Ump(meedee::ump::PacketValue::Stream(v)))
                 if matches!(v.status(), 32 | 33) =>
             {
                 return Err(crate::errors::CapabilityError::new_err(
                     "clip markers are not live messages",
                 ))
             }
-            (Protocol::Ump, Payload::Ump(v)) => {
+            (Encoding::Ump, v) => {
                 use meedee::ump::UmpValue;
                 return Ok(Py::new(
                     py,
@@ -182,8 +209,8 @@ fn prepare_message(
                 )?
                 .into_any());
             }
-            (_, Payload::Command(_)) => {
-                return Ok(crate::codecs::prepare_command(protocol, message)?
+            (Encoding::Bytes, Payload::Command(_)) => {
+                return Ok(crate::codecs::prepare_command(encoding, message)?
                     .into_pyobject(py)?
                     .into_any()
                     .unbind());
@@ -195,7 +222,7 @@ fn prepare_message(
             }
         }
     }
-    if protocol == Protocol::Midi1 {
+    if encoding == Encoding::Bytes {
         return Ok(PyBytes::new(py, &crate::messages::encode_message(message)?)
             .into_any()
             .unbind());
@@ -213,8 +240,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
     if let Ok(v) = crate::event_values::extract(&item) {
         return Ok(match &v {
-            Payload::Midi1(meedee::messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
-            Payload::Midi1(v) => v.encoded_len(),
+            Payload::Message(v) => v.encoded_len(),
             Payload::Ump(v) => {
                 use meedee::ump::UmpValue;
                 v.encode_words()
@@ -222,7 +248,14 @@ pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
                     .len()
                     * 4
             }
-            Payload::Command(_) => 64,
+            Payload::Command(v) => {
+                use meedee::messages::Command;
+                v.expand()
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?
+                    .iter()
+                    .map(|m| m.encoded_len())
+                    .sum()
+            }
         });
     }
     if let Ok(v) = item.extract::<PyRef<'_, StreamDiagnostic>>() {

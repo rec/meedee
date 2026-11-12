@@ -4,7 +4,7 @@ use crate::events::{Payload, Rational};
 use crate::messages::{self, AnyCommand, AnyMessage, Command, Message, PrimitiveMessage};
 use crate::messages::{Beats, Note, NoteDuration, Rest};
 use crate::playback::{Cancellation, MonotonicClock, PlaybackClock};
-use crate::transport::{self, Packet, Port, Protocol};
+use crate::transport::{self, Encoding, Packet, Port};
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::time::Duration;
@@ -242,7 +242,7 @@ impl Output {
         self.subprocess_options = options;
         Ok(self)
     }
-    /// Select advanced backend/protocol options before discovery or connection.
+    /// Select advanced backend/encoding options before discovery or connection.
     pub fn with_transport(
         mut self,
         options: transport::OutputOptions,
@@ -533,12 +533,12 @@ impl Output {
                         messages::NoteOff::new(note.note().into())?.with_channel(channel.into())?;
                     plan.push((
                         start,
-                        Some(self.prepare_message(Payload::Midi1(AnyMessage::NoteOn(attack)))?),
+                        Some(self.prepare_message(Payload::Message(AnyMessage::NoteOn(attack)))?),
                         rounded,
                     ));
                     plan.push((
                         end,
-                        Some(self.prepare_message(Payload::Midi1(AnyMessage::NoteOff(release)))?),
+                        Some(self.prepare_message(Payload::Message(AnyMessage::NoteOff(release)))?),
                         elapsed.multiply(1_000_000_000, 1)?.denominator() != 1,
                     ));
                 }
@@ -552,7 +552,7 @@ impl Output {
                     plan.push((start, Some(self.prepare_message(message)?), rounded))
                 }
                 OutputValue::Packet(packet) => {
-                    transport::validate_packet(self.options.protocol, &packet)
+                    transport::validate_packet(self.options.encoding, &packet)
                         .map_err(transport_error)?;
                     plan.push((start, Some(Prepared::Packet(packet)), rounded));
                 }
@@ -562,17 +562,27 @@ impl Output {
         Ok(plan)
     }
     fn prepare_message(&self, message: Payload) -> io::Result<Prepared> {
+        message.validate()?;
+        let message = message.resolve_channel(self.channel)?;
         match message {
-            Payload::Midi1(AnyMessage::ControlChange(v)) if v.resolution() == 14 => {
-                self.prepare_message(Payload::Command(AnyCommand::ControlChange(v)))
+            Payload::Message(message) if self.options.encoding == Encoding::Bytes => {
+                Ok(Prepared::Packet(Packet::Bytes(message.encode()?)))
             }
-            Payload::Midi1(message) if self.options.protocol == Protocol::Midi1 => {
-                Ok(Prepared::Packet(Packet::Bytes(
-                    resolve_message(message, self.channel)?.encode()?,
-                )))
+            Payload::Message(message) if self.options.encoding == Encoding::Ump => {
+                use crate::ump::UmpValue;
+                let packet = Packet::Ump(message.encode_words()?);
+                transport::validate_packet(self.options.encoding, &packet)
+                    .map_err(transport_error)?;
+                Ok(Prepared::Packet(packet))
             }
-            Payload::Command(command) if self.options.protocol == Protocol::Midi1 => {
-                let command = resolve_command(command, self.channel)?;
+            Payload::Command(command) if self.options.encoding == Encoding::Ump => {
+                use crate::ump::UmpValue;
+                let packet = Packet::Ump(Payload::Command(command).encode_words()?);
+                transport::validate_packet(self.options.encoding, &packet)
+                    .map_err(transport_error)?;
+                Ok(Prepared::Packet(packet))
+            }
+            Payload::Command(command) if self.options.encoding == Encoding::Bytes => {
                 let packets = command
                     .expand()?
                     .iter()
@@ -580,52 +590,22 @@ impl Output {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Prepared::Command { command, packets })
             }
-            Payload::Ump(message) if self.options.protocol == Protocol::Ump => {
-                use crate::ump::{UmpMessage, UmpValue};
+            Payload::Ump(message) if self.options.encoding == Encoding::Ump => {
+                use crate::ump::{PacketValue, UmpValue};
                 if matches!(
                     message,
-                    UmpMessage::Opaque(_)
-                        | UmpMessage::DeltaClockstamp(_)
-                        | UmpMessage::DeltaClockstampTicksPerQuarter(_)
-                ) || matches!(&message, UmpMessage::Stream(m) if matches!(m.status(),32|33))
+                    PacketValue::Opaque(_)
+                        | PacketValue::DeltaClockstamp(_)
+                        | PacketValue::DeltaClockstampTicksPerQuarter(_)
+                ) || matches!(&message, PacketValue::Stream(m) if matches!(m.status(),32|33))
                 {
                     return Err(invalid(
                         "opaque and file-only UMP require explicit raw packets",
                     ));
                 }
-                let message = match message {
-                    UmpMessage::NoteOn(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::NoteOn(v.with_channel(channel.into())?)
-                    }
-                    UmpMessage::NoteOff(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::NoteOff(v.with_channel(channel.into())?)
-                    }
-                    UmpMessage::PolyPressure(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::PolyPressure(v.with_channel(channel.into())?)
-                    }
-                    UmpMessage::ControlChange(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::ControlChange(v.with_channel(channel.into())?)
-                    }
-                    UmpMessage::ProgramChange(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::ProgramChange(v.with_channel(channel.into())?)
-                    }
-                    UmpMessage::ChannelPressure(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::ChannelPressure(v.with_channel(channel.into())?)
-                    }
-                    UmpMessage::PitchBend(v) => {
-                        let channel = self.channel.or(v.channel()).unwrap_or(1);
-                        UmpMessage::PitchBend(v.with_channel(channel.into())?)
-                    }
-                    v => v,
-                };
+
                 let packet = Packet::Ump(message.encode_words()?);
-                transport::validate_packet(self.options.protocol, &packet)
+                transport::validate_packet(self.options.encoding, &packet)
                     .map_err(transport_error)?;
                 Ok(Prepared::Packet(packet))
             }
@@ -879,33 +859,6 @@ impl OutputState {
             .chain(self.resets.into_values())
     }
 }
-fn resolve_message(message: AnyMessage, channel: Option<u8>) -> io::Result<AnyMessage> {
-    macro_rules! resolve { ($($name:ident),*) => { match message {
-        $(AnyMessage::$name(m) => {let c=channel.or(m.channel()).unwrap_or(1);Ok(AnyMessage::$name(m.with_channel(c.into())?))},)*
-        m => Ok(m),
-    } }; }
-    resolve!(
-        NoteOn,
-        NoteOff,
-        PolyPressure,
-        ControlChange,
-        ProgramChange,
-        ChannelPressure,
-        PitchBend
-    )
-}
-fn resolve_command(command: AnyCommand, channel: Option<u8>) -> io::Result<AnyCommand> {
-    macro_rules! resolve { ($($name:ident),*) => { match command {
-        $(AnyCommand::$name(m) => {let c=channel.or(m.channel()).unwrap_or(1);Ok(AnyCommand::$name(m.with_channel(c.into())?))},)*
-        m => Ok(m),
-    } }; }
-    resolve!(
-        ControlChange,
-        ParameterSet,
-        ParameterStep,
-        BankProgramSelect
-    )
-}
 pub(crate) fn select_port<'a>(ports: &'a [Port], pattern: Option<&str>) -> io::Result<&'a Port> {
     Ok(&ports[select_port_index(ports.iter().map(|p| p.name()), pattern)?])
 }
@@ -1055,11 +1008,7 @@ impl From<NoteDuration> for OutputValue {
 }
 impl From<AnyMessage> for OutputValue {
     fn from(v: AnyMessage) -> Self {
-        Self::Message(if v.version() == 2 {
-            Payload::Ump(crate::ump::UmpMessage::try_from(v).expect("MIDI 2 channel message"))
-        } else {
-            Payload::Midi1(v)
-        })
+        Self::Message(v.into())
     }
 }
 impl From<AnyCommand> for OutputValue {
@@ -1067,13 +1016,21 @@ impl From<AnyCommand> for OutputValue {
         Self::Message(Payload::Command(v))
     }
 }
-impl From<crate::ump::UmpMessage> for OutputValue {
-    fn from(v: crate::ump::UmpMessage) -> Self {
+impl From<crate::ump::PacketValue> for OutputValue {
+    fn from(v: crate::ump::PacketValue) -> Self {
         Self::Message(Payload::Ump(v))
     }
 }
 macro_rules! midi1_values {($($name:ident),*)=>{$(impl From<messages::$name> for OutputValue {fn from(v:messages::$name)->Self {AnyMessage::$name(v).into()}})*};}
 midi1_values!(
+    RegisteredPerNoteController,
+    AssignablePerNoteController,
+    PerNoteManagement,
+    RegisteredController,
+    AssignableController,
+    RelativeRegisteredController,
+    RelativeAssignableController,
+    PerNotePitchBend,
     NoteOn,
     NoteOff,
     PolyPressure,
@@ -1130,7 +1087,7 @@ mod tests {
     impl Fixture {
         fn new() -> Self {
             let sink = Rc::new(RefCell::new(
-                crate::testing::Output::new(Protocol::Midi1, 128, 4096).unwrap(),
+                crate::testing::Output::new(Encoding::Bytes, 128, 4096).unwrap(),
             ));
             let deadlines = Rc::new(RefCell::new(Vec::new()));
             let mut output = Output::new();
@@ -1198,7 +1155,7 @@ mod tests {
             .unwrap()
             .with_stream("input")
             .unwrap();
-        crate::archive::Record::Event(Box::new(Payload::Midi1(AnyMessage::NoteOn(message))))
+        crate::archive::Record::Event(Box::new(Payload::Message(AnyMessage::NoteOn(message))))
     }
 
     #[test]
@@ -1490,7 +1447,7 @@ mod tests {
     fn compound_prefix_is_tracked_when_later_packet_cannot_be_accepted() {
         let mut f = Fixture::new();
         f.sink = Rc::new(RefCell::new(
-            crate::testing::Output::new(Protocol::Midi1, 1, 3).unwrap(),
+            crate::testing::Output::new(Encoding::Bytes, 1, 3).unwrap(),
         ));
         f.output.connection = Some(Connection::Test(f.sink.clone()));
         let error = f
@@ -1523,9 +1480,9 @@ mod tests {
             .unwrap();
         assert!(f.output.send(note.clone()).is_err());
         assert_eq!(f.sink.borrow().snapshot().attempts, 0);
-        f.output.options.protocol = Protocol::Ump;
+        f.output.options.encoding = Encoding::Ump;
         f.sink = Rc::new(RefCell::new(
-            crate::testing::Output::new(Protocol::Ump, 8, 128).unwrap(),
+            crate::testing::Output::new(Encoding::Ump, 8, 128).unwrap(),
         ));
         f.output.connection = Some(Connection::Test(f.sink.clone()));
         f.output = f.output.with_channel(9).unwrap();
@@ -1543,6 +1500,54 @@ mod tests {
                 Packet::Ump(vec![0])
             ]
         );
+    }
+
+    #[test]
+    fn ump_semantics_resolve_per_note_channels_and_batch_logical_values() {
+        let mut f = Fixture::new();
+        f.output.options.encoding = Encoding::Ump;
+        f.sink = Rc::new(RefCell::new(
+            crate::testing::Output::new(Encoding::Ump, 8, 128).unwrap(),
+        ));
+        f.output.connection = Some(Connection::Test(f.sink.clone()));
+        f.output = f.output.with_channel(3).unwrap();
+        let per_note = messages::RegisteredPerNoteController::new(5, 7, 60, 3, 1234).unwrap();
+        let command = messages::ControlChange::new_with_resolution(7, 10000, 14)
+            .unwrap()
+            .with_group(3)
+            .unwrap();
+        let sysex = messages::SysEx::new((0..7).collect())
+            .unwrap()
+            .with_group(3)
+            .unwrap();
+        let report = f
+            .output
+            .send(vec![
+                OutputValue::from(per_note),
+                command.into(),
+                sysex.into(),
+            ])
+            .unwrap();
+        assert_eq!(report.sent_events, 3);
+        assert_eq!(
+            f.packets(),
+            vec![
+                Packet::Ump(vec![0x44023c03, 1234]),
+                Packet::Ump(vec![0x22b2074e, 0x22b22710]),
+                Packet::Ump(vec![0x32160001, 0x02030405, 0x32310600, 0]),
+            ]
+        );
+        let error = f
+            .output
+            .send(vec![
+                OutputValue::from(messages::NoteOn::new(60).unwrap().with_group(1).unwrap()),
+                messages::TimingClock::new().unwrap().into(),
+            ])
+            .unwrap_err();
+        assert_eq!(error.report.sent_events, 0);
+        assert!(f.packets().is_empty());
+        f.output.close().unwrap();
+        assert!(f.packets().is_empty());
     }
 
     #[test]
@@ -1593,7 +1598,7 @@ mod tests {
             let crate::archive::Record::Event(timed) = recorded(100, 60) else {
                 unreachable!()
             };
-            let plain = Payload::Midi1(AnyMessage::NoteOn(messages::NoteOn::new(62).unwrap()));
+            let plain = Payload::Message(AnyMessage::NoteOn(messages::NoteOn::new(62).unwrap()));
             let source = if timed_first {
                 vec![*timed, plain]
             } else {
@@ -1647,7 +1652,7 @@ macro_rules! ump_values {
     ($($name:ident => $variant:ident),* $(,)?) => {
         $(impl From<crate::ump::$name> for OutputValue {
             fn from(value: crate::ump::$name) -> Self {
-                crate::ump::UmpMessage::$variant(value).into()
+                crate::ump::PacketValue::$variant(value).into()
             }
         })*
     };
@@ -1658,15 +1663,6 @@ ump_values!(
     JrTimestamp => JrTimestamp,
     DeltaClockstampTicksPerQuarter => DeltaClockstampTicksPerQuarter,
     DeltaClockstamp => DeltaClockstamp,
-    Midi2RegisteredPerNoteController => Midi2RegisteredPerNoteController,
-    Midi2AssignablePerNoteController => Midi2AssignablePerNoteController,
-    Midi2PerNoteManagement => Midi2PerNoteManagement,
-    Midi2RegisteredController => Midi2RegisteredController,
-    Midi2AssignableController => Midi2AssignableController,
-    Midi2RelativeRegisteredController => Midi2RelativeRegisteredController,
-    Midi2RelativeAssignableController => Midi2RelativeAssignableController,
-    Midi2PerNotePitchBend => Midi2PerNotePitchBend,
-    Midi1Packet => Midi1,
     SysEx7Packet => SysEx7,
     SysEx8Packet => SysEx8,
     MixedDataSet => MixedDataSet,

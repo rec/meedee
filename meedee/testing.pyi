@@ -16,7 +16,7 @@ class Input:
         self,
         *,
         stream: str,
-        protocol: Literal["midi1", "ump"],
+        encoding: Literal["bytes", "ump"],
         packet_limit: int = 128,
         event_limit: int = 128,
         byte_limit: int | str = 8_388_608,
@@ -77,7 +77,7 @@ class Output:
     def __init__(
         self,
         *,
-        protocol: Literal["midi1", "ump"],
+        encoding: Literal["bytes", "ump"],
         packet_limit: int = 128,
         byte_limit: int | str = 8_388_608,
     ) -> None: ...

@@ -1,13 +1,14 @@
 //! M2-116-U 1.0 MIDI Clip framing. All UMPs, including clock/configuration, are retained.
+use crate::events::Payload;
 use crate::file_io::{invalid, Source};
 pub use crate::file_timing::{ClipReader as TimedReader, ClipTimeline as Timeline};
-use crate::ump::{self, UmpMessage, UmpValue};
+use crate::ump::{self, PacketValue, UmpValue};
 use std::io::{self, Read, Write};
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Entry {
     pub tick: Option<u64>,
     pub sequence: bool,
-    pub message: UmpMessage,
+    pub message: Payload,
 }
 #[derive(Default, Clone)]
 struct State {
@@ -23,12 +24,12 @@ struct State {
     previous_tempo: bool,
 }
 impl State {
-    fn accept(&mut self, v: UmpMessage, offset: u64) -> io::Result<Entry> {
+    fn accept(&mut self, v: Payload, offset: u64) -> io::Result<Entry> {
         if self.ended {
             return Err(invalid(offset, "data after EndOfClip"));
         }
-        let is_dcs = matches!(v, UmpMessage::DeltaClockstamp(_));
-        if let UmpMessage::DeltaClockstamp(d) = &v {
+        let is_dcs = matches!(v, Payload::Ump(PacketValue::DeltaClockstamp(_)));
+        if let Payload::Ump(PacketValue::DeltaClockstamp(d)) = &v {
             if !self.tpq && (self.dcs || d.ticks() != 0) {
                 return Err(invalid(offset, "first DCS must be zero before DCTPQ"));
             }
@@ -43,14 +44,14 @@ impl State {
                 .checked_add(u64::from(d.ticks()))
                 .ok_or_else(|| invalid(offset, "clip tick overflow"))?;
             self.dcs = true;
-        } else if let UmpMessage::DeltaClockstampTicksPerQuarter(_) = &v {
+        } else if let Payload::Ump(PacketValue::DeltaClockstampTicksPerQuarter(_)) = &v {
             if self.tpq || !self.last_dcs || self.tick != 0 {
                 return Err(invalid(offset, "DCTPQ must follow initial zero DCS"));
             }
             self.tpq = true;
         } else if !self.tpq {
             // Optional profile-tag SysEx packets are retained but never negotiated/executed.
-            if !matches!(v, UmpMessage::SysEx7(_)) || self.dcs {
+            if !matches!(v, Payload::Ump(PacketValue::SysEx7(_))) || self.dcs {
                 return Err(invalid(
                     offset,
                     "expected optional profile packets or DCS/DCTPQ",
@@ -60,7 +61,7 @@ impl State {
             if !self.dcs {
                 return Err(invalid(offset, "message lacks DCS"));
             }
-            if let UmpMessage::Stream(s) = &v {
+            if let Payload::Ump(PacketValue::Stream(s)) = &v {
                 match s.status() {
                     32 => {
                         if self.started || !self.last_dcs {
@@ -78,10 +79,8 @@ impl State {
                 }
             }
             if !self.started {
-                let is_tempo =
-                    matches!(&v,UmpMessage::FlexData(f) if f.status_bank()==0&&f.status()==0);
-                let is_sig =
-                    matches!(&v,UmpMessage::FlexData(f) if f.status_bank()==0&&f.status()==1);
+                let is_tempo = matches!(&v,Payload::Ump(PacketValue::FlexData(f)) if f.status_bank()==0&&f.status()==0);
+                let is_sig = matches!(&v,Payload::Ump(PacketValue::FlexData(f)) if f.status_bank()==0&&f.status()==1);
                 if is_tempo {
                     if self.tempo || self.header_events != 0 || self.tick != 0 {
                         return Err(invalid(offset, "configuration tempo must be first at zero"));
@@ -181,11 +180,20 @@ impl<W: Write> Writer<W> {
             failed: false,
         })
     }
-    pub fn write(&mut self, message: &UmpMessage) -> io::Result<()> {
+    pub fn write(&mut self, message: &Payload) -> io::Result<()> {
         if self.failed {
             return Err(invalid(self.offset, "writer failed"));
         }
         let result = (|| {
+            if matches!(
+                message,
+                Payload::Command(_) | Payload::Message(crate::messages::AnyMessage::SysEx(_))
+            ) {
+                return Err(invalid(
+                    self.offset,
+                    "expand commands and packetize complete SysEx explicitly for clip storage",
+                ));
+            }
             let mut state = self.state.clone();
             state.accept(message.clone(), self.offset)?;
             let bytes = ump::words_to_bytes(&message.encode_words()?, false);

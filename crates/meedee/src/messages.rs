@@ -184,10 +184,40 @@ pub trait Command: Message {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError>;
 }
 
+pub(crate) fn require_ungrouped(group: Option<u8>) -> Result<(), ValueError> {
+    if group.is_some() {
+        return Err(ValueError(
+            "remove the group explicitly before byte encoding".into(),
+        ));
+    }
+    Ok(())
+}
+
+macro_rules! group_methods {
+    () => {
+        pub fn group(&self) -> Option<u8> {
+            self.group
+        }
+        pub fn with_group(mut self, group: i64) -> Result<Self, crate::messages::ValueError> {
+            self.group = Some(crate::messages::checked_group(group)?);
+            Ok(self)
+        }
+        pub fn without_group(mut self) -> Result<Self, crate::messages::ValueError> {
+            self.group = None;
+            Ok(self)
+        }
+    };
+}
+pub(crate) use group_methods;
+pub(crate) fn checked_group(group: i64) -> Result<u8, ValueError> {
+    Ok(bounded(group, "group", 1, 16)? as u8)
+}
+
 /// An absolute registered or non-registered parameter value.
 #[derive(Clone, Debug)]
 pub struct ParameterSet {
     metadata: Option<Box<Metadata>>,
+    group: Option<u8>,
     channel: Option<u8>,
     parameter: u16,
     value: u16,
@@ -195,6 +225,7 @@ pub struct ParameterSet {
     family: crate::controls::ParameterFamily,
 }
 value_metadata!(ParameterSet {
+    group,
     channel,
     parameter,
     value,
@@ -202,10 +233,12 @@ value_metadata!(ParameterSet {
     family
 });
 impl ParameterSet {
+    group_methods!();
     pub fn new(parameter: i64, value: i64) -> Result<Self, ValueError> {
         validate_resolution(value, 14)?;
         Ok(Self {
             metadata: None,
+            group: None,
             channel: None,
             parameter: bounded(parameter, "parameter", 0, 16382)? as u16,
             value: value as u16,
@@ -271,7 +304,7 @@ impl ParameterSet {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum ChannelFormat {
-    Midi1,
+    Midi1 { group: Option<u8> },
     Midi2 { group: u8 },
 }
 
@@ -284,18 +317,22 @@ macro_rules! channel_values {
         value_metadata!($name { format, channel, $($field,)* $($extra,)* });
         impl $name {
             pub fn new($($arg: i64),*) -> Result<Self, ValueError> {
-                Ok(Self { metadata: None, format: ChannelFormat::Midi1, channel: None,
+                Ok(Self { metadata: None, format: ChannelFormat::Midi1 { group: None }, channel: None,
                     $($field: bounded($initial1, stringify!($field), $low1, $high1)? as $ty,)* $($extra: None,)* })
             }
             pub fn new_midi2($($arg: i64),*) -> Result<Self, ValueError> {
                 Ok(Self { metadata: None, format: ChannelFormat::Midi2 { group: 1 }, channel: None,
                     $($field: bounded($initial2, stringify!($field), $low2, $high2)? as $ty,)* $($extra: Some(0),)* })
             }
-            pub fn version(&self) -> u8 { match self.format { ChannelFormat::Midi1 => 1, ChannelFormat::Midi2 { .. } => 2 } }
-            pub fn group(&self) -> Option<u8> { match self.format { ChannelFormat::Midi1 => None, ChannelFormat::Midi2 { group } => Some(group) } }
+            pub fn version(&self) -> u8 { match self.format { ChannelFormat::Midi1 { .. } => 1, ChannelFormat::Midi2 { .. } => 2 } }
+            pub fn group(&self) -> Option<u8> { match self.format { ChannelFormat::Midi1 { group } => group, ChannelFormat::Midi2 { group } => Some(group) } }
             pub fn with_group(mut self, group: i64) -> Result<Self, ValueError> {
-                if self.version() != 2 { return Err(ValueError("group requires MIDI 2; use Midi1Packet for MIDI 1 UMP".into())); }
-                self.format = ChannelFormat::Midi2 { group: bounded(group, "group", 1, 16)? as u8 }; Ok(self)
+                let group = bounded(group, "group", 1, 16)? as u8;
+                self.format = match self.format { ChannelFormat::Midi1 { .. } => ChannelFormat::Midi1 { group: Some(group) }, ChannelFormat::Midi2 { .. } => ChannelFormat::Midi2 { group } }; Ok(self)
+            }
+            pub fn without_group(mut self) -> Result<Self, ValueError> {
+                if self.version() != 1 { return Err(ValueError("MIDI 2 requires a group".into())); }
+                self.format = ChannelFormat::Midi1 { group: None }; Ok(self)
             }
             pub fn channel(&self) -> Option<u8> { self.channel }
             pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
@@ -307,6 +344,7 @@ macro_rules! channel_values {
             }
             pub(crate) fn midi1_channel(&self) -> Result<u8, ValueError> {
                 if self.version() != 1 { return Err(ValueError("MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into())); }
+                require_ungrouped(self.group())?;
                 self.resolved_channel()
             }
             $(pub fn $field(&self) -> $ty { self.$field }
@@ -352,7 +390,7 @@ fn validate_note_attributes(kind: u8, data: u16) -> Result<(), ValueError> {
 channel_values! {
     NoteOn(note) {
         note: u8 => with_note = (0,127,0,127) => (note,note),
-        velocity: u16 => with_velocity = (0,127,0,65535) => (90, crate::ump::scale_up(90,7,16)? as i64)
+        velocity: u16 => with_velocity = (0,127,0,65535) => (90, crate::translation::scale_up(90,7,16)? as i64)
     } { attribute_type: u8 => with_attribute_type = 3, attribute_data: u16 => with_attribute_data = 65535 };
     NoteOff(note) {
         note: u8 => with_note = (0,127,0,127) => (note,note),
@@ -398,7 +436,7 @@ impl ControlChange {
         validate_resolution(value, resolution)?;
         Ok(Self {
             metadata: None,
-            format: ChannelFormat::Midi1,
+            format: ChannelFormat::Midi1 { group: None },
             channel: None,
             controller: bounded(
                 controller,
@@ -441,7 +479,7 @@ impl ControlChange {
     }
     pub fn group(&self) -> Option<u8> {
         match self.format {
-            ChannelFormat::Midi1 => None,
+            ChannelFormat::Midi1 { group } => group,
             ChannelFormat::Midi2 { group } => Some(group),
         }
     }
@@ -454,14 +492,18 @@ impl ControlChange {
         self
     }
     pub fn with_group(mut self, group: i64) -> Result<Self, ValueError> {
-        if self.version() != 2 {
-            return Err(ValueError(
-                "group requires MIDI 2; use Midi1Packet for MIDI 1 UMP".into(),
-            ));
-        }
-        self.format = ChannelFormat::Midi2 {
-            group: bounded(group, "group", 1, 16)? as u8,
+        let group = bounded(group, "group", 1, 16)? as u8;
+        self.format = match self.format {
+            ChannelFormat::Midi1 { .. } => ChannelFormat::Midi1 { group: Some(group) },
+            ChannelFormat::Midi2 { .. } => ChannelFormat::Midi2 { group },
         };
+        Ok(self)
+    }
+    pub fn without_group(mut self) -> Result<Self, ValueError> {
+        if self.version() != 1 {
+            return Err(ValueError("MIDI 2 requires a group".into()));
+        }
+        self.format = ChannelFormat::Midi1 { group: None };
         Ok(self)
     }
     pub fn with_controller(mut self, controller: i64) -> Result<Self, ValueError> {
@@ -504,6 +546,7 @@ impl ControlChange {
             .ok_or_else(|| ValueError("message channel is unassigned".into()))
     }
     pub(crate) fn midi1_channel(&self) -> Result<u8, ValueError> {
+        require_ungrouped(self.group())?;
         if self.version() != 1 {
             return Err(ValueError(
                 "MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into(),
@@ -522,21 +565,25 @@ impl ControlChange {
 #[derive(Clone, Debug)]
 pub struct ParameterStep {
     metadata: Option<Box<Metadata>>,
+    group: Option<u8>,
     channel: Option<u8>,
     parameter: u16,
     family: crate::controls::ParameterFamily,
     direction: crate::controls::StepDirection,
 }
 value_metadata!(ParameterStep {
+    group,
     channel,
     parameter,
     family,
     direction
 });
 impl ParameterStep {
+    group_methods!();
     pub fn new(parameter: i64) -> Result<Self, ValueError> {
         Self {
             metadata: None,
+            group: None,
             channel: None,
             parameter: 0,
             family: crate::controls::ParameterFamily::Rpn,
@@ -594,11 +641,12 @@ impl ParameterStep {
 macro_rules! system_messages {
     ($($name:ident { $($field:ident: $ty:ty = $low:literal ..= $high:literal),* };)*) => {
         $(#[derive(Clone, Debug)]
-        pub struct $name { metadata: Option<Box<Metadata>>, $($field: $ty),* }
-        value_metadata!($name { $($field),* });
+        pub struct $name { metadata: Option<Box<Metadata>>, group: Option<u8>, $($field: $ty),* }
+        value_metadata!($name { group, $($field),* });
         impl $name {
+            group_methods!();
             pub fn new($($field: i64),*) -> Result<Self, ValueError> {
-                Ok(Self { metadata: None, $($field: bounded($field, stringify!($field), $low, $high)? as $ty),* })
+                Ok(Self { metadata: None, group: None, $($field: bounded($field, stringify!($field), $low, $high)? as $ty),* })
             }
             $(pub fn $field(&self) -> $ty { self.$field })*
         })*
@@ -611,8 +659,18 @@ system_messages! {
     TuneRequest {}; TimingClock {}; Start {}; Continue {}; Stop {}; ActiveSensing {}; SystemReset {};
 }
 
+include!("messages_midi2.rs");
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AnyMessage {
+    RegisteredPerNoteController(RegisteredPerNoteController),
+    AssignablePerNoteController(AssignablePerNoteController),
+    PerNoteManagement(PerNoteManagement),
+    RegisteredController(RegisteredController),
+    AssignableController(AssignableController),
+    RelativeRegisteredController(RelativeRegisteredController),
+    RelativeAssignableController(RelativeAssignableController),
+    PerNotePitchBend(PerNotePitchBend),
     NoteOn(NoteOn),
     NoteOff(NoteOff),
     PolyPressure(PolyPressure),
@@ -633,6 +691,14 @@ pub enum AnyMessage {
     SysEx(SysEx),
 }
 enum_metadata!(AnyMessage {
+    RegisteredPerNoteController,
+    AssignablePerNoteController,
+    PerNoteManagement,
+    RegisteredController,
+    AssignableController,
+    RelativeRegisteredController,
+    RelativeAssignableController,
+    PerNotePitchBend,
     NoteOn,
     NoteOff,
     PolyPressure,
@@ -653,8 +719,187 @@ enum_metadata!(AnyMessage {
     SysEx
 });
 impl AnyMessage {
+    pub fn channel(&self) -> Option<u8> {
+        match self {
+            Self::RegisteredPerNoteController(v) => Some(v.channel()),
+            Self::AssignablePerNoteController(v) => Some(v.channel()),
+            Self::PerNoteManagement(v) => Some(v.channel()),
+            Self::RegisteredController(v) => Some(v.channel()),
+            Self::AssignableController(v) => Some(v.channel()),
+            Self::RelativeRegisteredController(v) => Some(v.channel()),
+            Self::RelativeAssignableController(v) => Some(v.channel()),
+            Self::PerNotePitchBend(v) => Some(v.channel()),
+            Self::NoteOn(v) => v.channel(),
+            Self::NoteOff(v) => v.channel(),
+            Self::PolyPressure(v) => v.channel(),
+            Self::ControlChange(v) => v.channel(),
+            Self::ProgramChange(v) => v.channel(),
+            Self::ChannelPressure(v) => v.channel(),
+            Self::PitchBend(v) => v.channel(),
+            _ => None,
+        }
+    }
+
+    pub fn with_channel(self, channel: i64) -> Result<Self, ValueError> {
+        bounded(channel, "channel", 1, 16)?;
+        macro_rules! remap { ($($name:ident),*) => { match self {
+            $(Self::$name(v) => Ok(Self::$name(v.with_channel(channel)?)),)*
+            v => Ok(v),
+        } }; }
+        remap!(
+            NoteOn,
+            NoteOff,
+            PolyPressure,
+            ControlChange,
+            ProgramChange,
+            ChannelPressure,
+            PitchBend,
+            RegisteredPerNoteController,
+            AssignablePerNoteController,
+            PerNoteManagement,
+            RegisteredController,
+            AssignableController,
+            RelativeRegisteredController,
+            RelativeAssignableController,
+            PerNotePitchBend
+        )
+    }
+
+    pub fn group(&self) -> Option<u8> {
+        macro_rules! groups { ($($name:ident),*) => { match self {
+            $(Self::$name(v) => v.group(),)*
+            Self::RegisteredPerNoteController(v) => Some(v.group()),
+            Self::AssignablePerNoteController(v) => Some(v.group()),
+            Self::PerNoteManagement(v) => Some(v.group()),
+            Self::RegisteredController(v) => Some(v.group()),
+            Self::AssignableController(v) => Some(v.group()),
+            Self::RelativeRegisteredController(v) => Some(v.group()),
+            Self::RelativeAssignableController(v) => Some(v.group()),
+            Self::PerNotePitchBend(v) => Some(v.group()),
+        } }; }
+        groups!(
+            NoteOn,
+            NoteOff,
+            PolyPressure,
+            ControlChange,
+            ProgramChange,
+            ChannelPressure,
+            PitchBend,
+            QuarterFrame,
+            SongPosition,
+            SongSelect,
+            TuneRequest,
+            TimingClock,
+            Start,
+            Continue,
+            Stop,
+            ActiveSensing,
+            SystemReset,
+            SysEx
+        )
+    }
+
+    pub fn with_group(self, group: i64) -> Result<Self, ValueError> {
+        macro_rules! groups { ($($name:ident),*) => { match self { $(Self::$name(v) => Ok(Self::$name(v.with_group(group)?)),)* } }; }
+        groups!(
+            NoteOn,
+            NoteOff,
+            PolyPressure,
+            ControlChange,
+            ProgramChange,
+            ChannelPressure,
+            PitchBend,
+            QuarterFrame,
+            SongPosition,
+            SongSelect,
+            TuneRequest,
+            TimingClock,
+            Start,
+            Continue,
+            Stop,
+            ActiveSensing,
+            SystemReset,
+            SysEx,
+            RegisteredPerNoteController,
+            AssignablePerNoteController,
+            PerNoteManagement,
+            RegisteredController,
+            AssignableController,
+            RelativeRegisteredController,
+            RelativeAssignableController,
+            PerNotePitchBend
+        )
+    }
+
+    pub fn without_group(self) -> Result<Self, ValueError> {
+        macro_rules! groups { ($($name:ident),*) => { match self {
+            $(Self::$name(v) => Ok(Self::$name(v.without_group()?)),)*
+            _ => Err(ValueError("MIDI 2 requires a group".into())),
+        } }; }
+        groups!(
+            NoteOn,
+            NoteOff,
+            PolyPressure,
+            ControlChange,
+            ProgramChange,
+            ChannelPressure,
+            PitchBend,
+            QuarterFrame,
+            SongPosition,
+            SongSelect,
+            TuneRequest,
+            TimingClock,
+            Start,
+            Continue,
+            Stop,
+            ActiveSensing,
+            SystemReset,
+            SysEx
+        )
+    }
+
+    pub fn kind(&self) -> &'static str {
+        macro_rules! kinds { ($($name:ident),*) => { match self { $(Self::$name(_) => stringify!($name),)* } }; }
+        kinds!(
+            NoteOn,
+            NoteOff,
+            PolyPressure,
+            ControlChange,
+            ProgramChange,
+            ChannelPressure,
+            PitchBend,
+            QuarterFrame,
+            SongPosition,
+            SongSelect,
+            TuneRequest,
+            TimingClock,
+            Start,
+            Continue,
+            Stop,
+            ActiveSensing,
+            SystemReset,
+            SysEx,
+            RegisteredPerNoteController,
+            AssignablePerNoteController,
+            PerNoteManagement,
+            RegisteredController,
+            AssignableController,
+            RelativeRegisteredController,
+            RelativeAssignableController,
+            PerNotePitchBend
+        )
+    }
+
     pub fn version(&self) -> u8 {
         match self {
+            Self::RegisteredPerNoteController(_)
+            | Self::AssignablePerNoteController(_)
+            | Self::PerNoteManagement(_)
+            | Self::RegisteredController(_)
+            | Self::AssignableController(_)
+            | Self::RelativeRegisteredController(_)
+            | Self::RelativeAssignableController(_)
+            | Self::PerNotePitchBend(_) => 2,
             Self::NoteOn(v) => v.version(),
             Self::NoteOff(v) => v.version(),
             Self::PolyPressure(v) => v.version(),
@@ -670,6 +915,13 @@ impl AnyMessage {
     pub fn encoded_len(&self) -> usize {
         if self.version() == 2 {
             return 8;
+        }
+        if self.group().is_some() {
+            return match self {
+                Self::SysEx(v) => v.data().len().max(1).div_ceil(6) * 8,
+                Self::ControlChange(v) if v.resolution() == 14 => 8,
+                _ => 4,
+            };
         }
         match self {
             Self::SysEx(v) => v.data().len() + 2,
@@ -693,9 +945,10 @@ impl AnyMessage {
 #[derive(Clone, Debug)]
 pub struct SysEx {
     metadata: Option<Box<crate::messages::Metadata>>,
+    group: Option<u8>,
     data: Box<[u8]>,
 }
-crate::messages::value_metadata!(SysEx { data });
+crate::messages::value_metadata!(SysEx { group, data });
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AnyCommand {
@@ -712,6 +965,44 @@ enum_metadata!(AnyCommand {
     BankProgramSelect,
     ZoneConfiguration
 });
+impl AnyCommand {
+    pub fn channel(&self) -> Option<u8> {
+        match self {
+            Self::ControlChange(v) => v.channel(),
+            Self::ParameterSet(v) => v.channel(),
+            Self::ParameterStep(v) => v.channel(),
+            Self::BankProgramSelect(v) => v.channel(),
+            Self::ZoneConfiguration(v) => Some(v.manager_channel()),
+        }
+    }
+    pub fn with_channel(self, channel: i64) -> Result<Self, ValueError> {
+        match self {
+            Self::ControlChange(v) => Ok(Self::ControlChange(v.with_channel(channel)?)),
+            Self::ParameterSet(v) => Ok(Self::ParameterSet(v.with_channel(channel)?)),
+            Self::ParameterStep(v) => Ok(Self::ParameterStep(v.with_channel(channel)?)),
+            Self::BankProgramSelect(v) => Ok(Self::BankProgramSelect(v.with_channel(channel)?)),
+            Self::ZoneConfiguration(v) => Ok(Self::ZoneConfiguration(v.with_channel(channel)?)),
+        }
+    }
+    pub fn group(&self) -> Option<u8> {
+        match self {
+            Self::ControlChange(v) => v.group(),
+            Self::ParameterSet(v) => v.group(),
+            Self::ParameterStep(v) => v.group(),
+            Self::BankProgramSelect(v) => v.group(),
+            Self::ZoneConfiguration(v) => v.group(),
+        }
+    }
+    pub fn with_group(self, group: i64) -> Result<Self, ValueError> {
+        match self {
+            Self::ControlChange(v) => Ok(Self::ControlChange(v.with_group(group)?)),
+            Self::ParameterSet(v) => Ok(Self::ParameterSet(v.with_group(group)?)),
+            Self::ParameterStep(v) => Ok(Self::ParameterStep(v.with_group(group)?)),
+            Self::BankProgramSelect(v) => Ok(Self::BankProgramSelect(v.with_group(group)?)),
+            Self::ZoneConfiguration(v) => Ok(Self::ZoneConfiguration(v.with_group(group)?)),
+        }
+    }
+}
 
 fn validate_resolution(value: i64, resolution: i64) -> Result<(), ValueError> {
     if resolution != 7 && resolution != 14 {
@@ -722,12 +1013,14 @@ fn validate_resolution(value: i64, resolution: i64) -> Result<(), ValueError> {
 }
 
 impl SysEx {
+    group_methods!();
     pub fn new(data: Vec<u8>) -> Result<Self, ValueError> {
         if data.iter().any(|value| *value > 127) {
             return Err(ValueError("SysEx payload bytes must be in 0..=127".into()));
         }
         Ok(Self {
             metadata: None,
+            group: None,
             data: data.into_boxed_slice(),
         })
     }
@@ -774,6 +1067,22 @@ pub(crate) fn inherit_metadata<M: Message>(
     } else {
         Ok(messages)
     }
+}
+
+pub(crate) fn inherit_command(
+    source: &(impl Message + ?Sized),
+    group: Option<u8>,
+    messages: Vec<AnyMessage>,
+) -> Result<Vec<AnyMessage>, ValueError> {
+    let messages = if let Some(group) = group {
+        messages
+            .into_iter()
+            .map(|m| m.with_group(group.into()))
+            .collect::<Result<_, _>>()?
+    } else {
+        messages
+    };
+    inherit_metadata(source, messages)
 }
 
 #[cfg(test)]

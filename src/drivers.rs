@@ -455,13 +455,13 @@ pub(crate) fn run_routing(
 #[pyclass(module = "meedee._core")]
 pub(crate) struct DiscoveryPollState {
     value: meedee::discovery::PollState,
-    protocol: String,
+    encoding: String,
 }
 #[pymethods]
 impl DiscoveryPollState {
     #[new]
     fn new(
-        protocol: String,
+        encoding: String,
         #[pyo3(from_py_with=crate::files::limit)] port_limit: usize,
         #[pyo3(from_py_with=crate::files::limit)] detail_limit: usize,
         #[pyo3(from_py_with=crate::files::limit)] history_limit: usize,
@@ -469,7 +469,7 @@ impl DiscoveryPollState {
         Ok(Self {
             value: meedee::discovery::PollState::new(port_limit, detail_limit, history_limit)
                 .map_err(|e| PyValueError::new_err(e.to_string()))?,
-            protocol,
+            encoding,
         })
     }
     fn poll(
@@ -495,7 +495,7 @@ impl DiscoveryPollState {
                 let name: String = calls.convert(port.getattr("name").and_then(|v| v.extract()))?;
                 endpoints.push(meedee::topology::Endpoint::new(
                     format!("{:?}", backend.native()),
-                    self.protocol.clone(),
+                    self.encoding.clone(),
                     direction.into(),
                     id,
                     name,

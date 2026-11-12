@@ -26,6 +26,7 @@ mod file_timing;
 mod files;
 mod live;
 mod messages;
+mod messages_midi2;
 mod metrics;
 mod packets;
 mod playback;
@@ -33,6 +34,7 @@ mod ports;
 mod profiles;
 mod recording;
 mod sysex;
+mod translation;
 mod tuning;
 mod ump;
 mod units;
@@ -53,6 +55,7 @@ fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_monitor, module)?)?;
     module.add_function(wrap_pyfunction!(populate_messages, module)?)?;
+    module.add_function(wrap_pyfunction!(populate_translation, module)?)?;
     module.add_function(wrap_pyfunction!(populate_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(populate_ci, module)?)?;
     module.add_function(wrap_pyfunction!(populate_inspection, module)?)?;
@@ -120,6 +123,10 @@ fn populate_codecs(module: &Bound<'_, PyModule>) -> PyResult<()> {
 fn populate_messages(module: &Bound<'_, PyModule>) -> PyResult<()> {
     messages::register(module)
 }
+#[pyfunction]
+fn populate_translation(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    translation::register(module)
+}
 
 #[pyfunction]
 fn populate_events(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -184,6 +191,7 @@ fn populate_midi(module: &Bound<'_, PyModule>) -> PyResult<()> {
     native.add_function(wrap_pyfunction!(callback::check_thread, &native)?)?;
     native.add_function(wrap_pyfunction!(packets::prepare_send, &native)?)?;
     native.add_function(wrap_pyfunction!(live::prepare_output, &native)?)?;
+    native.add_function(wrap_pyfunction!(live::resolve_output_channel, &native)?)?;
     native.add_function(wrap_pyfunction!(live::live_size, &native)?)?;
     playback::register_native(&native)?;
     PyModule::import(py, "sys")?

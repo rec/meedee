@@ -165,7 +165,7 @@ class Output:
         else:
             packets = list(
                 ump.packetize_sysex7(
-                    group=self.group, data=codecs.encode(response)[1:-1]
+                    messages.SysEx(codecs.encode(response)[1:-1], group=self.group)
                 )
             )
         self.receiver.items.extend((p).replace(stream="in") for p in packets)
@@ -286,7 +286,7 @@ def test_cli_requires_identity_and_explicit_ump_group_before_transport(
                     "in",
                     "--output-port",
                     "out",
-                    "--protocol",
+                    "--encoding",
                     "ump",
                     *extra,
                 ]
@@ -328,8 +328,8 @@ def test_cli_uses_fresh_muid_and_closes_both_connections(
                 "in",
                 "--output-port",
                 "out",
-                "--protocol",
-                "midi1",
+                "--encoding",
+                "bytes",
                 "--manufacturer",
                 "7d0000",
                 "--family",
@@ -371,7 +371,7 @@ def test_stream_diagnostic_stops_without_interpreting_later_input(
     clock = [0]
     monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
-    decoder = events.PacketDecoder(stream="in", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="in", encoding=midi.Encoding.Bytes)
     receiver.items.append(decoder.loss(lost=1, reason="known framing loss"))
     output = Output(receiver, None)
     report = run(browser(), receiver, output)

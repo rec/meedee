@@ -21,6 +21,7 @@ __all__: list[str] = [
     "Decoder",
     "Distribution",
     "DrumKit",
+    "Encoding",
     "FrameRate",
     "Gm1On",
     "Gm2On",
@@ -34,7 +35,6 @@ __all__: list[str] = [
     "MasterFineTuning",
     "MasterVolume",
     "Message",
-    "Midi1Packet",
     "MidiError",
     "Monitor",
     "MonitorReport",
@@ -59,7 +59,6 @@ __all__: list[str] = [
     "PortInfoError",
     "Program",
     "ProgramChange",
-    "Protocol",
     "QuarterFrame",
     "Rational",
     "Reader",
@@ -117,6 +116,7 @@ __all__: list[str] = [
     "testing",
     "timecode",
     "topology",
+    "translation",
     "tuning",
     "ump",
     "universal",
@@ -145,6 +145,7 @@ from . import (
     testing,
     timecode,
     topology,
+    translation,
     tuning,
     ump,
     universal,
@@ -215,6 +216,7 @@ from .midi import (
     CapabilityError,
     CompoundSendError,
     ConnectError,
+    Encoding,
     InitError,
     Input,
     MidiError,
@@ -222,7 +224,6 @@ from .midi import (
     Output,
     Port,
     PortInfoError,
-    Protocol,
     ResourceError,
     SendError,
     StateError,
@@ -235,7 +236,7 @@ from .mpe import ZoneConfiguration
 from .routing import Route, Router
 from .timecode import FrameRate
 from .tuning import NoChange, NoteTuning, Pitch, ScaleOffsets, TuningTable
-from .ump import Midi1Packet, SysEx7Packet, SysEx8Packet
+from .ump import SysEx7Packet, SysEx8Packet
 from .universal import (
     IdentityReply,
     IdentityRequest,

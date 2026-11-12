@@ -2,16 +2,16 @@
 use crate::{midi, topology, transport};
 
 pub struct Poller {
-    protocol: transport::Protocol,
+    encoding: transport::Encoding,
     backend: Option<transport::Backend>,
     state: PollState,
     input: Option<transport::Input>,
     output: Option<transport::Output>,
 }
 impl Poller {
-    pub fn new(protocol: transport::Protocol) -> midi::Result<Self> {
+    pub fn new(encoding: transport::Encoding) -> midi::Result<Self> {
         Ok(Self {
-            protocol,
+            encoding,
             backend: None,
             state: PollState::new(256, 128, 128)?,
             input: None,
@@ -37,7 +37,7 @@ impl Poller {
         if self.closed() {
             return Err(crate::drivers::invalid("discovery poller is closed"));
         }
-        let protocol = self.protocol;
+        let encoding = self.encoding;
         let backend = self.backend;
         let input = &mut self.input;
         let output = &mut self.output;
@@ -46,7 +46,7 @@ impl Poller {
                 if input.is_none() {
                     *input = Some(
                         transport::Input::new(transport::InputOptions {
-                            protocol,
+                            encoding,
                             backend,
                             ..Default::default()
                         })
@@ -57,7 +57,7 @@ impl Poller {
             } else {
                 if output.is_none() {
                     *output = Some(
-                        transport::Output::new(transport::OutputOptions { protocol, backend })
+                        transport::Output::new(transport::OutputOptions { encoding, backend })
                             .map_err(midi::Error::Init)?,
                     );
                 }
@@ -69,9 +69,9 @@ impl Poller {
                 .map(|p| {
                     Ok(topology::Endpoint::new(
                         format!("{:?}", p.backend()),
-                        match protocol {
-                            transport::Protocol::Midi1 => "midi1",
-                            transport::Protocol::Ump => "ump",
+                        match encoding {
+                            transport::Encoding::Bytes => "bytes",
+                            transport::Encoding::Ump => "ump",
                         }
                         .into(),
                         direction.into(),

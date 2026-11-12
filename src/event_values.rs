@@ -45,8 +45,8 @@ pub(crate) fn with_metadata(
     Ok(value)
 }
 pub fn payload(v: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
-    if let Ok(v) = crate::messages::extract_primitive(v) {
-        return Ok(model::Payload::Midi1(v));
+    if let Ok(v) = crate::messages::extract_message(v) {
+        return Ok(v.into());
     }
     if let Ok(v) = crate::messages::extract_command(v) {
         return Ok(model::Payload::Command(v));
@@ -59,7 +59,7 @@ pub fn payload(v: &Bound<'_, PyAny>) -> PyResult<model::Payload> {
 pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
     let metadata = v.metadata().cloned().unwrap_or_default();
     let object = match v.without_metadata() {
-        model::Payload::Midi1(v) => crate::messages::to_python(py, v),
+        model::Payload::Message(v) => crate::messages::to_python(py, v),
         model::Payload::Ump(v) => crate::ump::to_python(py, v),
         model::Payload::Command(v) => {
             let (name, kwargs) = crate::messages::command_wire(py, &v)?;

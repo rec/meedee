@@ -2,7 +2,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
 
-use crate::packets::{Protocol, TimestampMode, UmpPacket};
+use crate::packets::{Encoding, TimestampMode, UmpPacket};
 
 #[test]
 fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
@@ -12,14 +12,14 @@ fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
         crate::lifecycle::initialize(py).unwrap();
         let messages = PyModule::new(py, "meedee.messages").unwrap();
         crate::messages::register(&messages).unwrap();
-        for protocol in [Protocol::Midi1, Protocol::Ump] {
+        for encoding in [Encoding::Bytes, Encoding::Ump] {
             for mode in [TimestampMode::Absolute, TimestampMode::Off] {
                 let received = PyList::empty(py);
                 let options = PyDict::new(py);
                 options
                     .set_item("identity", "native-binding-input")
                     .unwrap();
-                options.set_item("protocol", protocol).unwrap();
+                options.set_item("encoding", encoding).unwrap();
                 options.set_item("timestamps", mode).unwrap();
                 let input = py
                     .get_type::<crate::input::Input>()
@@ -29,12 +29,12 @@ fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
                 options
                     .set_item("identity", "native-binding-output")
                     .unwrap();
-                options.set_item("protocol", protocol).unwrap();
+                options.set_item("encoding", encoding).unwrap();
                 let output = py
                     .get_type::<crate::output::Output>()
                     .call((), Some(&options))
                     .unwrap();
-                let name = format!("python-ffi-{protocol:?}-{mode:?}");
+                let name = format!("python-ffi-{encoding:?}-{mode:?}");
                 let incoming = input
                     .call_method1(
                         "create_virtual",
@@ -49,7 +49,7 @@ fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
                     .find(|p| p.getattr("name").unwrap().extract::<String>().unwrap() == name)
                     .unwrap();
                 let outgoing = output.call_method1("connect", (&port,)).unwrap();
-                let data = if protocol == Protocol::Midi1 {
+                let data = if encoding == Encoding::Bytes {
                     PyBytes::new(py, &[0x90, 60, 100]).into_any().unbind()
                 } else {
                     Py::new(
@@ -84,7 +84,7 @@ fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
                     .unwrap()
                     .call((), Some(&fields))
                     .unwrap();
-                if protocol == Protocol::Midi1 {
+                if encoding == Encoding::Bytes {
                     outgoing.call_method1("send_command", (command,)).unwrap();
                     assert_eq!(received.len(), 3);
                     for (index, bytes) in [(1, [0xb0, 7, 78]), (2, [0xb0, 39, 16])] {

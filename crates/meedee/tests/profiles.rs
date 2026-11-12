@@ -239,7 +239,7 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
     assert!(timecode::FullFrame::new(1, timecode::FrameRate::Fps30, 0, 0, 0, 0).is_err());
     let mut interpreter = controls::ControlInterpreter::new(None).unwrap();
     let cc = |controller, value| {
-        meedee::events::Payload::Midi1(AnyMessage::ControlChange(
+        meedee::events::Payload::Message(AnyMessage::ControlChange(
             meedee::messages::ControlChange::new(controller, value)
                 .unwrap()
                 .with_channel(1)
@@ -248,7 +248,7 @@ fn named_rpns_modes_and_mpe_keep_their_distinct_units_and_ranges() {
     };
     interpreter.feed(&cc(7, 1)).unwrap();
     let wire = gm::Gm2On::new(127).unwrap().encode().unwrap();
-    let mode = meedee::events::Payload::Midi1(AnyMessage::SysEx(
+    let mode = meedee::events::Payload::Message(AnyMessage::SysEx(
         SysEx::new(wire[1..wire.len() - 1].to_vec()).unwrap(),
     ));
     interpreter.feed(&mode).unwrap();

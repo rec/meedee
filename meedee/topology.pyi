@@ -5,7 +5,7 @@ class Endpoint:
         self,
         *,
         backend: str,
-        protocol: Literal["midi1", "ump"],
+        encoding: Literal["bytes", "ump"],
         direction: Literal["input", "output"],
         backend_id: int,
         name: str,
@@ -13,7 +13,7 @@ class Endpoint:
     @property
     def backend(self) -> str: ...
     @property
-    def protocol(self) -> str: ...
+    def encoding(self) -> str: ...
     @property
     def direction(self) -> str: ...
     @property

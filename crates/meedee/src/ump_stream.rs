@@ -8,7 +8,7 @@ pub struct DecodeDiagnostic {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DecodeOutput {
-    Message(UmpMessage),
+    Message(Payload),
     Diagnostic(DecodeDiagnostic),
 }
 #[derive(Clone, Debug)]
@@ -196,7 +196,7 @@ impl AssemblyState {
         self.reset();
         out
     }
-    pub fn feed_spanned(&mut self, value: &UmpMessage) -> Vec<(AssemblyItem, usize, usize)> {
+    pub fn feed_spanned(&mut self, value: &Payload) -> Vec<(AssemblyItem, usize, usize)> {
         let index = self.next_index;
         self.current_index = index;
         self.next_index = self.next_index.saturating_add(1);
@@ -219,23 +219,40 @@ impl AssemblyState {
             .flat_map(|p| [p.first_index, p.last_index])
             .collect()
     }
-    fn accept(&mut self, value: &UmpMessage) -> Vec<AssemblyItem> {
-        let group = value.group();
-        let realtime = matches!(value,UmpMessage::Midi1(v) if v.message().encode().expect("validated system message")[0]>=248);
+    fn accept(&mut self, payload: &Payload) -> Vec<AssemblyItem> {
+        let value = match payload {
+            Payload::Ump(v) => Some(v),
+            _ => None,
+        };
+        let group = payload.group();
+        let realtime = matches!(
+            payload,
+            Payload::Message(
+                AnyMessage::TimingClock(_)
+                    | AnyMessage::Start(_)
+                    | AnyMessage::Continue(_)
+                    | AnyMessage::Stop(_)
+                    | AnyMessage::ActiveSensing(_)
+                    | AnyMessage::SystemReset(_)
+            )
+        );
         let mut out = Vec::new();
         // A different grouped non-realtime message interrupts SysEx7. FlexData
         // permits only same-message fragments, realtime and groupless JR Clock.
         let interrupted=self.pending.keys().filter(|k|{
-            if k.kind==DataKind::SysEx7&&k.group==group&&!realtime {return !matches!(value,UmpMessage::SysEx7(v) if Some(v.group())==k.group);}
-            if k.kind==DataKind::FlexData&&(k.group==group||group.is_none()&&!matches!(value,UmpMessage::JrClock(_)))&&!realtime {return !matches!(value,UmpMessage::FlexData(v) if Some(v.group())==k.group&&v.channel()==k.channel&&Some(v.status_bank())==k.bank&&Some(u16::from(v.status()))==k.status);}
+            if k.kind==DataKind::SysEx7&&k.group==group&&!realtime {return !matches!(value,Some(PacketValue::SysEx7(v)) if Some(v.group())==k.group);}
+            if k.kind==DataKind::FlexData&&(k.group==group||group.is_none()&&!matches!(value,Some(PacketValue::JrClock(_))))&&!realtime {return !matches!(value,Some(PacketValue::FlexData(v)) if Some(v.group())==k.group&&v.channel()==k.channel&&Some(v.status_bank())==k.bank&&Some(u16::from(v.status()))==k.status);}
             false
         }).cloned().collect::<Vec<_>>();
         for key in interrupted {
             self.remove(&key);
             out.push(AssemblyItem::Diagnostic(AssemblyDiagnostic::Interrupted));
         }
+        let Some(value) = value else {
+            return out;
+        };
         let (key, format, data, abort, text, max_packets, max_len) = match value {
-            UmpMessage::SysEx7(v) => (
+            PacketValue::SysEx7(v) => (
                 Key {
                     kind: DataKind::SysEx7,
                     group: Some(v.group()),
@@ -251,7 +268,7 @@ impl AssemblyState {
                 usize::MAX,
                 self.message_limit,
             ),
-            UmpMessage::SysEx8(v) => (
+            PacketValue::SysEx8(v) => (
                 Key {
                     kind: DataKind::SysEx8,
                     group: Some(v.group()),
@@ -267,7 +284,7 @@ impl AssemblyState {
                 usize::MAX,
                 self.message_limit,
             ),
-            UmpMessage::FlexData(v) => (
+            PacketValue::FlexData(v) => (
                 Key {
                     kind: DataKind::FlexData,
                     group: Some(v.group()),
@@ -283,7 +300,7 @@ impl AssemblyState {
                 32,
                 384,
             ),
-            UmpMessage::Stream(v) if matches!(v.status(), 3 | 4 | 18) => {
+            PacketValue::Stream(v) if matches!(v.status(), 3 | 4 | 18) => {
                 let fb = v.status() == 18;
                 let limit = match v.status() {
                     3 => 98,

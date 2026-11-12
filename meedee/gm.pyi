@@ -9,9 +9,13 @@ class BankProgramSelect(messages.Message):
         bank_msb: int = 0,
         bank_lsb: int = 0,
         channel: int | None = None,
+        *,
+        group: int | None = None,
     ) -> None: ...
     @property
     def channel(self) -> int | None: ...
+    @property
+    def group(self) -> int | None: ...
     @property
     def bank_msb(self) -> int: ...
     @property
@@ -22,6 +26,7 @@ class BankProgramSelect(messages.Message):
         self,
         *,
         channel: int | None = ...,
+        group: int | None = ...,
         bank_msb: int = ...,
         bank_lsb: int = ...,
         program: int = ...,

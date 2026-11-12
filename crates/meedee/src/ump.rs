@@ -2,17 +2,15 @@
 //! belongs to the selected transport/file format and must be specified by callers.
 use crate::codecs::{DecodeItem, Decoder as ByteDecoder};
 pub use crate::event_views::Ump as Assembler;
+use crate::events::Payload;
 use crate::messages::{AnyMessage, Message, PrimitiveMessage, SysEx, ValueError};
 #[path = "ump_stream.rs"]
 mod streams;
 pub(crate) use streams::AssemblyState;
-#[path = "ump_translation.rs"]
-mod translation;
 pub use streams::{
     packetize_flex_text, packetize_stream_text, AssembledData, AssemblyDiagnostic, AssemblyItem,
     DataKind, DecodeDiagnostic, DecodeOutput, Decoder,
 };
-pub use translation::{scale_up, to_midi1, to_midi2, Translation, TranslationStatus};
 #[path = "ump_helpers.rs"]
 mod helpers;
 pub use helpers::{
@@ -24,26 +22,6 @@ include!("ump_values.rs");
 
 pub trait UmpValue: Message {
     fn encode_words(&self) -> Result<Vec<u32>, ValueError>;
-}
-macro_rules! scalar_group {
-    (Noop, $v:ident) => {
-        None
-    };
-    (JrClock, $v:ident) => {
-        None
-    };
-    (JrTimestamp, $v:ident) => {
-        None
-    };
-    (DeltaClockstampTicksPerQuarter, $v:ident) => {
-        None
-    };
-    (DeltaClockstamp, $v:ident) => {
-        None
-    };
-    ($name:ident, $v:ident) => {
-        Some($v.group())
-    };
 }
 macro_rules! scalar {
     ($($name:ident [$first:expr,$second:expr] {$($field:ident:$ty:ty = $lo:literal ..= $hi:literal => [$word:literal,$shift:literal,$mask:literal,$bias:literal]),*};)*)=>{
@@ -64,48 +42,54 @@ macro_rules! scalar {
             words.truncate(word_count(words[0]));Ok(words)
         }})*
         #[derive(Clone,Debug,PartialEq,Eq,Hash)]
-        pub enum UmpMessage {$($name($name),)* NoteOn(crate::messages::NoteOn), NoteOff(crate::messages::NoteOff), PolyPressure(crate::messages::PolyPressure), ControlChange(crate::messages::ControlChange), ProgramChange(crate::messages::ProgramChange), ChannelPressure(crate::messages::ChannelPressure), PitchBend(crate::messages::PitchBend), Midi1(Midi1Packet),SysEx7(SysEx7Packet),SysEx8(SysEx8Packet),MixedDataSet(MixedDataSet),FlexData(FlexData),Stream(StreamMessage),Opaque(OpaquePacket)}
-        impl UmpMessage {
+        pub enum PacketValue {$($name($name),)* SysEx7(SysEx7Packet),SysEx8(SysEx8Packet),MixedDataSet(MixedDataSet),FlexData(FlexData),Stream(StreamMessage),Opaque(OpaquePacket)}
+        impl PacketValue {
+            pub fn with_group(mut self, group: i64) -> Result<Self, ValueError> {
+                let group = crate::messages::checked_group(group)?;
+                match &mut self {
+                    Self::SysEx7(v) => v.group = group, Self::SysEx8(v) => v.group = group,
+                    Self::MixedDataSet(v) => v.group = group, Self::FlexData(v) => v.group = group,
+                    Self::Opaque(_) => return Err(ValueError("opaque packet addressing requires raw editing".into())),
+                    _ => {},
+                }
+                Ok(self)
+            }
             pub(crate) fn message_type(&self) -> u32 { match self {
                 $(Self::$name(_) => ($first as u32) >> 28,)*
-                Self::NoteOn(_) | Self::NoteOff(_) | Self::PolyPressure(_) | Self::ControlChange(_) | Self::ProgramChange(_) | Self::ChannelPressure(_) | Self::PitchBend(_) => 4,
-                Self::Midi1(v) => if v.message.encode().expect("validated MIDI 1 packet")[0] >= 240 { 1 } else { 2 },
                 Self::SysEx7(_) => 3, Self::SysEx8(_) | Self::MixedDataSet(_) => 5,
                 Self::FlexData(_) => 13, Self::Stream(_) => 15, Self::Opaque(v) => v.words()[0] >> 28,
             } }
-            pub(crate) fn group(&self) -> Option<u8> { match self {
-                $(Self::$name(v) => { let _ = v; scalar_group!($name, v) },)*
-                Self::NoteOn(v) => v.group(), Self::NoteOff(v) => v.group(), Self::PolyPressure(v) => v.group(), Self::ControlChange(v) => v.group(), Self::ProgramChange(v) => v.group(), Self::ChannelPressure(v) => v.group(), Self::PitchBend(v) => v.group(),
-                Self::Midi1(v) => Some(v.group()), Self::SysEx7(v) => Some(v.group()),
+            pub fn group(&self) -> Option<u8> { match self {
+                $(Self::$name(_) => None,)*
+                Self::SysEx7(v) => Some(v.group()),
                 Self::SysEx8(v) => Some(v.group()), Self::MixedDataSet(v) => Some(v.group()),
                 Self::FlexData(v) => Some(v.group()), Self::Stream(_) => None,
                 Self::Opaque(v) => matches!(self.message_type(),1..=5|13).then_some(((v.words()[0] >> 24) & 15) as u8 + 1),
             } }
             pub(crate) fn encoded_len(&self) -> usize { word_count(self.message_type() << 28) }
         }
-        impl UmpMessage { pub(crate) fn kind(&self) -> &'static str { match self {
+        impl PacketValue { pub(crate) fn kind(&self) -> &'static str { match self {
             $(Self::$name(_) => stringify!($name),)*
-            Self::NoteOn(_) => "NoteOn", Self::NoteOff(_) => "NoteOff", Self::PolyPressure(_) => "PolyPressure", Self::ControlChange(_) => "ControlChange", Self::ProgramChange(_) => "ProgramChange", Self::ChannelPressure(_) => "ChannelPressure", Self::PitchBend(_) => "PitchBend",
-            Self::Midi1(_) => "Midi1Packet", Self::SysEx7(_) => "SysEx7Packet",
+            Self::SysEx7(_) => "SysEx7Packet",
             Self::SysEx8(_) => "SysEx8Packet", Self::MixedDataSet(_) => "MixedDataSet",
             Self::FlexData(_) => "FlexData", Self::Stream(_) => "StreamMessage",
             Self::Opaque(_) => "OpaquePacket",
         } } }
-        crate::messages::enum_metadata!(UmpMessage { $($name,)* NoteOn, NoteOff, PolyPressure, ControlChange, ProgramChange, ChannelPressure, PitchBend, Midi1, SysEx7, SysEx8, MixedDataSet, FlexData, Stream, Opaque });
-        impl UmpValue for UmpMessage {fn encode_words(&self)->Result<Vec<u32>,ValueError>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::NoteOn(v)=>v.encode_words(),Self::NoteOff(v)=>v.encode_words(),Self::PolyPressure(v)=>v.encode_words(),Self::ControlChange(v)=>v.encode_words(),Self::ProgramChange(v)=>v.encode_words(),Self::ChannelPressure(v)=>v.encode_words(),Self::PitchBend(v)=>v.encode_words(),Self::Midi1(v)=>v.encode_words(),Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
-        fn scalar_decode(words:&[u32])->Result<Option<UmpMessage>,ValueError>{
+        crate::messages::enum_metadata!(PacketValue { $($name,)* SysEx7, SysEx8, MixedDataSet, FlexData, Stream, Opaque });
+        impl UmpValue for PacketValue {fn encode_words(&self)->Result<Vec<u32>,ValueError>{match self{$(Self::$name(v)=>v.encode_words(),)*Self::SysEx7(v)=>v.encode_words(),Self::SysEx8(v)=>v.encode_words(),Self::MixedDataSet(v)=>v.encode_words(),Self::FlexData(v)=>v.encode_words(),Self::Stream(v)=>v.encode_words(),Self::Opaque(v)=>v.encode_words()}}}
+        fn scalar_decode(words:&[u32])->Result<Option<PacketValue>,ValueError>{
             let key=if words[0]>>28==0{words[0]&0xfff00000}else{words[0]&0xf0f00000};
             $(if key==$first {
                 $(let raw=(words[$word]>>$shift)&$mask;let $field=if stringify!($ty)=="i32"&&($bias as i64)==0{(raw as i32) as i64}else{i64::from(raw)-$bias};)*
                 let value=$name::new($($field),*)?;
                 if value.encode_words()?!=words{return Err(ValueError("nonzero reserved scalar fields".into()));}
-                return Ok(Some(UmpMessage::$name(value)));
-            })*channel_decode(words)
+                return Ok(Some(PacketValue::$name(value)));
+            })*Ok(None)
         }
     };
 }
 scalar_values!(scalar);
-fn validate_scalar(words: &[u32]) -> Result<(), ValueError> {
+pub(crate) fn validate_scalar(words: &[u32]) -> Result<(), ValueError> {
     if words[0] >> 28 == 4 {
         let status = (words[0] >> 20) & 15;
         let attr = words[0] & 255;
@@ -129,41 +113,6 @@ pub fn encode(value: &(impl UmpValue + ?Sized)) -> Result<Vec<u32>, ValueError> 
     value.encode_words()
 }
 
-#[derive(Clone, Debug)]
-pub struct Midi1Packet {
-    metadata: Option<Box<crate::messages::Metadata>>,
-    group: u8,
-    message: AnyMessage,
-}
-impl Midi1Packet {
-    pub fn new(group: i64, message: AnyMessage) -> Result<Self, ValueError> {
-        if matches!(message, AnyMessage::SysEx(_)) {
-            return Err(ValueError("use SysEx7 packetization for SysEx".into()));
-        }
-        message.encode()?;
-        Ok(Self {
-            metadata: None,
-            group: bounded(group, 1, 16, "group")? as u8,
-            message,
-        })
-    }
-    pub fn group(&self) -> u8 {
-        self.group
-    }
-    pub fn message(&self) -> &AnyMessage {
-        &self.message
-    }
-}
-crate::messages::value_metadata!(Midi1Packet { group, message });
-impl UmpValue for Midi1Packet {
-    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
-        let b = self.message.encode()?;
-        let mut bytes = [0u8; 4];
-        bytes[0] = if b[0] >= 240 { 0x10 } else { 0x20 } | (self.group - 1);
-        bytes[1..1 + b.len()].copy_from_slice(&b);
-        Ok(vec![u32::from_be_bytes(bytes)])
-    }
-}
 #[derive(Clone, Debug)]
 pub struct SysEx7Packet {
     metadata: Option<Box<crate::messages::Metadata>>,
@@ -565,13 +514,15 @@ impl UmpValue for OpaquePacket {
     }
 }
 
-pub fn decode(words: &[u32], preserve_unknown: bool) -> Result<UmpMessage, ValueError> {
+pub fn decode(words: &[u32], preserve_unknown: bool) -> Result<Payload, ValueError> {
     if words.is_empty() || words.len() != word_count(words[0]) {
         return Err(ValueError("expected exactly one complete UMP".into()));
     }
     let fallback = |error: ValueError| {
         if preserve_unknown {
-            Ok(UmpMessage::Opaque(OpaquePacket::new(words.to_vec())?))
+            Ok(Payload::Ump(PacketValue::Opaque(OpaquePacket::new(
+                words.to_vec(),
+            )?)))
         } else {
             Err(error)
         }
@@ -582,15 +533,10 @@ pub fn decode(words: &[u32], preserve_unknown: bool) -> Result<UmpMessage, Value
         Err(e) => fallback(e),
     }
 }
-fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
-    let b = words
-        .iter()
-        .flat_map(|w| w.to_be_bytes())
-        .collect::<Vec<_>>();
-    let group = i64::from(b[0] & 15) + 1;
-    match b[0] >> 4 {
-        0 | 4 => scalar_decode(words),
+fn decode_known(words: &[u32]) -> Result<Option<Payload>, ValueError> {
+    match words[0] >> 28 {
         1 | 2 => {
+            let b = words[0].to_be_bytes();
             let len = match b[1] {
                 0x80..=0xbf | 0xe0..=0xef | 0xf2 => 3,
                 0xc0..=0xdf | 0xf1 | 0xf3 => 2,
@@ -609,14 +555,28 @@ fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
             let DecodeItem::Message(message) = items.remove(0) else {
                 return Err(ValueError("invalid MIDI 1 UMP data".into()));
             };
-            Ok(Some(UmpMessage::Midi1(Midi1Packet::new(group, message)?)))
+            Ok(Some(message.with_group(i64::from(b[0] & 15) + 1)?.into()))
         }
+        4 => Ok(crate::messages::decode_musical(words)?
+            .or(channel_decode(words)?)
+            .map(Payload::from)),
+        _ => Ok(decode_packet(words)?.map(Payload::Ump)),
+    }
+}
+fn decode_packet(words: &[u32]) -> Result<Option<PacketValue>, ValueError> {
+    let b = words
+        .iter()
+        .flat_map(|w| w.to_be_bytes())
+        .collect::<Vec<_>>();
+    let group = i64::from(b[0] & 15) + 1;
+    match b[0] >> 4 {
+        0 => scalar_decode(words),
         3 => {
             let n = usize::from(b[1] & 15);
             if n > 6 || b[2 + n..].iter().any(|&b| b != 0) {
                 return Err(ValueError("invalid SysEx7 byte count/padding".into()));
             }
-            Ok(Some(UmpMessage::SysEx7(SysEx7Packet::new(
+            Ok(Some(PacketValue::SysEx7(SysEx7Packet::new(
                 group,
                 i64::from(b[1] >> 4),
                 b[2..2 + n].to_vec(),
@@ -625,7 +585,7 @@ fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
         5 => {
             let status = b[1] >> 4;
             if status == 8 || status == 9 {
-                return Ok(Some(UmpMessage::MixedDataSet(MixedDataSet::new(
+                return Ok(Some(PacketValue::MixedDataSet(MixedDataSet::new(
                     group,
                     status == 8,
                     i64::from(b[1] & 15),
@@ -640,7 +600,7 @@ fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
             if b[if abort { 3 } else { 2 + n }..].iter().any(|&b| b != 0) {
                 return Err(ValueError("nonzero SysEx8 padding".into()));
             }
-            Ok(Some(UmpMessage::SysEx8(SysEx8Packet::new(
+            Ok(Some(PacketValue::SysEx8(SysEx8Packet::new(
                 group,
                 i64::from(status),
                 b[2].into(),
@@ -653,7 +613,7 @@ fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
             if address > 1 || address == 1 && b[1] & 15 != 0 {
                 return Err(ValueError("invalid FlexData address".into()));
             }
-            Ok(Some(UmpMessage::FlexData(FlexData::new(
+            Ok(Some(PacketValue::FlexData(FlexData::new(
                 group,
                 i64::from(b[1] >> 6),
                 if address == 0 {
@@ -666,7 +626,7 @@ fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
                 words[1..].to_vec(),
             )?)))
         }
-        15 => Ok(Some(UmpMessage::Stream(StreamMessage::new(
+        15 => Ok(Some(PacketValue::Stream(StreamMessage::new(
             i64::from((b[0] >> 2) & 3),
             i64::from(((u16::from(b[0]) & 3) << 8) | u16::from(b[1])),
             b[2..].to_vec(),
@@ -674,7 +634,13 @@ fn decode_known(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
         _ => Ok(None),
     }
 }
-pub fn packetize_sysex7(group: i64, data: &[u8]) -> Result<Vec<SysEx7Packet>, ValueError> {
+pub fn packetize_sysex7(message: &SysEx) -> Result<Vec<SysEx7Packet>, ValueError> {
+    let group = i64::from(
+        message
+            .group()
+            .ok_or_else(|| ValueError("UMP encoding requires a group".into()))?,
+    );
+    let data = message.data();
     bounded(group, 1, 16, "group")?;
     if data.iter().any(|&b| b > 127) {
         return Err(ValueError("SysEx7 requires seven-bit payload".into()));
@@ -776,23 +742,34 @@ impl Capabilities {
         })
     }
     /// None means these declarations do not establish support for this family.
-    pub fn supports(&self, message: &UmpMessage) -> Option<bool> {
+    pub fn supports(&self, message: &Payload) -> Option<bool> {
         match message {
-            UmpMessage::Opaque(_)
-            | UmpMessage::MixedDataSet(_)
-            | UmpMessage::FlexData(_)
-            | UmpMessage::Stream(_) => None,
-            UmpMessage::Midi1(v) => Some(
-                if v.message.encode().expect("decoded MIDI 1 message")[0] >= 240 {
-                    self.midi1 || self.midi2
-                } else {
-                    self.midi1
-                },
-            ),
-            UmpMessage::SysEx8(v) => Some(v.stream_id() < self.sysex8_streams),
-            UmpMessage::SysEx7(_) => Some(self.midi1 || self.midi2),
-            _ if message.message_type() == 4 => Some(self.midi2),
-            _ => None,
+            Payload::Message(v) => Some(if v.version() == 2 {
+                self.midi2
+            } else if matches!(
+                v,
+                AnyMessage::NoteOn(_)
+                    | AnyMessage::NoteOff(_)
+                    | AnyMessage::PolyPressure(_)
+                    | AnyMessage::ControlChange(_)
+                    | AnyMessage::ProgramChange(_)
+                    | AnyMessage::ChannelPressure(_)
+                    | AnyMessage::PitchBend(_)
+            ) {
+                self.midi1
+            } else {
+                self.midi1 || self.midi2
+            }),
+            Payload::Command(_) => Some(self.midi1),
+            Payload::Ump(message) => match message {
+                PacketValue::Opaque(_)
+                | PacketValue::MixedDataSet(_)
+                | PacketValue::FlexData(_)
+                | PacketValue::Stream(_) => None,
+                PacketValue::SysEx8(v) => Some(v.stream_id() < self.sysex8_streams),
+                PacketValue::SysEx7(_) => Some(self.midi1 || self.midi2),
+                _ => None,
+            },
         }
     }
 }
@@ -804,9 +781,7 @@ fn channel_header(
     status: u32,
 ) -> Result<u32, ValueError> {
     if version != 2 {
-        return Err(ValueError(
-            "use Midi1Packet for MIDI 1 UMP; conversion is explicit".into(),
-        ));
+        return Err(ValueError("MIDI 2 channel encoding required".into()));
     }
     let channel = channel.ok_or_else(|| ValueError("message channel is unassigned".into()))?;
     Ok(0x40000000
@@ -818,11 +793,102 @@ macro_rules! channel_encoding {
     ($($name:ident($v:ident) => ($status:expr, $first:expr, $second:expr);)*) => {$(
         impl UmpValue for crate::messages::$name {
             fn encode_words(&$v) -> Result<Vec<u32>, ValueError> {
+                if $v.version() == 1 {
+                    return encode_midi1(&AnyMessage::$name($v.clone()));
+                }
                 let head = channel_header($v.version(), $v.group(), $v.channel(), $status)?;
                 Ok(vec![head | $first, $second])
             }
         }
     )*};
+}
+
+fn encode_midi1(message: &AnyMessage) -> Result<Vec<u32>, ValueError> {
+    let group = message
+        .group()
+        .ok_or_else(|| ValueError("UMP encoding requires a group".into()))?;
+    let bytes = message.clone().without_group()?.encode()?;
+    let mut packet = [0; 4];
+    packet[0] = (if bytes[0] >= 240 { 0x10 } else { 0x20 }) | (group - 1);
+    packet[1..1 + bytes.len()].copy_from_slice(&bytes);
+    Ok(vec![u32::from_be_bytes(packet)])
+}
+macro_rules! system_encoding {
+    ($($name:ident),*) => { $(impl UmpValue for crate::messages::$name {
+        fn encode_words(&self) -> Result<Vec<u32>, ValueError> { encode_midi1(&AnyMessage::$name(self.clone())) }
+    })* };
+}
+system_encoding!(
+    QuarterFrame,
+    SongPosition,
+    SongSelect,
+    TuneRequest,
+    TimingClock,
+    Start,
+    Continue,
+    Stop,
+    ActiveSensing,
+    SystemReset
+);
+
+impl UmpValue for AnyMessage {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
+        match self {
+            Self::SysEx(v) => v.encode_words(),
+            v if v.version() == 1 => encode_midi1(v),
+            v => {
+                macro_rules! channels { ($($name:ident),*) => { match v {
+                    $(Self::$name(v) => v.encode_words(),)*
+                    _ => unreachable!("MIDI 2 semantic types"),
+                } }; }
+                channels!(
+                    NoteOn,
+                    NoteOff,
+                    PolyPressure,
+                    ControlChange,
+                    ProgramChange,
+                    ChannelPressure,
+                    PitchBend,
+                    RegisteredPerNoteController,
+                    AssignablePerNoteController,
+                    PerNoteManagement,
+                    RegisteredController,
+                    AssignableController,
+                    RelativeRegisteredController,
+                    RelativeAssignableController,
+                    PerNotePitchBend
+                )
+            }
+        }
+    }
+}
+
+impl UmpValue for SysEx {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
+        packetize_sysex7(self)?
+            .iter()
+            .try_fold(Vec::new(), |mut words, p| {
+                words.extend(p.encode_words()?);
+                Ok(words)
+            })
+    }
+}
+
+impl UmpValue for Payload {
+    fn encode_words(&self) -> Result<Vec<u32>, ValueError> {
+        self.validate()?;
+        match self {
+            Self::Message(v) => v.encode_words(),
+            Self::Ump(v) => v.encode_words(),
+            Self::Command(v) => {
+                use crate::messages::Command;
+                v.expand()?.iter().try_fold(Vec::new(), |mut words, m| {
+                    words.extend(m.encode_words()?);
+                    Ok(words)
+                })
+            }
+        }
+    }
 }
 channel_encoding! {
     NoteOn(self) => (9, u32::from(self.note()) << 8 | u32::from(self.attribute_type().unwrap()), u32::from(self.velocity()) << 16 | u32::from(self.attribute_data().unwrap()));
@@ -833,25 +899,7 @@ channel_encoding! {
     ChannelPressure(self) => (13, 0, self.pressure());
     PitchBend(self) => (14, 0, (i64::from(self.value()) + 2147483648) as u32);
 }
-impl TryFrom<AnyMessage> for UmpMessage {
-    type Error = ValueError;
-    fn try_from(value: AnyMessage) -> Result<Self, ValueError> {
-        macro_rules! channel { ($($name:ident),*) => { match value {
-            $(AnyMessage::$name(v) if v.version() == 2 => Ok(Self::$name(v)),)*
-            _ => Err(ValueError("MIDI 2 channel message required".into())),
-        } }; }
-        channel!(
-            NoteOn,
-            NoteOff,
-            PolyPressure,
-            ControlChange,
-            ProgramChange,
-            ChannelPressure,
-            PitchBend
-        )
-    }
-}
-fn channel_decode(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
+fn channel_decode(words: &[u32]) -> Result<Option<AnyMessage>, ValueError> {
     if words[0] >> 28 != 4 {
         return Ok(None);
     }
@@ -862,7 +910,7 @@ fn channel_decode(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
     let kind = i64::from(words[0] & 255);
     let data = i64::from(words[1] & 65535);
     let value = match (words[0] >> 20) & 15 {
-        8 => UmpMessage::NoteOff(
+        8 => AnyMessage::NoteOff(
             m::NoteOff::new_midi2(field)?
                 .with_group(group)?
                 .with_channel(channel)?
@@ -870,7 +918,7 @@ fn channel_decode(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
                 .with_attribute_type(kind)?
                 .with_attribute_data(data)?,
         ),
-        9 => UmpMessage::NoteOn(
+        9 => AnyMessage::NoteOn(
             m::NoteOn::new_midi2(field)?
                 .with_group(group)?
                 .with_channel(channel)?
@@ -878,18 +926,18 @@ fn channel_decode(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
                 .with_attribute_type(kind)?
                 .with_attribute_data(data)?,
         ),
-        10 => UmpMessage::PolyPressure(
+        10 => AnyMessage::PolyPressure(
             m::PolyPressure::new_midi2(field)?
                 .with_group(group)?
                 .with_channel(channel)?
                 .with_pressure(i64::from(words[1]))?,
         ),
-        11 => UmpMessage::ControlChange(
+        11 => AnyMessage::ControlChange(
             m::ControlChange::new_midi2(field, i64::from(words[1]))?
                 .with_group(group)?
                 .with_channel(channel)?,
         ),
-        12 => UmpMessage::ProgramChange(
+        12 => AnyMessage::ProgramChange(
             m::ProgramChange::new_midi2(i64::from((words[1] >> 24) & 127) + 1)?
                 .with_group(group)?
                 .with_channel(channel)?
@@ -897,13 +945,13 @@ fn channel_decode(words: &[u32]) -> Result<Option<UmpMessage>, ValueError> {
                 .with_bank_msb(i64::from((words[1] >> 8) & 127))?
                 .with_bank_lsb(i64::from(words[1] & 127))?,
         ),
-        13 => UmpMessage::ChannelPressure(
+        13 => AnyMessage::ChannelPressure(
             m::ChannelPressure::new_midi2()?
                 .with_group(group)?
                 .with_channel(channel)?
                 .with_pressure(i64::from(words[1]))?,
         ),
-        14 => UmpMessage::PitchBend(
+        14 => AnyMessage::PitchBend(
             m::PitchBend::new_midi2()?
                 .with_group(group)?
                 .with_channel(channel)?

@@ -1,4 +1,4 @@
-//! meedee archive v1. Big endian, CRC-32/ISO-HDLC frames, explicit completion.
+//! meedee archive v2. Big endian, CRC-32/ISO-HDLC frames, explicit completion.
 use crate::events::{Clock, Payload, SourceSpan, Timestamp};
 use crate::file_io::{invalid, Source};
 use crate::messages::Message;
@@ -7,7 +7,7 @@ pub use crate::recording::{Recorder, RecordingReport};
 use crate::ump::{self, UmpValue};
 use std::collections::BTreeMap;
 use std::io::{self, Cursor, Read, Write};
-pub const MAGIC: &[u8; 12] = b"MEEDEE\r\n\0\x01\0\0";
+pub const MAGIC: &[u8; 12] = b"MEEDEE\r\n\0\x02\0\0";
 #[derive(Clone, Debug)]
 pub enum Record {
     Clock(Clock),
@@ -399,6 +399,7 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
             2
         }
         Record::Event(e) => {
+            e.validate()?;
             if e.stream().is_none() {
                 return Err(invalid(0, "empty stream identity"));
             }
@@ -412,13 +413,14 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
                 timestamp(&mut out, s.last_timestamp.as_ref())?;
             }
             match e.as_ref() {
-                Payload::Midi1(m::AnyMessage::ControlChange(v)) if v.resolution() == 14 => {
-                    out.push(3);
-                    command(&mut out, &m::AnyCommand::ControlChange(v.clone()))?;
-                }
-                Payload::Midi1(v) => {
+                Payload::Message(v) if v.version() == 1 => {
                     out.push(1);
-                    out.extend(v.encode()?);
+                    out.push(v.group().unwrap_or(0));
+                    out.extend(v.clone().without_group()?.encode()?);
+                }
+                Payload::Message(v) => {
+                    out.push(4);
+                    out.extend(ump::words_to_bytes(&v.encode_words()?, false));
                 }
                 Payload::Ump(v) => {
                     out.push(2);
@@ -426,6 +428,7 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
                 }
                 Payload::Command(v) => {
                     out.push(3);
+                    out.push(v.group().unwrap_or(0));
                     command(&mut out, v)?;
                 }
             }
@@ -603,29 +606,63 @@ fn decode(body: &[u8], registry: &Registry, preserve: bool) -> io::Result<Record
             };
             let message = match tag {
                 1 => {
+                    let (&group, data) = data
+                        .split_first()
+                        .ok_or_else(|| invalid(0, "missing message group"))?;
+                    if group > 16 {
+                        return Err(invalid(0, "invalid message group"));
+                    }
                     let mut d = crate::codecs::Decoder::new(data.len().max(1))
                         .map_err(|e| invalid(0, e))?;
-                    let mut items = d.feed(&data);
+                    let mut items = d.feed(data);
                     if !d.finish().is_empty() || items.len() != 1 {
                         return Err(invalid(0, "expected exactly one complete MIDI 1 message"));
                     }
                     match items.remove(0) {
-                        crate::codecs::DecodeItem::Message(v) => Payload::Midi1(v),
+                        crate::codecs::DecodeItem::Message(v) => {
+                            if group == 0 {
+                                v.into()
+                            } else {
+                                v.with_group(group.into())?.into()
+                            }
+                        }
                         _ => return Err(invalid(0, "invalid MIDI 1 payload")),
                     }
                 }
-                2 => Payload::Ump(
-                    ump::decode(
+                2 | 4 => {
+                    let value = ump::decode(
                         &ump::bytes_to_words(&data, false).map_err(|e| invalid(0, e))?,
                         preserve,
                     )
-                    .map_err(|e| invalid(0, e))?,
-                ),
-                3 => match decode_command(&data) {
-                    Ok(v) => Payload::Command(v),
-                    Err(e) if preserve && e.kind() == io::ErrorKind::Unsupported => {
-                        return preserve_event();
+                    .map_err(|e| invalid(0, e))?;
+                    if !matches!((&value, tag), (Payload::Ump(_), 2))
+                        && !matches!((&value,tag), (Payload::Message(v),4) if v.version() == 2)
+                    {
+                        return Err(invalid(
+                            0,
+                            "message representation does not match its category",
+                        ));
                     }
+                    value
+                }
+                3 => match data
+                    .split_first()
+                    .ok_or_else(|| invalid(0, "missing command group"))
+                {
+                    Ok((&group, _)) if group > 16 => {
+                        return Err(invalid(0, "invalid command group"))
+                    }
+                    Ok((&group, data)) => match decode_command(data) {
+                        Ok(v) => Payload::Command(if group == 0 {
+                            v
+                        } else {
+                            v.with_group(group.into())?
+                        }),
+                        Err(e) if preserve && e.kind() == io::ErrorKind::Unsupported => {
+                            return preserve_event();
+                        }
+                        Err(e) => return Err(e),
+                    },
                     Err(e) => return Err(e),
                 },
                 _ => {
@@ -785,11 +822,13 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
         } => 11 + id.len() + label.len() + clock_identity.as_ref().map_or(0, |id| 4 + id.len()),
         Record::Event(e) => {
             let p = match e.as_ref() {
-                Payload::Midi1(m::AnyMessage::ControlChange(v)) if v.resolution() == 14 => 34,
-                Payload::Midi1(m::AnyMessage::SysEx(v)) => v.data().len() + 2,
-                Payload::Midi1(v) => v.encoded_len(),
+                Payload::Message(m::AnyMessage::SysEx(v)) => v.data().len() + 3,
+                Payload::Message(v) if v.version() == 1 => {
+                    v.clone().without_group()?.encoded_len() + 1
+                }
+                Payload::Message(v) => v.encoded_len(),
                 Payload::Ump(v) => v.encode_words()?.len() * 4,
-                Payload::Command(_) => 34,
+                Payload::Command(_) => 35,
             };
             7 + e.stream().unwrap_or_default().len()
                 + timestamp_size(e.timestamp())

@@ -1,7 +1,7 @@
 #![cfg(target_os = "macos")]
 
 use meedee::transport::{
-    Input, InputOptions, Output, OutputOptions, Packet, Protocol, TimestampMode,
+    Encoding, Input, InputOptions, Output, OutputOptions, Packet, TimestampMode,
 };
 use std::sync::mpsc;
 use std::time::Duration;
@@ -10,18 +10,18 @@ use std::time::Duration;
 #[test]
 #[ignore = "requires authorization to create CoreMIDI virtual ports"]
 fn virtual_ports_preserve_byte_and_native_ump_packets() {
-    for (protocol, packet) in [
-        (Protocol::Midi1, Packet::Bytes(vec![0x90, 60, 100])),
-        (Protocol::Ump, Packet::Ump(vec![0x40903c00, 0xc0000000])),
+    for (encoding, packet) in [
+        (Encoding::Bytes, Packet::Bytes(vec![0x90, 60, 100])),
+        (Encoding::Ump, Packet::Ump(vec![0x40903c00, 0xc0000000])),
     ] {
         for timestamps in [TimestampMode::Absolute, TimestampMode::Off] {
             let options = InputOptions {
-                protocol,
+                encoding,
                 timestamps,
                 ..InputOptions::default()
             };
             let name = format!(
-                "meedee-test-{}-{protocol:?}-{timestamps:?}",
+                "meedee-test-{}-{encoding:?}-{timestamps:?}",
                 std::process::id()
             );
             let (sender, receiver) = mpsc::channel();
@@ -32,7 +32,7 @@ fn virtual_ports_preserve_byte_and_native_ump_packets() {
                 })
                 .unwrap();
             let output = Output::new(OutputOptions {
-                protocol: options.protocol,
+                encoding: options.encoding,
                 backend: options.backend,
             })
             .unwrap();

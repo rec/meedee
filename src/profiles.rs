@@ -74,21 +74,25 @@ mod gm {
     #[pymethods]
     impl BankProgramSelect {
         #[new]
-        #[pyo3(signature=(program, bank_msb=0, bank_lsb=0, channel=None))]
+        #[pyo3(signature=(program, bank_msb=0, bank_lsb=0, channel=None, *, group=None))]
         fn new(
             #[pyo3(from_py_with=int)] program: i64,
             #[pyo3(from_py_with=int)] bank_msb: i64,
             #[pyo3(from_py_with=int)] bank_lsb: i64,
             channel: Option<&Bound<'_, PyAny>>,
+            group: Option<&Bound<'_, PyAny>>,
         ) -> PyResult<PyClassInitializer<Self>> {
             let channel = channel.map(int).transpose()?;
             Ok(
                 PyClassInitializer::from(Message::default()).add_subclass(Self {
                     value: {
-                        let value = model::BankProgramSelect::new(program)
+                        let mut value = model::BankProgramSelect::new(program)
                             .and_then(|m| m.with_bank_msb(bank_msb))
                             .and_then(|m| m.with_bank_lsb(bank_lsb))
                             .map_err(value_error)?;
+                        if let Some(g) = group {
+                            value = value.with_group(int(g)?).map_err(value_error)?;
+                        }
                         if let Some(channel) = channel {
                             value.with_channel(channel).map_err(value_error)?
                         } else {
@@ -97,6 +101,10 @@ mod gm {
                     },
                 }),
             )
+        }
+        #[getter]
+        fn group(&self) -> Option<u8> {
+            self.value.group()
         }
         #[getter]
         fn channel(&self) -> Option<u8> {
@@ -119,7 +127,7 @@ mod gm {
             render(
                 slf.into_pyobject(py)?.as_any(),
                 "BankProgramSelect",
-                &["program", "bank_msb", "bank_lsb", "channel"],
+                &["program", "bank_msb", "bank_lsb", "channel", "group"],
             )
         }
         fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
@@ -138,7 +146,7 @@ mod gm {
             let py = slf.py();
             replacement(
                 slf.into_pyobject(py)?.as_any(),
-                &["program", "bank_msb", "bank_lsb", "channel"],
+                &["program", "bank_msb", "bank_lsb", "channel", "group"],
                 changes,
             )
         }
@@ -152,6 +160,12 @@ mod gm {
             for name in ["program", "bank_msb", "bank_lsb"] {
                 fields.set_item(name, py.get_type::<PyInt>())?;
             }
+            fields.set_item(
+                "group",
+                py.import("typing")?
+                    .getattr("Optional")?
+                    .get_item(py.get_type::<PyInt>())?,
+            )?;
             fields.set_item(
                 "channel",
                 py.import("typing")?
@@ -281,7 +295,84 @@ mod gm {
 mod mpe {
     use super::*;
     use meedee::mpe as model;
-    classes! {"meedee.mpe"; ZoneConfiguration {manager_channel:int=>number:PyInt,members:int=>number:PyInt};}
+    #[pyclass(frozen, extends=Message, module="meedee.mpe")]
+    pub(super) struct ZoneConfiguration {
+        pub(super) value: model::ZoneConfiguration,
+    }
+    #[pymethods]
+    impl ZoneConfiguration {
+        #[new]
+        #[pyo3(signature=(*,manager_channel,members,group=None))]
+        fn new(
+            manager_channel: &Bound<'_, PyAny>,
+            members: &Bound<'_, PyAny>,
+            group: Option<&Bound<'_, PyAny>>,
+        ) -> PyResult<PyClassInitializer<Self>> {
+            let mut value = model::ZoneConfiguration::new(int(manager_channel)?, int(members)?)
+                .map_err(value_error)?;
+            if let Some(g) = group {
+                value = value.with_group(int(g)?).map_err(value_error)?;
+            }
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+        #[getter]
+        fn manager_channel(&self) -> u8 {
+            self.value.manager_channel()
+        }
+        #[getter]
+        fn members(&self) -> u8 {
+            self.value.members()
+        }
+        #[getter]
+        fn group(&self) -> Option<u8> {
+            self.value.group()
+        }
+        fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+            other
+                .extract::<PyRef<'_, Self>>()
+                .is_ok_and(|v| self.value == v.value)
+        }
+        fn __hash__(&self) -> u64 {
+            hash(&self.value)
+        }
+        fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
+            let py = slf.py();
+            render(
+                slf.into_pyobject(py)?.as_any(),
+                "ZoneConfiguration",
+                &["manager_channel", "members", "group"],
+            )
+        }
+        #[pyo3(signature=(**changes))]
+        fn replace<'py>(
+            slf: PyRef<'py, Self>,
+            changes: Option<&Bound<'py, PyDict>>,
+        ) -> PyResult<Bound<'py, PyAny>> {
+            let py = slf.py();
+            replacement(
+                slf.into_pyobject(py)?.as_any(),
+                &["manager_channel", "members", "group"],
+                changes,
+            )
+        }
+        #[classattr]
+        fn __match_args__() -> (&'static str, &'static str) {
+            ("manager_channel", "members")
+        }
+        #[classattr]
+        fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+            let d = PyDict::new(py);
+            d.set_item("manager_channel", py.get_type::<PyInt>())?;
+            d.set_item("members", py.get_type::<PyInt>())?;
+            d.set_item(
+                "group",
+                py.import("typing")?
+                    .getattr("Optional")?
+                    .get_item(py.get_type::<PyInt>())?,
+            )?;
+            Ok(d)
+        }
+    }
     pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module.add_class::<ZoneConfiguration>()
     }
@@ -416,9 +507,6 @@ pub fn extract_command(
     command: &Bound<'_, PyAny>,
 ) -> PyResult<Option<meedee::messages::AnyCommand>> {
     if let Ok(value) = command.extract::<PyRef<'_, gm::BankProgramSelect>>() {
-        if value.value.channel().is_none() {
-            return Err(PyValueError::new_err("message channel is unassigned"));
-        }
         return Ok(Some(meedee::messages::AnyCommand::BankProgramSelect(
             value.value.clone(),
         )));

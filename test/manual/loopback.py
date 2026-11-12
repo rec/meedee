@@ -44,17 +44,17 @@ class Collector:
 
 
 @pytest.mark.parametrize("direction", ["input", "output"])
-@pytest.mark.parametrize("protocol", [midi.Protocol.Midi1, midi.Protocol.Ump])
+@pytest.mark.parametrize("encoding", [midi.Encoding.Bytes, midi.Encoding.Ump])
 @pytest.mark.parametrize(
     "timestamps", [midi.TimestampMode.Absolute, midi.TimestampMode.Off]
 )
 def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
-    direction: str, protocol: midi.Protocol, timestamps: midi.TimestampMode
+    direction: str, encoding: midi.Encoding, timestamps: midi.TimestampMode
 ) -> None:
     require_unix()
     receiver = Collector()
-    source = midi.Input(raw=True, protocol=protocol, timestamps=timestamps)
-    target = midi.Output(protocol=protocol)
+    source = midi.Input(raw=True, encoding=encoding, timestamps=timestamps)
+    target = midi.Output(encoding=encoding)
     token = f"meedee-{uuid4().hex}"
     with ExitStack() as stack:
         if direction == "input":
@@ -67,7 +67,7 @@ def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
             incoming = stack.enter_context(source.connect(port, receiver))
         data = (
             b"\x90\x3c\x7f"
-            if protocol == midi.Protocol.Midi1
+            if encoding == midi.Encoding.Bytes
             else midi.UmpPacket(words=[0x40903C00, 0xFFFFFFFF])
         )
         outgoing(data)

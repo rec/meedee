@@ -135,24 +135,31 @@ fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>
     codecs::expand(&value)
         .map_err(|e| PyValueError::new_err(e.to_string()))?
         .into_iter()
-        .map(|message| crate::event_values::to_python(py, meedee::events::Payload::Midi1(message)))
+        .map(|message| {
+            crate::event_values::to_python(py, meedee::events::Payload::Message(message))
+        })
         .collect()
 }
 
 pub fn prepare_command(
-    protocol: crate::packets::Protocol,
+    encoding: crate::packets::Encoding,
     command: &Bound<'_, PyAny>,
 ) -> PyResult<(String, Py<pyo3::types::PyDict>, usize)> {
     let py = command.py();
     let command = messages::extract_command(command)?;
-    if protocol != crate::packets::Protocol::Midi1 {
+    if encoding != crate::packets::Encoding::Bytes {
         return Err(crate::errors::CapabilityError::new_err(
             "compound commands require MIDI 1.0 byte transport",
         ));
     }
-    let total = codecs::expand(&command)
-        .map_err(|e| PyValueError::new_err(e.to_string()))?
-        .len();
+    let messages = codecs::expand(&command).map_err(|e| PyValueError::new_err(e.to_string()))?;
+    use meedee::messages::PrimitiveMessage;
+    for message in &messages {
+        message
+            .encode()
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    }
+    let total = messages.len();
     let (name, fields) = messages::command_wire(py, &command)?;
     Ok((name, fields, total))
 }

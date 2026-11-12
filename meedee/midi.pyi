@@ -10,9 +10,9 @@ from ._resource import ResourceModel
 
 __version__: str
 
-class Protocol:
-    Midi1: ClassVar[Protocol]
-    Ump: ClassVar[Protocol]
+class Encoding:
+    Bytes: ClassVar[Encoding]
+    Ump: ClassVar[Encoding]
 
 class Backend:
     CoreMidi: ClassVar[Backend]
@@ -86,7 +86,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
     port: str | None
     event_limit: int
     sysex_limit: int
-    protocol: Protocol
+    encoding: Encoding
     backend: Backend | None
     timestamps: TimestampMode
     run_in_subprocess: bool
@@ -102,7 +102,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
         raw: Literal[True],
         channel: int | Iterable[int] | None = None,
         port: str | None = None,
-        protocol: Protocol = Protocol.Midi1,
+        encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         run_in_subprocess: bool = False,
@@ -120,7 +120,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
         raw: Literal[False] = False,
         channel: int | Iterable[int] | None = None,
         port: str | None = None,
-        protocol: Protocol = Protocol.Midi1,
+        encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         run_in_subprocess: bool = False,
@@ -138,7 +138,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
         raw: bool,
         channel: int | Iterable[int] | None = None,
         port: str | None = None,
-        protocol: Protocol = Protocol.Midi1,
+        encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,
         timestamps: TimestampMode = TimestampMode.Absolute,
         run_in_subprocess: bool = False,
@@ -233,7 +233,7 @@ class Output(ResourceModel):
     channel: int | None
     bpm: int | float | None
     port: str | None
-    protocol: Protocol
+    encoding: Encoding
     backend: Backend | None
     run_in_subprocess: bool
     subprocess_worker: Literal["python", "rust"]
@@ -246,7 +246,7 @@ class Output(ResourceModel):
         channel: int | None = None,
         bpm: int | float | None = None,
         port: str | None = None,
-        protocol: Protocol = Protocol.Midi1,
+        encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,
         run_in_subprocess: bool = False,
         subprocess_worker: Literal["python", "rust"] = "python",

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 
 class Poller(ResourceModel, frozen=True):
-    protocol: Literal["midi1", "ump"]
+    encoding: Literal["bytes", "ump"]
     backend: (
         Literal[
             "CoreMidi",
@@ -49,7 +49,7 @@ class Poller(ResourceModel, frozen=True):
 
     def model_post_init(self, context: object) -> None:
         self._state = _core.DiscoveryPollState(
-            self.protocol, self.port_limit, self.detail_limit, self.history_limit
+            self.encoding, self.port_limit, self.detail_limit, self.history_limit
         )
 
     def poll(self) -> topology.Report:
@@ -83,14 +83,14 @@ class Poller(ResourceModel, frozen=True):
     def _ports(self, direction: str) -> list[midi.Port]:
         from . import midi
 
-        protocol = (
-            midi.Protocol.Midi1 if self.protocol == "midi1" else midi.Protocol.Ump
+        encoding = (
+            midi.Encoding.Bytes if self.encoding == "bytes" else midi.Encoding.Ump
         )
         backend = None if self.backend is None else getattr(midi.Backend, self.backend)
         if direction == "input":
             if self._input is None:
                 self._input = midi.Input(
-                    protocol=protocol,
+                    encoding=encoding,
                     backend=backend,
                     run_in_subprocess=self.run_in_subprocess,
                     subprocess_worker=self.subprocess_worker,
@@ -99,7 +99,7 @@ class Poller(ResourceModel, frozen=True):
             return self._input.ports()
         if self._output is None:
             self._output = midi.Output(
-                protocol=protocol,
+                encoding=encoding,
                 backend=backend,
                 run_in_subprocess=self.run_in_subprocess,
                 subprocess_worker=self.subprocess_worker,

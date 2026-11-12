@@ -10,7 +10,7 @@ def run_discovery(config: Ports) -> int:
     interrupted = False
     watching = isinstance(config, WatchPorts)
     with discovery.Poller(
-        protocol=config.protocol,
+        encoding=config.encoding,
         backend=config.backend,
         run_in_subprocess=config.run_in_subprocess,
         subprocess_worker=config.subprocess_worker,
@@ -72,7 +72,7 @@ def run_discovery(config: Ports) -> int:
 def endpoint_data(endpoint: topology.Endpoint) -> dict[str, object]:
     return {
         n: getattr(endpoint, n)
-        for n in ("backend", "protocol", "direction", "backend_id", "name")
+        for n in ("backend", "encoding", "direction", "backend_id", "name")
     }
 
 

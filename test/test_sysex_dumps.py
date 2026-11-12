@@ -202,7 +202,7 @@ def test_empty_capture_times_out_and_uncertain_send_never_retries(
         cast(midi.Input, receiver), model="moog/subsequent-37", timeout="10 ms"
     )
     assert report.status == "timed_out" and not report.messages
-    output = testing.Output(protocol="midi1")
+    output = testing.Output(encoding="bytes")
     output.fail_next_send(accepted=True)
     report = sysex.dump(
         cast(midi.Input, receiver),
@@ -321,7 +321,7 @@ def test_truncated_frame_diagnostic_retains_only_complete_prefix(
     clock = testing.ManualClock()
     monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
     receiver = Input(clock)
-    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes)
     decoder.feed(
         events.ReceivedPacket(
             clock=events.Clock(
@@ -432,7 +432,7 @@ def test_failed_detection_never_sends_a_dump_request(
     receiver.scheduled = [
         messages.SysEx(bytes.fromhex(r)).replace(stream="s") for r in replies
     ]
-    output = testing.Output(protocol="midi1")
+    output = testing.Output(encoding="bytes")
     report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
     assert report.status == "failed" and reason in (report.reason or "")
     assert report.model is None and report.requests_sent == 0 and not report.messages
@@ -471,7 +471,7 @@ def test_identity_from_another_stream_is_ignored(
             stream="other"
         )
     ]
-    output = testing.Output(protocol="midi1")
+    output = testing.Output(encoding="bytes")
     report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
     assert report.status == "failed" and report.model is None
     assert report.ignored_events == 1 and report.requests_sent == 0
@@ -516,7 +516,7 @@ def test_discovery_failures_prevent_dump_requests(
         receiver.on_receive = lambda: setattr(receiver, "dropped_packets", 1)
     elif failure == "cancel":
         cancel.cancel()
-    output = testing.Output(protocol="midi1")
+    output = testing.Output(encoding="bytes")
     if failure == "send":
         output.fail_next_send(accepted=True)
     report = sysex.dump(
@@ -598,7 +598,7 @@ def test_universal_inquiry_reports_failures_and_retains_admitted_replies(
     cancel = events.Cancellation()
     if failure == "cancel":
         cancel.cancel()
-    output = testing.Output(protocol="midi1")
+    output = testing.Output(encoding="bytes")
     if failure == "send":
         output.fail_next_send(accepted=True)
     report = universal.identify(

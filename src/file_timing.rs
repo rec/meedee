@@ -316,7 +316,7 @@ struct ExportReport {
 impl ExportReport {
     #[getter]
     fn status(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(PyModule::import(py, "meedee.ump")?
+        Ok(PyModule::import(py, "meedee.translation")?
             .getattr("TranslationStatus")?
             .getattr(format!("{:?}", self.value.status))?
             .unbind())

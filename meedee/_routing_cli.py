@@ -10,7 +10,7 @@ def configured_routes(config: RouteOptions, stream: str) -> list[routing.Route]:
             name=d,
             source=stream,
             destination=d,
-            protocol=config.protocol,
+            encoding=config.encoding,
             channel=config.channel,
             group=config.group,
             remap_channel=config.remap_channel,

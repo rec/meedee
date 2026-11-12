@@ -29,8 +29,8 @@ def test_patch_cli_parses_static_routes_before_invoking_host(
             [
                 "patch",
                 "keys",
-                "--protocol",
-                "midi1",
+                "--encoding",
+                "bytes",
                 "--destinations",
                 "a",
                 "b",
@@ -117,7 +117,7 @@ def config(*, event_limit: int = 128) -> Patch:
     return Patch(
         port="keys",
         destinations=["a", "b", "c"],
-        protocol="midi1",
+        encoding="bytes",
         output="json",
         event_limit=event_limit,
         remap_channel=16,
@@ -164,7 +164,7 @@ def test_stop_policies_close_without_cleanup_or_retry(
         outputs[0].lose_input = source
     elif kind == "diagnostic":
         source.items = [
-            events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1).loss(
+            events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes).loss(
                 lost=1, reason="lost input"
             )
         ]

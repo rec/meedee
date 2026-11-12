@@ -45,7 +45,7 @@ def install(
     class Client:
         def __init__(self, **kwargs: object) -> None:
             assert (
-                kwargs["protocol"] == midi.Protocol.Midi1
+                kwargs["encoding"] == midi.Encoding.Bytes
                 and kwargs["run_in_subprocess"] is True
             )
             actions.append("created")

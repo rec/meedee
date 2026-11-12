@@ -44,7 +44,7 @@ def install(
     raw: bytes,
     fault: str = "",
 ) -> tuple[testing.Input, list[bytes], list[str]]:
-    receiver = testing.Input(stream="s", protocol="midi1")
+    receiver = testing.Input(stream="s", encoding="bytes")
     sent: list[bytes] = []
     actions: list[str] = []
 
@@ -72,7 +72,7 @@ def install(
     class InputClient:
         def __init__(self, **kwargs: object) -> None:
             assert (
-                kwargs["protocol"] == midi.Protocol.Midi1
+                kwargs["encoding"] == midi.Encoding.Bytes
                 and kwargs["run_in_subprocess"]
             )
 
@@ -86,7 +86,7 @@ def install(
     class OutputClient:
         def __init__(self, **kwargs: object) -> None:
             assert (
-                kwargs["protocol"] == midi.Protocol.Midi1
+                kwargs["encoding"] == midi.Encoding.Bytes
                 and kwargs["run_in_subprocess"]
             )
 

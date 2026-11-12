@@ -18,7 +18,7 @@ fn archive_completion_is_separate_from_capture_loss() {
             clock_identity: Some("c".into()),
         },
         archive::Record::Event(Box::new(
-            (Payload::Midi1(AnyMessage::NoteOn(
+            (Payload::Message(AnyMessage::NoteOn(
                 NoteOn::new(60)
                     .and_then(|m| m.with_velocity(100))
                     .and_then(|m| m.with_channel(16))

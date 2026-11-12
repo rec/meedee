@@ -66,7 +66,7 @@ impl Event {
     /// Channel of the contained MIDI message; file metadata has no channel.
     pub fn channel(&self) -> Option<u8> {
         match &self.record {
-            Record::Message(message) => message_channel(message),
+            Record::Message(message) => message.channel(),
             _ => None,
         }
     }
@@ -77,19 +77,6 @@ impl Event {
             self.record = Record::Message(crate::messages::Message::transpose(message, semitones));
         }
         self
-    }
-}
-
-pub(crate) fn message_channel(message: &AnyMessage) -> Option<u8> {
-    match message {
-        AnyMessage::NoteOn(v) => v.channel(),
-        AnyMessage::NoteOff(v) => v.channel(),
-        AnyMessage::PolyPressure(v) => v.channel(),
-        AnyMessage::ControlChange(v) => v.channel(),
-        AnyMessage::ProgramChange(v) => v.channel(),
-        AnyMessage::ChannelPressure(v) => v.channel(),
-        AnyMessage::PitchBend(v) => v.channel(),
-        _ => None,
     }
 }
 

@@ -6,7 +6,7 @@ use meedee::{
     events::{Clock, Payload, Rational, Timestamp},
     events::{InputItem as Item, PacketDecoder as Decoder, StreamDiagnosticKind as DiagnosticKind},
     messages::{AnyMessage, NoteOn},
-    transport::{Packet, Protocol},
+    transport::{Encoding, Packet},
 };
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -23,7 +23,7 @@ fn clock() -> Clock {
     .with_transport(1, true)
 }
 fn event(ticks: i64) -> Payload {
-    (Payload::Midi1(AnyMessage::NoteOn(
+    (Payload::Message(AnyMessage::NoteOn(
         NoteOn::new(60)
             .and_then(|m| m.with_velocity(100))
             .and_then(|m| m.with_channel(1))
@@ -41,7 +41,7 @@ fn event(ticks: i64) -> Payload {
 }
 #[test]
 fn completion_timestamps_and_spans_survive_realtime_and_running_status() {
-    let mut d = Decoder::new("s".into(), Protocol::Midi1, 1024).unwrap();
+    let mut d = Decoder::new("s".into(), Encoding::Bytes, 1024).unwrap();
     assert!(d
         .feed(&Packet::Bytes(vec![0x90, 60]), &clock(), Some(10), Some(0))
         .unwrap()
@@ -70,7 +70,7 @@ fn completion_timestamps_and_spans_survive_realtime_and_running_status() {
 }
 #[test]
 fn gaps_protocol_errors_and_clock_changes_cannot_join_old_fragments() {
-    let mut d = Decoder::new("s".into(), Protocol::Midi1, 1024).unwrap();
+    let mut d = Decoder::new("s".into(), Encoding::Bytes, 1024).unwrap();
     d.feed(&Packet::Bytes(vec![0x90, 60]), &clock(), Some(1), Some(0))
         .unwrap();
     let out = d
@@ -93,7 +93,7 @@ fn gaps_protocol_errors_and_clock_changes_cannot_join_old_fragments() {
     assert!(matches!(&out[0],Item::Diagnostic(v)if v.kind==DiagnosticKind::ClockChange));
     let Item::Message(e) = &out[1] else { panic!() };
     assert!(e.timestamp().is_none());
-    let mut d = Decoder::new("u".into(), Protocol::Ump, 1024).unwrap();
+    let mut d = Decoder::new("u".into(), Encoding::Ump, 1024).unwrap();
     assert!(d
         .feed(&Packet::Ump(vec![0x40903c00]), &clock(), Some(4), Some(0))
         .unwrap()

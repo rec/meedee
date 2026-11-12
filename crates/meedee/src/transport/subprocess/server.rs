@@ -56,7 +56,7 @@ impl Server {
                 self.limit = usize::try_from(unsigned(limit)?).map_err(worker_error)?;
                 if boolean(input)? {
                     self.input = Some(super::super::Input::new(super::super::InputOptions {
-                        protocol: backend.protocol(),
+                        encoding: backend.encoding(),
                         backend: Some(backend),
                         timestamps: if boolean(timestamps)? {
                             TimestampMode::Absolute
@@ -67,7 +67,7 @@ impl Server {
                     })?);
                 } else {
                     self.output = Some(super::super::Output::new(super::super::OutputOptions {
-                        protocol: backend.protocol(),
+                        encoding: backend.encoding(),
                         backend: Some(backend),
                     })?);
                 }
@@ -145,7 +145,7 @@ impl Server {
                     .collect::<Result<Vec<_>>>()?;
                 let output = self.output_connection.as_ref().ok_or(Error::Closed)?;
                 for packet in &packets {
-                    super::super::validate_packet(output.protocol, packet)?;
+                    super::super::validate_packet(output.encoding, packet)?;
                 }
                 if operation == "send" {
                     if packets.len() != 1 {

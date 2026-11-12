@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import gm, messages, ump
+from meedee import messages, translation, ump
 
 
 def vectors() -> list[tuple[str, tuple[int, ...]]]:
@@ -25,14 +25,10 @@ def test_shared_vectors_preserve_every_family_and_frozen_native_values() -> None
         value = ump.decode(words)
         assert isinstance(value, messages.Message)
         assert ump.encode(value) == words
-        namespace = messages if getattr(value, "version", None) == 2 else ump
+        namespace = ump if type(value).__module__ == "meedee.ump" else messages
         assert type(value).__module__ == namespace.__name__
         constructor = getattr(namespace, type(value).__name__)
-        fields = (
-            constructor.__annotations__
-            if namespace is messages
-            else constructor.__match_args__
-        )
+        fields = inspect.signature(constructor).parameters
         clone = constructor(**{f: getattr(value, f) for f in fields})
         assert clone == value and clone.replace() == value
         assert hash(clone) == hash(value)
@@ -101,7 +97,7 @@ def test_word_framing_recovers_without_confusing_byte_order_or_transport_buffers
     decoder = ump.Decoder()
     result = decoder.feed((0x40903C00, 0xFFFF0000, 0x60000000, 0x10F80000))
     assert isinstance(result[1], ump.DecodeDiagnostic) and result[1].word_offset == 2
-    assert isinstance(result[2], ump.Midi1Packet)
+    assert result[2] == messages.TimingClock(group=1)
     assert decoder.feed((0x40903C00,)) == []
     assert len(decoder.finish()) == 1 and decoder.finish() == []
     with pytest.raises(ValueError):
@@ -131,7 +127,7 @@ def test_sysex_assembly_is_scoped_bounded_and_discards_incomplete_payloads() -> 
     assembler = ump.Assembler()
     result = [
         v
-        for p in ump.packetize_sysex7(group=16, data=data)
+        for p in ump.packetize_sysex7(messages.SysEx(data, group=16))
         for v in [v.value for v in assembler.feed(p)]
     ]
     assert len(result) == 1 and isinstance(result[0], ump.AssembledData)
@@ -153,25 +149,18 @@ def test_sysex_assembly_is_scoped_bounded_and_discards_incomplete_payloads() -> 
     assert result[0].stream_id == 2
     [v.value for v in assembler.feed(ump.SysEx7Packet(group=1, format=1, data=b"\x7d"))]
     assert [
+        v.value for v in assembler.feed(messages.TimingClock().replace(group=1))
+    ] == []
+    assert [
         v.value
         for v in assembler.feed(
-            ump.Midi1Packet(group=1, message=messages.TimingClock())
+            messages.NoteOn(channel=1, note=60, velocity=100).replace(group=2)
         )
     ] == []
     assert [
         v.value
         for v in assembler.feed(
-            ump.Midi1Packet(
-                group=2, message=messages.NoteOn(channel=1, note=60, velocity=100)
-            )
-        )
-    ] == []
-    assert [
-        v.value
-        for v in assembler.feed(
-            ump.Midi1Packet(
-                group=1, message=messages.NoteOn(channel=1, note=60, velocity=100)
-            )
+            messages.NoteOn(channel=1, note=60, velocity=100).replace(group=1)
         )
     ] == [ump.AssemblyDiagnostic.Interrupted]
     small = ump.Assembler(message_limit=4, total_limit=4, max_streams=1)
@@ -191,7 +180,7 @@ def test_sysex_assembly_is_scoped_bounded_and_discards_incomplete_payloads() -> 
     [v.value for v in small.feed(ump.SysEx7Packet(group=1, format=1, data=b"x"))]
     assert [v.value for v in small.finish()] == [ump.AssemblyDiagnostic.Truncated]
     with pytest.raises(ValueError):
-        ump.packetize_sysex7(group=1, data=b"\x80")
+        ump.packetize_sysex7(messages.SysEx(b"\x80", group=1))
     with pytest.raises(ValueError):
         ump.packetize_sysex8(group=1, stream_id=0, data=b"xx", message_limit=1)
     mutable = bytearray(b"abc")
@@ -326,15 +315,11 @@ def test_endpoint_factories_and_capabilities_preserve_unknown_support() -> None:
     assert caps.supports(note) is True
     assert (
         caps.supports(
-            ump.Midi1Packet(
-                group=1, message=messages.NoteOn(channel=1, note=60, velocity=100)
-            )
+            messages.NoteOn(channel=1, note=60, velocity=100).replace(group=1)
         )
         is False
     )
-    assert (
-        caps.supports(ump.Midi1Packet(group=1, message=messages.TimingClock())) is True
-    )
+    assert caps.supports(messages.TimingClock().replace(group=1)) is True
     assert (
         caps.supports(ump.SysEx8Packet(group=1, format=0, stream_id=1, data=b""))
         is False
@@ -345,10 +330,15 @@ def test_endpoint_factories_and_capabilities_preserve_unknown_support() -> None:
 def test_translation_reports_precision_and_never_guesses_compound_context() -> None:
     for v in range(1, 128):
         original = messages.NoteOn(channel=16, note=60, velocity=v)
-        upgraded = ump.to_midi2(original, group=16)
-        assert upgraded.converted and upgraded.status == ump.TranslationStatus.Exact
-        assert ump.to_midi1(upgraded.messages[0]).messages == [original]
-    zero = ump.to_midi2(messages.NoteOn(channel=1, note=60, velocity=0), group=1)
+        upgraded = translation.to_midi2(original, group=16)
+        assert (
+            upgraded.converted
+            and upgraded.status == translation.TranslationStatus.Exact
+        )
+        assert translation.to_midi1(upgraded.messages[0]).messages == [original]
+    zero = translation.to_midi2(
+        messages.NoteOn(channel=1, note=60, velocity=0), group=1
+    )
     assert (
         isinstance(zero.messages[0], messages.NoteOff)
         and zero.messages[0].velocity == 32768
@@ -356,13 +346,13 @@ def test_translation_reports_precision_and_never_guesses_compound_context() -> N
     fine = messages.ControlChange(
         version=2, group=1, channel=1, controller=7, value=0x80000001
     )
-    denied = ump.to_midi1(fine)
+    denied = translation.to_midi1(fine)
     assert (
         not denied.converted
         and denied.messages == []
-        and denied.status == ump.TranslationStatus.Quantized
+        and denied.status == translation.TranslationStatus.Quantized
     )
-    accepted = ump.to_midi1(fine, allow_loss=True)
+    accepted = translation.to_midi1(fine, allow_loss=True)
     assert accepted.messages == [
         messages.ControlChange(channel=1, controller=7, value=64)
     ]
@@ -375,7 +365,7 @@ def test_translation_reports_precision_and_never_guesses_compound_context() -> N
         bank_msb=121,
         bank_lsb=3,
     )
-    assert ump.to_midi1(bank).messages == [
+    assert translation.to_midi1(bank).messages == [
         messages.ControlChange(channel=16, controller=0, value=121),
         messages.ControlChange(channel=16, controller=32, value=3),
         messages.ProgramChange(channel=16, program=128),
@@ -390,19 +380,24 @@ def test_translation_reports_precision_and_never_guesses_compound_context() -> N
         attribute_data=30720,
     )
     assert (
-        ump.to_midi1(attributed, allow_loss=True).status
-        == ump.TranslationStatus.ProfileDependent
+        translation.to_midi1(attributed, allow_loss=True).status
+        == translation.TranslationStatus.ProfileDependent
     )
-    context = ump.to_midi2(
+    context = translation.to_midi2(
         messages.ControlChange(channel=1, controller=101, value=0), group=1
     )
     assert (
-        context.status == ump.TranslationStatus.ContextRequired
+        context.status == translation.TranslationStatus.ContextRequired
         and not context.converted
     )
-    raw_mode = ump.to_midi2(gm.Gm1On(device_id=127), group=1)
-    assert isinstance(raw_mode.messages[0], ump.SysEx7Packet)
-    assert ump.scale_up(value=64, source_bits=7, destination_bits=32) == 0x80000000
-    assert ump.scale_up(value=127, source_bits=7, destination_bits=32) == 0xFFFFFFFF
+    raw_mode = translation.to_midi2(messages.SysEx(b"\x7e\x7f\x09\x01"), group=1)
+    assert raw_mode.messages == [messages.SysEx(b"\x7e\x7f\x09\x01", group=1)]
+    assert (
+        translation.scale_up(value=64, source_bits=7, destination_bits=32) == 0x80000000
+    )
+    assert (
+        translation.scale_up(value=127, source_bits=7, destination_bits=32)
+        == 0xFFFFFFFF
+    )
     with pytest.raises(TypeError):
-        ump.to_midi1(fine, allow_loss=1)  # ty: ignore[invalid-argument-type]
+        translation.to_midi1(fine, allow_loss=1)  # ty: ignore[invalid-argument-type]

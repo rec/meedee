@@ -112,7 +112,7 @@ class PacketDecoder:
         self,
         *,
         stream: str,
-        protocol: midi.Protocol,
+        encoding: midi.Encoding,
         sysex_limit: int | str = 1_048_576,
     ) -> None: ...
     def feed(

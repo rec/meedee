@@ -8,7 +8,7 @@ use crate::{
     messages::{AnyMessage, Message, PrimitiveMessage, SysEx, ValueError},
     midi,
     playback::{Cancellation, MonotonicClock, PlaybackClock},
-    ump::{self, AssemblyItem, UmpMessage},
+    ump::{self, AssemblyItem, PacketValue},
 };
 use std::{
     collections::{BTreeSet, VecDeque},
@@ -1751,12 +1751,12 @@ pub fn browse_with(
                 let wire = action.message.encode()?;
                 let raw = SysEx::new(wire[1..wire.len() - 1].to_vec())?;
                 let packets = if let Some(group) = route.group() {
-                    ump::packetize_sysex7(group.into(), raw.data())?
+                    ump::packetize_sysex7(&raw.clone().with_group(group.into())?)?
                         .into_iter()
-                        .map(|p| Payload::Ump(UmpMessage::SysEx7(p)))
+                        .map(|p| Payload::Ump(PacketValue::SysEx7(p)))
                         .collect::<Vec<_>>()
                 } else {
-                    vec![Payload::Midi1(AnyMessage::SysEx(raw))]
+                    vec![Payload::Message(AnyMessage::SysEx(raw))]
                 };
                 for packet in packets {
                     receiver.check()?;
@@ -1798,10 +1798,10 @@ pub fn browse_with(
                 break;
             }
             match (&*message, route.group()) {
-                (Payload::Midi1(AnyMessage::SysEx(raw)), None) => {
+                (Payload::Message(AnyMessage::SysEx(raw)), None) => {
                     queue.extend(browser.feed(raw, route.input(), None, clock.now_ns())?)
                 }
-                (Payload::Ump(UmpMessage::SysEx7(packet)), Some(group))
+                (Payload::Ump(PacketValue::SysEx7(packet)), Some(group))
                     if packet.group() == group =>
                 {
                     for observation in assembler.feed(&message)? {
@@ -1930,7 +1930,7 @@ mod tests {
             assert_eq!(report.confirmed_actions, 1);
             assert!(output.sent.iter().all(|(_, m)| matches!(
                 (group, m),
-                (None, Payload::Midi1(_)) | (Some(_), Payload::Ump(_))
+                (None, Payload::Message(_)) | (Some(_), Payload::Ump(_))
             )));
         }
         let mut clock = Clock::default();

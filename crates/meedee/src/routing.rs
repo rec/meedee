@@ -1,7 +1,7 @@
 //! Static, one-hop routing. The caller owns input ordering and output delivery.
 use crate::messages::Message;
 use crate::messages::PrimitiveMessage;
-use crate::{archive, codecs, events, messages, transport::Protocol, ump};
+use crate::{archive, events, transport::Encoding, ump};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::io::{self, Read};
 use std::time::Duration;
@@ -123,7 +123,7 @@ pub struct Route {
     name: String,
     source: String,
     destination: String,
-    protocol: Protocol,
+    encoding: Encoding,
     channel: Option<u8>,
     group: Option<u8>,
     remap_channel: Option<u8>,
@@ -140,8 +140,8 @@ impl Route {
     pub fn destination(&self) -> &str {
         &self.destination
     }
-    pub fn protocol(&self) -> Protocol {
-        self.protocol
+    pub fn encoding(&self) -> Encoding {
+        self.encoding
     }
     pub fn channel(&self) -> Option<u8> {
         self.channel
@@ -163,7 +163,7 @@ impl Route {
         name: String,
         source: String,
         destination: String,
-        protocol: Protocol,
+        encoding: Encoding,
         channel: Option<u8>,
         group: Option<u8>,
         remap_channel: Option<u8>,
@@ -177,17 +177,17 @@ impl Route {
                 .into_iter()
                 .flatten()
                 .any(|v| !(1..=16).contains(&v))
-            || protocol == Protocol::Midi1 && (group.is_some() || remap_group.is_some())
+            || encoding == Encoding::Bytes && (group.is_some() || remap_group.is_some())
         {
             return Err(invalid(
-                "nonempty route identities and valid protocol/channel/group required",
+                "nonempty route identities and valid encoding/channel/group required",
             ));
         }
         Ok(Self {
             name,
             source,
             destination,
-            protocol,
+            encoding,
             channel,
             group,
             remap_channel,
@@ -255,8 +255,8 @@ impl Router {
                 return Err(invalid("route names must be unique"));
             }
             if destinations
-                .insert(&r.destination, r.protocol)
-                .is_some_and(|p| p != r.protocol)
+                .insert(&r.destination, r.encoding)
+                .is_some_and(|p| p != r.encoding)
             {
                 return Err(invalid("one destination cannot use multiple protocols"));
             }
@@ -351,7 +351,7 @@ impl Router {
             .filter(|(_, r)| r.source == event.stream().unwrap_or_default())
         {
             let info = classify(event)?;
-            if info.protocol != r.protocol
+            if info.encoding != r.encoding
                 || r.group.is_some_and(|g| Some(g) != info.group)
                 || info
                     .channel
@@ -513,17 +513,21 @@ pub fn preview<R: Read>(
 }
 
 pub(crate) struct Info {
-    protocol: Protocol,
+    encoding: Encoding,
     pub(crate) group: Option<u8>,
     pub(crate) channel: Option<u8>,
     forwardable: bool,
 }
 pub(crate) fn classify(payload: &events::Payload) -> io::Result<Info> {
     match payload {
-        events::Payload::Midi1(v) => Ok(Info {
-            protocol: Protocol::Midi1,
-            group: None,
-            channel: midi1_channel(v),
+        events::Payload::Message(v) => Ok(Info {
+            encoding: if v.group().is_some() {
+                Encoding::Ump
+            } else {
+                Encoding::Bytes
+            },
+            group: v.group(),
+            channel: v.channel(),
             forwardable: true,
         }),
         events::Payload::Command(_) => Err(invalid(
@@ -533,15 +537,15 @@ pub(crate) fn classify(payload: &events::Payload) -> io::Result<Info> {
             let words = ump::encode(v)?;
             let kind = words[0] >> 28;
             Ok(Info {
-                protocol: Protocol::Ump,
+                encoding: Encoding::Ump,
                 group: matches!(kind, 1..=5 | 13).then_some(((words[0] >> 24) & 15) as u8 + 1),
                 channel: matches!(kind, 2 | 4).then_some(((words[0] >> 16) & 15) as u8 + 1),
                 forwardable: !matches!(
                     v,
-                    ump::UmpMessage::Opaque(_)
-                        | ump::UmpMessage::DeltaClockstamp(_)
-                        | ump::UmpMessage::DeltaClockstampTicksPerQuarter(_)
-                ) && !matches!(v, ump::UmpMessage::Stream(v) if matches!(v.status(), 32 | 33)),
+                    ump::PacketValue::Opaque(_)
+                        | ump::PacketValue::DeltaClockstamp(_)
+                        | ump::PacketValue::DeltaClockstampTicksPerQuarter(_)
+                ) && !matches!(v, ump::PacketValue::Stream(v) if matches!(v.status(), 32 | 33)),
             })
         }
     }
@@ -549,47 +553,31 @@ pub(crate) fn classify(payload: &events::Payload) -> io::Result<Info> {
 fn remap(payload: &events::Payload, route: &Route) -> io::Result<events::Payload> {
     let info = classify(payload)?;
     match payload {
-        events::Payload::Midi1(v) if info.channel.is_some() && route.remap_channel.is_some() => {
-            let mut bytes = v.encode()?;
-            bytes[0] = (bytes[0] & 0xf0) | (route.remap_channel.expect("selected channel") - 1);
-            let mut decoder = codecs::Decoder::new(1).map_err(|e| invalid(&e.to_string()))?;
-            match decoder.feed(&bytes).as_slice() {
-                [codecs::DecodeItem::Message(v)] => Ok(events::Payload::Midi1(v.clone())),
-                _ => Err(invalid("channel remap did not produce one message")),
+        events::Payload::Message(v) => {
+            let mut v = v.clone();
+            if let Some(c) = route.remap_channel {
+                v = v.with_channel(c.into())?;
             }
+            if let Some(g) = route.remap_group.filter(|_| info.group.is_some()) {
+                v = v.with_group(g.into())?;
+            }
+            Ok(v.into())
         }
         events::Payload::Ump(v) if route.remap_group.is_some() || route.remap_channel.is_some() => {
-            let mut words = ump::encode(v)?;
+            let mut v = v.clone();
             if let Some(g) = route.remap_group.filter(|_| info.group.is_some()) {
-                words[0] = (words[0] & !0x0f000000) | (u32::from(g - 1) << 24);
+                v = v.with_group(g.into())?;
             }
-            if let Some(c) = route.remap_channel.filter(|_| info.channel.is_some()) {
-                words[0] = (words[0] & !0x000f0000) | (u32::from(c - 1) << 16);
-            }
-            Ok(events::Payload::Ump(
-                ump::decode(&words, false).map_err(|e| invalid(&e.to_string()))?,
-            ))
+            Ok(events::Payload::Ump(v))
         }
         _ => Ok(payload.clone()),
     }
 }
-fn midi1_channel(value: &messages::AnyMessage) -> Option<u8> {
-    use messages::AnyMessage::*;
-    match value {
-        NoteOn(v) => v.channel(),
-        NoteOff(v) => v.channel(),
-        PolyPressure(v) => v.channel(),
-        ControlChange(v) => v.channel(),
-        ProgramChange(v) => v.channel(),
-        ChannelPressure(v) => v.channel(),
-        PitchBend(v) => v.channel(),
-        _ => None,
-    }
-}
+
 fn wire_bytes(payload: &events::Payload) -> io::Result<usize> {
     Ok(match payload {
-        events::Payload::Midi1(messages::AnyMessage::SysEx(v)) => v.data().len() + 2,
-        events::Payload::Midi1(v) => v.encode()?.len(),
+        events::Payload::Message(v) if v.group().is_some() => ump::encode(v)?.len() * 4,
+        events::Payload::Message(v) => v.encode()?.len(),
         events::Payload::Ump(v) => ump::encode(v)?.len() * 4,
         events::Payload::Command(_) => unreachable!("commands rejected during selection"),
     })

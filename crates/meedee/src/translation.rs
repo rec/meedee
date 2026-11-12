@@ -1,7 +1,9 @@
 //! Explicit stateless translation. Compound MIDI 1 input needs caller context;
 //! no bank, selector, profile, source or routing state is guessed.
-use super::*;
+use crate::events::Payload;
 use crate::messages as m;
+use crate::messages::{AnyMessage, ValueError};
+use crate::ump::PacketValue;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TranslationStatus {
     Exact,
@@ -70,14 +72,14 @@ pub fn scale_up(value: u32, source_bits: u8, destination_bits: u8) -> Result<u32
 fn up(value: u32, src: u8, dst: u8) -> u32 {
     scale_up(value, src, dst).expect("validated field and constant bit widths")
 }
-pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessage>, ValueError> {
+pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<AnyMessage>, ValueError> {
     if message.version() != 1 {
         return Err(ValueError("to_midi2 requires MIDI 1 input".into()));
     }
-    bounded(group, 1, 16, "group")?;
+    crate::messages::checked_group(group)?;
     let g = Some(group as u8);
     let value = match message {
-        AnyMessage::NoteOn(v) if v.velocity() == 0 => UmpMessage::NoteOff(
+        AnyMessage::NoteOn(v) if v.velocity() == 0 => AnyMessage::NoteOff(
             crate::messages::NoteOff::new_midi2(v.note().into())
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
@@ -85,7 +87,7 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
                 .and_then(|m| m.with_attribute_type(0))
                 .and_then(|m| m.with_attribute_data(0))?,
         ),
-        AnyMessage::NoteOn(v) => UmpMessage::NoteOn(
+        AnyMessage::NoteOn(v) => AnyMessage::NoteOn(
             crate::messages::NoteOn::new_midi2(v.note().into())
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
@@ -93,7 +95,7 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
                 .and_then(|m| m.with_attribute_type(0))
                 .and_then(|m| m.with_attribute_data(0))?,
         ),
-        AnyMessage::NoteOff(v) => UmpMessage::NoteOff(
+        AnyMessage::NoteOff(v) => AnyMessage::NoteOff(
             crate::messages::NoteOff::new_midi2(v.note().into())
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
@@ -101,19 +103,19 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
                 .and_then(|m| m.with_attribute_type(0))
                 .and_then(|m| m.with_attribute_data(0))?,
         ),
-        AnyMessage::PolyPressure(v) => UmpMessage::PolyPressure(
+        AnyMessage::PolyPressure(v) => AnyMessage::PolyPressure(
             crate::messages::PolyPressure::new_midi2(v.note().into())
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
                 .and_then(|m| m.with_pressure(up(v.pressure(), 7, 32).into()))?,
         ),
-        AnyMessage::ChannelPressure(v) => UmpMessage::ChannelPressure(
+        AnyMessage::ChannelPressure(v) => AnyMessage::ChannelPressure(
             crate::messages::ChannelPressure::new_midi2()
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
                 .and_then(|m| m.with_pressure(up(v.pressure(), 7, 32).into()))?,
         ),
-        AnyMessage::PitchBend(v) => UmpMessage::PitchBend(
+        AnyMessage::PitchBend(v) => AnyMessage::PitchBend(
             crate::messages::PitchBend::new_midi2()
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
@@ -121,7 +123,7 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
                     m.with_value(i64::from(up((v.value() + 8192) as u32, 14, 32)) - 2147483648)
                 })?,
         ),
-        AnyMessage::ProgramChange(v) => UmpMessage::ProgramChange(
+        AnyMessage::ProgramChange(v) => AnyMessage::ProgramChange(
             crate::messages::ProgramChange::new_midi2(v.program().into())
                 .and_then(|m| m.with_group(group))
                 .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
@@ -144,7 +146,7 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
             } else {
                 up(v.value(), v.resolution(), 32)
             };
-            UmpMessage::ControlChange(
+            AnyMessage::ControlChange(
                 crate::messages::ControlChange::new_midi2(v.controller().into(), value.into())
                     .and_then(|m| m.with_group(group))
                     .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,
@@ -153,16 +155,13 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
         AnyMessage::SysEx(v) => {
             return Ok(report(
                 TranslationStatus::Exact,
-                "SysEx7 packetization preserves all payload bytes",
+                "SysEx preserves all payload bytes",
                 g,
-                packetize_sysex7(group, v.data())?
-                    .into_iter()
-                    .map(UmpMessage::SysEx7)
-                    .collect(),
+                vec![AnyMessage::SysEx(v.clone().with_group(group)?)],
                 false,
             ))
         }
-        _ => UmpMessage::Midi1(Midi1Packet::new(group, message.clone())?),
+        _ => message.clone().with_group(group)?,
     };
     Ok(report(
         TranslationStatus::Exact,
@@ -174,20 +173,53 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
             "native MIDI 1 value is preserved under standard scaling"
         },
         g,
-        vec![value],
+        crate::messages::inherit_metadata(message, vec![value])?,
         false,
     ))
 }
 pub fn to_midi1(
-    message: &UmpMessage,
+    message: &Payload,
     allow_loss: bool,
 ) -> Result<Translation<AnyMessage>, ValueError> {
-    use UmpMessage::*;
-    let words = message.encode_words()?;
-    let group = if matches!(words[0] >> 28, 1..=5 | 13) {
-        Some(((words[0] >> 24) & 15) as u8 + 1)
-    } else {
-        None
+    use AnyMessage::*;
+    let (message, group) = match message {
+        Payload::Message(v) if v.version() == 1 => {
+            return Ok(report(
+                TranslationStatus::Exact,
+                "native MIDI 1 values retained",
+                v.group(),
+                vec![v.clone().without_group()?],
+                false,
+            ));
+        }
+        Payload::Message(v) => (v, v.group()),
+        Payload::Ump(PacketValue::SysEx7(v)) if v.format() == 0 => {
+            return Ok(report(
+                TranslationStatus::Exact,
+                "complete SysEx7 payload retained",
+                Some(v.group()),
+                vec![AnyMessage::SysEx(m::SysEx::new(v.data().to_vec())?)],
+                false,
+            ));
+        }
+        Payload::Ump(PacketValue::SysEx7(v)) => {
+            return Ok(report(
+                TranslationStatus::ContextRequired,
+                "assemble SysEx7 before translating its payload",
+                Some(v.group()),
+                vec![],
+                allow_loss,
+            ));
+        }
+        _ => {
+            return Ok(report(
+                TranslationStatus::Unsupported,
+                "no stateless MIDI 1 equivalent for this packet family",
+                None,
+                vec![],
+                allow_loss,
+            ))
+        }
     };
     let mut lost = false;
     let mut scale = |v: u32, src: u8, dst: u8| -> i64 {
@@ -198,7 +230,6 @@ pub fn to_midi1(
         i64::from(coarse)
     };
     let output = match message {
-        Midi1(v) => vec![v.message.clone()],
         NoteOn(v) => {
             if v.attribute_type().unwrap() != 0 {
                 return Ok(report(
@@ -293,7 +324,7 @@ pub fn to_midi1(
             ));
             output
         }
-        Midi2RegisteredController(v) if v.bank == 127 && v.index == 127 => {
+        RegisteredController(v) if v.bank() == 127 && v.index() == 127 => {
             return Ok(report(
                 TranslationStatus::Unsupported,
                 "RPN null has no MIDI 1 Data Entry target",
@@ -302,26 +333,21 @@ pub fn to_midi1(
                 allow_loss,
             ))
         }
-        Midi2RegisteredController(v) => {
-            parameter_to_midi1(v.channel, v.bank, v.index, v.value, false, &mut lost)?
+        RegisteredController(v) => parameter_to_midi1(
+            v.channel(),
+            v.bank(),
+            v.index(),
+            v.value(),
+            false,
+            &mut lost,
+        )?,
+        AssignableController(v) => {
+            parameter_to_midi1(v.channel(), v.bank(), v.index(), v.value(), true, &mut lost)?
         }
-        Midi2AssignableController(v) => {
-            parameter_to_midi1(v.channel, v.bank, v.index, v.value, true, &mut lost)?
-        }
-        SysEx7(v) if v.format == 0 => vec![AnyMessage::SysEx(SysEx::new(v.data.clone())?)],
-        SysEx7(_) => {
-            return Ok(report(
-                TranslationStatus::ContextRequired,
-                "assemble SysEx7 before translating its payload",
-                group,
-                vec![],
-                allow_loss,
-            ))
-        }
-        Midi2RegisteredPerNoteController(_)
-        | Midi2AssignablePerNoteController(_)
-        | Midi2PerNoteManagement(_)
-        | Midi2PerNotePitchBend(_) => return Ok(report(
+        RegisteredPerNoteController(_)
+        | AssignablePerNoteController(_)
+        | PerNoteManagement(_)
+        | PerNotePitchBend(_) => return Ok(report(
             TranslationStatus::ProfileDependent,
             "no default MIDI 1 per-note equivalent; explicit alternate profile mapping required",
             group,
@@ -338,6 +364,7 @@ pub fn to_midi1(
             ))
         }
     };
+    let output = crate::messages::inherit_metadata(message, output)?;
     Ok(report(
         if lost {
             TranslationStatus::Quantized

@@ -7,9 +7,9 @@ use crate::{
     live,
     messages::{Command, PrimitiveMessage},
     playback::Mapping,
-    smf,
-    transport::{Packet, Protocol},
-    ump::{self, UmpMessage, UmpValue},
+    smf, translation,
+    transport::{Encoding, Packet},
+    ump::{PacketValue, UmpValue},
 };
 use std::io;
 pub struct SmfTimeline {
@@ -57,7 +57,7 @@ impl SmfTimeline {
             "smf_timeline".into(),
             None,
         )?;
-        live::Decoder::new(stream.clone(), Protocol::Midi1, limit)?;
+        live::Decoder::new(stream.clone(), Encoding::Bytes, limit)?;
         Ok(Self {
             header,
             sequence,
@@ -150,7 +150,7 @@ impl SmfTimeline {
         if !self.decoders.contains_key(&track) {
             self.decoders.insert(
                 track,
-                live::Decoder::new(self.stream.clone(), Protocol::Midi1, self.limit)?,
+                live::Decoder::new(self.stream.clone(), Encoding::Bytes, self.limit)?,
             );
         }
         let decoder = self
@@ -224,7 +224,7 @@ impl ClipTimeline {
             .index
             .checked_add(1)
             .ok_or_else(|| invalid(0, "file index exhausted"))?;
-        if let UmpMessage::DeltaClockstampTicksPerQuarter(v) = &entry.message {
+        if let Payload::Ump(PacketValue::DeltaClockstampTicksPerQuarter(v)) = &entry.message {
             if self.clock.is_some() {
                 return Err(invalid(0, "duplicate file clock"));
             }
@@ -235,13 +235,13 @@ impl ClipTimeline {
                 "clip_timeline".into(),
                 None,
             )?;
-            let mut decoder = live::Decoder::new(self.stream.clone(), Protocol::Ump, 1_048_576)?;
+            let mut decoder = live::Decoder::new(self.stream.clone(), Encoding::Ump, 1_048_576)?;
             decoder.begin_at(index);
             self.clock = Some(clock);
             self.decoder = Some(decoder);
         }
         let Some(clock) = self.clock.as_ref() else {
-            if matches!(entry.message, UmpMessage::DeltaClockstamp(_)) {
+            if matches!(entry.message, Payload::Ump(PacketValue::DeltaClockstamp(_))) {
                 return Ok(vec![]);
             }
             return Err(invalid(0,"profile-tag configuration needs explicit MIDI-CI handling before timeline conversion"));
@@ -259,9 +259,10 @@ impl ClipTimeline {
         self.tick = tick;
         let file_only = matches!(
             entry.message,
-            UmpMessage::DeltaClockstamp(_) | UmpMessage::DeltaClockstampTicksPerQuarter(_)
-        ) || matches!(&entry.message,UmpMessage::Stream(v)if matches!(v.status(),32|33));
-        let tempo = if let UmpMessage::FlexData(f) = &entry.message {
+            Payload::Ump(PacketValue::DeltaClockstamp(_))
+                | Payload::Ump(PacketValue::DeltaClockstampTicksPerQuarter(_))
+        ) || matches!(&entry.message,Payload::Ump(PacketValue::Stream(v))if matches!(v.status(),32|33));
+        let tempo = if let Payload::Ump(PacketValue::FlexData(f)) = &entry.message {
             if f.status_bank() == 0 && f.status() == 0 {
                 Some(f.data()[0])
             } else {
@@ -270,8 +271,7 @@ impl ClipTimeline {
         } else {
             None
         };
-        let signature =
-            matches!(&entry.message,UmpMessage::FlexData(f)if f.status_bank()==0&&f.status()==1);
+        let signature = matches!(&entry.message,Payload::Ump(PacketValue::FlexData(f))if f.status_bank()==0&&f.status()==1);
         if !entry.sequence
             && !file_only
             && !self.include_configuration
@@ -289,7 +289,7 @@ impl ClipTimeline {
             .try_into()
             .map_err(|_| invalid(0, "exact clip time exceeds signed 64-bit clock range"))?;
         if !self.include_configuration
-            && matches!(&entry.message,UmpMessage::Stream(v)if v.status()==32)
+            && matches!(&entry.message,Payload::Ump(PacketValue::Stream(v))if v.status()==32)
         {
             self.origin_ticks = Some(timestamp);
         }
@@ -314,7 +314,7 @@ impl ClipTimeline {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ExportReport {
-    pub status: ump::TranslationStatus,
+    pub status: translation::TranslationStatus,
     pub reason: String,
     pub rounding_error_ticks: Rational,
     pub events: Vec<smf::Event>,
@@ -343,7 +343,7 @@ pub fn export_smf(
     }
     let Some(t) = &event.timestamp() else {
         return Ok(denied(
-            ump::TranslationStatus::ContextRequired,
+            translation::TranslationStatus::ContextRequired,
             "timestamp is absent; supply an explicit timing policy",
         ));
     };
@@ -356,14 +356,14 @@ pub fn export_smf(
         m.map(t)?
     } else {
         return Ok(denied(
-            ump::TranslationStatus::ContextRequired,
+            translation::TranslationStatus::ContextRequired,
             "clock mapping required",
         ));
     };
     let relative = seconds.checked_sub(origin.seconds()?)?;
     if relative.numerator() < 0 {
         return Ok(denied(
-            ump::TranslationStatus::Unsupported,
+            translation::TranslationStatus::Unsupported,
             "event precedes export origin",
         ));
     }
@@ -382,14 +382,14 @@ pub fn export_smf(
     let (tick, error) = tick_value.round(true)?;
     let Ok(tick) = u64::try_from(tick) else {
         return Ok(denied(
-            ump::TranslationStatus::Unsupported,
+            translation::TranslationStatus::Unsupported,
             "SMF absolute tick overflow",
         ));
     };
     let mut status = if error.numerator() == 0 {
-        ump::TranslationStatus::Exact
+        translation::TranslationStatus::Exact
     } else {
-        ump::TranslationStatus::Quantized
+        translation::TranslationStatus::Quantized
     };
     let mut reason = if error.numerator() == 0 {
         "exact timing conversion"
@@ -398,17 +398,23 @@ pub fn export_smf(
     }
     .to_string();
     let messages = match &event {
-        Payload::Midi1(v) => vec![v.clone()],
+        Payload::Message(v) if v.version() == 1 && v.group().is_none() => vec![v.clone()],
+        Payload::Command(c) if c.group().is_some() => {
+            return Ok(denied(
+                translation::TranslationStatus::ContextRequired,
+                "remove the command group explicitly before legacy SMF export",
+            ));
+        }
         Payload::Command(c) => {
             reason.push_str("; command explicitly expanded");
             c.expand()?
         }
-        Payload::Ump(v) => {
-            let report = ump::to_midi1(v, allow_loss).map_err(|e| invalid(0, e))?;
+        Payload::Ump(_) | Payload::Message(_) => {
+            let report = translation::to_midi1(&event, allow_loss).map_err(|e| invalid(0, e))?;
             if report.group.is_some() {
-                return Ok(denied(ump::TranslationStatus::ContextRequired,"resolve UMP group routing explicitly before legacy SMF export; use the translation report to choose a destination"));
+                return Ok(denied(translation::TranslationStatus::ContextRequired,"resolve UMP group routing explicitly before legacy SMF export; use the translation report to choose a destination"));
             }
-            if report.status != ump::TranslationStatus::Exact {
+            if report.status != translation::TranslationStatus::Exact {
                 status = report.status;
             }
             reason.push_str("; ");
@@ -416,8 +422,8 @@ pub fn export_smf(
             report.messages
         }
     };
-    let permitted = matches!(status, ump::TranslationStatus::Exact)
-        || status == ump::TranslationStatus::Quantized && allow_loss;
+    let permitted = matches!(status, translation::TranslationStatus::Exact)
+        || status == translation::TranslationStatus::Quantized && allow_loss;
     let events = if permitted {
         messages
             .into_iter()

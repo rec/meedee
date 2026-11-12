@@ -10,16 +10,16 @@ struct Endpoint {
 #[pymethods]
 impl Endpoint {
     #[new]
-    #[pyo3(signature=(*,backend,protocol,direction,backend_id,name))]
+    #[pyo3(signature=(*,backend,encoding,direction,backend_id,name))]
     fn new(
         backend: String,
-        protocol: String,
+        encoding: String,
         direction: String,
         backend_id: u64,
         name: String,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: topology::Endpoint::new(backend, protocol, direction, backend_id, name)
+            value: topology::Endpoint::new(backend, encoding, direction, backend_id, name)
                 .map_err(error)?,
         })
     }
@@ -28,8 +28,8 @@ impl Endpoint {
         self.value.backend()
     }
     #[getter]
-    fn protocol(&self) -> &str {
-        self.value.protocol()
+    fn encoding(&self) -> &str {
+        self.value.encoding()
     }
     #[getter]
     fn direction(&self) -> &str {

@@ -109,7 +109,7 @@ fn feed(
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         crate::event_values::with_metadata(
             value,
-            meedee::events::Payload::Midi1(meedee::messages::AnyMessage::SysEx(sysex)),
+            meedee::events::Payload::Message(meedee::messages::AnyMessage::SysEx(sysex)),
         )
     });
     let values = if let Ok(e) = message {

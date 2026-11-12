@@ -19,7 +19,7 @@ def clock() -> events.Clock:
 
 
 def test_fragments_reuse_running_status_and_preserve_signed_timestamp_spans() -> None:
-    i = testing.Input(stream="s", protocol="midi1")
+    i = testing.Input(stream="s", encoding="bytes")
     assert i.inject(b"\x90\x3c", clock=clock(), timestamp_ns=-10)
     assert i.receive(timeout=100) is None
     assert i.inject(b"\x64\x3d\x65", clock=clock(), timestamp_ns=20)
@@ -42,7 +42,7 @@ def test_fragments_reuse_running_status_and_preserve_signed_timestamp_spans() ->
 
 
 def test_raw_overflow_keeps_older_packets_and_reports_loss_even_after_silence() -> None:
-    i = testing.Input(stream="s", protocol="midi1", packet_limit=1)
+    i = testing.Input(stream="s", encoding="bytes", packet_limit=1)
     i.inject(b"\x90\x3c", clock=clock())
     assert not i.inject(b"\x64", clock=clock())
     saved = i.snapshot()
@@ -59,7 +59,7 @@ def test_raw_overflow_keeps_older_packets_and_reports_loss_even_after_silence() 
 
 
 def test_decoded_overflow_and_explicit_loss_reset_interpretation() -> None:
-    i = testing.Input(stream="s", protocol="midi1", event_limit=1)
+    i = testing.Input(stream="s", encoding="bytes", event_limit=1)
     i.inject(b"\x90\x3c\x64\x3d\x65", clock=clock())
     assert isinstance(i.receive(), messages.Message)
     loss = i.receive()
@@ -75,22 +75,22 @@ def test_ump_values_keep_native_width_and_protocol_mismatches_are_rejected() -> 
     message = messages.ControlChange(
         version=2, group=4, channel=2, controller=7, value=0xFEDCBA98
     )
-    o = testing.Output(protocol="ump")
+    o = testing.Output(encoding="ump")
     o.send(message)
     packet = o.take_packet()
     assert isinstance(packet, midi.UmpPacket)
-    i = testing.Input(stream="s", protocol="ump")
+    i = testing.Input(stream="s", encoding="ump")
     i.inject(packet, clock=clock())
     result = i.receive()
     assert isinstance(result, messages.Message) and result == message
     with pytest.raises(ValueError):
         i.inject(b"\xf8", clock=clock())
-    with pytest.raises(midi.CapabilityError):
+    with pytest.raises(ValueError, match="group"):
         o.send(messages.TimingClock())
 
 
 def test_worker_failure_is_visible_and_close_retires_input_without_devices() -> None:
-    i = testing.Input(stream="s", protocol="midi1")
+    i = testing.Input(stream="s", encoding="bytes")
     i.inject(b"\xf8", clock=clock())
     i.fail("simulated disconnect")
     assert isinstance(i.failure, midi.WorkerError)
@@ -109,7 +109,7 @@ def test_worker_failure_is_visible_and_close_retires_input_without_devices() -> 
 def test_send_failure_records_explicit_sink_effect_without_claiming_a_returned_handoff(
     accepted: bool,
 ) -> None:
-    o = testing.Output(protocol="midi1")
+    o = testing.Output(encoding="bytes")
     o.fail_next_send(accepted=accepted, reason="uncertain")
     with pytest.raises(midi.SendError, match="uncertain"):
         o.send(messages.TimingClock())
@@ -123,7 +123,7 @@ def test_send_failure_records_explicit_sink_effect_without_claiming_a_returned_h
 
 
 def test_output_capacity_never_discards_accepted_evidence() -> None:
-    o = testing.Output(protocol="midi1", packet_limit=1, byte_limit=3)
+    o = testing.Output(encoding="bytes", packet_limit=1, byte_limit=3)
     o.send(b"\x90\x3c\x64")
     with pytest.raises(midi.ResourceError):
         o.send(b"\x80\x3c\x00")
@@ -135,7 +135,7 @@ def test_output_capacity_never_discards_accepted_evidence() -> None:
 
 def test_empty_receive_and_cancellation_never_advance_manual_time() -> None:
     time = testing.ManualClock(now_ns=100)
-    with testing.Input(stream="s", protocol="midi1") as i:
+    with testing.Input(stream="s", encoding="bytes") as i:
         assert i.receive(timeout=3600) is None and time.now_ns == 100
         cancel = events.Cancellation()
         cancel.cancel()
@@ -151,15 +151,15 @@ def test_empty_receive_and_cancellation_never_advance_manual_time() -> None:
 
 
 def test_routing_conformance_uses_shared_injected_decode_and_recorded_output() -> None:
-    i = testing.Input(stream="s", protocol="midi1")
-    o = testing.Output(protocol="midi1")
+    i = testing.Input(stream="s", encoding="bytes")
+    o = testing.Output(encoding="bytes")
     router = routing.Router(
         routes=[
             routing.Route(
                 name="r",
                 source="s",
                 destination="out",
-                protocol="midi1",
+                encoding="bytes",
                 remap_channel=2,
             )
         ]
@@ -184,9 +184,9 @@ def test_routing_conformance_uses_shared_injected_decode_and_recorded_output() -
 def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
     group: int | None,
 ) -> None:
-    protocol = "midi1" if group is None else "ump"
-    i = testing.Input(stream="s", protocol=protocol)
-    o = testing.Output(protocol=protocol)
+    encoding = "bytes" if group is None else "ump"
+    i = testing.Input(stream="s", encoding=encoding)
+    o = testing.Output(encoding=encoding)
     time = testing.ManualClock()
     identity = ci.Identity(
         manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
@@ -203,7 +203,7 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
             return [wire]
         return [
             midi.UmpPacket(words=ump.encode(p))
-            for p in ump.packetize_sysex7(group=group, data=wire[1:-1])
+            for p in ump.packetize_sysex7(messages.SysEx(wire[1:-1], group=group))
         ]
 
     def send(action: ci.Action) -> None:
@@ -254,7 +254,7 @@ def test_ci_browser_conformance_uses_caller_driven_time_and_in_memory_endpoints(
 
 
 def test_output_accepts_messages_packets_and_compound_commands() -> None:
-    output = testing.Output(protocol="midi1")
+    output = testing.Output(encoding="bytes")
     note = messages.NoteOn(channel=1, note=60, velocity=100)
     output.send(note)
     output.send(b"\x90\x3c\x64")
@@ -271,7 +271,7 @@ def test_output_accepts_messages_packets_and_compound_commands() -> None:
 
 
 def test_compound_output_failure_preserves_prefix_and_reports_progress() -> None:
-    output = testing.Output(protocol="midi1", packet_limit=1)
+    output = testing.Output(encoding="bytes", packet_limit=1)
     with pytest.raises(midi.CompoundSendError) as failure:
         output.send(
             messages.ControlChange(resolution=14, channel=1, controller=7, value=128)

@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
 use super::{
-    ffi, worker::CallbackScope, Backend, Error, Packet, Port, Protocol, ReceivedPacket, Result,
+    ffi, worker::CallbackScope, Backend, Encoding, Error, Packet, Port, ReceivedPacket, Result,
     TimestampMode,
 };
 
@@ -410,7 +410,7 @@ impl Native {
         let receiver = self.receiver.as_mut().unwrap();
         let config = ffi::InputConfig {
             api: self.backend as i32,
-            flags: u32::from(self.backend.protocol() == Protocol::Ump)
+            flags: u32::from(self.backend.encoding() == Encoding::Ump)
                 | (u32::from(receiver.clock.mode == TimestampMode::Absolute) << 1),
             port,
             name: name.as_ptr(),

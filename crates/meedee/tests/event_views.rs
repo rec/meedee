@@ -7,7 +7,7 @@ use meedee::{
     ump,
 };
 fn event(message: AnyMessage, ticks: i64) -> Payload {
-    (Payload::Midi1(message))
+    (Payload::Message(message))
         .with_metadata(meedee::messages::Metadata {
             stream: Some("s".into()),
             timestamp: Some(Timestamp {
@@ -23,7 +23,7 @@ fn anonymous_controls_preserve_timing_and_require_reset_before_source_changes() 
     use meedee::controls::{ControlInterpreter, DiagnosticKind as ControlKind, Observation};
     let mut interpreter = ControlInterpreter::new(None).unwrap();
     let cc = |controller| {
-        Payload::Midi1(AnyMessage::ControlChange(
+        Payload::Message(AnyMessage::ControlChange(
             ControlChange::new(controller, 1)
                 .unwrap()
                 .with_channel(1)
@@ -191,9 +191,15 @@ fn inactive_parameter_selectors_retain_their_contributor_times() {
 #[test]
 fn ump_finish_retains_group_and_last_contributing_timestamp() {
     let mut assembler = ump::Assembler::new(1024, 2048, 4).unwrap();
-    let packets = ump::packetize_sysex7(3, &(0..20).collect::<Vec<u8>>()).unwrap();
+    let packets = ump::packetize_sysex7(
+        &meedee::messages::SysEx::new((0..20).collect())
+            .unwrap()
+            .with_group(3)
+            .unwrap(),
+    )
+    .unwrap();
     let packet = |index: usize, ticks| {
-        Payload::Ump(ump::UmpMessage::SysEx7(packets[index].clone()))
+        Payload::Ump(ump::PacketValue::SysEx7(packets[index].clone()))
             .with_timestamp(Timestamp {
                 ticks,
                 clock: Clock::new("capture".into(), 1, 1_000_000_000, "test".into(), None).unwrap(),
@@ -202,7 +208,7 @@ fn ump_finish_retains_group_and_last_contributing_timestamp() {
     };
     assembler.feed(&packet(0, 10)).unwrap();
     assembler
-        .feed(&Payload::Ump(ump::UmpMessage::Noop(
+        .feed(&Payload::Ump(ump::PacketValue::Noop(
             ump::Noop::new().unwrap(),
         )))
         .unwrap();
@@ -327,7 +333,13 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
     assert_eq!((out[0].first_index, out[0].last_index), (Some(0), Some(1)));
     assert!(matches!(&out[0].value,Value::Velocity(v)if v.velocity==16383));
     let mut assembler = meedee::ump::Assembler::new(1024, 8192, 64).unwrap();
-    let packets = ump::packetize_sysex7(2, &[125, 1, 2, 3, 4, 5, 6, 7]).unwrap();
+    let packets = ump::packetize_sysex7(
+        &meedee::messages::SysEx::new(vec![125, 1, 2, 3, 4, 5, 6, 7])
+            .unwrap()
+            .with_group(2)
+            .unwrap(),
+    )
+    .unwrap();
     let mut a = event(
         AnyMessage::NoteOn(
             NoteOn::new(60)
@@ -337,7 +349,7 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
         ),
         10,
     );
-    a = Payload::Ump(ump::UmpMessage::SysEx7(packets[0].clone()))
+    a = Payload::Ump(ump::PacketValue::SysEx7(packets[0].clone()))
         .with_metadata(a.metadata().unwrap().clone())
         .unwrap();
     assert!(assembler.feed(&a).unwrap().is_empty());
@@ -348,7 +360,7 @@ fn velocity_and_ump_assembly_keep_exact_event_ranges() {
             ..a.timestamp().unwrap().clone()
         })
         .unwrap();
-    a = Payload::Ump(ump::UmpMessage::SysEx7(packets[1].clone()))
+    a = Payload::Ump(ump::PacketValue::SysEx7(packets[1].clone()))
         .with_metadata(a.metadata().unwrap().clone())
         .unwrap();
     let out = assembler.feed(&a).unwrap();

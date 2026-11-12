@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meedee import events, gm, messages, midi, mpe, ump
+from meedee import events, gm, messages, midi, mpe
 from meedee._clients import Input, Output
 from meedee._native import CallbackBridge
 from meedee._transport import ReceiveQueue
@@ -534,7 +534,7 @@ def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPac
                     "raw": True,
                     "run_in_subprocess": True,
                     "backend": midi.Backend.CoreMidiUmp
-                    if settings.get("protocol") == midi.Protocol.Ump
+                    if settings.get("encoding") == midi.Encoding.Ump
                     else midi.Backend.CoreMidi,
                 }
                 | settings
@@ -552,7 +552,7 @@ def output_client(mode: str, **settings: object) -> midi.Output:
                 {
                     "run_in_subprocess": True,
                     "backend": midi.Backend.CoreMidiUmp
-                    if settings.get("protocol") == midi.Protocol.Ump
+                    if settings.get("encoding") == midi.Encoding.Ump
                     else midi.Backend.CoreMidi,
                 }
                 | settings
@@ -599,7 +599,7 @@ def test_isolated_ump_preserves_words_clock_identity_and_disabled_time(
     timestamps: midi.TimestampMode, workers: None
 ) -> None:
     packets: Queue[ReceivedPacket] = Queue()
-    source = input_client("early", protocol=midi.Protocol.Ump, timestamps=timestamps)
+    source = input_client("early", encoding=midi.Encoding.Ump, timestamps=timestamps)
     connection = source.connect(source.ports()[0], packets.put_nowait)
     packet = packets.get(timeout=3)
     assert isinstance(packet.packet, midi.UmpPacket)
@@ -611,7 +611,7 @@ def test_isolated_ump_preserves_words_clock_identity_and_disabled_time(
     assert packet.clock.backend == midi.Backend.CoreMidiUmp
     old_clock = connection.clock
     connection.close()
-    source = input_client("early", protocol=midi.Protocol.Ump, timestamps=timestamps)
+    source = input_client("early", encoding=midi.Encoding.Ump, timestamps=timestamps)
     connection = source.connect(source.ports()[0], packets.put_nowait)
     assert connection.clock != old_clock
     connection.close()
@@ -714,9 +714,9 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     )
     connection.close()
     assert source.worker_failure is None
-    ump = output_client("healthy", protocol=midi.Protocol.Ump)
+    ump = output_client("healthy", encoding=midi.Encoding.Ump)
     with ump.connect(ump.ports()[0]) as connection:
-        with pytest.raises(midi.CapabilityError):
+        with pytest.raises(ValueError, match="group"):
             connection.send(
                 messages.ControlChange(
                     resolution=14, channel=1, controller=7, value=10000
@@ -856,8 +856,8 @@ def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
         )
         assert report.sent_events == 2 and not report.cancelled
         assert report.lateness is not None and report.lateness.count == 2
-        with pytest.raises(midi.CapabilityError, match="protocols differ"):
-            output.send(ump.Midi1Packet(group=1, message=note))
+        with pytest.raises(midi.CapabilityError, match="encodings differ"):
+            output.send(note.replace(group=1))
         assert not output.closed and output.worker_failure is None
     assert output.closed
 
@@ -1032,6 +1032,6 @@ def test_worker_preserves_bytes_and_strided_buffers(
 
 
 def test_worker_preserves_all_ump_word_bits_on_send(workers: None) -> None:
-    source = output_client("check_ump", protocol=midi.Protocol.Ump)
+    source = output_client("check_ump", encoding=midi.Encoding.Ump)
     with source.connect(source.ports()[0]):
         source.send(midi.UmpPacket(words=[0x40903C00, 0xFFFFFFFF]))

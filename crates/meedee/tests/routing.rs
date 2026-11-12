@@ -1,8 +1,8 @@
 use meedee::messages::Message;
-use meedee::{archive, events, messages, routing, transport::Protocol, ump};
+use meedee::{archive, events, messages, routing, transport::Encoding, ump};
 
 fn event(source: &str, note: i64) -> events::Payload {
-    (events::Payload::Midi1(messages::AnyMessage::NoteOn(
+    (events::Payload::Message(messages::AnyMessage::NoteOn(
         messages::NoteOn::new(note)
             .and_then(|m| m.with_velocity(100))
             .and_then(|m| m.with_channel(1))
@@ -20,7 +20,7 @@ fn route(name: &str, source: &str) -> routing::Route {
         name.into(),
         source.into(),
         name.into(),
-        Protocol::Midi1,
+        Encoding::Bytes,
         None,
         None,
         None,
@@ -77,7 +77,7 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
         "r".into(),
         "s".into(),
         "out".into(),
-        Protocol::Ump,
+        Encoding::Ump,
         Some(16),
         Some(16),
         Some(1),
@@ -91,7 +91,7 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
     e = e
         .with_timestamp(events::Timestamp { ticks: -5, clock })
         .unwrap();
-    e = events::Payload::Ump(ump::UmpMessage::ControlChange(
+    e = events::Payload::Message(meedee::messages::AnyMessage::ControlChange(
         meedee::messages::ControlChange::new_midi2(74, 0xfedcba98)
             .and_then(|m| m.with_group(16))
             .and_then(|m| m.with_channel(16))
@@ -103,11 +103,11 @@ fn ump_remapping_preserves_native_value_and_source_provenance() {
     let d = router.peek().unwrap();
     assert_eq!(d.event.stream().unwrap(), "s");
     assert_eq!(d.event.timestamp(), e.timestamp());
-    let events::Payload::Ump(v) = &d.event else {
+    let events::Payload::Message(v) = &d.event else {
         panic!("expected UMP")
     };
     assert_eq!(ump::encode(v).unwrap(), [0x40b04a00, 0xfedcba98]);
-    let events::Payload::Ump(v) = &e else {
+    let events::Payload::Message(v) = &e else {
         panic!("expected UMP")
     };
     assert_eq!(ump::encode(v).unwrap(), [0x4fbf4a00, 0xfedcba98]);

@@ -409,7 +409,7 @@ impl Capture {
     }
     fn send(&mut self, output: &mut impl Sender, recipe: &Recipe) -> bool {
         self.report.uncertain_send = true;
-        match output.send(Payload::Midi1(AnyMessage::SysEx(
+        match output.send(Payload::Message(AnyMessage::SysEx(
             recipe.steps[self.step].request.clone(),
         ))) {
             Ok(()) => {
@@ -443,7 +443,7 @@ impl Capture {
             }
             Item::Message(m) => m,
         };
-        let Payload::Midi1(AnyMessage::SysEx(sysex)) = message.as_ref() else {
+        let Payload::Message(AnyMessage::SysEx(sysex)) = message.as_ref() else {
             self.report.ignored_events += 1;
             return true;
         };
@@ -504,7 +504,7 @@ impl Capture {
             .into_iter()
             .filter_map(|r| match r {
                 Record::Event(m) => match *m {
-                    Payload::Midi1(AnyMessage::SysEx(s)) => Some(s),
+                    Payload::Message(AnyMessage::SysEx(s)) => Some(s),
                     _ => None,
                 },
                 _ => None,

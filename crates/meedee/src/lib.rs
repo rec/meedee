@@ -12,6 +12,7 @@ pub mod routing;
 pub mod testing;
 pub mod timecode;
 pub mod topology;
+pub mod translation;
 pub mod transport;
 pub mod tuning;
 pub mod ump;
@@ -65,7 +66,7 @@ pub use messages::{
 };
 pub use metrics::{Distribution, Histogram};
 pub use midi::{
-    Backend, Error, Input, Output, OutputSource, OutputValue, PlaybackOptions, Port, Protocol,
+    Backend, Encoding, Error, Input, Output, OutputSource, OutputValue, PlaybackOptions, Port,
     Recording, RecordingOptions, SubprocessOptions, TimestampMode,
 };
 pub use mpe::ZoneConfiguration;
@@ -73,7 +74,7 @@ pub use routing::{Route, Router};
 pub use timecode::FrameRate;
 pub use transport::Packet;
 pub use tuning::{NoteTuning, Pitch, ScaleOffsets, TuningTable, TuningValue};
-pub use ump::{Midi1Packet, SysEx7Packet, SysEx8Packet};
+pub use ump::{SysEx7Packet, SysEx8Packet};
 pub use universal::{
     IdentityReply, IdentityRequest, MasterCoarseTuning, MasterFineTuning, MasterVolume,
 };

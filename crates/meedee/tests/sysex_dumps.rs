@@ -55,7 +55,7 @@ struct Output {
 }
 impl Sender for Output {
     fn send(&mut self, message: Payload) -> midi::Result<()> {
-        let Payload::Midi1(AnyMessage::SysEx(message)) = message else {
+        let Payload::Message(AnyMessage::SysEx(message)) = message else {
             panic!("request was not SysEx")
         };
         assert_eq!(message.data(), self.requests.pop_front().unwrap());
@@ -68,7 +68,7 @@ impl Sender for Output {
 }
 fn item(data: Vec<u8>) -> InputItem {
     InputItem::Message(Box::new(
-        Payload::Midi1(AnyMessage::SysEx(SysEx::new(data).unwrap()))
+        Payload::Message(AnyMessage::SysEx(SysEx::new(data).unwrap()))
             .with_stream("s")
             .unwrap(),
     ))
@@ -160,7 +160,7 @@ fn documented_requests_retain_exact_opaque_replies() {
                     else {
                         panic!("expected SysEx event")
                     };
-                    let Payload::Midi1(AnyMessage::SysEx(m)) = message.as_ref() else {
+                    let Payload::Message(AnyMessage::SysEx(m)) = message.as_ref() else {
                         panic!("expected SysEx")
                     };
                     m.data().to_vec()
@@ -314,7 +314,7 @@ struct Inquiry {
 }
 impl Sender for Inquiry {
     fn send(&mut self, message: Payload) -> midi::Result<()> {
-        let Payload::Midi1(AnyMessage::SysEx(message)) = message else {
+        let Payload::Message(AnyMessage::SysEx(message)) = message else {
             panic!("request was not SysEx")
         };
         assert_eq!(message.data(), hex("7e7f0601"));

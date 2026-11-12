@@ -27,12 +27,12 @@ def verify(module: ModuleType) -> None:
         "attribute_type": int | None,
         "attribute_data": int | None,
     }
-    assert module.SysEx.__annotations__ == {"data": bytes}
+    assert module.SysEx.__annotations__ == {"data": bytes, "group": int | None}
     assert str(inspect.signature(module.NoteOn)) == (
         "(note, velocity=None, channel=None, *, version=1, group=None, "
         "attribute_type=None, attribute_data=None)"
     )
-    assert str(inspect.signature(module.SysEx)) == "(data)"
+    assert str(inspect.signature(module.SysEx)) == "(data, *, group=None)"
 
     note = module.NoteOn(channel=1, note=60, velocity=100)
     assert isinstance(note, module.Message)

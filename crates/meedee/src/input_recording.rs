@@ -221,7 +221,7 @@ mod tests {
         live::Decoder,
         messages::{AnyMessage, NoteOn},
         midi,
-        transport::Protocol,
+        transport::Encoding,
     };
     use std::io::Write;
     use std::sync::{mpsc, Condvar, Mutex};
@@ -285,7 +285,7 @@ mod tests {
             .unwrap(),
         );
         gate.0.lock().unwrap().active = true;
-        let message = events::Payload::Midi1(AnyMessage::NoteOn(
+        let message = events::Payload::Message(AnyMessage::NoteOn(
             NoteOn::new(60).unwrap().with_channel(1).unwrap(),
         ))
         .with_stream("retry")
@@ -295,7 +295,7 @@ mod tests {
         let mut core = Core::new();
         core.stream = Some("retry".into());
         core.clock = Some(clock);
-        core.decoder = Some(Decoder::new("retry".into(), Protocol::Midi1, 1024).unwrap());
+        core.decoder = Some(Decoder::new("retry".into(), Encoding::Bytes, 1024).unwrap());
         core.recording = Some(Attachment {
             recorder,
             stopping: false,

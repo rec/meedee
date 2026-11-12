@@ -782,6 +782,41 @@ monotonic caller-clock requirement.
 
 ## Slice 7 UMP/MIDI 2.0 contract
 
+### Shared semantic boundary
+
+`messages` owns MIDI 1 and MIDI 2 musical values, including
+RegisteredPerNoteController, AssignablePerNoteController, PerNoteManagement,
+RegisteredController, AssignableController, RelativeRegisteredController,
+RelativeAssignableController and PerNotePitchBend. The latter eight have an
+inherent `version=2` and retain required group/channel arguments and native
+integer values. There are no old UMP aliases. Encoding never implies scaling.
+
+Shared MIDI 1 channel/system messages, complete SysEx and compound commands
+accept an optional group, numbered 1..16. A group selects UMP addressing without
+changing version. `ump.decode` returns these same classes for MIDI 1 UMP.
+Rust `events::Payload` has `Message(AnyMessage)`, `Ump(ump::PacketValue)` and
+`Command(AnyCommand)` categories. PacketValue contains only packet families,
+not parallel musical enum arms or a nested MIDI 1 wrapper. Authored values enter
+through canonical From conversions; MIDI 1 fourteen-bit CC is a command.
+Explicit inconsistent low-level categories are rejected.
+
+`midi.Encoding.Bytes`/`Ump` (Rust `Encoding::Bytes`/`Ump`) and `encoding` options
+select wire representation. MIDI version describes native message semantics.
+Byte encoding rejects grouped values; remove a MIDI 1 group's address explicitly
+with Python `replace(group=None)` or Rust `without_group()?`. UMP encoding
+requires a group on MIDI 1 values. Output's channel override applies uniformly
+to all channel-addressed semantic messages and commands, preserving other fields
+and metadata. Raw packets keep their addresses.
+
+`ump.packetize_sysex7(SysEx(..., group=...))` exposes explicit fragments;
+ordinary UMP output can package a grouped complete SysEx or expanded MIDI 1
+command into one bounded stream handoff. Sent-event reports count logical values.
+Backend acceptance is not physical delivery. Decoding continues to return raw
+data fragments without automatic assembly. Translation and its reports/scaling
+helpers live in `translation`, independently of UMP framing. Archives use the
+single current v2 format in [archive-format.md](archive-format.md), retaining
+semantic/packet/command identity, group and occurrence metadata.
+
 The pure `meedee.ump` namespace exposes frozen native Message subclasses backed
 by Rust values. It creates no transport clients, initializes no workers, performs no I/O and does not
 attach host timestamps. `encode` returns an immutable tuple of 32-bit words;
@@ -805,7 +840,7 @@ velocity of zero is a sounding-note event, unlike MIDI 1 NoteOn zero.
 | Packet family | Representation and scope |
 | --- | --- |
 | Utility | Noop, JrClock, JrTimestamp, DeltaClockstampTicksPerQuarter, DeltaClockstamp; no Group field |
-| System/MIDI 1.0 channel | Midi1Packet(group, message) reuses immutable MIDI 1 values; SysEx uses separate packetization |
+| System/MIDI 1.0 channel | Shared `messages` classes with an optional group; complete SysEx uses explicit or output-time packetization |
 | MIDI 2.0 channel | Shared versioned NoteOn/Off, PolyPressure, ChannelPressure, ControlChange, ProgramChange, PitchBend; MIDI 2-only Registered/AssignableController, relative controllers, registered/assignable per-note controllers, per-note bend/management |
 | Data64 | SysEx7Packet: format 0/1/2/3 = Complete/Start/Continue/End, at most six seven-bit bytes |
 | Data128 | SysEx8Packet: format, stream ID 0–255, up to thirteen payload bytes; explicit aborted End; MixedDataSet header/payload packets retain their fourteen bytes |
@@ -856,7 +891,7 @@ operation, and does not require or assert a physical receiver's capability.
 
 ### Translation policy
 
-`to_midi2(MIDI1_message, group=...)` and `to_midi1(UMP_message, allow_loss=False)`
+`translation.to_midi2(MIDI1_message, group=...)` and `translation.to_midi1(message, allow_loss=False)`
 return immutable reports: status, reason, routing group, converted and a fresh
 list of messages. Min-Center-Max scaling follows M2-115-U 1.0.2, with truncating
 downscaling; native integer values remain exact until conversion is requested.
@@ -1075,7 +1110,7 @@ is no automatic alignment, cross-format musical conversion or resynchronization.
 The optional `cli` extra supplies Pydantic/Tyro inspect, validate, compare and
 monitor commands, text/JSON output and 0/1/2 verdicts. Reccy is a runtime dependency for unit-aware Python inputs; its dependencies
 also supply Pydantic and Tyro. The passive monitor selects one exact unique
-input name and explicit protocol, with isolation enabled by default and existing
+input name and explicit encoding, with isolation enabled by default and existing
 typed-queue/payload limits. Display filters do not filter interpretation or hide
 loss/failure notices. Known loss resets views and continues; terminal transport
 failure stops. History and payload previews are bounded. It sends no MIDI.
@@ -1157,14 +1192,14 @@ or sent. The existing MPE tracker retains its separate zone/member semantics.
 ## Static protocol-aware routing
 
 Rust `routing::Route` and Python `routing.Route` specify name, exact source and
-destination identities, protocol, optional channel/group selectors and optional
-channel/group remaps. Python protocol values are `"midi1"` or `"ump"`, allowing
+destination identities, encoding, optional channel/group selectors and optional
+channel/group remaps. Python encoding values are `"bytes"` or `"ump"`, allowing
 configuration and preview without constructing transport clients. Channels/groups
 use 1-16; byte MIDI rejects group options. Python routes are frozen; Rust fields
 are private and constructor-validated. No mandatory dependency is added.
 
 `Router(routes=..., event_limit=128, byte_limit=8388608)` accepts 1-128 uniquely
-named routes. A destination must have one protocol. `feed(Message)` selects routes
+named routes. A destination must have one encoding. `feed(Message)` selects routes
 in configuration order, preserving caller event order without timestamp sorting.
 Several matching routes may deliberately deliver multiple copies to one output.
 No protocol conversion, command expansion, musical transformation or autonomous
@@ -1217,7 +1252,7 @@ error. Examples are bounded by both `detail_limit` and the aggregate byte limit,
 with explicit omissions. Native preview confirmation is simulated acceptance;
 the CLI labels these counts `planned`, never sent.
 
-The optional CLI adds `route-preview` and `patch`, sharing protocol, destinations,
+The optional CLI adds `route-preview` and `patch`, sharing encoding, destinations,
 channel/group options, non-channel opt-in and bounds. Preview opens no ports and
 changes no files. Patch selects one exact unique input and exact unique output
 names, using isolated typed connections by default. It opens outputs before input
@@ -1235,7 +1270,7 @@ unsent copies as confirmed. Already-sent notes can remain active after stopping.
 ## Topology observations and discovery polling
 
 Rust `topology::Endpoint` and frozen Python `topology.Endpoint` contain backend
-label, protocol (`midi1`/`ump`), direction (`input`/`output`), backend ID and name.
+label, encoding (`bytes`/`ump`), direction (`input`/`output`), backend ID and name.
 Equality compares all five fields. The backend label is observation metadata;
 backend IDs and names do not establish physical identity or health. Empty names
 are retained. Endpoints are inert descriptors, without native handles or
@@ -1265,7 +1300,7 @@ inferred from a failed/partial scan. `observe` after stopping raises an error.
 Snapshots and collection getters return independent copies. Cardinality limits
 bound retained observations, not metadata byte sizes or caller-owned copies.
 
-`discovery.Poller` is a Python adapter with explicit protocol, optional backend,
+`discovery.Poller` is a Python adapter with explicit encoding, optional backend,
 isolation enabled by default and the same observation limits. Import and
 construction start no transport clients. The first explicit `poll()` creates
 one unconnected Input and one Output client; subsequent polls reuse them. Each
@@ -1282,7 +1317,7 @@ path, without promising synchronous native destruction. No endpoint is opened,
 no traffic is sent, and no background polling thread is introduced. Rust hosts
 can feed their existing discovery results to the shared tracker directly.
 
-The optional CLI adds `ports --protocol midi1|ump` for one scan and `watch-ports`
+The optional CLI adds `ports --encoding bytes|ump` for one scan and `watch-ports`
 for polling, with explicit backend/isolation choices and text/JSON output.
 Watch defaults to a one-second interval, prints the initial baseline and actual
 changes, and emits a final bounded summary on duration expiry, Ctrl-C or failure.
@@ -1390,9 +1425,9 @@ CLI contract are documented in [ci.md](ci.md#one-scan-management-browser).
 The public Rust `testing` module and Python `meedee.testing` provide `ManualClock`,
 `Input`, `Output` and independent frozen Python `InputReport` / `OutputReport`
 snapshots. They initialize no native lifecycle, clients, threads, timers or sleeps.
-Python constructors require `protocol="midi1"|"ump"` so even test construction
+Python constructors require `encoding="bytes"|"ump"` so even test construction
 does not create a native MIDI client. Rust uses the existing
-`transport::Protocol` and `Packet` values. This is a small receive/send-compatible
+`transport::Encoding` and `Packet` values. This is a small receive/send-compatible
 testing surface, not another selectable native backend or a complete replacement
 for discovery, callback, recording, playback or compound-send connection methods.
 
@@ -1402,7 +1437,7 @@ Nothing advances it implicitly. A caller explicitly connects its value to host
 clock hooks and chooses when to advance it. Input timestamps are separate signed
 nanosecond values and may regress deliberately to exercise diagnostics.
 
-`Input(stream=..., protocol=..., packet_limit=128, event_limit=128,
+`Input(stream=..., encoding=..., packet_limit=128, event_limit=128,
 byte_limit=8_388_608, sysex_limit=1_048_576)` owns a bounded raw packet queue and a
 bounded decoded-item queue over the existing source-local `live::Decoder`.
 `inject(packet, clock=..., timestamp_ns=None)` accepts byte buffers or an existing
@@ -1436,7 +1471,7 @@ Already queued input/loss can be drained before receive raises that failure.
 `close` discards queued input, resets interpretation and retires receiving; it
 is idempotent. Counters and failure evidence survive close. Context exit closes.
 
-`Output(protocol=..., packet_limit=128, byte_limit=8_388_608)` records accepted
+`Output(encoding=..., packet_limit=128, byte_limit=8_388_608)` records accepted
 packets without connecting them to any input automatically. Python `send` accepts
 message objects, compound commands and encoded packets with the same preparation
 as live output. It rejects implicit protocol translation. Compound failures raise

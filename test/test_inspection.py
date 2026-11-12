@@ -36,7 +36,7 @@ def test_archive_completion_is_distinct_from_capture_loss() -> None:
     assert not source.closed
     assert report.complete and report.problem is None
     assert report.records == 6
-    assert report.message_counts == {"TimingClock": 1, "UMP.Midi2ChannelVoice": 1}
+    assert report.message_counts == {"TimingClock": 1, "ControlChange": 1}
     assert report.streams[0].id == "keys"
     assert report.streams[0].label == "Keyboard"
     assert report.streams[0].clock_identity == report.clocks[0].identity == "native"
@@ -121,7 +121,7 @@ def test_clip_completion_and_syx_limits_use_existing_readers() -> None:
     )
     report = inspection.inspect_file(BytesIO(data), format="clip")
     assert report.complete and report.records == 8
-    assert report.message_counts["UMP.Midi1ChannelVoice"] == 1
+    assert report.message_counts["NoteOn"] == 1
     assert report.message_counts["UMP.Stream"] == 2
     assert report.untimed_events == 0
     assert report.note_state.channels[0].source == "clip"
@@ -202,7 +202,7 @@ def test_timing_segments_preserve_exact_ranges_and_reset_after_loss() -> None:
 def test_live_monitor_reports_loss_and_typed_entries_without_owning_connection() -> (
     None
 ):
-    source = testing.Input(stream="s", protocol="midi1")
+    source = testing.Input(stream="s", encoding="bytes")
     clock = events.Clock(identity="c")
     source.lose(2)
     source.inject(b"\x90\x3c\x5a", clock=clock)
@@ -229,7 +229,7 @@ def test_live_monitor_reports_loss_and_typed_entries_without_owning_connection()
 
 
 def test_live_monitor_propagates_terminal_failure_and_preserves_snapshot() -> None:
-    source = testing.Input(stream="s", protocol="midi1")
+    source = testing.Input(stream="s", encoding="bytes")
     clock = events.Clock(identity="c")
     source.inject(b"\x90\x3c\x5a", clock=clock)
     monitor = inspection.Monitor(stream="s", clock=clock)

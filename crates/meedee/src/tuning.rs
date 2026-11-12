@@ -936,7 +936,7 @@ impl Query {
             return Ok(());
         }
         match event.as_ref() {
-            Payload::Midi1(AnyMessage::SysEx(raw)) => {
+            Payload::Message(AnyMessage::SysEx(raw)) => {
                 let decoded = match tuning::decode(raw) {
                     Ok(v) => v,
                     Err(e) => {
@@ -958,7 +958,7 @@ impl Query {
                     }
                 }
             }
-            Payload::Midi1(_) => {}
+            Payload::Message(_) => {}
             _ => {
                 self.fail("query requires MIDI 1 byte events");
                 return Ok(());
@@ -1053,7 +1053,7 @@ pub fn query_with(
         }
         if query.snapshot().status == "ready" {
             let request = query.prepare(clock.now_ns())?;
-            match output.send(crate::events::Payload::Midi1(
+            match output.send(crate::events::Payload::Message(
                 crate::messages::AnyMessage::SysEx(request),
             )) {
                 Ok(()) => query.confirm(clock.now_ns())?,

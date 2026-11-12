@@ -80,22 +80,35 @@ pub(crate) struct SysEx {
 #[pymethods]
 impl SysEx {
     #[new]
-    #[pyo3(signature = (data))]
-    fn new(data: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
-        Ok(
-            PyClassInitializer::from(Message::default()).add_subclass(Self {
-                value: payload(data)?,
-            }),
-        )
+    #[pyo3(signature = (data, *, group=None))]
+    fn new(
+        data: &Bound<'_, PyAny>,
+        group: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let mut value = payload(data)?;
+        if let Some(g) = group {
+            value = value
+                .with_group(integer(g, "group")?)
+                .map_err(value_error)?;
+        }
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
     }
 
     #[getter]
     fn data<'py>(&self, py: Python<'py>) -> Bound<'py, PyBytes> {
         PyBytes::new(py, self.value.data())
     }
+    #[getter]
+    fn group(&self) -> Option<u8> {
+        self.value.group()
+    }
 
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
-        Ok(format!("SysEx(data={})", self.data(py).repr()?))
+        let suffix = self
+            .value
+            .group()
+            .map_or(String::new(), |g| format!(", group={g}"));
+        Ok(format!("SysEx(data={}{})", self.data(py).repr()?, suffix))
     }
 
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -114,13 +127,19 @@ impl SysEx {
         changes: Option<&Bound<'py, PyDict>>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let py = slf.py();
-        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["data"], changes)
+        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["data", "group"], changes)
     }
 
     #[classattr]
     fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
         let annotations = PyDict::new(py);
         annotations.set_item("data", py.get_type::<PyBytes>())?;
+        annotations.set_item(
+            "group",
+            py.import("typing")?
+                .getattr("Optional")?
+                .get_item(py.get_type::<PyInt>())?,
+        )?;
         Ok(annotations)
     }
 
@@ -169,7 +188,8 @@ macro_rules! versioned_message {
             fn __hash__(&self) -> u64 { value_hash(&self.value) }
             fn __repr__(slf:PyRef<'_,Self>) -> PyResult<String> {
                 let py=slf.py();
-                let fields = if slf.value.version()==1 { vec![$(stringify!($required),)* $(stringify!($optional),)* "channel"] } else { vec![$(stringify!($required),)* $(stringify!($optional),)* "channel", "version", "group", $(stringify!($extra)),*] };
+                let mut fields = if slf.value.version()==1 { vec![$(stringify!($required),)* $(stringify!($optional),)* "channel"] } else { vec![$(stringify!($required),)* $(stringify!($optional),)* "channel", "version", "group", $(stringify!($extra)),*] };
+                if slf.value.version()==1 && slf.value.group().is_some() { fields.push("group"); }
                 crate::tuning::render(slf.into_pyobject(py)?.as_any(), stringify!($name), &fields)
             }
             #[pyo3(signature=(**changes))]
@@ -317,7 +337,7 @@ impl ControlChange {
     }
     fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
         let py = slf.py();
-        let fields = if slf.value.version() == 2 {
+        let mut fields = if slf.value.version() == 2 {
             vec![
                 "controller",
                 "value",
@@ -329,6 +349,9 @@ impl ControlChange {
         } else {
             vec!["controller", "value", "channel", "resolution"]
         };
+        if slf.value.version() == 1 && slf.value.group().is_some() {
+            fields.push("group");
+        }
         crate::tuning::render(slf.into_pyobject(py)?.as_any(), "ControlChange", &fields)
     }
     #[pyo3(signature=(**changes))]
@@ -386,20 +409,6 @@ versioned_message! { ProgramChange (program, channel=None, *, version=1, group=N
 versioned_message! { ChannelPressure (pressure=None, channel=None, *, version=1, group=None) {} {pressure => with_pressure} {} }
 versioned_message! { PitchBend (value=None, channel=None, *, version=1, group=None) {} {value => with_value} {} }
 
-pub(crate) fn extract_midi2(value: &Bound<'_, PyAny>) -> PyResult<meedee::ump::UmpMessage> {
-    macro_rules! extract { ($($name:ident),*) => { $(if let Ok(v)=value.extract::<PyRef<'_,$name>>() { return meedee::ump::UmpMessage::try_from(messages::AnyMessage::$name(v.value.clone())).map_err(value_error); })* }; }
-    extract!(
-        NoteOn,
-        NoteOff,
-        PolyPressure,
-        ControlChange,
-        ProgramChange,
-        ChannelPressure,
-        PitchBend
-    );
-    Err(PyTypeError::new_err("expected a MIDI 2 channel message"))
-}
-
 macro_rules! message_classes {
     (NoteOn $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
     (NoteOff $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
@@ -419,18 +428,21 @@ macro_rules! message_classes {
             #[pymethods]
             impl $name {
                 #[new]
-                #[pyo3(signature = $signature)]
-                fn new($($field: &Bound<'_, PyAny>),*) -> PyResult<PyClassInitializer<Self>> {
+                #[pyo3(signature = ($($field,)* *, group=None))]
+                fn new($($field: &Bound<'_, PyAny>,)* group: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
+                    let mut value = messages::$name::new($(integer($field, stringify!($field))?),*).map_err(value_error)?;
+                    if let Some(g) = group { value = value.with_group(integer(g, "group")?).map_err(value_error)?; }
                     Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
-                        value: messages::$name::new($(integer($field, stringify!($field))?),*)
-                            .map_err(value_error)?,
+                        value,
                     }))
                 }
                 $(#[getter]
                 fn $field(&self) -> i64 { i64::from(self.value.$field()) })*
+                #[getter] fn group(&self) -> Option<u8> { self.value.group() }
 
                 fn __repr__(&self) -> String {
-                    let fields: Vec<String> = vec![$(format!("{}={}", stringify!($field), self.value.$field())),*];
+                    let mut fields: Vec<String> = vec![$(format!("{}={}", stringify!($field), self.value.$field())),*];
+                    if let Some(g) = self.value.group() { fields.push(format!("group={g}")); }
                     format!("{}({})", stringify!($name), fields.join(", "))
                 }
                 fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
@@ -441,12 +453,13 @@ macro_rules! message_classes {
                 #[pyo3(signature = (**changes))]
                 fn replace<'py>(slf: PyRef<'py, Self>, changes: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
         let py = slf.py();
-        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &[$(stringify!($field)),*], changes)
+        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &[$(stringify!($field),)* "group"], changes)
     }
                 #[classattr]
                 fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
                     let annotations = PyDict::new(py);
                     $(annotations.set_item(stringify!($field), py.get_type::<PyInt>())?;)*
+                    annotations.set_item("group", py.import("typing")?.getattr("Optional")?.get_item(py.get_type::<PyInt>())?)?;
                     Ok(annotations)
                 }
                 #[classattr]
@@ -481,9 +494,10 @@ macro_rules! short_messages {
             crate::tuning::encode_message(message)
         }
 
-        pub(crate) fn extract_primitive(message: &Bound<'_, PyAny>) -> PyResult<messages::AnyMessage> {
+        pub(crate) fn extract_message(message: &Bound<'_, PyAny>) -> PyResult<messages::AnyMessage> {
+            if let Some(v) = crate::messages_midi2::extract(message) { return Ok(v); }
             if let Ok(value) = message.extract::<PyRef<'_, SysEx>>() {return Ok(messages::AnyMessage::SysEx(value.value.clone()));}
-            $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {return Ok(messages::AnyMessage::$name(value.resolved()?.clone()));})*
+            $(if let Ok(value) = message.extract::<PyRef<'_, $name>>() {return Ok(messages::AnyMessage::$name(value.value.clone()));})*
             Err(PyTypeError::new_err("expected a primitive MIDI 1.0 message"))
         }
 
@@ -493,6 +507,7 @@ macro_rules! short_messages {
                     PyClassInitializer::from(Message::default()).add_subclass(SysEx { value }))?.into_any()),
                 $(messages::AnyMessage::$name(value) => Ok(Py::new(py,
                     PyClassInitializer::from(Message::default()).add_subclass($name::from_value(value)))?.into_any()),)*
+                v => crate::messages_midi2::to_python(py, v),
             }
         }
 
@@ -527,7 +542,6 @@ fn register_commands(module: &Bound<'_, PyModule>) -> PyResult<()> {
 pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
     macro_rules! extract { ($($name:ident),*) => { $(
         if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
-            if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
             return Ok(messages::AnyCommand::$name(command.value.clone()));
         }
     )* }; }
@@ -536,9 +550,6 @@ pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyComm
             return Err(PyTypeError::new_err(
                 "MIDI 2 controller values require UMP encoding",
             ));
-        }
-        if command.value.channel().is_none() {
-            return Err(PyValueError::new_err("message channel is unassigned"));
         }
         return Ok(messages::AnyCommand::ControlChange(command.value.clone()));
     }
@@ -551,6 +562,7 @@ pub fn command_wire(
     command: &messages::AnyCommand,
 ) -> PyResult<(String, Py<PyDict>)> {
     let kwargs = PyDict::new(py);
+    kwargs.set_item("group", command.group())?;
     let name = match command {
         messages::AnyCommand::ControlChange(value) => {
             kwargs.set_item("controller", value.controller())?;
@@ -609,14 +621,19 @@ struct ParameterSet {
 }
 #[pymethods]
 impl ParameterSet {
+    #[getter]
+    fn group(&self) -> Option<u8> {
+        self.value.group()
+    }
     #[new]
-    #[pyo3(signature=(parameter, value, resolution=14, channel=None, *, family="rpn"))]
+    #[pyo3(signature=(parameter, value, resolution=14, channel=None, *, family="rpn", group=None))]
     fn new(
         #[pyo3(from_py_with=strict_integer)] parameter: i64,
         #[pyo3(from_py_with=strict_integer)] value: i64,
         #[pyo3(from_py_with=strict_integer)] resolution: i64,
         channel: Option<&Bound<'_, PyAny>>,
         family: &str,
+        group: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         let family = parameter_family(family)?;
         let mut value = messages::ParameterSet::new(0, value)
@@ -624,6 +641,11 @@ impl ParameterSet {
             .and_then(|v| v.with_parameter(parameter))
             .and_then(|v| v.with_resolution(resolution))
             .map_err(value_error)?;
+        if let Some(g) = group {
+            value = value
+                .with_group(integer(g, "group")?)
+                .map_err(value_error)?;
+        }
         if let Some(channel) = channel {
             value = value
                 .with_channel(integer(channel, "channel")?)
@@ -656,7 +678,14 @@ impl ParameterSet {
         crate::tuning::render(
             slf.into_pyobject(py)?.as_any(),
             "ParameterSet",
-            &["parameter", "value", "resolution", "channel", "family"],
+            &[
+                "parameter",
+                "value",
+                "resolution",
+                "channel",
+                "family",
+                "group",
+            ],
         )
     }
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
@@ -675,7 +704,14 @@ impl ParameterSet {
         let py = slf.py();
         crate::tuning::replacement(
             slf.into_pyobject(py)?.as_any(),
-            &["parameter", "value", "resolution", "channel", "family"],
+            &[
+                "parameter",
+                "value",
+                "resolution",
+                "channel",
+                "family",
+                "group",
+            ],
             changes,
         )
     }
@@ -692,6 +728,12 @@ impl ParameterSet {
                 .get_item(py.get_type::<PyInt>())?,
         )?;
         fields.set_item("family", py.get_type::<pyo3::types::PyString>())?;
+        fields.set_item(
+            "group",
+            py.import("typing")?
+                .getattr("Optional")?
+                .get_item(py.get_type::<PyInt>())?,
+        )?;
         Ok(fields)
     }
     #[classattr]
@@ -706,13 +748,18 @@ struct ParameterStep {
 }
 #[pymethods]
 impl ParameterStep {
+    #[getter]
+    fn group(&self) -> Option<u8> {
+        self.value.group()
+    }
     #[new]
-    #[pyo3(signature=(parameter, direction=1, channel=None, *, family="rpn"))]
+    #[pyo3(signature=(parameter, direction=1, channel=None, *, family="rpn", group=None))]
     fn new(
         #[pyo3(from_py_with=strict_integer)] parameter: i64,
         #[pyo3(from_py_with=strict_integer)] direction: i64,
         channel: Option<&Bound<'_, PyAny>>,
         family: &str,
+        group: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyClassInitializer<Self>> {
         use meedee::controls::StepDirection;
         let family = parameter_family(family)?;
@@ -726,6 +773,11 @@ impl ParameterStep {
             .and_then(|v| v.with_parameter(parameter))
             .map_err(value_error)?
             .with_direction(direction);
+        if let Some(g) = group {
+            value = value
+                .with_group(integer(g, "group")?)
+                .map_err(value_error)?;
+        }
         if let Some(channel) = channel {
             value = value
                 .with_channel(integer(channel, "channel")?)
@@ -781,7 +833,7 @@ impl ParameterStep {
         let py = slf.py();
         crate::tuning::replacement(
             slf.into_pyobject(py)?.as_any(),
-            &["parameter", "direction", "channel", "family"],
+            &["parameter", "direction", "channel", "family", "group"],
             changes,
         )
     }
@@ -797,6 +849,12 @@ impl ParameterStep {
                 .get_item(py.get_type::<PyInt>())?,
         )?;
         annotations.set_item("family", py.get_type::<pyo3::types::PyString>())?;
+        annotations.set_item(
+            "group",
+            py.import("typing")?
+                .getattr("Optional")?
+                .get_item(py.get_type::<PyInt>())?,
+        )?;
         Ok(annotations)
     }
     #[classattr]
@@ -840,7 +898,7 @@ fn value_error(error: messages::ValueError) -> PyErr {
     PyValueError::new_err(error.to_string())
 }
 
-fn value_hash(value: &impl Hash) -> u64 {
+pub(crate) fn value_hash(value: &impl Hash) -> u64 {
     let mut hasher = DefaultHasher::new();
     value.hash(&mut hasher);
     hasher.finish()
@@ -947,6 +1005,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<SysEx>()?;
     register_short(module)?;
     register_commands(module)?;
+    crate::messages_midi2::register(module)?;
     Ok(())
 }
 

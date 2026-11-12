@@ -11,16 +11,19 @@ pub use extensions::{
 #[derive(Clone, Debug)]
 pub struct BankProgramSelect {
     metadata: Option<Box<crate::messages::Metadata>>,
+    group: Option<u8>,
     channel: Option<u8>,
     bank_msb: u8,
     bank_lsb: u8,
     program: u8,
 }
 impl BankProgramSelect {
+    crate::messages::group_methods!();
     pub fn new(program: i64) -> Result<Self, ValueError> {
         let program = ProgramChange::new(program)?.program();
         Ok(Self {
             metadata: None,
+            group: None,
             channel: None,
             bank_msb: 0,
             bank_lsb: 0,
@@ -63,6 +66,7 @@ impl BankProgramSelect {
     }
 }
 crate::messages::value_metadata!(BankProgramSelect {
+    group,
     channel,
     bank_msb,
     bank_lsb,
@@ -73,8 +77,9 @@ impl Command for BankProgramSelect {
         let channel = self
             .channel
             .ok_or_else(|| ValueError("message channel is unassigned".into()))?;
-        crate::messages::inherit_metadata(
+        crate::messages::inherit_command(
             self,
+            self.group(),
             vec![
                 AnyMessage::ControlChange(
                     ControlChange::new(0, self.bank_msb.into())

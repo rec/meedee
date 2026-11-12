@@ -1,7 +1,7 @@
 //! Deterministic, caller-driven transport doubles. No devices, threads or sleeps.
 use crate::events::{Clock, Payload};
 use crate::live::{Decoder, Item};
-use crate::transport::{validate_packet, Error, Packet, Protocol, Result};
+use crate::transport::{validate_packet, Encoding, Error, Packet, Result};
 use std::collections::VecDeque;
 
 #[derive(Debug, Default)]
@@ -43,7 +43,7 @@ struct QueuedPacket {
 }
 pub struct Input {
     stream: String,
-    protocol: Protocol,
+    encoding: Encoding,
     decoder: Decoder,
     packets: VecDeque<QueuedPacket>,
     items: VecDeque<Item>,
@@ -62,7 +62,7 @@ pub struct Input {
 impl Input {
     pub fn new(
         stream: String,
-        protocol: Protocol,
+        encoding: Encoding,
         packet_limit: usize,
         event_limit: usize,
         byte_limit: usize,
@@ -78,11 +78,11 @@ impl Input {
                 "testing input requires a nonempty stream and positive limits".into(),
             ));
         }
-        let decoder = Decoder::new(stream.clone(), protocol, sysex_limit)
+        let decoder = Decoder::new(stream.clone(), encoding, sysex_limit)
             .map_err(|e| Error::Native(e.to_string()))?;
         Ok(Self {
             stream,
-            protocol,
+            encoding,
             decoder,
             packets: VecDeque::new(),
             items: VecDeque::new(),
@@ -102,7 +102,7 @@ impl Input {
     pub fn stream(&self) -> &str {
         &self.stream
     }
-    /// Raw packets may contain fragments or malformed content; their protocol must match.
+    /// Raw packets may contain fragments or malformed content; their encoding must match.
     pub fn inject(
         &mut self,
         packet: Packet,
@@ -111,10 +111,10 @@ impl Input {
     ) -> Result<bool> {
         self.available()?;
         if !matches!(
-            (self.protocol, &packet),
-            (Protocol::Midi1, Packet::Bytes(_)) | (Protocol::Ump, Packet::Ump(_))
+            (self.encoding, &packet),
+            (Encoding::Bytes, Packet::Bytes(_)) | (Encoding::Ump, Packet::Ump(_))
         ) {
-            return Err(Error::Invalid("injected packet protocol mismatch".into()));
+            return Err(Error::Invalid("injected packet encoding mismatch".into()));
         }
         if clock.numerator() != 1
             || clock.denominator() != 1_000_000_000
@@ -265,7 +265,7 @@ pub struct OutputReport {
     pub failure: Option<String>,
 }
 pub struct Output {
-    protocol: Protocol,
+    encoding: Encoding,
     packets: VecDeque<Packet>,
     packet_limit: usize,
     byte_limit: usize,
@@ -277,14 +277,14 @@ pub struct Output {
     closed: bool,
 }
 impl Output {
-    pub fn new(protocol: Protocol, packet_limit: usize, byte_limit: usize) -> Result<Self> {
+    pub fn new(encoding: Encoding, packet_limit: usize, byte_limit: usize) -> Result<Self> {
         if packet_limit == 0 || byte_limit == 0 {
             return Err(Error::Invalid(
                 "testing output limits must be positive".into(),
             ));
         }
         Ok(Self {
-            protocol,
+            encoding,
             packets: VecDeque::new(),
             packet_limit,
             byte_limit,
@@ -303,7 +303,7 @@ impl Output {
         if let Some(reason) = &self.failure {
             return Err(Error::Native(reason.clone()));
         }
-        validate_packet(self.protocol, &packet)?;
+        validate_packet(self.encoding, &packet)?;
         self.attempts = self
             .attempts
             .checked_add(1)
@@ -369,7 +369,7 @@ fn item_size(item: &Item) -> usize {
     match item {
         Item::Diagnostic(v) => v.reason.len(),
         Item::Message(e) => match e.as_ref() {
-            Payload::Midi1(v) => v.encoded_len(),
+            Payload::Message(v) => v.encoded_len(),
             Payload::Ump(v) => v.encoded_len() * 4,
             Payload::Command(_) => 64,
         },

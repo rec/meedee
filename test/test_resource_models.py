@@ -13,7 +13,7 @@ from meedee._resource import ResourceModel
 
 @pytest.mark.parametrize(
     "create",
-    [midi.Input, midi.Output, lambda: discovery.Poller(protocol="midi1")],
+    [midi.Input, midi.Output, lambda: discovery.Poller(encoding="bytes")],
 )
 def test_settings_roundtrip_creates_a_distinct_resource_without_runtime_state(
     create: Callable[[], ResourceModel],
@@ -25,7 +25,7 @@ def test_settings_roundtrip_creates_a_distinct_resource_without_runtime_state(
     assert resource != other
     assert len({resource, other}) == 2
     with pytest.raises(ValidationError, match="frozen"):
-        resource.protocol = settings["protocol"]  # ty: ignore[invalid-assignment]
+        resource.encoding = settings["encoding"]  # ty: ignore[invalid-assignment]
     for operation in (copy.copy, copy.deepcopy, pickle.dumps):
         with pytest.raises(TypeError, match="Resource objects cannot"):
             operation(resource)
@@ -54,7 +54,7 @@ def test_unit_values_and_iterable_channels_become_validated_fields() -> None:
         (lambda: midi.Input(event_limit="128"), "event_limit"),  # ty: ignore[invalid-argument-type]
         (lambda: midi.Output(channel=True), "channel"),
         (lambda: midi.Output(bpm="120"), "bpm"),  # ty: ignore[invalid-argument-type]
-        (lambda: discovery.Poller(protocol="midi1", port_limit=True), "port_limit"),
+        (lambda: discovery.Poller(encoding="bytes", port_limit=True), "port_limit"),
     ],
 )
 def test_invalid_settings_report_the_field_without_coercing_values(

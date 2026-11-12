@@ -4,7 +4,7 @@ use crate::{
     codecs,
     events::{Clock, Payload, SourceSpan, Timestamp},
     file_io::invalid,
-    transport::{Packet, Protocol},
+    transport::{Encoding, Packet},
     ump,
 };
 use std::io;
@@ -35,7 +35,7 @@ struct Marker {
 }
 pub struct Decoder {
     stream: String,
-    protocol: Protocol,
+    encoding: Encoding,
     bytes: codecs::Decoder,
     words: ump::Decoder,
     pending: Option<Marker>,
@@ -44,13 +44,13 @@ pub struct Decoder {
     stopped: bool,
 }
 impl Decoder {
-    pub fn new(stream: String, protocol: Protocol, limit: usize) -> io::Result<Self> {
+    pub fn new(stream: String, encoding: Encoding, limit: usize) -> io::Result<Self> {
         if stream.is_empty() {
             return Err(invalid(0, "empty source identity"));
         }
         Ok(Self {
             stream,
-            protocol,
+            encoding,
             bytes: codecs::Decoder::new(limit).map_err(|e| invalid(0, e))?,
             words: ump::Decoder::new(false),
             pending: None,
@@ -134,8 +134,8 @@ impl Decoder {
             time: time.clone(),
         };
         let previous = self.pending.take();
-        let (mut decoded, offset, pending) = match (self.protocol, packet) {
-            (Protocol::Midi1, Packet::Bytes(b)) => {
+        let (mut decoded, offset, pending) = match (self.encoding, packet) {
+            (Encoding::Bytes, Packet::Bytes(b)) => {
                 let offset = self.bytes.offset();
                 let values: Vec<_> = self
                     .bytes
@@ -144,7 +144,7 @@ impl Decoder {
                     .map(|(v, start, _)| {
                         (
                             match v {
-                                codecs::DecodeItem::Message(v) => Ok(Payload::Midi1(v)),
+                                codecs::DecodeItem::Message(v) => Ok(v.into()),
                                 codecs::DecodeItem::Diagnostic(d) => {
                                     Err(format!("{:?} at byte {}", d.kind, d.offset))
                                 }
@@ -155,7 +155,7 @@ impl Decoder {
                     .collect();
                 (values, offset, self.bytes.pending_start())
             }
-            (Protocol::Ump, Packet::Ump(w)) => {
+            (Encoding::Ump, Packet::Ump(w)) => {
                 let offset = self.words.offset();
                 let values: Vec<_> = self
                     .words
@@ -164,7 +164,7 @@ impl Decoder {
                     .map(|(v, start, _)| {
                         (
                             match v {
-                                ump::DecodeOutput::Message(v) => Ok(Payload::Ump(v)),
+                                ump::DecodeOutput::Message(v) => Ok(v),
                                 ump::DecodeOutput::Diagnostic(d) => {
                                     Err(format!("{} at word {}", d.reason, d.word_offset))
                                 }
@@ -180,7 +180,7 @@ impl Decoder {
                 out.push(self.diagnostic(
                     DiagnosticKind::Malformed,
                     0,
-                    "packet protocol mismatch".into(),
+                    "packet encoding mismatch".into(),
                     index,
                 ));
                 return Ok(out);
@@ -245,7 +245,7 @@ impl Decoder {
     }
 }
 
-/// Typed output uses the existing owner-thread transport. No implicit protocol translation.
+/// Typed output uses the existing owner-thread transport. No implicit encoding translation.
 pub fn send_message(
     output: &crate::transport::OutputConnection,
     message: &Payload,
@@ -256,17 +256,28 @@ pub fn send_message(
         Payload::Command(_) => Err(crate::transport::Error::Capability(
             "use send_command for compound commands".into(),
         )),
-        Payload::Midi1(v) => output.send(&Packet::Bytes(v.encode().map_err(|_| {
-            crate::transport::Error::Invalid("message channel is unassigned".into())
-        })?)),
+        Payload::Message(v) => {
+            let packet = if v.group().is_some() {
+                Packet::Ump(
+                    v.encode_words()
+                        .map_err(|e| crate::transport::Error::Invalid(e.to_string()))?,
+                )
+            } else {
+                Packet::Bytes(
+                    v.encode()
+                        .map_err(|e| crate::transport::Error::Invalid(e.to_string()))?,
+                )
+            };
+            output.send(&packet)
+        }
         Payload::Ump(
-            ump::UmpMessage::Opaque(_)
-            | ump::UmpMessage::DeltaClockstamp(_)
-            | ump::UmpMessage::DeltaClockstampTicksPerQuarter(_),
+            ump::PacketValue::Opaque(_)
+            | ump::PacketValue::DeltaClockstamp(_)
+            | ump::PacketValue::DeltaClockstampTicksPerQuarter(_),
         ) => Err(crate::transport::Error::Capability(
             "opaque/file-only UMP requires deliberate raw handling".into(),
         )),
-        Payload::Ump(ump::UmpMessage::Stream(v)) if matches!(v.status(), 32 | 33) => Err(
+        Payload::Ump(ump::PacketValue::Stream(v)) if matches!(v.status(), 32 | 33) => Err(
             crate::transport::Error::Capability("clip markers are file-only records".into()),
         ),
         Payload::Ump(v) => output.send(&Packet::Ump(v.encode_words().map_err(|_| {

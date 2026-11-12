@@ -12,7 +12,7 @@ pub use crate::playback::{
     Report as PlaybackReport,
 };
 pub use crate::transport::ReceivedPacket;
-use crate::ump::UmpMessage;
+use crate::ump::PacketValue;
 use std::io;
 use std::time::Duration;
 
@@ -148,15 +148,132 @@ impl SourceSpan {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Payload {
-    Midi1(AnyMessage),
-    Ump(UmpMessage),
+    Message(AnyMessage),
+    Ump(PacketValue),
     Command(AnyCommand),
 }
 crate::messages::enum_metadata!(Payload {
-    Midi1,
+    Message,
     Ump,
     Command
 });
+impl From<AnyMessage> for Payload {
+    fn from(value: AnyMessage) -> Self {
+        match value {
+            AnyMessage::ControlChange(v) if v.version() == 1 && v.resolution() == 14 => {
+                Self::Command(AnyCommand::ControlChange(v))
+            }
+            v => Self::Message(v),
+        }
+    }
+}
+impl From<PacketValue> for Payload {
+    fn from(value: PacketValue) -> Self {
+        Self::Ump(value)
+    }
+}
+impl From<AnyCommand> for Payload {
+    fn from(value: AnyCommand) -> Self {
+        Self::Command(value)
+    }
+}
+macro_rules! semantic_payloads {
+    ($($name:ident),*) => { $(impl From<crate::messages::$name> for Payload {
+        fn from(value: crate::messages::$name) -> Self { AnyMessage::$name(value).into() }
+    })* };
+}
+semantic_payloads!(
+    NoteOn,
+    NoteOff,
+    PolyPressure,
+    ControlChange,
+    ProgramChange,
+    ChannelPressure,
+    PitchBend,
+    QuarterFrame,
+    SongPosition,
+    SongSelect,
+    TuneRequest,
+    TimingClock,
+    Start,
+    Continue,
+    Stop,
+    ActiveSensing,
+    SystemReset,
+    SysEx,
+    RegisteredPerNoteController,
+    AssignablePerNoteController,
+    PerNoteManagement,
+    RegisteredController,
+    AssignableController,
+    RelativeRegisteredController,
+    RelativeAssignableController,
+    PerNotePitchBend
+);
+macro_rules! command_payloads {
+    ($module:ident: $($name:ident),*) => { $(impl From<crate::$module::$name> for Payload {
+        fn from(value: crate::$module::$name) -> Self { Self::Command(AnyCommand::$name(value)) }
+    })* };
+}
+command_payloads!(messages: ParameterSet,ParameterStep);
+command_payloads!(gm: BankProgramSelect);
+command_payloads!(mpe: ZoneConfiguration);
+macro_rules! packet_payloads {
+    ($($name:ident => $variant:ident),*) => { $(impl From<crate::ump::$name> for Payload {
+        fn from(value: crate::ump::$name) -> Self { Self::Ump(PacketValue::$variant(value)) }
+    })* };
+}
+packet_payloads!(Noop=>Noop,JrClock=>JrClock,JrTimestamp=>JrTimestamp,
+    DeltaClockstampTicksPerQuarter=>DeltaClockstampTicksPerQuarter,DeltaClockstamp=>DeltaClockstamp,
+    SysEx7Packet=>SysEx7,SysEx8Packet=>SysEx8,MixedDataSet=>MixedDataSet,
+    FlexData=>FlexData,StreamMessage=>Stream,OpaquePacket=>Opaque);
+impl Payload {
+    /// Resolve connection-relative channels while preserving all other fields.
+    pub fn resolve_channel(self, channel: Option<u8>) -> Result<Self, crate::messages::ValueError> {
+        if channel.is_some_and(|c| !(1..=16).contains(&c)) {
+            return Err(crate::messages::ValueError(
+                "channel must be in 1..=16".into(),
+            ));
+        }
+        match self {
+            Self::Message(v) => {
+                let channel = channel.or(v.channel()).unwrap_or(1);
+                Ok(Self::Message(v.with_channel(channel.into())?))
+            }
+            Self::Command(v) => {
+                let channel = channel.or(v.channel()).unwrap_or(1);
+                Ok(Self::Command(v.with_channel(channel.into())?))
+            }
+            v => Ok(v),
+        }
+    }
+    pub fn validate(&self) -> Result<(), crate::messages::ValueError> {
+        match self {
+            Self::Message(AnyMessage::ControlChange(v))
+                if v.version() == 1 && v.resolution() == 14 =>
+            {
+                Err(crate::messages::ValueError(
+                    "14-bit ControlChange must be classified as a command".into(),
+                ))
+            }
+            Self::Command(AnyCommand::ControlChange(v))
+                if v.version() != 1 || v.resolution() != 14 =>
+            {
+                Err(crate::messages::ValueError(
+                    "controller command requires MIDI 1 with 14-bit resolution".into(),
+                ))
+            }
+            _ => Ok(()),
+        }
+    }
+    pub fn group(&self) -> Option<u8> {
+        match self {
+            Self::Message(v) => v.group(),
+            Self::Ump(v) => v.group(),
+            Self::Command(v) => v.group(),
+        }
+    }
+}
 /// Checked rational seconds, reduced on construction. Floating point is never used.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rational {

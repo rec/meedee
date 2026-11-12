@@ -326,13 +326,14 @@ fn short_message(status: u8, data: [u8; 2]) -> AnyMessage {
 macro_rules! encode_short {
     ($($name:ident ($value:ident) => $bytes:expr;)*) => {
         $(impl PrimitiveMessage for $name {
-            fn encode(&$value) -> Result<Vec<u8>, ValueError> { Ok($bytes) }
+            fn encode(&$value) -> Result<Vec<u8>, ValueError> { require_ungrouped($value.group())?; Ok($bytes) }
         })*
         impl PrimitiveMessage for AnyMessage {
             fn encode(&self) -> Result<Vec<u8>, ValueError> {
                 match self {
                     $(Self::$name(message) => message.encode(),)*
                     Self::SysEx(message) => message.encode(),
+                    _ => Err(ValueError("MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into())),
                 }
             }
         }
@@ -341,6 +342,7 @@ macro_rules! encode_short {
 
 impl PrimitiveMessage for SysEx {
     fn encode(&self) -> Result<Vec<u8>, ValueError> {
+        require_ungrouped(self.group())?;
         let mut bytes = Vec::with_capacity(self.data().len() + 2);
         bytes.push(0xf0);
         bytes.extend_from_slice(self.data());
@@ -382,8 +384,9 @@ impl Command for ControlChange {
             self.resolved_channel()?;
             return Ok(vec![AnyMessage::ControlChange(self.clone())]);
         }
-        inherit_metadata(
+        inherit_command(
             self,
+            self.group(),
             vec![
                 cc(
                     self.resolved_channel()?,
@@ -417,8 +420,9 @@ impl Command for ParameterSet {
             crate::controls::ParameterFamily::Rpn => 101,
             crate::controls::ParameterFamily::Nrpn => 99,
         };
-        inherit_metadata(
+        inherit_command(
             self,
+            self.group(),
             parameter_command(self.resolved_channel()?, self.parameter(), selector, &data),
         )
     }
@@ -446,8 +450,9 @@ impl Command for ParameterStep {
             StepDirection::Increment => 96,
             StepDirection::Decrement => 97,
         };
-        inherit_metadata(
+        inherit_command(
             self,
+            self.group(),
             parameter_command(
                 self.resolved_channel()?,
                 self.parameter(),

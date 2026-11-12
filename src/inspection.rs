@@ -305,24 +305,24 @@ pub(crate) struct Monitor {
 #[pymethods]
 impl Monitor {
     #[new]
-    #[pyo3(signature=(*,stream,clock,protocol="midi1",types=Vec::new(),channel=None,group=None,detail_limit=128))]
+    #[pyo3(signature=(*,stream,clock,encoding="bytes",types=Vec::new(),channel=None,group=None,detail_limit=128))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         stream: String,
         clock: PyRef<'_, crate::packets::Clock>,
-        protocol: &str,
+        encoding: &str,
         types: Vec<String>,
         channel: Option<u8>,
         group: Option<u8>,
         #[pyo3(from_py_with=limit)] detail_limit: usize,
     ) -> PyResult<Self> {
-        let protocol = match protocol {
-            "midi1" => meedee::transport::Protocol::Midi1,
-            "ump" => meedee::transport::Protocol::Ump,
-            _ => return Err(PyValueError::new_err("protocol must be midi1 or ump")),
+        let encoding = match encoding {
+            "bytes" => meedee::transport::Encoding::Bytes,
+            "ump" => meedee::transport::Encoding::Ump,
+            _ => return Err(PyValueError::new_err("encoding must be bytes or ump")),
         };
         let options = inspection::MonitorOptions {
-            protocol,
+            encoding,
             types,
             channel,
             group,

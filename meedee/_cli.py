@@ -57,7 +57,7 @@ class Monitor(BaseModel, frozen=True):
     """Passively monitor one input selected by its exact, unique port name."""
 
     port: tyro.conf.Positional[str] = Field(min_length=1)
-    protocol: Literal["midi1", "ump"]
+    encoding: Literal["bytes", "ump"]
     backend: (
         Literal[
             "CoreMidi",
@@ -98,13 +98,13 @@ class Monitor(BaseModel, frozen=True):
 
     @model_validator(mode="after")
     def check_group(self) -> Self:
-        if self.protocol == "midi1" and self.group is not None:
-            raise ValueError("a group filter requires UMP protocol")
+        if self.encoding == "bytes" and self.group is not None:
+            raise ValueError("a group filter requires UMP encoding")
         return self
 
 
 class RouteOptions(BaseModel, frozen=True):
-    protocol: Literal["midi1", "ump"]
+    encoding: Literal["bytes", "ump"]
     destinations: list[str] = Field(min_length=1, max_length=128)
     channel: int | None = Field(default=None, ge=1, le=16)
     group: int | None = Field(default=None, ge=1, le=16)
@@ -123,7 +123,7 @@ class RouteOptions(BaseModel, frozen=True):
             self.destinations
         ):
             raise ValueError("destinations must be nonempty and distinct")
-        if self.protocol == "midi1" and (
+        if self.encoding == "bytes" and (
             self.group is not None or self.remap_group is not None
         ):
             raise ValueError("group selection/remapping requires UMP")
@@ -179,7 +179,7 @@ class Patch(RouteOptions, frozen=True):
 class Ports(BaseModel, frozen=True):
     """List a complete input/output discovery snapshot, without opening endpoints."""
 
-    protocol: Literal["midi1", "ump"]
+    encoding: Literal["bytes", "ump"]
     backend: (
         Literal[
             "CoreMidi",
@@ -334,7 +334,7 @@ class CiBrowse(BaseModel, frozen=True):
 
     input_port: str = Field(min_length=1)
     output_port: str = Field(min_length=1)
-    protocol: Literal["midi1", "ump"]
+    encoding: Literal["bytes", "ump"]
     manufacturer: str
     family: int = Field(ge=0, le=16383)
     model: int = Field(ge=0, le=16383)
@@ -389,9 +389,9 @@ class CiBrowse(BaseModel, frozen=True):
             model=self.model,
             revision=bytes.fromhex(self.revision),
         )
-        if (self.protocol == "ump") != (self.group is not None):
+        if (self.encoding == "ump") != (self.group is not None):
             raise ValueError("UMP requires an explicit group; MIDI 1 has no group")
-        if self.protocol == "midi1" and self.function_block is not None:
+        if self.encoding == "bytes" and self.function_block is not None:
             raise ValueError("MIDI 1 has no UMP Function Block")
         if self.timeout <= self.discovery_timeout:
             raise ValueError("overall timeout must exceed discovery duration")

@@ -12,7 +12,7 @@ from meedee import messages
 def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
     import pytest
 
-    from meedee import codecs, events, ump
+    from meedee import codecs, events, translation, ump
 
     pairs = [
         (messages.NoteOn(60, 127, 1), messages.NoteOn(60, 65535, 1, version=2)),
@@ -50,10 +50,9 @@ def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
             a.replace(version=2)
         with pytest.raises(ValueError, match="version"):
             b.replace(version=1)
-        with pytest.raises(ValueError):
-            a.replace(group=1)
+        assert a.replace(group=1).group == 1
     note = messages.NoteOn(60, version=2)
-    assert note.channel is None and note.velocity == ump.scale_up(
+    assert note.channel is None and note.velocity == translation.scale_up(
         value=90, source_bits=7, destination_bits=16
     )
     assert messages.NoteOn(60, 90, version=2).velocity == 90
@@ -140,7 +139,7 @@ def test_note_transposition_clamps_and_preserves_channel_and_velocity() -> None:
 
 
 def test_transformations_preserve_metadata_and_payload_identity() -> None:
-    from meedee import codecs, events, gm, ump
+    from meedee import codecs, events, gm
 
     clock = events.Clock(identity="capture")
     timestamp = events.Timestamp(ticks=12, clock=clock)
@@ -150,7 +149,7 @@ def test_transformations_preserve_metadata_and_payload_identity() -> None:
         messages.SysEx(b"\x7d\x01"),
         messages.TimingClock(),
         gm.BankProgramSelect(12, channel=2),
-        ump.Midi1Packet(group=1, message=messages.NoteOn(60, channel=2)),
+        messages.NoteOn(60, channel=2).replace(group=1),
     ]:
         tagged = m.replace(timestamp=timestamp, stream="keyboard", span=span)
         assert tagged == m and hash(tagged) == hash(m)
@@ -209,7 +208,7 @@ def test_transpose_defaults_to_the_same_message_object() -> None:
         messages.TimingClock(),
         messages.SysEx(b"\x7d\x01"),
         ump.Noop(),
-        ump.Midi1Packet(group=2, message=messages.TimingClock()),
+        messages.TimingClock().replace(group=2),
     ]:
         tagged = m.replace(timestamp=timestamp, stream="keyboard")
         assert tagged.transpose(semitones=12) is tagged
@@ -217,7 +216,7 @@ def test_transpose_defaults_to_the_same_message_object() -> None:
 
 
 def test_transpose_shifts_all_note_addresses_and_preserves_other_fields() -> None:
-    from meedee import events, ump
+    from meedee import events
 
     timestamp = events.Timestamp(ticks=12, clock=events.Clock(identity="source"))
     span = events.SourceSpan(first_packet=1, last_packet=2)
@@ -230,14 +229,14 @@ def test_transpose_shifts_all_note_addresses_and_preserves_other_fields() -> Non
         ),
         messages.NoteOff(60, 30_000, 2, version=2, group=3),
         messages.PolyPressure(60, 0xFEDCBA98, 2, version=2, group=3),
-        ump.Midi2RegisteredPerNoteController(
+        messages.RegisteredPerNoteController(
             group=3, channel=2, note=60, controller=1, value=1234
         ),
-        ump.Midi2AssignablePerNoteController(
+        messages.AssignablePerNoteController(
             group=3, channel=2, note=60, controller=2, value=5678
         ),
-        ump.Midi2PerNotePitchBend(group=3, channel=2, note=60, value=-1234),
-        ump.Midi2PerNoteManagement(group=3, channel=2, note=60, flags=3),
+        messages.PerNotePitchBend(group=3, channel=2, note=60, value=-1234),
+        messages.PerNoteManagement(group=3, channel=2, note=60, flags=3),
     ]:
         tagged = m.replace(timestamp=timestamp, stream="keyboard", span=span)
         assert tagged.transpose(12) == tagged.replace(note=72)
@@ -251,11 +250,13 @@ def test_transpose_shifts_all_note_addresses_and_preserves_other_fields() -> Non
             span,
         )
         assert tagged.note == 60
-    wrapped = ump.Midi1Packet(
-        group=3, message=messages.PolyPressure(60, 50, 2)
-    ).replace(timestamp=timestamp, stream="keyboard", span=span)
+    wrapped = (
+        messages.PolyPressure(60, 50, 2)
+        .replace(group=3)
+        .replace(timestamp=timestamp, stream="keyboard", span=span)
+    )
     shifted = wrapped.transpose(12)
-    assert shifted.group == 3 and shifted.message == messages.PolyPressure(72, 50, 2)
+    assert shifted == messages.PolyPressure(72, 50, 2, group=3)
     assert (shifted.timestamp, shifted.stream, shifted.span) == (
         timestamp,
         "keyboard",

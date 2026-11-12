@@ -31,7 +31,7 @@ fn archive_comparison_retains_occurrence_metadata_while_message_equality_ignores
     use meedee::events::{Clock, Payload, SourceSpan, Timestamp};
     use meedee::messages::{AnyMessage, Message, Metadata, NoteOn};
     let clock = Clock::new("clock".into(), 1, 1000, "test".into(), None).unwrap();
-    let first = Payload::Midi1(AnyMessage::NoteOn(
+    let first = Payload::Message(AnyMessage::NoteOn(
         NoteOn::new(60).unwrap().with_channel(1).unwrap(),
     ))
     .with_metadata(Metadata {

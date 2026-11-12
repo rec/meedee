@@ -1,8 +1,8 @@
-"""Note observations retain protocol meaning without claiming device voices."""
+"""Note observations retain encoding meaning without claiming device voices."""
 
 import pytest
 
-from meedee import events, messages, midi, notes, ump
+from meedee import events, messages, midi, notes
 
 
 def event(
@@ -42,7 +42,7 @@ def test_ump_groups_and_protocols_preserve_zero_velocity_note_on_meaning() -> No
     tracker = notes.Tracker(stream="s")
     on = messages.NoteOn(channel=1, note=60, velocity=0)
     tracker.feed(event(on))
-    tracker.feed(event(ump.Midi1Packet(group=16, message=on)))
+    tracker.feed(event(on.replace(group=16)))
     tracker.feed(
         event(
             messages.NoteOn(
@@ -104,7 +104,7 @@ def test_loss_and_clock_changes_invalidate_only_affected_history() -> None:
     assert channel.uncertain and channel.notes[0].held == 1
     tracker.invalidate()
     assert tracker.snapshot().channels[0].notes == []
-    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes)
     tracker.feed(decoder.loss(lost=1, reason="known loss"))
     tracker.feed(event(on.replace(channel=2)))
     assert tracker.snapshot().channels[1].uncertain

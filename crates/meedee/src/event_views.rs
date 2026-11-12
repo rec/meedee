@@ -147,21 +147,20 @@ fn group(value: Option<u8>) -> io::Result<Option<u8>> {
 }
 fn midi1(event: &Payload, group: Option<u8>) -> io::Result<Option<Cow<'_, AnyMessage>>> {
     match &event {
-        Payload::Midi1(v) => {
-            if group.is_none() {
-                Ok(Some(Cow::Borrowed(v)))
-            } else {
-                Err(invalid(0, "a selected UMP group requires UMP events"))
-            }
-        }
+        Payload::Message(v) => match (v.group(), group) {
+            (None, None) => Ok((v.version() == 1).then_some(Cow::Borrowed(v))),
+            (Some(g), Some(s)) => Ok((g == s && v.version() == 1).then_some(Cow::Borrowed(v))),
+            (None, Some(_)) => Err(invalid(0, "a selected UMP group requires UMP events")),
+            (Some(_), None) => Err(invalid(
+                0,
+                "select a group for MIDI 1 interpretation inside UMP",
+            )),
+        },
         Payload::Ump(v) => {
             let selected = group
                 .ok_or_else(|| invalid(0, "select a group for MIDI 1 interpretation inside UMP"))?;
             match v {
-                ump::UmpMessage::Midi1(v) if v.group() == selected => {
-                    Ok(Some(Cow::Borrowed(v.message())))
-                }
-                ump::UmpMessage::SysEx7(v) if v.group() == selected && v.format() == 0 => {
+                ump::PacketValue::SysEx7(v) if v.group() == selected && v.format() == 0 => {
                     Ok(Some(Cow::Owned(AnyMessage::SysEx(
                         SysEx::new(v.data().to_vec()).expect("validated SysEx7"),
                     ))))
@@ -475,16 +474,18 @@ impl Ump {
 }
 impl View for Ump {
     fn feed(&mut self, event: &Payload, _: Option<u64>) -> io::Result<Vec<Observation>> {
-        let Payload::Ump(message) = &event else {
+        if matches!(event, Payload::Command(_))
+            || matches!(event, Payload::Message(v) if v.group().is_none())
+        {
             return Err(invalid(0, "UMP events required"));
-        };
+        }
         let (index, changed) = self.context.event(event, true)?;
         let mut out = vec![];
         if changed {
             self.state.reset();
             out.push(self.context.state_reset(index, None));
         }
-        for (value, first, last) in self.state.feed_spanned(message) {
+        for (value, first, last) in self.state.feed_spanned(event) {
             let group = if let ump::AssemblyItem::Data(v) = &value {
                 v.group
             } else {
@@ -543,7 +544,7 @@ impl Tuning {
         }
         let sysex = SysEx::new(data.data.clone()).map_err(|e| invalid(0, e))?;
         let value = tuning::decode(&sysex).map_err(|e| invalid(0, e))?;
-        let event = Payload::Midi1(AnyMessage::SysEx(sysex))
+        let event = Payload::Message(AnyMessage::SysEx(sysex))
             .with_metadata(crate::messages::Metadata {
                 stream: observation.stream.clone(),
                 timestamp: observation

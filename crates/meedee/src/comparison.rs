@@ -357,8 +357,8 @@ fn records_equal(a: Record, b: Record, o: &Options) -> io::Result<bool> {
             let delta = matches!(
                 (&a.message, &b.message),
                 (
-                    ump::UmpMessage::DeltaClockstamp(_),
-                    ump::UmpMessage::DeltaClockstamp(_)
+                    events::Payload::Ump(ump::PacketValue::DeltaClockstamp(_)),
+                    events::Payload::Ump(ump::PacketValue::DeltaClockstamp(_))
                 )
             );
             ticks

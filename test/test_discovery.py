@@ -50,7 +50,7 @@ def test_polling_is_lazy_reuses_clients_and_keeps_only_observable_descriptors(
     inputs = Client([[port("keys")], [port("renamed")]])
     outputs = Client([[port("synth")]])
     created = install(monkeypatch, inputs, outputs)
-    poller = discovery.Poller(protocol="midi1")
+    poller = discovery.Poller(encoding="bytes")
     assert created == [] and poller.snapshot().generation == 0
     first = poller.poll()
     assert first.port_count == 2 and len(created) == 2
@@ -76,7 +76,7 @@ def test_partial_failed_scan_cannot_replace_trusted_baseline(
     )
     outputs = Client([[port("synth")], failed_output])
     install(monkeypatch, inputs, outputs)
-    poller = discovery.Poller(protocol="midi1", port_limit=2)
+    poller = discovery.Poller(encoding="bytes", port_limit=2)
     poller.poll()
     report = poller.poll()
     assert report.stopped and poller.closed and report.generation == 1
@@ -95,7 +95,7 @@ def test_initial_client_failure_has_no_baseline(
         raise midi.InitError("unavailable")
 
     monkeypatch.setattr(midi, "Input", failed_client)
-    poller = discovery.Poller(protocol="midi1")
+    poller = discovery.Poller(encoding="bytes")
     report = poller.poll()
     assert report.stopped and report.generation == 0 and report.last is None
     assert report.reason == "unavailable" and poller.closed
@@ -137,7 +137,7 @@ def test_ports_cli_passes_subprocess_choice_to_both_clients(
     monkeypatch.setattr(midi, "Input", client)
     monkeypatch.setattr(midi, "Output", client)
     with pytest.raises(SystemExit) as result:
-        cli.main(["ports", "--protocol", "midi1", *flags])
+        cli.main(["ports", "--encoding", "bytes", *flags])
     assert result.value.code == 0
     assert choices == [expected, expected]
 
@@ -167,8 +167,8 @@ def test_watch_cli_is_quiet_for_unchanged_scans_and_stops_at_duration(
         cli.main(
             [
                 "watch-ports",
-                "--protocol",
-                "midi1",
+                "--encoding",
+                "bytes",
                 "--duration",
                 "2.5",
                 "--output",
@@ -197,7 +197,7 @@ def test_ports_cli_reports_scan_failure_without_claiming_empty_discovery(
 
     install(monkeypatch, Client([midi.PortInfoError("scan failed")]), Client([[]]))
     with pytest.raises(SystemExit) as result:
-        cli.main(["ports", "--protocol", "midi1", "--output", "json"])
+        cli.main(["ports", "--encoding", "bytes", "--output", "json"])
     assert result.value.code == 2
     data = json.loads(capsys.readouterr().out)
     assert data["kind"] == "topology_failure" and not data["initialized"]
@@ -219,7 +219,7 @@ def test_watch_interrupt_keeps_its_baseline_without_inventing_changes(
 
     monkeypatch.setattr(_topology_cli, "sleep", interrupt)
     with pytest.raises(SystemExit) as result:
-        cli.main(["watch-ports", "--protocol", "midi1", "--output", "json"])
+        cli.main(["watch-ports", "--encoding", "bytes", "--output", "json"])
     assert result.value.code == 0
     rows = [json.loads(r) for r in capsys.readouterr().out.splitlines()]
     assert len(rows) == 2 and rows[-1]["interrupted"]

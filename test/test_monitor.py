@@ -8,7 +8,7 @@ import pytest
 pytest.importorskip("tyro", reason="install meedee[cli] for monitor tests")
 pytest.importorskip("pydantic", reason="install meedee[cli] for monitor tests")
 
-from meedee import events, inspection, messages, midi, ump
+from meedee import events, inspection, messages, midi
 from meedee._cli import Monitor
 from meedee._monitor import Session, select_port, watch
 
@@ -21,7 +21,7 @@ def event(message: messages.Message, ticks: int = 0) -> messages.Message:
 
 
 def test_filters_keep_interpretation_context_but_loss_resets_it() -> None:
-    config = Monitor(port="keys", protocol="midi1", types=["NoteOn"], history_limit=2)
+    config = Monitor(port="keys", encoding="bytes", types=["NoteOn"], history_limit=2)
     session = Session(config, "s", events.Clock(identity="c"))
     monitor = session.monitor
     prefix = event(messages.ControlChange(channel=1, controller=88, value=13))
@@ -31,7 +31,7 @@ def test_filters_keep_interpretation_context_but_loss_resets_it() -> None:
     assert entry is not None and "12813" in str(entry.observations)
     session.present(entry)
     monitor.feed(prefix)
-    decoder = events.PacketDecoder(stream="s", protocol=midi.Protocol.Midi1)
+    decoder = events.PacketDecoder(stream="s", encoding=midi.Encoding.Bytes)
     entry = monitor.feed(decoder.loss(lost=2, reason="lost input"))
     assert entry is not None and entry.diagnostic is not None
     assert entry.kind == "diagnostic" and entry.diagnostic.lost == 2
@@ -54,15 +54,13 @@ def test_filters_keep_interpretation_context_but_loss_resets_it() -> None:
 
 
 def test_group_channel_filters_and_sysex_previews_are_bounded() -> None:
-    config = Monitor(port="keys", protocol="ump", group=16, channel=16)
+    config = Monitor(port="keys", encoding="ump", group=16, channel=16)
     session = Session(config, "s", events.Clock(identity="c"))
-    message = ump.Midi1Packet(
-        group=16, message=messages.NoteOn(channel=16, note=60, velocity=100)
-    )
+    message = messages.NoteOn(channel=16, note=60, velocity=100).replace(group=16)
     entry = session.monitor.feed(event(message))
     assert entry is not None and entry.message == message
     assert session.monitor.feed(event(message.replace(group=1))) is None
-    config = Monitor(port="keys", protocol="midi1", preview_bytes=4)
+    config = Monitor(port="keys", encoding="bytes", preview_bytes=4)
     session = Session(config, "s", events.Clock(identity="c"))
     entry = session.monitor.feed(event(messages.SysEx(data=bytes(range(20)))))
     assert entry is not None
@@ -71,7 +69,7 @@ def test_group_channel_filters_and_sysex_previews_are_bounded() -> None:
     assert "00010203" in str(preview) and "20 bytes" in str(preview)
     assert "04050607" not in str(preview)
     with pytest.raises(ValueError, match="group filter"):
-        Monitor(port="keys", protocol="midi1", group=1)
+        Monitor(port="keys", encoding="bytes", group=1)
 
 
 def test_filtered_notes_update_state_and_loss_invalidates_it() -> None:
@@ -118,14 +116,14 @@ def test_monitor_duration_interrupt_and_terminal_failure_close_the_input(
     monkeypatch.setattr(
         "meedee.inspection.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
     )
-    config = Monitor(port="keys", protocol="midi1", duration=0.5, output="json")
+    config = Monitor(port="keys", encoding="bytes", duration=0.5, output="json")
     assert watch(feed, config) == 0  # ty: ignore[invalid-argument-type]
     assert feed.closed
     data = json.loads(capsys.readouterr().out.splitlines()[-1])
     assert data["records"] == 1 and data["live"] and "complete" not in data
     assert "metrics" not in data
     feed = Feed([])
-    config = Monitor(port="keys", protocol="midi1", output="json")
+    config = Monitor(port="keys", encoding="bytes", output="json")
     assert watch(feed, config) == 0  # ty: ignore[invalid-argument-type]
     assert feed.closed
     assert json.loads(capsys.readouterr().out.splitlines()[-1])["interrupted"]
@@ -160,7 +158,7 @@ def test_monitor_metrics_count_filtered_events_without_comparing_source_clocks(
         "meedee.inspection.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
     )
     config = Monitor(
-        port="keys", protocol="midi1", metrics=True, types=["NoteOn"], output="json"
+        port="keys", encoding="bytes", metrics=True, types=["NoteOn"], output="json"
     )
     assert watch(feed, config) == 1  # ty: ignore[invalid-argument-type]
     data = json.loads(capsys.readouterr().out.splitlines()[-1])

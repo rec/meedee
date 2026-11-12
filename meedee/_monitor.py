@@ -13,7 +13,7 @@ class Session:
         self.monitor = inspection.Monitor(
             stream=stream,
             clock=clock,
-            protocol=config.protocol,
+            encoding=config.encoding,
             types=config.types,
             channel=config.channel,
             group=config.group,
@@ -34,7 +34,7 @@ class Session:
             }
         elif (item := entry.message) is not None:
             message = item
-            inner = message.message if isinstance(message, ump.Midi1Packet) else message
+            inner = message
             channel = getattr(inner, "channel", None)
             group = getattr(message, "group", None)
             if isinstance(inner, messages.SysEx):
@@ -99,11 +99,11 @@ def run_monitor(config: Monitor) -> int:
     }
     if any(t not in known for t in config.types):
         raise ValueError("--types must name concrete MIDI message classes")
-    protocol = midi.Protocol.Midi1 if config.protocol == "midi1" else midi.Protocol.Ump
+    encoding = midi.Encoding.Bytes if config.encoding == "bytes" else midi.Encoding.Ump
     backend = None if config.backend is None else getattr(midi.Backend, config.backend)
     try:
         client = midi.Input(
-            protocol=protocol,
+            encoding=encoding,
             backend=backend,
             run_in_subprocess=config.run_in_subprocess,
             subprocess_worker=config.subprocess_worker,

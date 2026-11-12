@@ -36,7 +36,9 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
             zip(
                 ["channel", "bank_msb", "bank_lsb", "program"]
                 if name == "BankProgramSelect"
-                else inspect.signature(constructor).parameters,
+                else [
+                    n for n in inspect.signature(constructor).parameters if n != "group"
+                ],
                 (int(n) for n in numbers),
                 strict=True,
             )
@@ -93,14 +95,14 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
         assert v == v.replace()
         assert hash(v) == hash(v.replace())
         assert not hasattr(v, "__dict__")
-        assert cls.__match_args__ == tuple(fields)
+        assert cls.__match_args__ == tuple(f for f in fields if f != "group")
         assert repr(v).startswith(cls.__name__ + "(")
         with pytest.raises(TypeError):
             v.replace(unknown=1)
         for f in fields:
             assert inspect.signature(cls).parameters[f].kind == (
                 inspect.Parameter.POSITIONAL_OR_KEYWORD
-                if cls is gm.BankProgramSelect
+                if cls is gm.BankProgramSelect and f != "group"
                 else inspect.Parameter.KEYWORD_ONLY
             )
             with pytest.raises(AttributeError):

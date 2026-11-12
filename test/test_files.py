@@ -70,9 +70,7 @@ def test_clip_preserves_big_endian_words_and_requires_completion() -> None:
         ump.DeltaClockstamp(ticks=0),
         ump.start_of_clip(),
         ump.DeltaClockstamp(ticks=1),
-        ump.Midi1Packet(
-            group=1, message=messages.NoteOn(channel=1, note=60, velocity=100)
-        ),
+        messages.NoteOn(channel=1, note=60, velocity=100).replace(group=1),
         ump.DeltaClockstamp(ticks=0),
         ump.end_of_clip(),
     ]

@@ -175,7 +175,7 @@ fn fine_controls_follow_wire_order_and_keep_only_the_known_coarse_component() {
     );
     cc(&mut interpreter, 2, 7, 9);
     interpreter
-        .feed(&meedee::events::Payload::Midi1(AnyMessage::TimingClock(
+        .feed(&meedee::events::Payload::Message(AnyMessage::TimingClock(
             TimingClock::new().unwrap(),
         )))
         .unwrap();
@@ -572,7 +572,7 @@ fn resets_and_source_boundaries_invalidate_only_the_applicable_state() {
         matches!(&cc(&mut one, 1, 39, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
     );
     assert!(matches!(&cc(&mut one, 2, 39, 1)[0], Observation::Control(v) if v.value == 385));
-    one.feed(&meedee::events::Payload::Midi1(AnyMessage::SystemReset(
+    one.feed(&meedee::events::Payload::Message(AnyMessage::SystemReset(
         SystemReset::new().unwrap(),
     )))
     .unwrap();
@@ -595,11 +595,13 @@ fn cc(
     value: i64,
 ) -> Vec<Observation> {
     interpreter
-        .feed(&meedee::events::Payload::Midi1(AnyMessage::ControlChange(
-            ControlChange::new(controller, value)
-                .and_then(|m| m.with_channel(channel))
-                .unwrap(),
-        )))
+        .feed(&meedee::events::Payload::Message(
+            AnyMessage::ControlChange(
+                ControlChange::new(controller, value)
+                    .and_then(|m| m.with_channel(channel))
+                    .unwrap(),
+            ),
+        ))
         .unwrap()
         .into_iter()
         .map(|v| match v.value {

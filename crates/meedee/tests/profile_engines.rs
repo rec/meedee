@@ -62,7 +62,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
     assert_eq!(t.snapshot(2).unwrap().pitch_bend, None);
     assert_eq!(t.snapshot(2).unwrap().sustain, None);
     for note in [60, 60, 64] {
-        t.feed(&meedee::events::Payload::Midi1(
+        t.feed(&meedee::events::Payload::Message(
             (AnyMessage::NoteOn(
                 NoteOn::new(note)
                     .and_then(|m| m.with_velocity(100))
@@ -74,7 +74,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
         .unwrap();
     }
     assert!(t.snapshot(2).unwrap().ambiguous);
-    t.feed(&meedee::events::Payload::Midi1(
+    t.feed(&meedee::events::Payload::Message(
         (AnyMessage::ControlChange(
             ControlChange::new(64, 127)
                 .and_then(|m| m.with_channel(1))
@@ -83,7 +83,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
         .clone(),
     ))
     .unwrap();
-    t.feed(&meedee::events::Payload::Midi1(
+    t.feed(&meedee::events::Payload::Message(
         (AnyMessage::ControlChange(
             ControlChange::new(123, 0)
                 .and_then(|m| m.with_channel(1))
@@ -94,7 +94,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
     .unwrap();
     assert_eq!(t.snapshot(2).unwrap().sustain, Some(true));
     assert_eq!(t.snapshot(2).unwrap().notes[0].sustained, 2);
-    t.feed(&meedee::events::Payload::Midi1(
+    t.feed(&meedee::events::Payload::Message(
         (AnyMessage::ControlChange(
             ControlChange::new(64, 0)
                 .and_then(|m| m.with_channel(1))
@@ -104,7 +104,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
     ))
     .unwrap();
     assert!(t.snapshot(2).unwrap().notes.is_empty());
-    t.feed(&meedee::events::Payload::Midi1(
+    t.feed(&meedee::events::Payload::Message(
         (AnyMessage::NoteOn(
             NoteOn::new(60)
                 .and_then(|m| m.with_velocity(100))
@@ -114,7 +114,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
         .clone(),
     ))
     .unwrap();
-    t.feed(&meedee::events::Payload::Midi1(
+    t.feed(&meedee::events::Payload::Message(
         (AnyMessage::ControlChange(
             ControlChange::new(120, 0)
                 .and_then(|m| m.with_channel(1))
@@ -131,7 +131,7 @@ fn mpe_exhaustion_sustain_and_ambiguous_notes_do_not_invent_voice_attribution() 
 fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
     use meedee::events::{ObservationValue, Payload};
     let mut d = velocity::VelocityInterpreter::new(None).unwrap();
-    let prefix = Payload::Midi1(AnyMessage::ControlChange(
+    let prefix = Payload::Message(AnyMessage::ControlChange(
         ControlChange::new(88, 127)
             .unwrap()
             .with_channel(1)
@@ -140,7 +140,7 @@ fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
     let note = NoteOn::new(60).unwrap().with_velocity(1).unwrap();
     d.feed(&prefix).unwrap();
     let coarse = d
-        .feed(&Payload::Midi1(AnyMessage::NoteOn(
+        .feed(&Payload::Message(AnyMessage::NoteOn(
             note.clone().with_channel(2).unwrap(),
         )))
         .unwrap();
@@ -148,7 +148,7 @@ fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
         matches!(&coarse[0].value, ObservationValue::Velocity(v) if v.velocity==1 && v.resolution==7)
     );
     let fine = d
-        .feed(&Payload::Midi1(AnyMessage::NoteOn(
+        .feed(&Payload::Message(AnyMessage::NoteOn(
             note.clone().with_channel(1).unwrap(),
         )))
         .unwrap();
@@ -157,7 +157,7 @@ fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
     );
     d.feed(&prefix).unwrap();
     let off = d
-        .feed(&Payload::Midi1(AnyMessage::NoteOn(
+        .feed(&Payload::Message(AnyMessage::NoteOn(
             note.with_channel(1).unwrap().with_velocity(0).unwrap(),
         )))
         .unwrap();
@@ -165,7 +165,7 @@ fn velocity_prefix_is_channel_scoped_one_shot_and_cleared_on_reset() {
     d.feed(&prefix).unwrap();
     d.reset();
     let coarse = d
-        .feed(&Payload::Midi1(AnyMessage::NoteOff(
+        .feed(&Payload::Message(AnyMessage::NoteOff(
             NoteOff::new(60)
                 .unwrap()
                 .with_velocity(64)
@@ -189,7 +189,7 @@ fn timecode_sequence_lock_requires_continuity_and_expires_without_extrapolation(
         for (i, v) in n.into_iter().enumerate() {
             let r = a
                 .feed(
-                    &meedee::events::Payload::Midi1(AnyMessage::QuarterFrame(
+                    &meedee::events::Payload::Message(AnyMessage::QuarterFrame(
                         QuarterFrame::new(i as i64, v).unwrap(),
                     )),
                     now,

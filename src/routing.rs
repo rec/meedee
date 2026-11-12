@@ -13,12 +13,12 @@ struct Route {
 impl Route {
     #[new]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature=(*, name, source, destination, protocol, channel=None, group=None, remap_channel=None, remap_group=None, include_nonchannel=false))]
+    #[pyo3(signature=(*, name, source, destination, encoding, channel=None, group=None, remap_channel=None, remap_group=None, include_nonchannel=false))]
     fn new(
         name: String,
         source: String,
         destination: String,
-        protocol: &str,
+        encoding: &str,
         channel: Option<u8>,
         group: Option<u8>,
         remap_channel: Option<u8>,
@@ -30,10 +30,10 @@ impl Route {
                 name,
                 source,
                 destination,
-                match protocol {
-                    "midi1" => meedee::transport::Protocol::Midi1,
-                    "ump" => meedee::transport::Protocol::Ump,
-                    _ => return Err(PyValueError::new_err("protocol must be midi1 or ump")),
+                match encoding {
+                    "bytes" => meedee::transport::Encoding::Bytes,
+                    "ump" => meedee::transport::Encoding::Ump,
+                    _ => return Err(PyValueError::new_err("encoding must be bytes or ump")),
                 },
                 channel,
                 group,
@@ -57,10 +57,10 @@ impl Route {
         self.value.destination()
     }
     #[getter]
-    fn protocol(&self) -> &str {
-        match self.value.protocol() {
-            meedee::transport::Protocol::Midi1 => "midi1",
-            meedee::transport::Protocol::Ump => "ump",
+    fn encoding(&self) -> &str {
+        match self.value.encoding() {
+            meedee::transport::Encoding::Bytes => "bytes",
+            meedee::transport::Encoding::Ump => "ump",
         }
     }
     #[getter]

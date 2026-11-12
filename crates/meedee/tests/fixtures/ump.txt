@@ -10,16 +10,16 @@ PolyPressure|40a03c00 ffffffff
 ChannelPressure|40d00000 ffffffff
 PitchBend|40e00000 80000000
 ControlChange|41b20700 80000000
-Midi2RelativeRegisteredController|40407f7f ffffffff
-Midi2RelativeAssignableController|40507f7f 80000000
-Midi2RegisteredController|40207f7f ffffffff
-Midi2AssignableController|40307f7f ffffffff
-Midi2RegisteredPerNoteController|40003c03 ffffffff
-Midi2AssignablePerNoteController|40103cff ffffffff
-Midi2PerNoteManagement|40f03c03 00000000
-Midi2PerNotePitchBend|40603c00 80000000
+RelativeRegisteredController|40407f7f ffffffff
+RelativeAssignableController|40507f7f 80000000
+RegisteredController|40207f7f ffffffff
+AssignableController|40307f7f ffffffff
+RegisteredPerNoteController|40003c03 ffffffff
+AssignablePerNoteController|40103cff ffffffff
+PerNoteManagement|40f03c03 00000000
+PerNotePitchBend|40603c00 80000000
 ProgramChange|4fcf0001 7f007903
-Midi1Packet|2f9f7f7f
+NoteOn|2f9f7f7f
 System|10f80000
 SysEx7Packet|30037d01 02000000
 SysEx8Packet|5f03ff00 ff000000 00000000 00000000

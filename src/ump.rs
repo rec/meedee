@@ -60,54 +60,26 @@ macro_rules! scalar {
             $(#[getter]fn $field(&self)->$ty{self.value.$field()})*
             #[classattr]fn __annotations__(py:Python<'_>)->PyResult<Bound<'_,PyDict>>{let d=PyDict::new(py);$(d.set_item(stringify!($field),py.get_type::<PyInt>())?;)*Ok(d)}
         });)*
-        pub(crate) fn extract(value:&Bound<'_,PyAny>)->PyResult<model::UmpMessage>{
-            if let Ok(v)=value.extract::<PyRef<'_,Noop>>(){return Ok(model::UmpMessage::Noop(v.value.clone()));}
-            $(if let Ok(v)=value.extract::<PyRef<'_,$name>>(){return Ok(model::UmpMessage::$name(v.value.clone()));})*
-            if let Ok(v) = messages::extract_midi2(value) { return Ok(v); }
+        pub(crate) fn extract(value:&Bound<'_,PyAny>)->PyResult<model::PacketValue>{
+            if let Ok(v)=value.extract::<PyRef<'_,Noop>>(){return Ok(model::PacketValue::Noop(v.value.clone()));}
+            $(if let Ok(v)=value.extract::<PyRef<'_,$name>>(){return Ok(model::PacketValue::$name(v.value.clone()));})*
             extract_packet(value)
         }
-        pub(crate) fn to_python(py:Python<'_>,value:model::UmpMessage)->PyResult<Py<PyAny>>{match value{
-            model::UmpMessage::Noop(value)=>object(py,Noop{value}),
-            model::UmpMessage::NoteOn(value)=>messages::to_python(py,meedee::messages::AnyMessage::NoteOn(value)),
-            model::UmpMessage::NoteOff(value)=>messages::to_python(py,meedee::messages::AnyMessage::NoteOff(value)),
-            model::UmpMessage::PolyPressure(value)=>messages::to_python(py,meedee::messages::AnyMessage::PolyPressure(value)),
-            model::UmpMessage::ControlChange(value)=>messages::to_python(py,meedee::messages::AnyMessage::ControlChange(value)),
-            model::UmpMessage::ProgramChange(value)=>messages::to_python(py,meedee::messages::AnyMessage::ProgramChange(value)),
-            model::UmpMessage::ChannelPressure(value)=>messages::to_python(py,meedee::messages::AnyMessage::ChannelPressure(value)),
-            model::UmpMessage::PitchBend(value)=>messages::to_python(py,meedee::messages::AnyMessage::PitchBend(value)),
+        pub(crate) fn to_python(py:Python<'_>,value:model::PacketValue)->PyResult<Py<PyAny>>{match value{
+            model::PacketValue::Noop(value)=>object(py,Noop{value}),
 
-            $(model::UmpMessage::$name(value)=>object(py,$name{value}),)*
-            model::UmpMessage::Midi1(value)=>object(py,Midi1Packet{value}),
-            model::UmpMessage::SysEx7(value)=>object(py,SysEx7Packet{value}),
-            model::UmpMessage::SysEx8(value)=>object(py,SysEx8Packet{value}),
-            model::UmpMessage::MixedDataSet(value)=>object(py,MixedDataSet{value}),
-            model::UmpMessage::FlexData(value)=>object(py,FlexData{value}),
-            model::UmpMessage::Stream(value)=>object(py,StreamMessage{value}),
-            model::UmpMessage::Opaque(value)=>object(py,OpaquePacket{value}),
+            $(model::PacketValue::$name(value)=>object(py,$name{value}),)*
+            model::PacketValue::SysEx7(value)=>object(py,SysEx7Packet{value}),
+            model::PacketValue::SysEx8(value)=>object(py,SysEx8Packet{value}),
+            model::PacketValue::MixedDataSet(value)=>object(py,MixedDataSet{value}),
+            model::PacketValue::FlexData(value)=>object(py,FlexData{value}),
+            model::PacketValue::Stream(value)=>object(py,StreamMessage{value}),
+            model::PacketValue::Opaque(value)=>object(py,OpaquePacket{value}),
         }}
         pub(crate) fn register(module:&Bound<'_,PyModule>)->PyResult<()>{module.add_class::<Noop>()?;$(module.add_class::<$name>()?;)*register_packets(module)}
     };
 }
 scalar_values!(scalar);
-#[pyclass(frozen,extends=Message,module="meedee.ump")]
-struct Midi1Packet {
-    value: model::Midi1Packet,
-}
-value_methods!(Midi1Packet;group,message;{
-    #[new]#[pyo3(signature=(*,group,message))]
-    fn new(group:&Bound<'_,PyAny>,message:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::Midi1Packet::new(int(group)?,messages::extract_primitive(message)?).map_err(error)?}))}
-    fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=messages::strict_integer)] semitones:i64)->PyResult<Py<PyAny>> {
-        let py=slf.py();
-        let changes=PyDict::new(py);
-        let original=slf.message(py)?;
-        let shifted=original.bind(py).call_method1("transpose", (semitones,))?;
-        if shifted.is(original.bind(py)) { return Ok(slf.into_pyobject(py)?.into_any().unbind()); }
-        changes.set_item("message", shifted)?;
-        Ok(Self::replace(slf,Some(&changes))?.unbind())
-    }
-    #[getter]fn group(&self)->u8{self.value.group()}
-    #[getter]fn message(&self,py:Python<'_>)->PyResult<Py<PyAny>>{messages::to_python(py,self.value.message().clone())}
-});
 #[pyclass(frozen,extends=Message,module="meedee.ump")]
 struct SysEx7Packet {
     value: model::SysEx7Packet,
@@ -167,33 +139,33 @@ value_methods!(OpaquePacket;words;{
     fn new(words:&Bound<'_,PyAny>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::OpaquePacket::new(self::words(words,4)?).map_err(error)?}))}
     #[getter]fn words<'py>(&self,py:Python<'py>)->PyResult<Bound<'py,PyTuple>>{tuple(py,self.value.words())}
 });
-fn extract_packet(value: &Bound<'_, PyAny>) -> PyResult<model::UmpMessage> {
-    if let Ok(v) = value.extract::<PyRef<'_, Midi1Packet>>() {
-        return Ok(model::UmpMessage::Midi1(v.value.clone()));
-    }
+fn extract_packet(value: &Bound<'_, PyAny>) -> PyResult<model::PacketValue> {
     if let Ok(v) = value.extract::<PyRef<'_, SysEx7Packet>>() {
-        return Ok(model::UmpMessage::SysEx7(v.value.clone()));
+        return Ok(model::PacketValue::SysEx7(v.value.clone()));
     }
     if let Ok(v) = value.extract::<PyRef<'_, SysEx8Packet>>() {
-        return Ok(model::UmpMessage::SysEx8(v.value.clone()));
+        return Ok(model::PacketValue::SysEx8(v.value.clone()));
     }
     if let Ok(v) = value.extract::<PyRef<'_, MixedDataSet>>() {
-        return Ok(model::UmpMessage::MixedDataSet(v.value.clone()));
+        return Ok(model::PacketValue::MixedDataSet(v.value.clone()));
     }
     if let Ok(v) = value.extract::<PyRef<'_, FlexData>>() {
-        return Ok(model::UmpMessage::FlexData(v.value.clone()));
+        return Ok(model::PacketValue::FlexData(v.value.clone()));
     }
     if let Ok(v) = value.extract::<PyRef<'_, StreamMessage>>() {
-        return Ok(model::UmpMessage::Stream(v.value.clone()));
+        return Ok(model::PacketValue::Stream(v.value.clone()));
     }
     if let Ok(v) = value.extract::<PyRef<'_, OpaquePacket>>() {
-        return Ok(model::UmpMessage::Opaque(v.value.clone()));
+        return Ok(model::PacketValue::Opaque(v.value.clone()));
     }
     Err(PyTypeError::new_err("expected a meedee.ump message"))
 }
 #[pyfunction]
 fn encode<'py>(py: Python<'py>, message: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
-    tuple(py, &model::encode(&extract(message)?).map_err(error)?)
+    tuple(
+        py,
+        &model::encode(&crate::event_values::extract(message)?).map_err(error)?,
+    )
 }
 #[pyfunction]
 #[pyo3(signature=(words,*,preserve_unknown=false))]
@@ -202,7 +174,7 @@ fn decode(
     words: &Bound<'_, PyAny>,
     #[pyo3(from_py_with=boolean)] preserve_unknown: bool,
 ) -> PyResult<Py<PyAny>> {
-    to_python(
+    crate::event_values::to_python(
         py,
         model::decode(&self::words(words, 4)?, preserve_unknown).map_err(error)?,
     )
@@ -233,14 +205,16 @@ fn words_to_bytes<'py>(
     ))
 }
 #[pyfunction]
-#[pyo3(signature=(*,group,data,message_limit=1_048_576))]
+#[pyo3(signature=(message,*,message_limit=1_048_576))]
 fn packetize_sysex7(
     py: Python<'_>,
-    group: &Bound<'_, PyAny>,
-    data: &Bound<'_, PyAny>,
+    message: PyRef<'_, messages::SysEx>,
     #[pyo3(from_py_with=crate::units::bytes)] message_limit: usize,
 ) -> PyResult<Vec<Py<PyAny>>> {
-    model::packetize_sysex7(int(group)?, &buffer(py, data, message_limit)?)
+    if message.value.data().len() > message_limit {
+        return Err(PyValueError::new_err("SysEx payload exceeds message_limit"));
+    }
+    model::packetize_sysex7(&message.value)
         .map_err(error)?
         .into_iter()
         .map(|value| object(py, SysEx7Packet { value }))
@@ -352,7 +326,7 @@ fn decode_outputs(py: Python<'_>, values: Vec<model::DecodeOutput>) -> PyResult<
     values
         .into_iter()
         .map(|v| match v {
-            model::DecodeOutput::Message(v) => to_python(py, v),
+            model::DecodeOutput::Message(v) => crate::event_values::to_python(py, v),
             model::DecodeOutput::Diagnostic(value) => {
                 Ok(Py::new(py, DecodeDiagnostic { value })?.into_any())
             }
@@ -367,7 +341,7 @@ macro_rules! enums {
         impl From<model::$name> for $name{fn from(v:model::$name)->Self{match v{$(model::$name::$variant=>Self::$variant),*}}}
     )*};
 }
-enums! {DataKind{SysEx7,SysEx8,FlexData,StreamText};AssemblyDiagnostic{Interrupted,UnexpectedContinuation,Aborted,PayloadLimit,StreamLimit,MalformedText,TooManyPackets,Truncated};TranslationStatus{Exact,Quantized,Unsupported,ProfileDependent,ContextRequired};}
+enums! {DataKind{SysEx7,SysEx8,FlexData,StreamText};AssemblyDiagnostic{Interrupted,UnexpectedContinuation,Aborted,PayloadLimit,StreamLimit,MalformedText,TooManyPackets,Truncated};}
 #[pyclass(frozen, module = "meedee.ump")]
 struct AssembledData {
     value: model::AssembledData,
@@ -435,82 +409,6 @@ pub(crate) fn assembly_outputs(
         })
         .collect()
 }
-#[derive(Clone)]
-enum Translated {
-    Midi1(model::Translation<meedee::messages::AnyMessage>),
-    Midi2(model::Translation<model::UmpMessage>),
-}
-#[pyclass(frozen, module = "meedee.ump")]
-struct Translation {
-    value: Translated,
-}
-#[pymethods]
-impl Translation {
-    #[getter]
-    fn status(&self) -> TranslationStatus {
-        match &self.value {
-            Translated::Midi1(v) => v.status.into(),
-            Translated::Midi2(v) => v.status.into(),
-        }
-    }
-    #[getter]
-    fn reason(&self) -> &str {
-        match &self.value {
-            Translated::Midi1(v) => v.reason,
-            Translated::Midi2(v) => v.reason,
-        }
-    }
-    #[getter]
-    fn group(&self) -> Option<u8> {
-        match &self.value {
-            Translated::Midi1(v) => v.group,
-            Translated::Midi2(v) => v.group,
-        }
-    }
-    #[getter]
-    fn converted(&self) -> bool {
-        match &self.value {
-            Translated::Midi1(v) => v.converted(),
-            Translated::Midi2(v) => v.converted(),
-        }
-    }
-    #[getter]
-    fn messages(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
-        match &self.value {
-            Translated::Midi1(v) => v
-                .messages
-                .iter()
-                .cloned()
-                .map(|m| messages::to_python(py, m))
-                .collect(),
-            Translated::Midi2(v) => v
-                .messages
-                .iter()
-                .cloned()
-                .map(|m| to_python(py, m))
-                .collect(),
-        }
-    }
-}
-#[pyfunction]
-#[pyo3(signature=(message,*,allow_loss=false))]
-fn to_midi1(
-    message: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=boolean)] allow_loss: bool,
-) -> PyResult<Translation> {
-    Ok(Translation {
-        value: Translated::Midi1(model::to_midi1(&extract(message)?, allow_loss).map_err(error)?),
-    })
-}
-#[pyfunction]
-#[pyo3(signature=(message,*,group))]
-fn to_midi2(message: &Bound<'_, PyAny>, group: &Bound<'_, PyAny>) -> PyResult<Translation> {
-    Ok(Translation {
-        value: Translated::Midi2(
-            model::to_midi2(&midi1_message(message)?, int(group)?).map_err(error)?,
-        ),
-    })
-}
 #[pyclass(frozen, module = "meedee.ump")]
 struct Capabilities {
     value: model::Capabilities,
@@ -519,10 +417,9 @@ value_methods!(Capabilities;midi1,midi2,sysex8_streams;{
     #[new]#[pyo3(signature=(*,midi1,midi2,sysex8_streams))]
     fn new(midi1:&Bound<'_,PyAny>,midi2:&Bound<'_,PyAny>,sysex8_streams:&Bound<'_,PyAny>)->PyResult<Self>{Ok(Self{value:model::Capabilities::new(boolean(midi1)?,boolean(midi2)?,int(sysex8_streams)?).map_err(error)?})}
     #[getter]fn midi1(&self)->bool{self.value.midi1}#[getter]fn midi2(&self)->bool{self.value.midi2}#[getter]fn sysex8_streams(&self)->u8{self.value.sysex8_streams}
-    fn supports(&self,message:&Bound<'_,PyAny>)->PyResult<Option<bool>>{Ok(self.value.supports(&extract(message)?))}
+    fn supports(&self,message:&Bound<'_,PyAny>)->PyResult<Option<bool>>{Ok(self.value.supports(&crate::event_values::extract(message)?))}
 });
 fn register_packets(module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add_class::<Midi1Packet>()?;
     module.add_class::<SysEx7Packet>()?;
     module.add_class::<SysEx8Packet>()?;
     module.add_class::<MixedDataSet>()?;
@@ -535,8 +432,6 @@ fn register_packets(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<AssembledData>()?;
     module.add_class::<AssemblyDiagnostic>()?;
 
-    module.add_class::<TranslationStatus>()?;
-    module.add_class::<Translation>()?;
     module.add_class::<Capabilities>()?;
     module.add_function(wrap_pyfunction!(encode, module)?)?;
     module.add_function(wrap_pyfunction!(decode, module)?)?;
@@ -546,8 +441,6 @@ fn register_packets(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(packetize_sysex8, module)?)?;
     module.add_function(wrap_pyfunction!(packetize_flex_text, module)?)?;
     module.add_function(wrap_pyfunction!(packetize_stream_text, module)?)?;
-    module.add_function(wrap_pyfunction!(to_midi1, module)?)?;
-    module.add_function(wrap_pyfunction!(to_midi2, module)?)?;
     register_helpers(module)
 }
 fn object<T: pyo3::PyClass<BaseType = Message>>(py: Python<'_>, value: T) -> PyResult<Py<PyAny>> {
@@ -557,7 +450,7 @@ fn object<T: pyo3::PyClass<BaseType = Message>>(py: Python<'_>, value: T) -> PyR
     )?
     .into_any())
 }
-fn error(v: meedee::messages::ValueError) -> PyErr {
+pub(crate) fn error(v: meedee::messages::ValueError) -> PyErr {
     PyValueError::new_err(v.to_string())
 }
 fn int(v: &Bound<'_, PyAny>) -> PyResult<i64> {
@@ -682,21 +575,6 @@ fn end_of_clip(py: Python<'_>) -> PyResult<Py<PyAny>> {
     )
 }
 #[pyfunction]
-#[pyo3(signature=(*,value,source_bits,destination_bits))]
-fn scale_up(
-    value: &Bound<'_, PyAny>,
-    source_bits: &Bound<'_, PyAny>,
-    destination_bits: &Bound<'_, PyAny>,
-) -> PyResult<u32> {
-    let value = u32::try_from(int(value)?)
-        .map_err(|_| PyValueError::new_err("value must be unsigned 32-bit"))?;
-    let source = u8::try_from(int(source_bits)?)
-        .map_err(|_| PyValueError::new_err("invalid source_bits"))?;
-    let destination = u8::try_from(int(destination_bits)?)
-        .map_err(|_| PyValueError::new_err("invalid destination_bits"))?;
-    model::scale_up(value, source, destination).map_err(error)
-}
-#[pyfunction]
 fn word_count(first: &Bound<'_, PyAny>) -> PyResult<usize> {
     let first = u32::try_from(crate::files::uint(first)?)
         .map_err(|_| PyValueError::new_err("first exceeds u32"))?;
@@ -716,28 +594,7 @@ fn register_helpers(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(function_block_info, module)?)?;
     module.add_function(wrap_pyfunction!(start_of_clip, module)?)?;
     module.add_function(wrap_pyfunction!(end_of_clip, module)?)?;
-    module.add_function(wrap_pyfunction!(scale_up, module)?)?;
     Ok(())
-}
-
-fn midi1_message(message: &Bound<'_, PyAny>) -> PyResult<meedee::messages::AnyMessage> {
-    if let Ok(meedee::messages::AnyCommand::ControlChange(value)) =
-        messages::extract_command(message)
-    {
-        if value.version() == 1 {
-            return Ok(meedee::messages::AnyMessage::ControlChange(value));
-        }
-    }
-    if let Ok(value) = messages::extract_primitive(message) {
-        return Ok(value);
-    }
-    let wire = messages::encode_message(message)?;
-    if wire.first() == Some(&240) && wire.last() == Some(&247) {
-        return Ok(meedee::messages::AnyMessage::SysEx(
-            meedee::messages::SysEx::new(wire[1..wire.len() - 1].to_vec()).map_err(error)?,
-        ));
-    }
-    Err(PyTypeError::new_err("expected a primitive MIDI 1 message"))
 }
 
 fn tempo_period(value: &Bound<'_, PyAny>) -> PyResult<i64> {

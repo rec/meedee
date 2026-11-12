@@ -53,7 +53,7 @@ def run_transfer(config: TransferPreview) -> int:
     completed = False
     try:
         client = midi.Output(
-            protocol=midi.Protocol.Midi1,
+            encoding=midi.Encoding.Bytes,
             backend=None
             if config.backend is None
             else getattr(midi.Backend, config.backend),
@@ -126,7 +126,7 @@ def run_receive(config: SysexReceive) -> int:
         if config.destination.exists():
             raise FileExistsError("capture destination already exists")
         client = midi.Input(
-            protocol=midi.Protocol.Midi1,
+            encoding=midi.Encoding.Bytes,
             backend=None
             if config.backend is None
             else getattr(midi.Backend, config.backend),

@@ -3,7 +3,11 @@
 from . import events, messages
 
 class ZoneConfiguration(messages.Message):
-    def __init__(self, *, manager_channel: int, members: int) -> None: ...
+    def __init__(
+        self, *, manager_channel: int, members: int, group: int | None = None
+    ) -> None: ...
+    @property
+    def group(self) -> int | None: ...
     @property
     def manager_channel(self) -> int: ...
     @property
@@ -12,6 +16,7 @@ class ZoneConfiguration(messages.Message):
         self,
         *,
         manager_channel: int = ...,
+        group: int | None = ...,
         members: int = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,

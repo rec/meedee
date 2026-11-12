@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 
-from meedee import clip, events, messages, smf, ump
+from meedee import clip, events, messages, smf, translation, ump
 
 
 def song(format: int = 1, division: int = 480) -> bytes:
@@ -142,7 +142,9 @@ def test_independent_sequences_and_smpte_export_have_explicit_loss_reports() -> 
     assert isinstance(value, messages.Message)
     header = smf.Header(format=0, tracks=1, division=480)
     denied = smf.export_event(value, header=header, origin=reader.origin)
-    assert denied.status == ump.TranslationStatus.Quantized and denied.events == []
+    assert (
+        denied.status == translation.TranslationStatus.Quantized and denied.events == []
+    )
     accepted = smf.export_event(
         value, header=header, origin=reader.origin, allow_loss=True
     )
@@ -160,7 +162,7 @@ def test_independent_sequences_and_smpte_export_have_explicit_loss_reports() -> 
         smf.export_event(
             wide, header=header, origin=reader.origin, allow_loss=True
         ).status
-        == ump.TranslationStatus.ContextRequired
+        == translation.TranslationStatus.ContextRequired
     )
 
 

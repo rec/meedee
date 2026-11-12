@@ -15,7 +15,7 @@ from meedee import codecs, events, gm, messages, midi, testing
 
 class NativeConnection:
     def __init__(self) -> None:
-        self.sink = testing.Output(protocol="midi1")
+        self.sink = testing.Output(encoding="bytes")
         self.closed = False
         self.fail_release = False
         self.partial: int | None = None
@@ -90,8 +90,8 @@ def test_output_channel_overrides_messages_and_tracks_cleanup(
 def test_midi2_output_resolves_channel_without_scaling_or_cleanup(
     transport: NativeConnection,
 ) -> None:
-    transport.sink = testing.Output(protocol="ump")
-    with midi.Output(protocol=midi.Protocol.Ump, channel=3) as out:
+    transport.sink = testing.Output(encoding="ump")
+    with midi.Output(encoding=midi.Encoding.Ump, channel=3) as out:
         out.send(messages.NoteOn(60, 65535, version=2))
         out.send(messages.NoteOff(60, channel=9, version=2))
     assert transport.packets() == [
@@ -115,6 +115,51 @@ def test_parameter_step_uses_output_channel_and_preserves_nrpn_family(
         b"\xb1\x65\x7f",
         b"\xb1\x64\x7f",
     ]
+
+
+def test_ump_channel_override_covers_every_musical_family_and_grouped_commands(
+    transport: NativeConnection,
+) -> None:
+    from meedee import ump
+
+    transport.sink = testing.Output(encoding="ump")
+    values = [
+        messages.RegisteredPerNoteController(
+            group=5, channel=7, note=60, controller=3, value=1234
+        ),
+        messages.AssignablePerNoteController(
+            group=5, channel=7, note=60, controller=3, value=1234
+        ),
+        messages.PerNoteManagement(group=5, channel=7, note=60, flags=3),
+        messages.PerNotePitchBend(group=5, channel=7, note=60, value=-1234),
+        messages.RegisteredController(group=5, channel=7, bank=1, index=2, value=1234),
+        messages.AssignableController(group=5, channel=7, bank=1, index=2, value=1234),
+        messages.RelativeRegisteredController(
+            group=5, channel=7, bank=1, index=2, value=-1234
+        ),
+        messages.RelativeAssignableController(
+            group=5, channel=7, bank=1, index=2, value=-1234
+        ),
+    ]
+    with midi.Output(encoding=midi.Encoding.Ump, channel=3) as output:
+        report = output.send(values)
+        assert report.sent_events == 8
+        original = [ump.encode(v) for v in values]
+        expected = [
+            midi.UmpPacket(words=((w[0] & ~0xF0000) | 0x20000, w[1])) for w in original
+        ]
+        assert transport.packets() == expected
+        assert all(v.channel == 7 and v.group == 5 for v in values)
+        report = output.send(
+            messages.ControlChange(7, 10000, 2, resolution=14, group=3)
+        )
+        assert report.sent_events == 1
+        assert transport.packets() == [midi.UmpPacket(words=(0x22B2074E, 0x22B22710))]
+        with pytest.raises(ValueError, match="group"):
+            output.send(
+                [messages.NoteOn(60, channel=1, group=1), messages.TimingClock()]
+            )
+        assert transport.packets() == []
 
 
 def test_call_schedules_cumulative_delays_including_trailing_time(

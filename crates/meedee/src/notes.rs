@@ -1,5 +1,5 @@
 //! Bounded observations of note traffic, not a model of an instrument's voices.
-use crate::{events::Payload, messages, ump};
+use crate::{events::Payload, messages};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -235,32 +235,24 @@ enum Action {
 }
 
 fn action(message: &Payload) -> Option<(Option<u8>, &'static str, u8, Action)> {
-    match message {
-        Payload::Midi1(v) => midi1(v).map(|(c, a)| (None, "midi1", c, a)),
-        Payload::Ump(ump::UmpMessage::Midi1(v)) => {
-            midi1(v.message()).map(|(c, a)| (Some(v.group()), "midi1", c, a))
-        }
-        Payload::Ump(ump::UmpMessage::NoteOn(v)) => {
-            Some((v.group(), "midi2", v.channel()?, Action::On(v.note())))
-        }
-        Payload::Ump(ump::UmpMessage::NoteOff(v)) => {
-            Some((v.group(), "midi2", v.channel()?, Action::Off(v.note())))
-        }
-        Payload::Ump(ump::UmpMessage::ControlChange(v)) if selected_control(v.controller()) => {
-            Some((
-                v.group(),
-                "midi2",
-                v.channel()?,
-                Action::Control(v.controller(), v.value()),
-            ))
-        }
-        _ => None,
-    }
+    let Payload::Message(v) = message else {
+        return None;
+    };
+    midi1(v).map(|(c, a)| {
+        (
+            v.group(),
+            if v.version() == 1 { "midi1" } else { "midi2" },
+            c,
+            a,
+        )
+    })
 }
 fn midi1(message: &messages::AnyMessage) -> Option<(u8, Action)> {
     use messages::AnyMessage::*;
     match message {
-        NoteOn(v) if v.velocity() != 0 => Some((v.channel()?, Action::On(v.note()))),
+        NoteOn(v) if v.version() == 2 || v.velocity() != 0 => {
+            Some((v.channel()?, Action::On(v.note())))
+        }
         NoteOn(v) => Some((v.channel()?, Action::Off(v.note()))),
         NoteOff(v) => Some((v.channel()?, Action::Off(v.note()))),
         ControlChange(v) if selected_control(v.controller()) => {

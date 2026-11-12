@@ -49,15 +49,15 @@ def main() -> None:
         deliveries = metrics.Delivery(start_ns=0)
         deliveries.observe(5)
         assert deliveries.snapshot(10).elapsed_ns == 10
-        simulated = testing.Input(stream="pure", protocol="midi1")
+        simulated = testing.Input(stream="pure", encoding="bytes")
         synthetic_clock = events.Clock(identity="simulation", origin="manual")
         simulated.inject(b"\xf8", clock=synthetic_clock)
         assert isinstance(simulated.receive(), messages.Message)
-        output = testing.Output(protocol="midi1")
+        output = testing.Output(encoding="bytes")
         output.send(messages.TimingClock())
         assert output.take_packet() == b"\xf8"
-        ump_output = testing.Output(protocol="ump")
-        ump_input = testing.Input(stream="ump-test", protocol="ump")
+        ump_output = testing.Output(encoding="ump")
+        ump_input = testing.Input(stream="ump-test", encoding="ump")
         ump_output.send(
             messages.ControlChange(
                 version=2, group=1, channel=1, controller=7, value=0xFFFFFFFF
@@ -167,7 +167,7 @@ def main() -> None:
         router = routing.Router(
             routes=[
                 routing.Route(
-                    name="r", source="pure", destination="out", protocol="midi1"
+                    name="r", source="pure", destination="out", encoding="bytes"
                 )
             ]
         )
@@ -181,7 +181,7 @@ def main() -> None:
         assert list(events.with_gap(iter(["item"]), 0.1)) == ["item", 0.1]
         from meedee import discovery
 
-        poller = discovery.Poller(protocol="midi1")
+        poller = discovery.Poller(encoding="bytes")
         assert poller.snapshot().generation == 0
         poller.close()
         assert archive.Stream(id="s", label="", clock_identity=clock.identity).id == "s"

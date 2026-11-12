@@ -24,7 +24,7 @@ from meedee._cli import WatchPorts
 def test_configuration_retains_authored_units_and_normalizes_cli() -> None:
     config = tyro.cli(
         WatchPorts,
-        args=["--protocol", "midi1", "--interval", "250 ms", "--duration", "1:30"],
+        args=["--encoding", "bytes", "--interval", "250 ms", "--duration", "1:30"],
     )
     assert config.interval == 0.25
     assert config.duration == 90
@@ -83,7 +83,7 @@ def test_smf_tempo_conversion_preserves_event_ticks() -> None:
 
 def test_simulated_receive_accepts_seconds_and_packet_timestamps() -> None:
     source = testing.Input(
-        stream="test", protocol="midi1", byte_limit="1 KiB", sysex_limit="512 byte"
+        stream="test", encoding="bytes", byte_limit="1 KiB", sysex_limit="512 byte"
     )
     clock = events.Clock(identity="test")
     source.inject(b"\x90\x3c\x40", clock=clock, timestamp_ns="2 ms")

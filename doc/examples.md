@@ -337,8 +337,8 @@ with md.Input() as receiver, md.Output() as output:
 
 The browser handles management replies but performs no Profiles, Property
 Exchange or instrument configuration writes. An empty inventory does not prove
-the device is offline. For native UMP, set both clients' protocol to
-`md.Protocol.Ump` and set `group=1` on the route; backend support is required.
+the device is offline. For native UMP, set both clients' encoding to
+`md.Encoding.Ump` and set `group=1` on the route; backend support is required.
 
 See the [API contract](https://github.com/rec/meedee/blob/main/plan/api.md) and
 [MIDI-CI contract](https://github.com/rec/meedee/blob/main/plan/ci.md) for ownership,
@@ -355,7 +355,7 @@ import meedee as md
 with md.Input() as source, md.Output() as destination:
     router = md.Router(routes=[md.Route(
         name="keys", source=source.stream, destination="synth",
-        protocol="midi1", remap_channel=2,
+        encoding="bytes", remap_channel=2,
     )])
     print(md.routing.run(router, source, {"synth": destination}, duration=10))
 ```
@@ -440,17 +440,42 @@ to 1, and output resolves the channel. Values use their native MIDI 2 widths:
 ```python
 import meedee as md
 
-with md.Output(protocol=md.Protocol.Ump) as out:
+with md.Output(encoding=md.Encoding.Ump) as out:
     out.send(md.NoteOn(60, 40_000, version=2), "500 ms", md.NoteOff(60, version=2))
 ```
 
-This requires a native UMP endpoint. Protocol conversion is always explicit.
+This requires a native UMP endpoint. Encoding conversion is always explicit.
 
 Omitted NoteOn velocity uses the scaled equivalent of MIDI 1 velocity 90.
 An explicitly supplied velocity is a raw 16-bit value. The same version selection
 applies to NoteOff, PolyPressure, ControlChange, ProgramChange, ChannelPressure
-and PitchBend. Use `md.ump.to_midi1()` or `md.ump.to_midi2()` for conversion;
+and PitchBend. Use `md.translation.to_midi1()` or `md.translation.to_midi2()` for conversion;
 `replace(version=...)` cannot change the protocol.
+
+UMP also carries MIDI 1 values. Set a group on an ordinary message to package
+its existing native values, without scaling or upgrading it:
+
+```python
+import meedee as md
+
+legacy = md.NoteOn(60, 90, channel=2, group=3)
+assert md.ump.encode(legacy) == (0x22913C5A,)
+assert md.ump.decode((0x22913C5A,)) == legacy
+wide = md.translation.to_midi2(legacy, group=3).messages[0]
+assert wide.version == 2
+assert md.codecs.encode(legacy.replace(group=None)) == b"\x91\x3c\x5a"
+
+with md.Output(encoding=md.Encoding.Ump, channel=3) as out:
+    out.send(md.messages.PerNotePitchBend(group=3, channel=2, note=60, value=1234))
+    out.send(md.ControlChange(7, 10000, resolution=14, group=3))
+    out.send(md.SysEx(bytes(range(20)), group=3))
+```
+
+The output channel applies to every semantic channel message. A grouped MIDI 1
+command expands to MIDI 1 UMPs, and complete SysEx packetizes as SysEx7. Each
+logical value uses one bounded transport handoff. Incoming SysEx7/8 fragments
+remain separate until explicitly assembled. MIDI 2-only musical classes live in
+`messages`; utility, data, Flex and stream packet classes live in `ump`.
 
 ## Interpret controller gestures
 
@@ -534,7 +559,7 @@ It clears pending fragments and leaves the assembler reusable.
 import meedee as md
 
 assembler = md.ump.Assembler()
-packets = md.ump.packetize_sysex7(group=2, data=bytes(range(20)))
+packets = md.ump.packetize_sysex7(md.SysEx(bytes(range(20)), group=2))
 assembler.feed(packets[0])
 print(assembler.finish())
 ```
