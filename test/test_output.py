@@ -124,21 +124,23 @@ def test_ump_channel_override_covers_every_musical_family_and_grouped_commands(
 
     transport.sink = testing.Output(encoding="ump")
     values = [
-        messages.RegisteredPerNoteController(
+        messages.PerNoteController(
             group=5, channel=7, note=60, controller=3, value=1234
         ),
-        messages.AssignablePerNoteController(
-            group=5, channel=7, note=60, controller=3, value=1234
+        messages.PerNoteController(
+            family="assignable", group=5, channel=7, note=60, controller=3, value=1234
         ),
         messages.PerNoteManagement(group=5, channel=7, note=60, flags=3),
         messages.PerNotePitchBend(group=5, channel=7, note=60, value=-1234),
-        messages.RegisteredController(group=5, channel=7, bank=1, index=2, value=1234),
-        messages.AssignableController(group=5, channel=7, bank=1, index=2, value=1234),
-        messages.RelativeRegisteredController(
+        messages.ParameterController(group=5, channel=7, bank=1, index=2, value=1234),
+        messages.ParameterController(
+            family="assignable", group=5, channel=7, bank=1, index=2, value=1234
+        ),
+        messages.RelativeParameterController(
             group=5, channel=7, bank=1, index=2, value=-1234
         ),
-        messages.RelativeAssignableController(
-            group=5, channel=7, bank=1, index=2, value=-1234
+        messages.RelativeParameterController(
+            family="assignable", group=5, channel=7, bank=1, index=2, value=-1234
         ),
     ]
     with midi.Output(encoding=midi.Encoding.Ump, channel=3) as output:

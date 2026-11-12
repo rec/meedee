@@ -189,11 +189,19 @@ fn generic_transpose_preserves_default_values_and_dispatches_note_addresses() {
 #[test]
 fn transpose_keeps_per_note_controls_and_ump_wrappers_addressed_to_the_shifted_key() {
     let controls = [
-        meedee::messages::AnyMessage::RegisteredPerNoteController(
-            messages::RegisteredPerNoteController::new(3, 2, 60, 1, 1234).unwrap(),
+        meedee::messages::AnyMessage::PerNoteController(
+            messages::PerNoteController::new(3, 2, 60, 1, 1234).unwrap(),
         ),
-        meedee::messages::AnyMessage::AssignablePerNoteController(
-            messages::AssignablePerNoteController::new(3, 2, 60, 2, 5678).unwrap(),
+        meedee::messages::AnyMessage::PerNoteController(
+            messages::PerNoteController::new_with_family(
+                3,
+                2,
+                60,
+                2,
+                5678,
+                messages::ControllerFamily::Assignable,
+            )
+            .unwrap(),
         ),
         meedee::messages::AnyMessage::PerNotePitchBend(
             messages::PerNotePitchBend::new(3, 2, 60, -1234).unwrap(),

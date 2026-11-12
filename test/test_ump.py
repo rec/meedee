@@ -51,7 +51,23 @@ def test_shared_vectors_preserve_every_family_and_frozen_native_values() -> None
             "EndpointInfo",
             "StartOfClip",
         }:
-            assert type(value).__name__ == name
+            expected = {
+                "RegisteredPerNoteController": "PerNoteController",
+                "AssignablePerNoteController": "PerNoteController",
+                "RegisteredController": "ParameterController",
+                "AssignableController": "ParameterController",
+                "RelativeRegisteredController": "RelativeParameterController",
+                "RelativeAssignableController": "RelativeParameterController",
+            }.get(name, name)
+            assert type(value).__name__ == expected
+            if expected in {
+                "PerNoteController",
+                "ParameterController",
+                "RelativeParameterController",
+            }:
+                assert value.family == (
+                    "assignable" if "Assignable" in name else "registered"
+                )
     on = messages.NoteOn(
         version=2,
         group=16,

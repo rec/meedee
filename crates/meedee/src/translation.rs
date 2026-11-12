@@ -328,7 +328,11 @@ pub fn to_midi1(
             ));
             output
         }
-        RegisteredController(v) if v.bank() == 127 && v.index() == 127 => {
+        ParameterController(v)
+            if v.family() == m::ControllerFamily::Registered
+                && v.bank() == 127
+                && v.index() == 127 =>
+        {
             return Ok(report(
                 TranslationStatus::Unsupported,
                 "RPN null has no MIDI 1 Data Entry target",
@@ -337,21 +341,15 @@ pub fn to_midi1(
                 allow_loss,
             ))
         }
-        RegisteredController(v) => parameter_to_midi1(
+        ParameterController(v) => parameter_to_midi1(
             v.channel(),
             v.bank(),
             v.index(),
             v.value(),
-            false,
+            v.family() == m::ControllerFamily::Assignable,
             &mut lost,
         )?,
-        AssignableController(v) => {
-            parameter_to_midi1(v.channel(), v.bank(), v.index(), v.value(), true, &mut lost)?
-        }
-        RegisteredPerNoteController(_)
-        | AssignablePerNoteController(_)
-        | PerNoteManagement(_)
-        | PerNotePitchBend(_) => return Ok(report(
+        PerNoteController(_) | PerNoteManagement(_) | PerNotePitchBend(_) => return Ok(report(
             TranslationStatus::ProfileDependent,
             "no default MIDI 1 per-note equivalent; explicit alternate profile mapping required",
             group,

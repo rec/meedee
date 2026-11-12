@@ -787,11 +787,14 @@ monotonic caller-clock requirement.
 ### Shared semantic boundary
 
 `messages` owns MIDI 1 and MIDI 2 musical values, including
-RegisteredPerNoteController, AssignablePerNoteController, PerNoteManagement,
-RegisteredController, AssignableController, RelativeRegisteredController,
-RelativeAssignableController and PerNotePitchBend. The latter eight have an
+PerNoteController, PerNoteManagement, ParameterController,
+RelativeParameterController and PerNotePitchBend. These five have an
 inherent `version=2` and retain required group/channel arguments and native
 integer values. There are no old UMP aliases. Encoding never implies scaling.
+The three controller classes accept `family="registered"` (the default) or
+`"assignable"`. Rust uses `ControllerFamily` with `new_with_family` or a checked
+`with_family` builder. Absolute values are unsigned; relative values are signed.
+Registered per-note controller validation remains family-specific.
 
 Shared MIDI 1 channel/system messages, complete SysEx and compound commands
 accept an optional group, numbered 1..16. A group selects UMP addressing without
@@ -844,7 +847,7 @@ velocity of zero is a sounding-note event, unlike MIDI 1 NoteOn zero.
 | --- | --- |
 | Utility | Noop, JrClock, JrTimestamp, DeltaClockstampTicksPerQuarter, DeltaClockstamp; no Group field |
 | System/MIDI 1.0 channel | Shared `messages` classes with an optional group; complete SysEx uses explicit or output-time packetization |
-| MIDI 2.0 channel | Shared versioned NoteOn/Off, PolyPressure, ChannelPressure, ControlChange, ProgramChange, PitchBend; MIDI 2-only Registered/AssignableController, relative controllers, registered/assignable per-note controllers, per-note bend/management |
+| MIDI 2.0 channel | Shared versioned NoteOn/Off, PolyPressure, ChannelPressure, ControlChange, ProgramChange, PitchBend; MIDI 2-only ParameterController, RelativeParameterController and PerNoteController with a registered/assignable family, plus per-note bend/management |
 | Data64 | SysEx7Packet: format 0/1/2/3 = Complete/Start/Continue/End, at most six seven-bit bytes |
 | Data128 | SysEx8Packet: format, stream ID 0–255, up to thirteen payload bytes; explicit aborted End; MixedDataSet header/payload packets retain their fourteen bytes |
 | Flex Data | Group, optional channel, format, status bank/status and three data words; tempo/time-signature/metronome/key-signature factories and bounded UTF-8 packetization |

@@ -9,6 +9,43 @@ from native import meedee_messages
 from meedee import messages
 
 
+def test_midi2_controller_families_preserve_values_and_per_note_validation() -> None:
+    import pytest
+
+    from meedee import events, ump
+
+    stamp = events.Timestamp(ticks=3, clock=events.Clock(identity="controller"))
+    for registered in [
+        messages.ParameterController(
+            group=3, channel=2, bank=1, index=2, value=2**32 - 1
+        ),
+        messages.RelativeParameterController(
+            group=3, channel=2, bank=1, index=2, value=-(2**31)
+        ),
+        messages.PerNoteController(
+            group=3, channel=2, note=60, controller=1, value=2**32 - 1
+        ),
+    ]:
+        assignable = registered.replace(family="assignable")
+        assert registered.family == "registered" and len({registered, assignable}) == 2
+        assert assignable.replace(family="registered") == registered
+        assert (ump.encode(registered)[0] ^ ump.encode(assignable)[0]) == 0x00100000
+        for value in (registered, assignable):
+            assert ump.decode(ump.encode(value)) == value
+            marked = value.replace(timestamp=stamp, stream="keys")
+            assert marked.replace(channel=4).timestamp == stamp
+            assert marked.replace(family="assignable").stream == "keys"
+        with pytest.raises(ValueError, match="family"):
+            registered.replace(family="other")
+    per_note = messages.PerNoteController(
+        group=1, channel=1, note=60, controller=255, value=1, family="assignable"
+    )
+    with pytest.raises(ValueError):
+        per_note.replace(family="registered")
+    assert per_note.transpose(12).family == "assignable"
+    assert per_note.transpose(12).note == 72
+
+
 def test_program_changes_preserve_bank_pairs_and_derive_midi2_bank_validity() -> None:
     import pytest
 
@@ -259,11 +296,11 @@ def test_transpose_shifts_all_note_addresses_and_preserves_other_fields() -> Non
         ),
         messages.NoteOff(60, 30_000, 2, version=2, group=3),
         messages.PolyPressure(60, 0xFEDCBA98, 2, version=2, group=3),
-        messages.RegisteredPerNoteController(
+        messages.PerNoteController(
             group=3, channel=2, note=60, controller=1, value=1234
         ),
-        messages.AssignablePerNoteController(
-            group=3, channel=2, note=60, controller=2, value=5678
+        messages.PerNoteController(
+            family="assignable", group=3, channel=2, note=60, controller=2, value=5678
         ),
         messages.PerNotePitchBend(group=3, channel=2, note=60, value=-1234),
         messages.PerNoteManagement(group=3, channel=2, note=60, flags=3),

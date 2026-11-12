@@ -483,6 +483,15 @@ is a separate observation returned when interpreting incoming controller message
 
 ## Send native MIDI 2 messages
 
+```python
+import meedee as md
+
+with md.Output(encoding=md.Encoding.Ump) as out:
+    out.send(md.messages.ParameterController(
+        group=1, channel=1, bank=1, index=2, value=2**31, family="assignable"
+    ))
+```
+
 The same channel-message classes support MIDI 2 with `version=2`. Group defaults
 to 1, and output resolves the channel. Values use their native MIDI 2 widths:
 

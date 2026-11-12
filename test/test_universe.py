@@ -200,8 +200,8 @@ def test_native_parameters_per_note_state_and_tuning_fragments() -> None:
     cache = universe.Universe()
     scope = universe.Scope(group=2, version=2)
     cache.feed(
-        messages.AssignableController(
-            group=2, channel=1, bank=1, index=2, value=0xFEDCBA98
+        messages.ParameterController(
+            family="assignable", group=2, channel=1, bank=1, index=2, value=0xFEDCBA98
         )
     )
     parameter = known(
@@ -215,7 +215,7 @@ def test_native_parameters_per_note_state_and_tuning_fragments() -> None:
         is None
     )
     cache.feed(
-        messages.RegisteredPerNoteController(
+        messages.PerNoteController(
             group=2, channel=1, note=60, controller=1, value=0xFFFFFFFF
         )
     )
@@ -233,7 +233,9 @@ def test_native_parameters_per_note_state_and_tuning_fragments() -> None:
     assert isinstance(pitch, tuning.Pitch)
     assert pitch.semitone == 60
     cache.feed(
-        messages.AssignableController(group=2, channel=1, bank=1, index=2, value=1)
+        messages.ParameterController(
+            family="assignable", group=2, channel=1, bank=1, index=2, value=1
+        )
     )
     assert parameter.native == 0xFEDCBA98
 

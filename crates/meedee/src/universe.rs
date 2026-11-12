@@ -880,23 +880,21 @@ impl Universe {
         }
         if self.effective(Category::Controls) == Retention::Full {
             let parameter = match message {
-                AnyMessage::RegisteredController(v) => Some((
-                    ParameterFamily::Rpn,
+                AnyMessage::ParameterController(v) => Some((
+                    if v.family() == crate::messages::ControllerFamily::Registered {
+                        ParameterFamily::Rpn
+                    } else {
+                        ParameterFamily::Nrpn
+                    },
                     u16::from(v.bank()) * 128 + u16::from(v.index()),
                     Some(v.value()),
                 )),
-                AnyMessage::AssignableController(v) => Some((
-                    ParameterFamily::Nrpn,
-                    u16::from(v.bank()) * 128 + u16::from(v.index()),
-                    Some(v.value()),
-                )),
-                AnyMessage::RelativeRegisteredController(v) => Some((
-                    ParameterFamily::Rpn,
-                    u16::from(v.bank()) * 128 + u16::from(v.index()),
-                    None,
-                )),
-                AnyMessage::RelativeAssignableController(v) => Some((
-                    ParameterFamily::Nrpn,
+                AnyMessage::RelativeParameterController(v) => Some((
+                    if v.family() == crate::messages::ControllerFamily::Registered {
+                        ParameterFamily::Rpn
+                    } else {
+                        ParameterFamily::Nrpn
+                    },
                     u16::from(v.bank()) * 128 + u16::from(v.index()),
                     None,
                 )),
@@ -927,8 +925,7 @@ impl Universe {
                 AnyMessage::NoteOff(v) => Some(v.note()),
                 AnyMessage::PolyPressure(v) => Some(v.note()),
                 AnyMessage::PerNotePitchBend(v) => Some(v.note()),
-                AnyMessage::RegisteredPerNoteController(v) => Some(v.note()),
-                AnyMessage::AssignablePerNoteController(v) => Some(v.note()),
+                AnyMessage::PerNoteController(v) => Some(v.note()),
                 AnyMessage::PerNoteManagement(v) => Some(v.note()),
                 _ => None,
             };
@@ -962,12 +959,14 @@ impl Universe {
                     }
                     AnyMessage::PolyPressure(v) => state.pressure = Some(v.pressure()),
                     AnyMessage::PerNotePitchBend(v) => state.pitch_bend = Some(v.value()),
-                    AnyMessage::RegisteredPerNoteController(v) => {
-                        state.registered.insert(v.controller(), v.value());
-                    }
-                    AnyMessage::AssignablePerNoteController(v) => {
-                        state.assignable.insert(v.controller(), v.value());
-                    }
+                    AnyMessage::PerNoteController(v) => match v.family() {
+                        crate::messages::ControllerFamily::Registered => {
+                            state.registered.insert(v.controller(), v.value());
+                        }
+                        crate::messages::ControllerFamily::Assignable => {
+                            state.assignable.insert(v.controller(), v.value());
+                        }
+                    },
                     AnyMessage::PerNoteManagement(v) if v.flags() & 2 != 0 => {
                         state.registered.clear();
                         state.assignable.clear();

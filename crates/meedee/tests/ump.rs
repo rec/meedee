@@ -2,6 +2,25 @@ use meedee::{messages::*, translation::*, ump::*};
 
 #[test]
 fn shared_channel_values_keep_versions_defaults_and_encoding_boundaries() {
+    let registered = ParameterController::new(1, 1, 1, 2, u32::MAX.into()).unwrap();
+    let assignable = registered
+        .clone()
+        .with_family(ControllerFamily::Assignable)
+        .unwrap();
+    assert_ne!(registered, assignable);
+    assert_eq!(
+        encode(&registered).unwrap()[0] ^ encode(&assignable).unwrap()[0],
+        0x00100000
+    );
+    assert_eq!(
+        assignable
+            .with_family(ControllerFamily::Registered)
+            .unwrap(),
+        registered
+    );
+    let per_note =
+        PerNoteController::new_with_family(1, 1, 60, 255, 1, ControllerFamily::Assignable).unwrap();
+    assert!(per_note.with_family(ControllerFamily::Registered).is_err());
     let byte = NoteOn::new(60).unwrap().with_channel(1).unwrap();
     let wide = NoteOn::new_midi2(60).unwrap();
     assert_eq!(byte.version(), 1);
@@ -86,7 +105,7 @@ fn independent_packets_cover_all_families_and_preserve_native_widths() {
         [0x4fcf0001, 0x7f007903]
     );
     assert_eq!(
-        encode(&RelativeRegisteredController::new(1, 1, 127, 127, -1).unwrap()).unwrap(),
+        encode(&RelativeParameterController::new(1, 1, 127, 127, -1).unwrap()).unwrap(),
         [0x40407f7f, 0xffffffff]
     );
     assert_eq!(
@@ -478,8 +497,8 @@ fn rejected_layouts_and_long_lived_streams_remain_bounded_and_recoverable() {
             [original]
         );
     }
-    let null = meedee::messages::AnyMessage::RegisteredController(
-        RegisteredController::new(1, 1, 127, 127, 0).unwrap(),
+    let null = meedee::messages::AnyMessage::ParameterController(
+        ParameterController::new(1, 1, 127, 127, 0).unwrap(),
     );
     assert_eq!(
         to_midi1(&null.clone().into(), false).unwrap().status,

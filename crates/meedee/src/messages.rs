@@ -762,13 +762,10 @@ include!("messages_midi2.rs");
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AnyMessage {
-    RegisteredPerNoteController(RegisteredPerNoteController),
-    AssignablePerNoteController(AssignablePerNoteController),
+    PerNoteController(PerNoteController),
     PerNoteManagement(PerNoteManagement),
-    RegisteredController(RegisteredController),
-    AssignableController(AssignableController),
-    RelativeRegisteredController(RelativeRegisteredController),
-    RelativeAssignableController(RelativeAssignableController),
+    ParameterController(ParameterController),
+    RelativeParameterController(RelativeParameterController),
     PerNotePitchBend(PerNotePitchBend),
     NoteOn(NoteOn),
     NoteOff(NoteOff),
@@ -790,13 +787,10 @@ pub enum AnyMessage {
     SysEx(SysEx),
 }
 enum_metadata!(AnyMessage {
-    RegisteredPerNoteController,
-    AssignablePerNoteController,
+    PerNoteController,
     PerNoteManagement,
-    RegisteredController,
-    AssignableController,
-    RelativeRegisteredController,
-    RelativeAssignableController,
+    ParameterController,
+    RelativeParameterController,
     PerNotePitchBend,
     NoteOn,
     NoteOff,
@@ -820,13 +814,10 @@ enum_metadata!(AnyMessage {
 impl AnyMessage {
     pub fn channel(&self) -> Option<u8> {
         match self {
-            Self::RegisteredPerNoteController(v) => Some(v.channel()),
-            Self::AssignablePerNoteController(v) => Some(v.channel()),
+            Self::PerNoteController(v) => Some(v.channel()),
             Self::PerNoteManagement(v) => Some(v.channel()),
-            Self::RegisteredController(v) => Some(v.channel()),
-            Self::AssignableController(v) => Some(v.channel()),
-            Self::RelativeRegisteredController(v) => Some(v.channel()),
-            Self::RelativeAssignableController(v) => Some(v.channel()),
+            Self::ParameterController(v) => Some(v.channel()),
+            Self::RelativeParameterController(v) => Some(v.channel()),
             Self::PerNotePitchBend(v) => Some(v.channel()),
             Self::NoteOn(v) => v.channel(),
             Self::NoteOff(v) => v.channel(),
@@ -853,13 +844,10 @@ impl AnyMessage {
             ProgramChange,
             ChannelPressure,
             PitchBend,
-            RegisteredPerNoteController,
-            AssignablePerNoteController,
+            PerNoteController,
             PerNoteManagement,
-            RegisteredController,
-            AssignableController,
-            RelativeRegisteredController,
-            RelativeAssignableController,
+            ParameterController,
+            RelativeParameterController,
             PerNotePitchBend
         )
     }
@@ -867,13 +855,10 @@ impl AnyMessage {
     pub fn group(&self) -> Option<u8> {
         macro_rules! groups { ($($name:ident),*) => { match self {
             $(Self::$name(v) => v.group(),)*
-            Self::RegisteredPerNoteController(v) => Some(v.group()),
-            Self::AssignablePerNoteController(v) => Some(v.group()),
+            Self::PerNoteController(v) => Some(v.group()),
             Self::PerNoteManagement(v) => Some(v.group()),
-            Self::RegisteredController(v) => Some(v.group()),
-            Self::AssignableController(v) => Some(v.group()),
-            Self::RelativeRegisteredController(v) => Some(v.group()),
-            Self::RelativeAssignableController(v) => Some(v.group()),
+            Self::ParameterController(v) => Some(v.group()),
+            Self::RelativeParameterController(v) => Some(v.group()),
             Self::PerNotePitchBend(v) => Some(v.group()),
         } }; }
         groups!(
@@ -919,13 +904,10 @@ impl AnyMessage {
             ActiveSensing,
             SystemReset,
             SysEx,
-            RegisteredPerNoteController,
-            AssignablePerNoteController,
+            PerNoteController,
             PerNoteManagement,
-            RegisteredController,
-            AssignableController,
-            RelativeRegisteredController,
-            RelativeAssignableController,
+            ParameterController,
+            RelativeParameterController,
             PerNotePitchBend
         )
     }
@@ -978,26 +960,20 @@ impl AnyMessage {
             ActiveSensing,
             SystemReset,
             SysEx,
-            RegisteredPerNoteController,
-            AssignablePerNoteController,
+            PerNoteController,
             PerNoteManagement,
-            RegisteredController,
-            AssignableController,
-            RelativeRegisteredController,
-            RelativeAssignableController,
+            ParameterController,
+            RelativeParameterController,
             PerNotePitchBend
         )
     }
 
     pub fn version(&self) -> u8 {
         match self {
-            Self::RegisteredPerNoteController(_)
-            | Self::AssignablePerNoteController(_)
+            Self::PerNoteController(_)
             | Self::PerNoteManagement(_)
-            | Self::RegisteredController(_)
-            | Self::AssignableController(_)
-            | Self::RelativeRegisteredController(_)
-            | Self::RelativeAssignableController(_)
+            | Self::ParameterController(_)
+            | Self::RelativeParameterController(_)
             | Self::PerNotePitchBend(_) => 2,
             Self::NoteOn(v) => v.version(),
             Self::NoteOff(v) => v.version(),

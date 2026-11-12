@@ -1,7 +1,7 @@
 use meedee::controls::{ControlInterpreter, ParameterFamily};
 use meedee::events::Payload;
 use meedee::messages::{AnyMessage, ControlChange, ProgramChange};
-use meedee::messages::{Message, NoteOn, RegisteredController, SysEx};
+use meedee::messages::{Message, NoteOn, ParameterController, SysEx};
 use meedee::universe::{CacheOptions, Category, Retention, Scope, Universe};
 
 fn cc(controller: i64, value: i64) -> Payload {
@@ -199,8 +199,8 @@ fn notes_tuning_and_timecode_use_existing_decoders() {
         .unwrap()
         .notes
         .contains_key(&60));
-    let native = Payload::Message(AnyMessage::RegisteredController(
-        RegisteredController::new(2, 1, 1, 2, 0xffffffff).unwrap(),
+    let native = Payload::Message(AnyMessage::ParameterController(
+        ParameterController::new(2, 1, 1, 2, 0xffffffff).unwrap(),
     ));
     cache.feed(&native, Some(3)).unwrap();
     assert_eq!(

@@ -330,7 +330,7 @@ resolves an unassigned channel for you.
 ```rust
 use meedee::midi::Output;
 use meedee::transport::{OutputOptions, Encoding};
-use meedee::messages::{NoteOff, NoteOn};
+use meedee::messages::{ControllerFamily, NoteOff, NoteOn, ParameterController};
 use std::time::Duration;
 
 let mut out = Output::new().with_transport(OutputOptions {
@@ -342,6 +342,9 @@ out.send([
     Duration::from_millis(500).into(),
     NoteOff::new_midi2(60)?.into(),
 ])?;
+out.send(ParameterController::new_with_family(
+    1, 1, 1, 2, 1 << 31, ControllerFamily::Assignable,
+)?)?;
 out.close()?;
 ```
 

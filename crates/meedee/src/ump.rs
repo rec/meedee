@@ -852,13 +852,10 @@ impl UmpValue for AnyMessage {
                     ProgramChange,
                     ChannelPressure,
                     PitchBend,
-                    RegisteredPerNoteController,
-                    AssignablePerNoteController,
+                    PerNoteController,
                     PerNoteManagement,
-                    RegisteredController,
-                    AssignableController,
-                    RelativeRegisteredController,
-                    RelativeAssignableController,
+                    ParameterController,
+                    RelativeParameterController,
                     PerNotePitchBend
                 )
             }

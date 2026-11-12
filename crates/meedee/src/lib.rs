@@ -61,9 +61,9 @@ pub use gm::{BankProgram, DrumKit, Gm1On, Gm2On, GmOff, Percussion, Program};
 pub use inspection::{ComparisonReport, Monitor, MonitorReport};
 pub use messages::{
     ActiveSensing, AnyCommand, AnyMessage, Beats, ChannelPressure, Command, Continue,
-    ControlChange, Message, Note, NoteOff, NoteOn, ParameterSet, ParameterStep, PitchBend,
-    PolyPressure, PrimitiveMessage, ProgramChange, QuarterFrame, Rest, SongPosition, SongSelect,
-    Start, Stop, SysEx, SystemReset, TimingClock, TuneRequest,
+    ControlChange, ControllerFamily, Message, Note, NoteOff, NoteOn, ParameterSet, ParameterStep,
+    PitchBend, PolyPressure, PrimitiveMessage, ProgramChange, QuarterFrame, Rest, SongPosition,
+    SongSelect, Start, Stop, SysEx, SystemReset, TimingClock, TuneRequest,
 };
 pub use metrics::{Distribution, Histogram};
 pub use midi::{

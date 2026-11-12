@@ -1023,13 +1023,10 @@ impl From<crate::ump::PacketValue> for OutputValue {
 }
 macro_rules! midi1_values {($($name:ident),*)=>{$(impl From<messages::$name> for OutputValue {fn from(v:messages::$name)->Self {AnyMessage::$name(v).into()}})*};}
 midi1_values!(
-    RegisteredPerNoteController,
-    AssignablePerNoteController,
+    PerNoteController,
     PerNoteManagement,
-    RegisteredController,
-    AssignableController,
-    RelativeRegisteredController,
-    RelativeAssignableController,
+    ParameterController,
+    RelativeParameterController,
     PerNotePitchBend,
     NoteOn,
     NoteOff,
@@ -1506,7 +1503,7 @@ mod tests {
         ));
         f.output.connection = Some(Connection::Test(f.sink.clone()));
         f.output = f.output.with_channel(3).unwrap();
-        let per_note = messages::RegisteredPerNoteController::new(5, 7, 60, 3, 1234).unwrap();
+        let per_note = messages::PerNoteController::new(5, 7, 60, 3, 1234).unwrap();
         let command = messages::ControlChange::new_with_resolution(7, 10000, 14)
             .unwrap()
             .with_group(3)
