@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Python bindings for the meedee Rust MIDI toolkit"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = ["reccy>=0.2.0"]
+dependencies = ["pydantic>=2", "reccy>=0.2.0"]
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "third_party/libremidi/LICENSE.md"]
 classifiers = [
@@ -22,7 +22,6 @@ classifiers = [
 [project.optional-dependencies]
 ufor = ["ufor; python_version >= '3.13'"]
 cli = [
-    "pydantic>=2",
     "tyro>=1.0.16",
 ]
 

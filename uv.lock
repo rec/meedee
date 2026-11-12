@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.13"
 
 [options]
-exclude-newer = "2026-11-05T10:56:04.934683Z"
+exclude-newer = "2026-11-05T11:23:09.778177Z"
 exclude-newer-span = "P1W"
 
 [[package]]
@@ -91,12 +91,12 @@ wheels = [
 name = "meedee"
 source = { editable = "." }
 dependencies = [
+    { name = "pydantic" },
     { name = "reccy" },
 ]
 
 [package.optional-dependencies]
 cli = [
-    { name = "pydantic" },
     { name = "tyro" },
 ]
 ufor = [
@@ -114,7 +114,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pydantic", marker = "extra == 'cli'", specifier = ">=2" },
+    { name = "pydantic", specifier = ">=2" },
     { name = "reccy", git = "https://github.com/rec/reccy.git?branch=main" },
     { name = "tyro", marker = "extra == 'cli'", specifier = ">=1.0.16" },
     { name = "ufor", marker = "python_full_version >= '3.13' and extra == 'ufor'", git = "https://github.com/rec/ufor?branch=main" },
