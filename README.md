@@ -946,8 +946,8 @@ On Windows set `PYO3_PYTHON` to `.venv/Scripts/python.exe`. Native software-port
 checks in `test/manual/loopback.py` and `test/manual/windows.py` are explicit
 opt-ins and require target-host authorization. No unit test selects hardware.
 
-middi is MIT licensed. See [third-party notices](THIRD_PARTY_NOTICES.md) and
-[vendored provenance](third_party/libremidi/SOURCE.md). Publication is a separate
+middi is MIT licensed. See [third-party notices](crates/middi/THIRD_PARTY_NOTICES.md) and
+[vendored provenance](crates/middi/third_party/libremidi/SOURCE.md). Publication is a separate
 decision after the remaining qualification gates.
 ### Observed note activity
 

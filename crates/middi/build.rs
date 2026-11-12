@@ -4,7 +4,7 @@ use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=native");
-    println!("cargo:rerun-if-changed=../../third_party/libremidi");
+    println!("cargo:rerun-if-changed=third_party/libremidi");
     for name in [
         "CMAKE_TOOLCHAIN_FILE",
         "CMAKE_GENERATOR",
@@ -17,7 +17,7 @@ fn main() {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let target = env::var("TARGET").unwrap();
-    let vendor = manifest.join("../../third_party/libremidi").canonicalize()
+    let vendor = manifest.join("third_party/libremidi").canonicalize()
         .expect("build from the complete middi checkout or source distribution: vendored libremidi is missing");
     let mut configure = Command::new("cmake");
     configure

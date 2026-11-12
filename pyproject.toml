@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["pydantic>=2", "reccy>=0.2.0"]
 license = "MIT"
-license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "third_party/libremidi/LICENSE.md"]
+license-files = ["LICENSE", "crates/middi/THIRD_PARTY_NOTICES.md", "crates/middi/third_party/libremidi/LICENSE.md"]
 classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Rust",
@@ -59,7 +59,7 @@ cache-keys = [
     { file = "crates/**/*.rs" },
     { file = "crates/**/Cargo.toml" },
     { file = "crates/middi/native/**/*" },
-    { file = "third_party/libremidi/**/*" },
+    { file = "crates/middi/third_party/libremidi/**/*" },
     { file = "middi/*.py" },
     { file = "middi/*.pyi" },
     { file = "middi/py.typed" },

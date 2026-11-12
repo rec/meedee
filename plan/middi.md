@@ -50,7 +50,7 @@ now the owner's fork at `53a94516cc280fa63f6de12bfe279ba3c26d02b9`, including
 two separately committed CoreMIDI property fixes and checked input teardown
 for CoreMIDI and Windows, checked CoreMIDI output disposal and initialized
 WinMM output storage. Windows native qualification is still outstanding. See
-[source provenance](../third_party/libremidi/SOURCE.md). Backend integration
+[source provenance](../crates/middi/third_party/libremidi/SOURCE.md). Backend integration
 and cross-platform build qualification remain unfinished.
 
 libremidi provides MIDI 2.0 transport through CoreMIDI UMP, ALSA UMP, and
@@ -870,6 +870,6 @@ immutable message contract.
 - [ ] When all work here is finished, remind Tom to send the libremidi fork
   commits upstream for review, with their regression tests and validation
   limitations. Use the commit history recorded in
-  [source provenance](../third_party/libremidi/SOURCE.md). This reminder is for
+  [source provenance](../crates/middi/third_party/libremidi/SOURCE.md). This reminder is for
   project completion, not merely completion of slice 2. Do not submit the
   commits or contact upstream developers automatically.

@@ -141,9 +141,13 @@ def test_wheels_include_typed_api_and_matching_version_metadata() -> None:
             assert metadata["License-Expression"] == "MIT"
             assert any(n.endswith("/licenses/LICENSE") for n in names)
             assert any(
-                n.endswith("/licenses/third_party/libremidi/LICENSE.md") for n in names
+                n.endswith("/licenses/crates/middi/third_party/libremidi/LICENSE.md")
+                for n in names
             )
-            assert any(n.endswith("/licenses/THIRD_PARTY_NOTICES.md") for n in names)
+            assert any(
+                n.endswith("/licenses/crates/middi/THIRD_PARTY_NOTICES.md")
+                for n in names
+            )
             assert (
                 archive.read("middi/midi.pyi")
                 == (project / "middi" / "midi.pyi").read_bytes()
@@ -172,11 +176,12 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "test/qualification/access.py",
                 "test/native/coremidi_access.cpp",
                 "test/native/middi_reopen.py",
-                "third_party/libremidi/include/libremidi/backends/coremidi/notifications.hpp",
-                "third_party/libremidi/tests/unit/coremidi_keeper.cpp",
-                "third_party/libremidi/tests/unit/winmm_discovery.cpp",
+                "crates/middi/third_party/libremidi/include/libremidi/backends/coremidi/notifications.hpp",
+                "crates/middi/third_party/libremidi/tests/unit/coremidi_keeper.cpp",
+                "crates/middi/third_party/libremidi/tests/unit/winmm_discovery.cpp",
                 "LICENSE",
-                "THIRD_PARTY_NOTICES.md",
+                "crates/middi/LICENSE",
+                "crates/middi/THIRD_PARTY_NOTICES.md",
                 "middi/midi.pyi",
                 "middi/py.typed",
                 "middi/_clients.py",
@@ -364,8 +369,8 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "crates/middi/tests/coremidi-fixture/build.rs",
                 "crates/middi/tests/coremidi-fixture/src/lib.rs",
                 "crates/middi/tests/coremidi-fixture/coremidi.cpp",
-                "third_party/libremidi/include/libremidi/libremidi-c.cpp",
-                "third_party/libremidi/LICENSE.md",
+                "crates/middi/third_party/libremidi/include/libremidi/libremidi-c.cpp",
+                "crates/middi/third_party/libremidi/LICENSE.md",
                 "crates/middi/src/lib.rs",
                 "crates/middi/src/messages.rs",
                 "src/lifecycle.rs",

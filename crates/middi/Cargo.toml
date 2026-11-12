@@ -6,7 +6,7 @@ rust-version = "1.87"
 description = "Immutable MIDI values and native MIDI toolkit"
 repository = "https://github.com/rec/middi"
 license = "MIT"
-publish = false
+readme = "../../README.md"
 
 [lib]
 path = "src/lib.rs"

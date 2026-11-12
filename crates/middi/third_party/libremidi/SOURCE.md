@@ -137,7 +137,7 @@ not establish whole-backend safety or hardware I/O.
 Example focused build from the project root:
 
 ```sh
-cmake -S third_party/libremidi -B target/libremidi-properties -G Ninja \
+cmake -S crates/middi/third_party/libremidi -B target/libremidi-properties -G Ninja \
   -DLIBREMIDI_TESTS=ON -DLIBREMIDI_NO_BOOST=ON \
   -DLIBREMIDI_NO_JACK=ON -DLIBREMIDI_NO_PIPEWIRE=ON \
   -DLIBREMIDI_NO_NETWORK=ON -DLIBREMIDI_NO_KEYBOARD=ON \

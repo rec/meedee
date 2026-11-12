@@ -10,7 +10,7 @@ Vendored libremidi sources are pinned to fork revision
 MIT/BSD license texts are retained in third_party/libremidi/LICENSE.md.
 See third_party/libremidi/SOURCE.md for provenance and fork patches. The Rust
 transport statically links these sources. The complete upstream license text is
-included in binary distributions as licenses/third_party/libremidi/LICENSE.md.
+included in binary distributions as licenses/crates/middi/third_party/libremidi/LICENSE.md.
 The Python binding uses this same Rust transport. There is no midir backend.
 
 Linux loads the system `libasound.so.2` dynamically; current wheels do not bundle

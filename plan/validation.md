@@ -524,10 +524,10 @@ checked with long ASCII, multibyte text, embedded NUL, empty values and an inval
 UTF-16 surrogate. The tests create no MIDI clients or endpoints and query no devices.
 
 The fork's selected build sources and focused test sources are imported under
-`third_party/libremidi`, pinned to the second commit. Every imported file's raw
+`crates/middi/third_party/libremidi`, pinned to the second commit. Every imported file's raw
 Git blob hash matches that revision. The vendored copy independently builds and
 passes the focused target. Provenance, retained license texts and omissions are
-recorded in `third_party/libremidi/SOURCE.md`. The ASCII input-name conversion
+recorded in `crates/middi/third_party/libremidi/SOURCE.md`. The ASCII input-name conversion
 is deliberately unchanged; it was not one of the two requested fixes.
 
 This source import does not yet link libremidi into middi or remove midir.
