@@ -455,8 +455,9 @@ fn failed_discovery_returns_no_snapshot_and_allows_explicit_rediscovery() {
 fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {
     enable();
     for command in [
-        meedee::messages::AnyCommand::NrpnSet(
-            meedee::messages::NrpnSet::new(1234, 10000)
+        meedee::messages::AnyCommand::ParameterSet(
+            meedee::messages::ParameterSet::new(1234, 10000)
+                .and_then(|m| m.with_family(meedee::controls::ParameterFamily::Nrpn))
                 .and_then(|m| m.with_resolution(14))
                 .and_then(|m| m.with_channel(1))
                 .unwrap(),
@@ -532,7 +533,7 @@ fn simultaneous_raw_and_compound_sends_do_not_interleave_command_messages() {
             for _ in 0..50 {
                 loop {
                     match output.send_command(
-                        &meedee::messages::RpnSet::new(0, 128)
+                        &meedee::messages::ParameterSet::new(0, 128)
                             .and_then(|m| m.with_resolution(14))
                             .and_then(|m| m.with_channel(1))
                             .unwrap(),
@@ -562,7 +563,7 @@ fn simultaneous_raw_and_compound_sends_do_not_interleave_command_messages() {
         });
     });
     let expected: Vec<_> = meedee::codecs::expand(
-        &meedee::messages::RpnSet::new(0, 128)
+        &meedee::messages::ParameterSet::new(0, 128)
             .and_then(|m| m.with_resolution(14))
             .and_then(|m| m.with_channel(1))
             .unwrap(),

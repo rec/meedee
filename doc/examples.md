@@ -409,6 +409,14 @@ with md.Output() as out:
 
 ## Step an RPN or NRPN parameter
 
+```python
+import meedee as md
+
+with md.Output() as out:
+    out.send(md.ParameterSet(0, 2 << 7))  # Pitch-bend range: 2 semitones.
+    out.send(md.ParameterSet(1234, 10000, family="nrpn"))
+```
+
 Increment registered parameter 7 once, then decrement non-registered parameter 7
 once. Choose parameter numbers supported by your instrument.
 

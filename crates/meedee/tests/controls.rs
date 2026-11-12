@@ -44,6 +44,19 @@ fn controller_resolution_preserves_wire_values_and_rejects_incompatible_formats(
 
 #[test]
 fn commands_expand_to_independent_wire_vectors() {
+    let rpn = ParameterSet::new(1234, 90).unwrap();
+    assert_eq!(rpn.family(), ParameterFamily::Rpn);
+    assert_eq!(rpn.resolution(), 14);
+    assert_eq!(rpn.channel(), None);
+    let nrpn = rpn.clone().with_family(ParameterFamily::Nrpn).unwrap();
+    assert_ne!(rpn, nrpn);
+    let boundary = nrpn.with_parameter(16383).unwrap();
+    assert!(boundary.clone().with_family(ParameterFamily::Rpn).is_err());
+    assert!(boundary
+        .with_parameter(0)
+        .unwrap()
+        .with_family(ParameterFamily::Rpn)
+        .is_ok());
     for line in include_str!("fixtures/commands.txt").lines() {
         if line.starts_with('#') || line.is_empty() {
             continue;
@@ -56,6 +69,8 @@ fn commands_expand_to_independent_wire_vectors() {
             .iter()
             .take(if name == "ParameterStep" {
                 3
+            } else if name == "ParameterSet" {
+                4
             } else {
                 fields.len()
             })
@@ -67,14 +82,16 @@ fn commands_expand_to_independent_wire_vectors() {
                     .and_then(|m| m.with_channel(v[0]))
                     .unwrap(),
             ),
-            "RpnSet" => AnyCommand::RpnSet(
-                RpnSet::new(v[1], v[2])
-                    .and_then(|m| m.with_resolution(v[3]))
-                    .and_then(|m| m.with_channel(v[0]))
-                    .unwrap(),
-            ),
-            "NrpnSet" => AnyCommand::NrpnSet(
-                NrpnSet::new(v[1], v[2])
+            "ParameterSet" => AnyCommand::ParameterSet(
+                ParameterSet::new(0, v[2])
+                    .and_then(|m| {
+                        m.with_family(if fields[4] == "rpn" {
+                            ParameterFamily::Rpn
+                        } else {
+                            ParameterFamily::Nrpn
+                        })
+                    })
+                    .and_then(|m| m.with_parameter(v[1]))
                     .and_then(|m| m.with_resolution(v[3]))
                     .and_then(|m| m.with_channel(v[0]))
                     .unwrap(),
@@ -115,21 +132,24 @@ fn commands_expand_to_independent_wire_vectors() {
             "{line}"
         );
     }
-    assert!(RpnSet::new(16383, 0)
+    assert!(ParameterSet::new(16383, 0)
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(1))
         .is_err());
-    assert!(NrpnSet::new(16383, 127)
+    assert!(ParameterSet::new(0, 127)
+        .and_then(|m| m.with_family(ParameterFamily::Nrpn))
+        .and_then(|m| m.with_parameter(16383))
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(1))
         .is_ok());
     for resolution in [0, 8, 13, 15] {
-        assert!(RpnSet::new(0, 0)
+        assert!(ParameterSet::new(0, 0)
             .and_then(|m| m.with_resolution(resolution))
             .and_then(|m| m.with_channel(1))
             .is_err());
     }
-    assert!(NrpnSet::new(0, 128)
+    assert!(ParameterSet::new(0, 128)
+        .and_then(|m| m.with_family(meedee::controls::ParameterFamily::Nrpn))
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(1))
         .is_err());

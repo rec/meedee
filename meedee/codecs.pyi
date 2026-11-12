@@ -8,8 +8,7 @@ from .messages import Message
 def encode(message: Message) -> bytes: ...
 def expand(
     command: messages.ControlChange
-    | messages.RpnSet
-    | messages.NrpnSet
+    | messages.ParameterSet
     | messages.ParameterStep
     | gm.BankProgramSelect
     | mpe.ZoneConfiguration,

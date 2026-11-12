@@ -441,8 +441,7 @@ fn command_kind(value: &messages::AnyCommand) -> &'static str {
     use messages::AnyCommand::*;
     match value {
         ControlChange(_) => "ControlChange",
-        RpnSet(_) => "RpnSet",
-        NrpnSet(_) => "NrpnSet",
+        ParameterSet(_) => "ParameterSet",
         ParameterStep(_) => "ParameterStep",
         BankProgramSelect(_) => "BankProgramSelect",
         ZoneConfiguration(_) => "ZoneConfiguration",

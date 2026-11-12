@@ -91,7 +91,7 @@ def test_unassigned_messages_preserve_identity_until_resolved() -> None:
     with pytest.raises(ValueError, match="unassigned"):
         codecs.encode(note)
     assert codecs.encode(note.replace(channel=2)) == b"\x91\x3c\x5a"
-    command = messages.RpnSet(0, 256)
+    command = messages.ParameterSet(0, 256)
     assert command.resolution == 14 and command.channel is None
     with pytest.raises(ValueError, match="unassigned"):
         codecs.expand(command)

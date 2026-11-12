@@ -94,8 +94,8 @@ fn expanded_commands_retain_the_original_provenance() {
                 .with_channel(2)
                 .unwrap(),
         ),
-        AnyCommand::RpnSet(
-            meedee::messages::RpnSet::new(0, 1234)
+        AnyCommand::ParameterSet(
+            meedee::messages::ParameterSet::new(0, 1234)
                 .unwrap()
                 .with_channel(2)
                 .unwrap(),

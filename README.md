@@ -587,9 +587,9 @@ allocation, sustain, entry limits and sequence-lock behavior.
 ```python
 from meedee.codecs import expand
 from meedee.controls import ControlInterpreter
-from meedee.messages import NrpnSet
+from meedee.messages import ParameterSet
 
-command = NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+command = ParameterSet(1234, 10000, channel=1, family="nrpn")
 primitives = expand(command)
 interpreter = ControlInterpreter()  # One per independent input source.
 observations = [o for m in primitives for o in interpreter.feed(m)]
@@ -598,8 +598,9 @@ observations = [o for m in primitives for o in interpreter.feed(m)]
 ```
 
 `ControlChange(..., resolution=14)` emits a coarse/fine CC pair; the MIDI 1
-default is 7 bits, and MIDI 2 uses 32 bits. RPN/NRPN set commands require
-explicit 7-/14-bit resolution. Increment/decrement commands represent one
+default is 7 bits, and MIDI 2 uses 32 bits. `ParameterSet` selects RPN by default,
+or NRPN with `family="nrpn"`; resolution defaults to 14 and can be 7.
+Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN
 identifier. Use `out.send(...)` for messages, compound commands or encoded packets.

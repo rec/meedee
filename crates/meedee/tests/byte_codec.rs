@@ -218,7 +218,7 @@ fn defaults_require_channel_resolution_and_transposition_clamps() {
 
 #[test]
 fn commands_resolve_channels_before_expansion_and_builders_validate_ranges() {
-    let command = RpnSet::new(0, 128).unwrap();
+    let command = ParameterSet::new(0, 128).unwrap();
     assert_eq!(command.resolution(), 14);
     assert!(command.expand().is_err());
     assert!(command.clone().with_resolution(7).is_err());
@@ -236,7 +236,7 @@ fn commands_resolve_channels_before_expansion_and_builders_validate_ranges() {
         .flat_map(|m| m.encode().unwrap())
         .collect();
     assert_eq!(bytes, [0xb1, 0, 0, 0xb1, 32, 0, 0xc1, 33]);
-    assert!(RpnSet::new(0, 127)
+    assert!(ParameterSet::new(0, 127)
         .unwrap()
         .with_resolution(7)
         .unwrap()

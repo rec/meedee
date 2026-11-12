@@ -171,7 +171,7 @@ NoteOff(channel=1, note=60, velocity=64)
 ProgramChange(channel=1, program=1)
 ControlChange(channel=1, controller=7, value=100)
 ControlChange(channel=1, controller=7, value=10000, resolution=14)
-NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+ParameterSet(family="nrpn", channel=1, parameter=1234, value=10000, resolution=14)
 SysEx(data=...)
 ```
 

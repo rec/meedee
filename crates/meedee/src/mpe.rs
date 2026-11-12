@@ -1,6 +1,6 @@
 //! Pure MPE zone configuration, explicit allocation and bounded channel tracking.
 pub use crate::event_views::Mpe as Tracker;
-use crate::messages::{AnyMessage, Command, RpnSet, ValueError};
+use crate::messages::{AnyMessage, Command, ParameterSet, ValueError};
 
 #[derive(Clone, Debug)]
 pub struct ZoneConfiguration {
@@ -37,7 +37,7 @@ impl Command for ZoneConfiguration {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
         crate::messages::inherit_metadata(
             self,
-            RpnSet::new(6, self.members.into())
+            ParameterSet::new(6, self.members.into())
                 .and_then(|m| m.with_resolution(7))
                 .and_then(|m| m.with_channel(self.manager_channel.into()))
                 .expect("validated MPE configuration fields")

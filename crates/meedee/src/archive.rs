@@ -303,19 +303,11 @@ fn command(out: &mut Vec<u8>, c: &m::AnyCommand) -> io::Result<()> {
         ControlChange(_) => {
             return Err(invalid(0, "controller command requires 14-bit resolution"))
         }
-        RpnSet(v) => (
-            2,
-            vec![
-                v.channel()
-                    .ok_or_else(|| invalid(0, "message channel is unassigned"))?
-                    .into(),
-                v.parameter().into(),
-                v.value().into(),
-                v.resolution().into(),
-            ],
-        ),
-        NrpnSet(v) => (
-            3,
+        ParameterSet(v) => (
+            match v.family() {
+                crate::controls::ParameterFamily::Rpn => 2,
+                crate::controls::ParameterFamily::Nrpn => 3,
+            },
             vec![
                 v.channel()
                     .ok_or_else(|| invalid(0, "message channel is unassigned"))?
@@ -698,25 +690,21 @@ fn decode_command(b: &[u8]) -> io::Result<m::AnyCommand> {
                     .map_err(|e| invalid(0, e))?,
             )
         }
-        2 => {
+        2 | 3 => {
             let channel = f.i64()?;
             let parameter = f.i64()?;
             let value = f.i64()?;
             let resolution = f.i64()?;
-            RpnSet(
-                m::RpnSet::new(parameter, value)
-                    .and_then(|m| m.with_resolution(resolution))
-                    .and_then(|m| m.with_channel(channel))
-                    .map_err(|e| invalid(0, e))?,
-            )
-        }
-        3 => {
-            let channel = f.i64()?;
-            let parameter = f.i64()?;
-            let value = f.i64()?;
-            let resolution = f.i64()?;
-            NrpnSet(
-                m::NrpnSet::new(parameter, value)
+            ParameterSet(
+                m::ParameterSet::new(0, value)
+                    .and_then(|m| {
+                        m.with_family(if id == 2 {
+                            crate::controls::ParameterFamily::Rpn
+                        } else {
+                            crate::controls::ParameterFamily::Nrpn
+                        })
+                    })
+                    .and_then(|m| m.with_parameter(parameter))
                     .and_then(|m| m.with_resolution(resolution))
                     .and_then(|m| m.with_channel(channel))
                     .map_err(|e| invalid(0, e))?,

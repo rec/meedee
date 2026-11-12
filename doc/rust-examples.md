@@ -236,11 +236,11 @@ queue and SysEx limits; `with_transport` configures backend admission separately
 
 ```rust
 use meedee::midi::Output;
-use meedee::messages::{NoteOn, RpnSet};
+use meedee::messages::{NoteOn, ParameterSet};
 use std::time::Duration;
 
 let mut out = Output::new();
-out.send(RpnSet::new(0, 2 << 7)?)?; // Pitch-bend sensitivity: two semitones.
+out.send(ParameterSet::new(0, 2 << 7)?)?; // Pitch-bend sensitivity: two semitones.
 out.send([
     meedee::midi::OutputValue::from(NoteOn::new(60)?),
     Duration::from_millis(300).into(),
@@ -618,6 +618,15 @@ out.close()?;
 ```
 
 ## Step an RPN or NRPN parameter
+
+```rust
+use meedee::{Output, ParameterFamily, ParameterSet};
+
+let mut out = Output::new();
+out.send(ParameterSet::new(0, 2 << 7)?)?; // Pitch-bend range: 2 semitones.
+out.send(ParameterSet::new(1234, 10000)?.with_family(ParameterFamily::Nrpn)?)?;
+out.close()?;
+```
 
 Use the same single-step command with typed family and direction builders:
 

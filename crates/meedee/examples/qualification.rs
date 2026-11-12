@@ -1,6 +1,6 @@
 //! Device-free, fixed-size release-build measurements. No timing assertions.
 use meedee::codecs::{self, DecodeItem, Decoder};
-use meedee::messages::{Command, ControlChange, NrpnSet, PrimitiveMessage, SysEx};
+use meedee::messages::{Command, ControlChange, ParameterSet, PrimitiveMessage, SysEx};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -25,7 +25,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         assert!(values.iter().all(|v| matches!(v, DecodeItem::Message(_))));
         black_box(values);
     });
-    let command = NrpnSet::new(1234, 12345)
+    let command = ParameterSet::new(1234, 12345)
+        .and_then(|m| m.with_family(meedee::controls::ParameterFamily::Nrpn))
         .and_then(|m| m.with_resolution(14))
         .and_then(|m| m.with_channel(1))?;
     measure("rust_nrpn_expand_encode", 2048, || {

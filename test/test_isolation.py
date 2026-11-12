@@ -670,7 +670,9 @@ def test_compound_failure_preserves_progress_through_the_worker_pipe(
 ) -> None:
     source = output_client(f"partial_command_{accepted}")
     connection = source.connect(source.ports()[0])
-    command = messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+    command = messages.ParameterSet(
+        family="nrpn", channel=1, parameter=1234, value=10000, resolution=14
+    )
     with pytest.raises(midi.CompoundSendError, match="device disconnected") as error:
         connection.send(command)
     assert isinstance(error.value, midi.SendError)
@@ -706,7 +708,9 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     with pytest.raises(TypeError):
         connection.send(object())  # ty: ignore[invalid-argument-type]
     connection.send(
-        messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+        messages.ParameterSet(
+            family="nrpn", channel=1, parameter=1234, value=10000, resolution=14
+        )
     )
     connection.close()
     assert source.worker_failure is None

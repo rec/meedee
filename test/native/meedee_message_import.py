@@ -91,8 +91,12 @@ def main() -> None:
         assert (
             len(
                 codecs.expand(
-                    messages.NrpnSet(
-                        channel=1, parameter=1234, value=10000, resolution=14
+                    messages.ParameterSet(
+                        family="nrpn",
+                        channel=1,
+                        parameter=1234,
+                        value=10000,
+                        resolution=14,
                     )
                 )
             )

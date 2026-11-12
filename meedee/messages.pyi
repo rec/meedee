@@ -425,13 +425,15 @@ class SystemReset(Message):
         span: events.SourceSpan | None = ...,
     ) -> SystemReset: ...
 
-class RpnSet(Message):
+class ParameterSet(Message):
     def __init__(
         self,
         parameter: int,
         value: int,
         resolution: int = 14,
         channel: int | None = None,
+        *,
+        family: Literal["rpn", "nrpn"] = "rpn",
     ) -> None: ...
     @property
     def channel(self) -> int | None: ...
@@ -441,6 +443,8 @@ class RpnSet(Message):
     def value(self) -> int: ...
     @property
     def resolution(self) -> int: ...
+    @property
+    def family(self) -> Literal["rpn", "nrpn"]: ...
     def replace(
         self,
         *,
@@ -448,38 +452,11 @@ class RpnSet(Message):
         parameter: int = ...,
         value: int = ...,
         resolution: int = ...,
+        family: Literal["rpn", "nrpn"] = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
-    ) -> RpnSet: ...
-
-class NrpnSet(Message):
-    def __init__(
-        self,
-        parameter: int,
-        value: int,
-        resolution: int = 14,
-        channel: int | None = None,
-    ) -> None: ...
-    @property
-    def channel(self) -> int | None: ...
-    @property
-    def parameter(self) -> int: ...
-    @property
-    def value(self) -> int: ...
-    @property
-    def resolution(self) -> int: ...
-    def replace(
-        self,
-        *,
-        channel: int | None = ...,
-        parameter: int = ...,
-        value: int = ...,
-        resolution: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> NrpnSet: ...
+    ) -> ParameterSet: ...
 
 class ParameterStep(Message):
     def __init__(

@@ -147,7 +147,7 @@ def test_file_only_packets_and_commands_are_not_implicitly_sent() -> None:
     router = routing.Router(routes=[route()])
     with pytest.raises(ValueError, match="expanded"):
         router.feed(
-            event(messages.RpnSet(channel=1, parameter=0, value=2, resolution=7))
+            event(messages.ParameterSet(channel=1, parameter=0, value=2, resolution=7))
         )
 
 

@@ -184,51 +184,89 @@ pub trait Command: Message {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError>;
 }
 
-macro_rules! channel_messages {
-    ($($name:ident ($($arg:ident),*) { $($field:ident: $ty:ty => $setter:ident = $low:literal ..= $high:literal => $initial:expr),* };)*) => {
-        $(
-            #[derive(Clone, Debug)]
-            pub struct $name { metadata: Option<Box<Metadata>>, channel: Option<u8>, $($field: $ty),* }
-            value_metadata!($name { channel, $($field),* });
-            impl $name {
-                pub fn new($($arg: i64),*) -> Result<Self, ValueError> {
-                    let result = Self { metadata: None, channel: None, $($field: bounded($initial, stringify!($field), $low, $high)? as $ty),* };
-                    check_parameter!($name, result)?;
-                    Ok(result)
-                }
-                pub fn channel(&self) -> Option<u8> { self.channel }
-                pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
-                    self.channel = Some(bounded(channel, "channel", 1, 16)? as u8);
-                    Ok(self)
-                }
-                pub fn without_channel(mut self) -> Self { self.channel = None; self }
-                pub(crate) fn resolved_channel(&self) -> Result<u8, ValueError> {
-                    self.channel.ok_or_else(|| ValueError("message channel is unassigned".into()))
-                }
-                $(pub fn $field(&self) -> $ty { self.$field }
-                pub fn $setter(mut self, value: i64) -> Result<Self, ValueError> {
-                    self.$field = bounded(value, stringify!($field), $low, $high)? as $ty;
-                    check_parameter!($name, self)?;
-                    Ok(self)
-                })*
-            }
-        )*
-    };
+/// An absolute registered or non-registered parameter value.
+#[derive(Clone, Debug)]
+pub struct ParameterSet {
+    metadata: Option<Box<Metadata>>,
+    channel: Option<u8>,
+    parameter: u16,
+    value: u16,
+    resolution: u8,
+    family: crate::controls::ParameterFamily,
 }
-macro_rules! check_parameter {
-    (RpnSet, $value:expr) => {
-        validate_resolution($value.value.into(), $value.resolution.into())
-    };
-    (NrpnSet, $value:expr) => {
-        validate_resolution($value.value.into(), $value.resolution.into())
-    };
-    ($name:ident, $value:expr) => {
-        Ok::<(), ValueError>(())
-    };
-}
-channel_messages! {
-    RpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16382 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
-    NrpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16383 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
+value_metadata!(ParameterSet {
+    channel,
+    parameter,
+    value,
+    resolution,
+    family
+});
+impl ParameterSet {
+    pub fn new(parameter: i64, value: i64) -> Result<Self, ValueError> {
+        validate_resolution(value, 14)?;
+        Ok(Self {
+            metadata: None,
+            channel: None,
+            parameter: bounded(parameter, "parameter", 0, 16382)? as u16,
+            value: value as u16,
+            resolution: 14,
+            family: crate::controls::ParameterFamily::Rpn,
+        })
+    }
+    pub fn parameter(&self) -> u16 {
+        self.parameter
+    }
+    pub fn value(&self) -> u16 {
+        self.value
+    }
+    pub fn resolution(&self) -> u8 {
+        self.resolution
+    }
+    pub fn family(&self) -> crate::controls::ParameterFamily {
+        self.family
+    }
+    pub fn channel(&self) -> Option<u8> {
+        self.channel
+    }
+    pub fn with_parameter(mut self, parameter: i64) -> Result<Self, ValueError> {
+        let maximum = if self.family == crate::controls::ParameterFamily::Rpn {
+            16382
+        } else {
+            16383
+        };
+        self.parameter = bounded(parameter, "parameter", 0, maximum)? as u16;
+        Ok(self)
+    }
+    pub fn with_value(mut self, value: i64) -> Result<Self, ValueError> {
+        validate_resolution(value, self.resolution.into())?;
+        self.value = value as u16;
+        Ok(self)
+    }
+    pub fn with_resolution(mut self, resolution: i64) -> Result<Self, ValueError> {
+        validate_resolution(self.value.into(), resolution)?;
+        self.resolution = resolution as u8;
+        Ok(self)
+    }
+    pub fn with_family(
+        mut self,
+        family: crate::controls::ParameterFamily,
+    ) -> Result<Self, ValueError> {
+        self.family = family;
+        let parameter = self.parameter;
+        self.with_parameter(parameter.into())
+    }
+    pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
+        self.channel = Some(bounded(channel, "channel", 1, 16)? as u8);
+        Ok(self)
+    }
+    pub fn without_channel(mut self) -> Self {
+        self.channel = None;
+        self
+    }
+    pub(crate) fn resolved_channel(&self) -> Result<u8, ValueError> {
+        self.channel
+            .ok_or_else(|| ValueError("message channel is unassigned".into()))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -662,16 +700,14 @@ crate::messages::value_metadata!(SysEx { data });
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AnyCommand {
     ControlChange(ControlChange),
-    RpnSet(RpnSet),
-    NrpnSet(NrpnSet),
+    ParameterSet(ParameterSet),
     ParameterStep(ParameterStep),
     BankProgramSelect(crate::gm::BankProgramSelect),
     ZoneConfiguration(crate::mpe::ZoneConfiguration),
 }
 enum_metadata!(AnyCommand {
     ControlChange,
-    RpnSet,
-    NrpnSet,
+    ParameterSet,
     ParameterStep,
     BankProgramSelect,
     ZoneConfiguration

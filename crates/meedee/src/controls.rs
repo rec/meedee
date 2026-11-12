@@ -358,55 +358,55 @@ pub fn pitch_bend_sensitivity(
     channel: i64,
     semitones: i64,
     cents: i64,
-) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+) -> Result<crate::messages::ParameterSet, crate::messages::ValueError> {
     if !(0..=127).contains(&semitones) || !(0..=127).contains(&cents) {
         return Err(crate::messages::ValueError(
             "semitones and cents must be seven-bit values".into(),
         ));
     }
-    crate::messages::RpnSet::new(0, semitones * 128 + cents)
+    crate::messages::ParameterSet::new(0, semitones * 128 + cents)
         .and_then(|m| m.with_resolution(14))
         .and_then(|m| m.with_channel(channel))
 }
 pub fn channel_fine_tuning(
     channel: i64,
     value: i64,
-) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+) -> Result<crate::messages::ParameterSet, crate::messages::ValueError> {
     if !(-8192..=8191).contains(&value) {
         return Err(crate::messages::ValueError(
             "value must be in -8192..=8191".into(),
         ));
     }
-    crate::messages::RpnSet::new(1, value + 8192)
+    crate::messages::ParameterSet::new(1, value + 8192)
         .and_then(|m| m.with_resolution(14))
         .and_then(|m| m.with_channel(channel))
 }
 pub fn channel_coarse_tuning(
     channel: i64,
     semitones: i64,
-) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
+) -> Result<crate::messages::ParameterSet, crate::messages::ValueError> {
     if !(-64..=63).contains(&semitones) {
         return Err(crate::messages::ValueError(
             "semitones must be in -64..=63".into(),
         ));
     }
-    crate::messages::RpnSet::new(2, semitones + 64)
+    crate::messages::ParameterSet::new(2, semitones + 64)
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(channel))
 }
 pub fn tuning_program(
     channel: i64,
     program: i64,
-) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
-    crate::messages::RpnSet::new(3, program)
+) -> Result<crate::messages::ParameterSet, crate::messages::ValueError> {
+    crate::messages::ParameterSet::new(3, program)
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(channel))
 }
 pub fn tuning_bank(
     channel: i64,
     bank: i64,
-) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
-    crate::messages::RpnSet::new(4, bank)
+) -> Result<crate::messages::ParameterSet, crate::messages::ValueError> {
+    crate::messages::ParameterSet::new(4, bank)
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(channel))
 }
@@ -415,8 +415,8 @@ pub fn tuning_bank(
 pub fn modulation_depth_range(
     channel: i64,
     value: i64,
-) -> Result<crate::messages::RpnSet, crate::messages::ValueError> {
-    crate::messages::RpnSet::new(5, value)
+) -> Result<crate::messages::ParameterSet, crate::messages::ValueError> {
+    crate::messages::ParameterSet::new(5, value)
         .and_then(|m| m.with_resolution(14))
         .and_then(|m| m.with_channel(channel))
 }

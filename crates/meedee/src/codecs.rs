@@ -403,34 +403,36 @@ impl Command for ControlChange {
     }
 }
 
-macro_rules! parameter_commands {
-    ($($set:ident => $selector:literal),* $(,)?) => {
-        $(impl Command for $set {
-            fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-                let data = if self.resolution() == 7 {
-                    vec![(6, self.value() as u8)]
-                } else {
-                    vec![(6, (self.value() >> 7) as u8), (38, (self.value() & 127) as u8)]
-                };
-                inherit_metadata(self, parameter_command(self.resolved_channel()?, self.parameter(), $selector, &data))
-            }
-        })*
-        impl Command for AnyCommand {
-            fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-                match self {
-                    Self::ControlChange(command) => command.expand(),
-                    Self::BankProgramSelect(command) => command.expand(),
-                    Self::ZoneConfiguration(command) => command.expand(),
-                    $(Self::$set(command) => command.expand(),)*
-                    Self::ParameterStep(command) => command.expand(),
-                }
-            }
-        }
-    };
+impl Command for ParameterSet {
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        let data = if self.resolution() == 7 {
+            vec![(6, self.value() as u8)]
+        } else {
+            vec![
+                (6, (self.value() >> 7) as u8),
+                (38, (self.value() & 127) as u8),
+            ]
+        };
+        let selector = match self.family() {
+            crate::controls::ParameterFamily::Rpn => 101,
+            crate::controls::ParameterFamily::Nrpn => 99,
+        };
+        inherit_metadata(
+            self,
+            parameter_command(self.resolved_channel()?, self.parameter(), selector, &data),
+        )
+    }
 }
-
-parameter_commands! {
-    RpnSet => 101, NrpnSet => 99,
+impl Command for AnyCommand {
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        match self {
+            Self::ControlChange(command) => command.expand(),
+            Self::ParameterSet(command) => command.expand(),
+            Self::ParameterStep(command) => command.expand(),
+            Self::BankProgramSelect(command) => command.expand(),
+            Self::ZoneConfiguration(command) => command.expand(),
+        }
+    }
 }
 
 impl Command for ParameterStep {

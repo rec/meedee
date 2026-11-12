@@ -78,20 +78,10 @@ def command_vectors() -> Iterator[tuple[object, bytes]]:
                 bytes.fromhex(wire),
             )
             continue
+        channel, parameter, value, resolution, family = values
         yield (
             constructor(
-                **dict(
-                    zip(
-                        ["channel"]
-                        + [
-                            n
-                            for n in inspect.signature(constructor).parameters
-                            if n != "channel"
-                        ],
-                        (int(v) for v in values),
-                        strict=True,
-                    )
-                )
+                int(parameter), int(value), int(resolution), int(channel), family=family
             ),
             bytes.fromhex(wire),
         )
@@ -121,36 +111,65 @@ def test_commands_are_frozen_positional_values_with_checked_replacement() -> Non
         assert constructor.__module__ == "meedee.messages"
         assert not hasattr(c, "__dict__")
         values = {k: getattr(c, k) for k in fields}
-        rendered = ", ".join(f"{k}={v}" for k, v in values.items())
+        rendered = ", ".join(f"{k}={v!r}" for k, v in values.items())
         assert repr(c) == f"{constructor.__name__}({rendered})"
         assert c == c.replace()
         assert hash(c) == hash(c.replace())
         with pytest.raises(TypeError):
             c.replace(unknown=1)
-        assert constructor(*values.values()) == c
+        assert (
+            constructor(
+                *(values[k] for k in constructor.__match_args__), family=c.family
+            )
+            == c
+        )
         for f in fields:
-            assert fields[f] == (int | None if f == "channel" else int)
-            assert (
-                inspect.signature(constructor).parameters[f].kind
-                == inspect.Parameter.POSITIONAL_OR_KEYWORD
+            assert fields[f] == (
+                str if f == "family" else int | None if f == "channel" else int
+            )
+            assert inspect.signature(constructor).parameters[f].kind == (
+                inspect.Parameter.KEYWORD_ONLY
+                if f == "family"
+                else inspect.Parameter.POSITIONAL_OR_KEYWORD
             )
             with pytest.raises(AttributeError):
                 setattr(c, f, 1)
             for v in (True, 1.0, "1", None):
                 if f == "channel" and v is None:
                     continue
-                with pytest.raises(TypeError):
+                error = (
+                    ValueError if f == "family" and isinstance(v, str) else TypeError
+                )
+                with pytest.raises(error):
                     constructor(**(values | {f: v}))
-                with pytest.raises(TypeError):
+                with pytest.raises(error):
                     c.replace(**{f: v})
-    command = messages.NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
+    command = messages.ParameterSet(
+        family="nrpn", channel=1, parameter=1234, value=10000, resolution=14
+    )
+    registered = command.replace(family="rpn")
+    assert registered == messages.ParameterSet(1234, 10000, channel=1)
+    assert len({command, registered}) == 2
+    stamp = events.Timestamp(ticks=3, clock=events.Clock(identity="parameter"))
+    marked = command.replace(timestamp=stamp, stream="knob")
+    assert marked.replace(family="rpn").timestamp == stamp
+    assert marked.replace(value=10).stream == "knob"
+    assert all(
+        p.timestamp == stamp and p.stream == "knob" for p in codecs.expand(marked)
+    )
+    boundary = command.replace(parameter=16383)
+    with pytest.raises(ValueError):
+        boundary.replace(family="rpn")
+    assert boundary.replace(parameter=0, family="rpn").parameter == 0
+    with pytest.raises(ValueError, match="family"):
+        command.replace(family="other")  # ty: ignore[invalid-argument-type]
     assert command.replace(value=10001).value == 10001
     assert command.value == 10000
     with pytest.raises(ValueError):
         command.replace(resolution=7)
     assert command.replace(resolution=7, value=127).value == 127
     match command:
-        case messages.NrpnSet(1234, 10000, 14, 1):
+        case messages.ParameterSet(1234, 10000, 14, 1, family="nrpn"):
             pass
         case _:
             pytest.fail("command pattern did not match")
@@ -170,23 +189,35 @@ def test_command_ranges_and_null_parameter_are_explicit() -> None:
     for value in (-1, 16384):
         with pytest.raises(ValueError):
             messages.ControlChange(resolution=14, channel=1, controller=0, value=value)
-    for name in ("RpnSet", "NrpnSet"):
-        constructor = getattr(messages, name)
+    for family in ("rpn", "nrpn"):
         for resolution in (0, 8, 13, 15):
             with pytest.raises(ValueError):
-                constructor(channel=1, parameter=0, value=0, resolution=resolution)
+                messages.ParameterSet(
+                    channel=1,
+                    parameter=0,
+                    value=0,
+                    resolution=resolution,
+                    family=family,
+                )
         with pytest.raises(ValueError):
-            constructor(channel=1, parameter=0, value=128, resolution=7)
-        assert constructor(channel=1, parameter=0, value=0).resolution == 14
-    for name in ("RpnSet", "ParameterStep"):
+            messages.ParameterSet(
+                channel=1, parameter=0, value=128, resolution=7, family=family
+            )
+        assert (
+            messages.ParameterSet(
+                channel=1, parameter=0, value=0, family=family
+            ).resolution
+            == 14
+        )
+    for name in ("ParameterSet", "ParameterStep"):
         fields = {"channel": 1, "parameter": 16383}
-        if name == "RpnSet":
+        if name == "ParameterSet":
             fields |= {"value": 0, "resolution": 7}
         with pytest.raises(ValueError):
             getattr(messages, name)(**fields)
     assert (
-        messages.NrpnSet(
-            channel=16, parameter=16383, value=16383, resolution=14
+        messages.ParameterSet(
+            family="nrpn", channel=16, parameter=16383, value=16383, resolution=14
         ).parameter
         == 16383
     )
@@ -431,7 +462,9 @@ def test_resets_invalidate_channel_source_and_parameter_state() -> None:
     assert one.reset() is None
     assert isinstance(one.feed(fine)[0].value, controls.Diagnostic)
     for command in codecs.expand(
-        messages.NrpnSet(channel=1, parameter=0, value=1, resolution=14)
+        messages.ParameterSet(
+            family="nrpn", channel=1, parameter=0, value=1, resolution=14
+        )
     )[:2]:
         one.feed(command)
     one.reset()

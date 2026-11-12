@@ -89,7 +89,9 @@ def test_byte_codecs() -> None:
         assert all(isinstance(v, messages.ControlChange) for v in values)
 
     measure("python_cc_decode", 2048, controls)
-    command = messages.NrpnSet(channel=1, parameter=1234, value=12345, resolution=14)
+    command = messages.ParameterSet(
+        family="nrpn", channel=1, parameter=1234, value=12345, resolution=14
+    )
 
     def nrpn() -> None:
         for _ in range(2048):

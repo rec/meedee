@@ -679,8 +679,7 @@ class Output(_Client, frozen=True):
                         messages.ProgramChange,
                         messages.ChannelPressure,
                         messages.PitchBend,
-                        messages.RpnSet,
-                        messages.NrpnSet,
+                        messages.ParameterSet,
                         messages.ParameterStep,
                     ),
                 ) and (self.channel is not None or v.channel is None):

@@ -239,12 +239,14 @@ provided by slice 4 below and tuning by slice 5; GM profiles and files retain la
 
 Frozen controller and command subclasses are provided in `meedee.messages`:
 ControlChange(controller, value, channel=None, *, version=1, group=None,
-resolution=None), RpnSet/NrpnSet(parameter,
-value, resolution=14, channel=None), and ParameterStep(parameter, direction=1,
+resolution=None), ParameterSet(parameter,
+value, resolution=14, channel=None, *, family="rpn"), and ParameterStep(parameter, direction=1,
 channel=None, *, family="rpn"). Direction is exactly -1 or 1; family is "rpn"
 or "nrpn". Rust uses `ParameterStep::new(parameter)` with `with_family` and
 `with_direction` builders taking the existing controls enums. The default is an
-RPN increment. Builders validate each result: select NRPN before setting parameter
+RPN increment. Rust `ParameterSet::new(parameter, value)` also defaults to RPN
+and resolution 14, with `with_family`, `with_resolution` and `with_channel` builders.
+Builders validate each result: select NRPN before setting parameter
 16383. The separate `controls.ParameterStep` represents incoming observations.
 Payload integer fields are positional strict integers, with an optional trailing channel and checked
 replacement, annotations and class patterns as for primitive messages.
@@ -556,7 +558,7 @@ avoid overlapping identical requests, and retain the raw input and checksum
 status when that matters. A reply is a dump, not acknowledgment that a preceding
 retuning succeeded. Physical tuning and device support are not established by
 these pure-codec tests. RPN fine/coarse tuning, MIDI 2.0 pitch and MPE remain
-separate mechanisms; existing RpnSet can explicitly select MTS tuning programs
+separate mechanisms; existing ParameterSet can explicitly select MTS tuning programs
 and banks without adding an automatic selection operation here.
 
 ### Slice 6 GM and selected profiles, approved 2026-10-15
@@ -630,7 +632,7 @@ specifically uses one. These helpers do not emulate a synthesizer's controller
 response. All Notes Off differs from immediate All Sound Off and can leave
 sustained/releasing sound.
 
-Named RPN factories return the existing RpnSet, using fresh selectors and the
+Named RPN factories return the existing ParameterSet, using fresh selectors and the
 existing RPN-null release. `pitch_bend_sensitivity(channel, semitones, cents)`
 keeps both seven-bit fields exactly, without carry/normalization;
 `channel_fine_tuning(channel, value)` is signed -8192–8191 in 100/8192-cent units;

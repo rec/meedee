@@ -130,74 +130,6 @@ impl SysEx {
     }
 }
 
-macro_rules! channel_value {
-    (RpnSet, $parameter:expr, $value:expr, $resolution:expr) => { messages::RpnSet::new($parameter,$value).and_then(|m| m.with_resolution($resolution)) };
-    (NrpnSet, $parameter:expr, $value:expr, $resolution:expr) => { messages::NrpnSet::new($parameter,$value).and_then(|m| m.with_resolution($resolution)) };
-    ($name:ident, $($field:expr),*) => { messages::$name::new($($field),*) };
-}
-macro_rules! wire_field {
-    ($value:ident, channel) => {
-        i64::from($value.channel().expect("resolved command channel"))
-    };
-    ($value:ident, $field:ident) => {
-        i64::from($value.$field())
-    };
-}
-
-macro_rules! channel_message {
-    ($name:ident $signature:tt { $($field:ident),* } $(; $($method:item)*)?) => {
-        #[pyclass(frozen, extends = Message, module = "meedee.messages")]
-        struct $name { value: messages::$name }
-        impl $name {
-            fn from_value(value: messages::$name) -> Self { Self { value } }
-            fn resolved(&self) -> PyResult<&messages::$name> {
-                if self.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
-                Ok(&self.value)
-            }
-        }
-        #[pymethods]
-        impl $name {
-            $($($method)*)?
-            #[new]
-            #[pyo3(signature = $signature)]
-            fn new($(#[pyo3(from_py_with=strict_integer)] $field: i64,)* channel: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
-                let channel = channel.map(|v| integer(v, "channel")).transpose()?;
-                Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
-                    value: {
-                        let value = channel_value!($name, $($field),*).map_err(value_error)?;
-                        if let Some(channel) = channel { value.with_channel(channel).map_err(value_error)? } else { value }
-                    },
-                }))
-            }
-            #[getter]
-            fn channel(&self) -> Option<i64> { self.value.channel().map(i64::from) }
-            $(#[getter] fn $field(&self) -> i64 { i64::from(self.value.$field()) })*
-            fn __repr__(&self) -> String {
-                let fields = vec![$(format!("{}={}", stringify!($field), self.value.$field())),*];
-                format!("{}({}, channel={})", stringify!($name), fields.join(", "), self.channel().map_or_else(|| "None".into(), |v| v.to_string()))
-            }
-            fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
-                other.extract::<PyRef<'_, Self>>().is_ok_and(|v| self.value == v.value)
-            }
-            fn __hash__(&self) -> u64 { value_hash(&self.value) }
-            #[pyo3(signature=(**changes))]
-            fn replace<'py>(slf: PyRef<'py, Self>, changes: Option<&Bound<'py, PyDict>>) -> PyResult<Bound<'py, PyAny>> {
-        let py = slf.py();
-        crate::tuning::replacement(slf.into_pyobject(py)?.as_any(), &["channel", $(stringify!($field)),*], changes)
-    }
-            #[classattr]
-            fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-                let annotations = PyDict::new(py);
-                $(annotations.set_item(stringify!($field), py.get_type::<PyInt>())?;)*
-                annotations.set_item("channel", py.import("typing")?.getattr("Optional")?.get_item(py.get_type::<PyInt>())?)?;
-                Ok(annotations)
-            }
-            #[classattr]
-            fn __match_args__(py: Python<'_>) -> PyResult<Bound<'_, PyTuple>> { PyTuple::new(py, [$(stringify!($field),)* "channel"]) }
-        }
-    };
-}
-
 macro_rules! versioned_message {
     ($name:ident $signature:tt { $($required:ident),* } { $($optional:ident => $setter:ident),* } { $($extra:ident => $extra_setter:ident),* } $(; $($method:item)*)?) => {
         #[pyclass(frozen, extends=Message, module="meedee.messages")]
@@ -476,10 +408,6 @@ macro_rules! message_classes {
     (ProgramChange $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
     (ChannelPressure $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
     (PitchBend $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
-    ($name:ident $signature:tt { channel, $($field:ident),* }; $($rest:tt)*) => {
-        channel_message! { $name $signature { $($field),* } }
-        message_classes! { $($rest)* }
-    };
     ($name:ident $signature:tt { $($field:ident),* }; $($rest:tt)*) => {
             #[pyclass(frozen, extends = Message, module = "meedee.messages")]
             struct $name { value: messages::$name }
@@ -592,64 +520,184 @@ short_messages! {
     SystemReset () {};
 }
 
-macro_rules! command_messages {
-    ($($name:ident $signature:tt { $($field:ident),* };)*) => {
-        message_classes! { $($name $signature { $($field),* };)* }
-
-        fn register_commands(module: &Bound<'_, PyModule>) -> PyResult<()> {
-            module.add_class::<ParameterStep>()?;
-            $(module.add_class::<$name>()?;)*
-            Ok(())
+fn register_commands(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<ParameterSet>()?;
+    module.add_class::<ParameterStep>()
+}
+pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
+    macro_rules! extract { ($($name:ident),*) => { $(
+        if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
+            if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
+            return Ok(messages::AnyCommand::$name(command.value.clone()));
         }
-        pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
-            if let Ok(command) = command.extract::<PyRef<'_, ControlChange>>() {
-                if command.value.version() != 1 { return Err(PyTypeError::new_err("MIDI 2 controller values require UMP encoding")); }
-                if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
-                return Ok(messages::AnyCommand::ControlChange(command.value.clone()));
-            }
-            if let Ok(command) = command.extract::<PyRef<'_, ParameterStep>>() {
-                if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
-                return Ok(messages::AnyCommand::ParameterStep(command.value.clone()));
-            }
-            $(if let Ok(command) = command.extract::<PyRef<'_, $name>>() {
-                return Ok(messages::AnyCommand::$name(command.resolved()?.clone()));
-            })*
-            crate::profiles::extract_command(command)?
-                .ok_or_else(|| PyTypeError::new_err("command must be a supported compound command"))
+    )* }; }
+    if let Ok(command) = command.extract::<PyRef<'_, ControlChange>>() {
+        if command.value.version() != 1 {
+            return Err(PyTypeError::new_err(
+                "MIDI 2 controller values require UMP encoding",
+            ));
         }
-        pub fn command_wire(py: Python<'_>, command: &messages::AnyCommand) -> PyResult<(String, Py<PyDict>)> {
-            let kwargs = PyDict::new(py);
-            if let messages::AnyCommand::ControlChange(value) = command {
-                kwargs.set_item("controller", value.controller())?;
-                kwargs.set_item("value", value.value())?;
-                kwargs.set_item("channel", value.channel())?;
-                kwargs.set_item("version", value.version())?;
-                kwargs.set_item("group", value.group())?;
-                kwargs.set_item("resolution", value.resolution())?;
-                return Ok(("ControlChange".into(), kwargs.unbind()));
-            }
-            if let messages::AnyCommand::ParameterStep(value) = command {
-                let value = ParameterStep { value: value.clone() };
-                kwargs.set_item("parameter", value.parameter())?;
-                kwargs.set_item("direction", value.direction())?;
-                kwargs.set_item("channel", value.channel())?;
-                kwargs.set_item("family", value.family())?;
-                return Ok(("ParameterStep".into(), kwargs.unbind()));
-            }
-            let (name, fields): (String, std::collections::HashMap<String, i64>) = match command {
-                $(messages::AnyCommand::$name(value) => (stringify!($name).into(),
-                    [$( (stringify!($field).into(), wire_field!(value, $field)) ),*].into_iter().collect()),)*
-                _ => crate::profiles::command_wire(command),
+        if command.value.channel().is_none() {
+            return Err(PyValueError::new_err("message channel is unassigned"));
+        }
+        return Ok(messages::AnyCommand::ControlChange(command.value.clone()));
+    }
+    extract!(ParameterSet, ParameterStep);
+    crate::profiles::extract_command(command)?
+        .ok_or_else(|| PyTypeError::new_err("command must be a supported compound command"))
+}
+pub fn command_wire(
+    py: Python<'_>,
+    command: &messages::AnyCommand,
+) -> PyResult<(String, Py<PyDict>)> {
+    let kwargs = PyDict::new(py);
+    let name = match command {
+        messages::AnyCommand::ControlChange(value) => {
+            kwargs.set_item("controller", value.controller())?;
+            kwargs.set_item("value", value.value())?;
+            kwargs.set_item("channel", value.channel())?;
+            kwargs.set_item("version", value.version())?;
+            kwargs.set_item("group", value.group())?;
+            kwargs.set_item("resolution", value.resolution())?;
+            "ControlChange".into()
+        }
+        messages::AnyCommand::ParameterSet(value) => {
+            kwargs.set_item("parameter", value.parameter())?;
+            kwargs.set_item("value", value.value())?;
+            kwargs.set_item("resolution", value.resolution())?;
+            kwargs.set_item("channel", value.channel())?;
+            kwargs.set_item("family", family_name(value.family()))?;
+            "ParameterSet".into()
+        }
+        messages::AnyCommand::ParameterStep(value) => {
+            let value = ParameterStep {
+                value: value.clone(),
             };
-            for (key, value) in fields { kwargs.set_item(key, value)?; }
-            Ok((name, kwargs.unbind()))
+            kwargs.set_item("parameter", value.parameter())?;
+            kwargs.set_item("direction", value.direction())?;
+            kwargs.set_item("channel", value.channel())?;
+            kwargs.set_item("family", value.family())?;
+            "ParameterStep".into()
+        }
+        _ => {
+            let (name, fields) = crate::profiles::command_wire(command);
+            for (key, value) in fields {
+                kwargs.set_item(key, value)?;
+            }
+            name
         }
     };
+    Ok((name, kwargs.unbind()))
+}
+fn family_name(family: meedee::controls::ParameterFamily) -> &'static str {
+    match family {
+        meedee::controls::ParameterFamily::Rpn => "rpn",
+        meedee::controls::ParameterFamily::Nrpn => "nrpn",
+    }
+}
+fn parameter_family(family: &str) -> PyResult<meedee::controls::ParameterFamily> {
+    match family {
+        "rpn" => Ok(meedee::controls::ParameterFamily::Rpn),
+        "nrpn" => Ok(meedee::controls::ParameterFamily::Nrpn),
+        _ => Err(PyValueError::new_err("family must be rpn or nrpn")),
+    }
 }
 
-command_messages! {
-    RpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
-    NrpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
+#[pyclass(frozen, extends = Message, module = "meedee.messages")]
+struct ParameterSet {
+    value: messages::ParameterSet,
+}
+#[pymethods]
+impl ParameterSet {
+    #[new]
+    #[pyo3(signature=(parameter, value, resolution=14, channel=None, *, family="rpn"))]
+    fn new(
+        #[pyo3(from_py_with=strict_integer)] parameter: i64,
+        #[pyo3(from_py_with=strict_integer)] value: i64,
+        #[pyo3(from_py_with=strict_integer)] resolution: i64,
+        channel: Option<&Bound<'_, PyAny>>,
+        family: &str,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let family = parameter_family(family)?;
+        let mut value = messages::ParameterSet::new(0, value)
+            .and_then(|v| v.with_family(family))
+            .and_then(|v| v.with_parameter(parameter))
+            .and_then(|v| v.with_resolution(resolution))
+            .map_err(value_error)?;
+        if let Some(channel) = channel {
+            value = value
+                .with_channel(integer(channel, "channel")?)
+                .map_err(value_error)?;
+        }
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+    }
+    #[getter]
+    fn parameter(&self) -> u16 {
+        self.value.parameter()
+    }
+    #[getter]
+    fn value(&self) -> u16 {
+        self.value.value()
+    }
+    #[getter]
+    fn resolution(&self) -> u8 {
+        self.value.resolution()
+    }
+    #[getter]
+    fn channel(&self) -> Option<u8> {
+        self.value.channel()
+    }
+    #[getter]
+    fn family(&self) -> &'static str {
+        family_name(self.value.family())
+    }
+    fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
+        let py = slf.py();
+        crate::tuning::render(
+            slf.into_pyobject(py)?.as_any(),
+            "ParameterSet",
+            &["parameter", "value", "resolution", "channel", "family"],
+        )
+    }
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, Self>>()
+            .is_ok_and(|v| self.value == v.value)
+    }
+    fn __hash__(&self) -> u64 {
+        value_hash(&self.value)
+    }
+    #[pyo3(signature=(**changes))]
+    fn replace<'py>(
+        slf: PyRef<'py, Self>,
+        changes: Option<&Bound<'py, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let py = slf.py();
+        crate::tuning::replacement(
+            slf.into_pyobject(py)?.as_any(),
+            &["parameter", "value", "resolution", "channel", "family"],
+            changes,
+        )
+    }
+    #[classattr]
+    fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+        let fields = PyDict::new(py);
+        for name in ["parameter", "value", "resolution"] {
+            fields.set_item(name, py.get_type::<PyInt>())?;
+        }
+        fields.set_item(
+            "channel",
+            py.import("typing")?
+                .getattr("Optional")?
+                .get_item(py.get_type::<PyInt>())?,
+        )?;
+        fields.set_item("family", py.get_type::<pyo3::types::PyString>())?;
+        Ok(fields)
+    }
+    #[classattr]
+    fn __match_args__() -> (&'static str, &'static str, &'static str, &'static str) {
+        ("parameter", "value", "resolution", "channel")
+    }
 }
 
 #[pyclass(frozen, extends = Message, module = "meedee.messages")]
@@ -666,12 +714,8 @@ impl ParameterStep {
         channel: Option<&Bound<'_, PyAny>>,
         family: &str,
     ) -> PyResult<PyClassInitializer<Self>> {
-        use meedee::controls::{ParameterFamily, StepDirection};
-        let family = match family {
-            "rpn" => ParameterFamily::Rpn,
-            "nrpn" => ParameterFamily::Nrpn,
-            _ => return Err(PyValueError::new_err("family must be rpn or nrpn")),
-        };
+        use meedee::controls::StepDirection;
+        let family = parameter_family(family)?;
         let direction = match direction {
             1 => StepDirection::Increment,
             -1 => StepDirection::Decrement,
@@ -761,10 +805,13 @@ impl ParameterStep {
     }
 }
 
-pub(crate) fn rpn_to_python(py: Python<'_>, value: messages::RpnSet) -> PyResult<Py<PyAny>> {
+pub(crate) fn parameter_set_to_python(
+    py: Python<'_>,
+    value: messages::ParameterSet,
+) -> PyResult<Py<PyAny>> {
     Ok(Py::new(
         py,
-        PyClassInitializer::from(Message::default()).add_subclass(RpnSet::from_value(value)),
+        PyClassInitializer::from(Message::default()).add_subclass(ParameterSet { value }),
     )?
     .into_any())
 }

@@ -175,7 +175,7 @@ macro_rules! helpers {
         fn $rpn(py:Python<'_>,$($field:&Bound<'_,PyAny>),*)->PyResult<Py<PyAny>> {
             let value=controls::$rpn($(crate::messages::integer($field,stringify!($field))?),*)
                 .map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
-            crate::messages::rpn_to_python(py,value)
+            crate::messages::parameter_set_to_python(py,value)
         })*
         $(#[pyfunction]
         #[pyo3(signature=(*,$($arg),*))]
