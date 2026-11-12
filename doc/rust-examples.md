@@ -365,15 +365,15 @@ for record in &recording.records {
 }
 ```
 
-Run this separately to restore the backup. Choose the minimum pause from the
+Run this separately to restore the backup. Choose the wait duration from the
 instrument's documentation. Sending a dump can replace sounds or settings.
 
 ```rust
-use meedee::{midi::Output, sysex};
+use meedee::{events, midi::Output, sysex};
 use std::time::Duration;
 
 let mut output = Output::new();
-println!("{:?}", sysex::send(&mut output, sysex::Reader::open("backup.syx")?, Duration::from_millis(100))?);
+println!("{:?}", output.send(events::with_gap(sysex::Reader::open("backup.syx")?, Duration::from_millis(100)))?);
 output.close()?;
 ```
 
@@ -412,9 +412,11 @@ This uses timestamps retained from the input, whose default timestamp mode is
 `TimestampMode::Absolute`. It preserves observed message timing; it does not infer
 the synth's required receive gap. In particular, separately requested replies
 include request turnaround time. Saving to `.syx` discards timing. For an untimed
-`.syx` file, use the explicit `sysex::send` example above, choosing the gap from
-the instrument's documentation. That pause is measured between send handoffs,
-not confirmed wire completion.
+`.syx` file, use the `events::with_gap` example above, choosing the gap from the
+instrument's documentation. It inserts a wait after every item, including the
+last. Output uses ordinary sequence timing, not completion-relative pacing.
+The generic helper yields `events::GapItem<T>` values (`Item(T)` or
+`Gap(Duration)`); it does not sleep or send.
 
 ## 13. Query a tuning dump
 
@@ -507,7 +509,8 @@ OpenOptions::new().write(true).create_new(true).open("just-three.syx")?
 println!("{dump:?}");
 ```
 
-Use `sysex::send` to send complete SysEx messages with explicit pacing.
+Use `output.send(events::with_gap(messages, gap))` to insert explicit waits
+between complete SysEx messages and after the final message.
 For individual real-time changes, use
 `tuning::note_changes(&pitches, 0, 2, true, None, false)?`.
 These builders do not open ports or send messages. `None` selects the unbanked

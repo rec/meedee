@@ -94,9 +94,17 @@ impl<T: Into<OutputValue>> OutputItem for T {
         Ok(self.into())
     }
 }
-impl OutputItem for io::Result<crate::archive::Record> {
+impl<T: Into<OutputValue>> OutputItem for io::Result<T> {
     fn output_item(self) -> io::Result<OutputValue> {
-        self.map(OutputValue::Record)
+        self.map(Into::into)
+    }
+}
+impl<T: OutputItem> OutputItem for crate::events::GapItem<T> {
+    fn output_item(self) -> io::Result<OutputValue> {
+        match self {
+            Self::Item(i) => i.output_item(),
+            Self::Gap(gap) => Ok(OutputValue::Wait(gap.into())),
+        }
     }
 }
 impl OutputItem for io::Result<crate::file_io::Record> {
@@ -1142,6 +1150,35 @@ mod tests {
     }
     fn bytes(values: &[&[u8]]) -> Vec<Packet> {
         values.iter().map(|v| Packet::Bytes(v.to_vec())).collect()
+    }
+
+    #[test]
+    fn with_gap_schedules_fallible_sysex_and_a_trailing_wait() {
+        let mut fixture = Fixture::new();
+        let source = crate::sysex::Reader::new(&b"\xf0\x7d\xf7\xf0\x7d\xf7"[..], 1024).unwrap();
+        let report = fixture
+            .output
+            .send(crate::events::with_gap(source, Duration::from_millis(100)))
+            .unwrap();
+        assert_eq!(report.sent_events, 2);
+        assert_eq!(*fixture.deadlines.borrow(), [0, 100_000_000, 200_000_000]);
+        assert_eq!(
+            fixture.packets(),
+            bytes(&[&[0xf0, 0x7d, 0xf7], &[0xf0, 0x7d, 0xf7]])
+        );
+    }
+
+    #[test]
+    fn with_gap_preserves_source_errors_before_sending() {
+        let mut fixture = Fixture::new();
+        let source = crate::sysex::Reader::new(&b"\xf0\x7d\xf7\xf0\x7d"[..], 1024).unwrap();
+        let failure = fixture
+            .output
+            .send(crate::events::with_gap(source, Duration::ZERO))
+            .unwrap_err();
+        assert!(matches!(failure.cause, crate::playback::Cause::Input(_)));
+        assert_eq!(failure.report.sent_events, 0);
+        assert!(fixture.packets().is_empty());
     }
 
     fn recorded(ticks: i64, note: u8) -> crate::archive::Record {

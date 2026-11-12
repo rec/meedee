@@ -165,8 +165,8 @@ interpreters after known loss; never silently replay uncertain operations.
 ### 6. SysEx transfer execution and diagnostics
 
 **Implemented MIDI 1 foundation:** ordinary Input.record and Output.send handle
-SysEx with timing. The sysex.send helper provides completion-relative pacing for
-untimed dumps; strict SYX codecs and preview/send CLI commands retain exact bytes.
+SysEx with timing. The generic events.with_gap helper inserts explicit waits for
+untimed sequences; strict SYX codecs and preview/send CLI commands retain exact bytes.
 There are no separate transfer plans, sessions or capture objects. Passive backup
 records for a duration, then exports SysEx. Recording diagnostics remain visible;
 a completed observation window does not prove dump completeness.
@@ -182,8 +182,8 @@ outside those documented recipes remain separate work requiring explicit rules.
 
 **Use:** Back up or restore an instrument using documented transfer rules.
 
-Use Input.record and Output.send for timed data, and sysex.send for explicitly paced
-untimed dumps. Retain original bytes and report confirmed progress. Do not infer
+Use Input.record and Output.send for timed data, and Output.send with events.with_gap
+for untimed sequences with explicit waits. Retain original bytes and report confirmed progress. Do not infer
 arbitrary manufacturer protocols or retry uncertain state-changing commands.
 
 Device descriptions and librarian organization belong to the integration work

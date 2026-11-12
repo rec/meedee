@@ -63,6 +63,3 @@ def write(
     *,
     payload_limit: int | str = 1_048_576,
 ) -> None: ...
-def send(
-    output: midi.Output, messages: Iterable[SysEx], *, gap: float | str
-) -> events.PlaybackReport: ...

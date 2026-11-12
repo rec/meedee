@@ -14,6 +14,25 @@ pub use crate::playback::{
 pub use crate::transport::ReceivedPacket;
 use crate::ump::UmpMessage;
 use std::io;
+use std::time::Duration;
+
+/// A sequence item or an explicit wait, as produced by [`with_gap`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GapItem<T> {
+    Item(T),
+    Gap(Duration),
+}
+
+/// Yield each item followed by a gap, including after the final item.
+pub fn with_gap<T>(
+    items: impl IntoIterator<Item = T>,
+    gap: Duration,
+) -> impl Iterator<Item = GapItem<T>> {
+    items
+        .into_iter()
+        .flat_map(move |i| [GapItem::Item(i), GapItem::Gap(gap)])
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Clock {
     identity: String,

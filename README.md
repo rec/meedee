@@ -16,8 +16,9 @@ load the optional CLI implementation or uFor adapter dependencies.
 
 The domain workflows are grouped under `md.tuning`, `md.ci` and `md.sysex`:
 `tuning.query` runs a tuning query, `ci.browse` runs a management scan, and
-`sysex.send` sends SysEx messages with explicit pacing. Use ordinary `Input.record()`
-and `Output.send()` to record and replay SysEx with timing.
+`sysex.dump` captures instrument dumps. `events.with_gap` inserts explicit waits
+into any item sequence. Use ordinary `Input.record()` and `Output.send()` to
+record and replay SysEx with timing.
 
 `sysex.dump(receiver, output)` detects a supported model with an identity request,
 then requests and captures opaque dump replies. Set `model` explicitly to skip
@@ -1036,13 +1037,16 @@ validated before output discovery. Defaults bound CLI input to 256 messages, 8 M
 of framed bytes and 1 MiB per payload; CLI options can change these limits.
 Preview samples are bounded by `--detail-limit` and `--preview-bytes`.
 
-The shared Rust/Python `sysex.send(output, messages, gap)` helper accepts untimed
-SysEx messages and waits at least the selected gap after each successful handoff
-before sending the next. It returns the ordinary playback report, retains typed
-send failures with confirmed progress, and never retries or closes the output.
-There is no pause after the last message. `Output.send()` itself has no gap option;
-use it directly for timestamped recordings. `sysex.Reader` and `sysex.write` retain
-strict file parsing and export. See the
+Use `output.send(events.with_gap(sysex.Reader("backup.syx"), 0.1))` to insert a
+100 ms wait after every message, including the last. `events.with_gap(items, gap)`
+is a lazy generic iterator: Python yields each item followed by gap seconds;
+Rust yields `GapItem::Item` and `GapItem::Gap` with a typed `Duration`.
+The helper does not send, sleep or validate its values. `Output.send()` applies
+ordinary sequence timing and returns the playback report. These waits use the
+sequence timeline, not a measured pause after wire completion or each handoff.
+Use untimestamped items with gaps; send timestamped recordings directly to
+preserve their timing. `sysex.Reader` and `sysex.write` retain strict file parsing
+and export. See the
 [transfer contract](plan/api.md#bounded-midi-1-sysex-transfers).
 
 ### One MIDI-CI management scan

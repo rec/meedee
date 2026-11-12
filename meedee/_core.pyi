@@ -39,13 +39,6 @@ def run_tuning(
     cancel: events.Cancellation,
     now: Callable[[], int],
 ) -> tuning.QueryReport: ...
-def run_sysex_send(
-    output: object,
-    messages: object,
-    gap: float | str,
-    cancel: events.Cancellation,
-    now: Callable[[], int],
-) -> events.PlaybackReport: ...
 def run_sysex_dump(
     receiver: object,
     output: object,

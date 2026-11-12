@@ -1,6 +1,7 @@
 """Transfer commands validate before discovery and preserve partial progress."""
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -24,10 +25,16 @@ class Connection:
     def __exit__(self, *args: object) -> None:
         self.closed = True
 
-    def send(self, message: messages.SysEx) -> None:
-        self.sent.append(codecs.encode(message))
-        if self.fail and len(self.sent) == 2:
-            raise midi.SendError("uncertain send")
+    def send(self, values: Iterator[messages.SysEx | float]) -> SimpleNamespace:
+        for v in values:
+            if isinstance(v, float):
+                continue
+            self.sent.append(codecs.encode(v))
+            if self.fail and len(self.sent) == 2:
+                error = midi.SendError("uncertain send")
+                error.completed_events = 1
+                raise error
+        return SimpleNamespace(sent_events=len(self.sent), cancelled=False)
 
 
 def install(

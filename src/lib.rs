@@ -45,7 +45,6 @@ mod transport_tests;
 fn _core(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(run_subprocess_worker, module)?)?;
     module.add_class::<drivers::DiscoveryPollState>()?;
-    module.add_function(wrap_pyfunction!(drivers::run_sysex_send, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_sysex_dump, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_tuning, module)?)?;
     module.add_function(wrap_pyfunction!(drivers::run_ci, module)?)?;

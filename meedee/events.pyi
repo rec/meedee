@@ -1,6 +1,10 @@
 """Immutable events and explicit clocks; transport nanoseconds do not imply accuracy."""
 
+from collections.abc import Iterator
+
 from . import messages, metrics, midi
+
+def with_gap[T](items: Iterator[T], gap: float) -> Iterator[T | float]: ...
 
 class Clock:
     def __init__(

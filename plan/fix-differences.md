@@ -111,7 +111,7 @@ limits and the point at which validation occurs.
 | K04 | `inspection::Options` | inspect_file keywords. Match payload_limit, preserve_unknown and detail_limit, including default values. |
 | K05 | `midi::PlaybackOptions` | Output.send keywords. Match origin, mappings, cancellation, rounding and metrics. Retain the approved persistent Rust with_playback builder versus per-call Python keywords, and explain that lifetime difference. |
 | K06 | `routing::PreviewOptions` | preview_file keywords. Match queue/event/byte/payload/detail budgets and incomplete-input handling. |
-| K07 | `sysex::send` | sysex.send keywords and Rust typed gap. SysEx uses ordinary record/send and strict file helpers. Preserve whole-message sends and no automatic retries. |
+| K07 | `events::with_gap` | Python item-or-float iterator and Rust GapItem<T> with typed Duration. SysEx uses ordinary record/send and strict file helpers. Preserve whole-message sends and no automatic retries. |
 | K08 | `transport::InputOptions` | Input constructor/builders. Compare controls reachable through high-level Rust midi::Input, including raw/callback mode and receive budgets. Low-level transport options are not a replacement high-level API. Keep Python isolation explicit. |
 | K09 | `transport::OutputOptions` | Output constructor/builders. Match backend/protocol selection through midi::Output; keep channel/tempo/port selection in the high-level API and Python isolation separate. |
 
@@ -286,7 +286,7 @@ language-specific behavior.
 | K04 | Adaptation | inspection.rs / src/inspection.rs; inspection.rs and test_inspection.py cover positive limits, prefix reports and preservation. |
 | K05 | Exception | output.rs / _clients.py; output core replay_options_persist test and test_output.py cover repeated playback. Persistent Rust builder configuration versus per-call Python keywords remains approved. |
 | K06 | Adaptation | routing.rs / src/routing.rs; routing.rs, test_routing.py and test_patch.py cover budgets, preview and confirmed/uncertain progress. |
-| K07 | Adaptation | sysex.rs / src/drivers.rs; sysex send tests cover completion-relative pacing, whole messages and confirmed progress. |
+| K07 | Adaptation | events.with_gap / events::with_gap insert waits, including after the final item; ordinary Output.send owns scheduling and confirmed progress. |
 | K08 | Exception | input.rs, input_api.rs, transport/mod.rs / _clients.py; coremidi_boundary.rs and test_live.py cover reachable high-level raw/callback/filter/limit operations. Python isolation remains separate. |
 | K09 | Exception | output.rs, transport/mod.rs / _clients.py; output core tests, coremidi_boundary.rs and test_output.py cover selection, protocol, defaults and closure. Python isolation remains separate. |
 | E01 | Adaptation | playback.rs uses monotonic time and cancellable waits; src/live.rs supplies Python host timing. live.rs and test_live.py cover scheduling/cancellation, not merely clock reads. |

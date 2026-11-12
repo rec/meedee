@@ -10,7 +10,7 @@ from time import monotonic
 
 import pytest
 
-from meedee import codecs, gm, messages, midi, testing
+from meedee import codecs, events, gm, messages, midi, testing
 
 
 class NativeConnection:
@@ -156,6 +156,31 @@ def test_delay_only_call_waits_without_sending(transport: NativeConnection) -> N
         out.send("2ms")
         assert monotonic() - start >= 0.002
     assert transport.packets() == []
+
+
+def test_with_gap_schedules_sysex_and_trailing_wait(
+    transport: NativeConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meedee import _native
+
+    deadlines: list[int] = []
+
+    def sequence(
+        send: Callable[[object], None],
+        scheduled: Iterable[tuple[int, object, bool]],
+        **options: object,
+    ) -> None:
+        for t, m, _ in scheduled:
+            deadlines.append(t)
+            if m is not None:
+                send(m)
+
+    monkeypatch.setattr(_native, "output_sequence", sequence)
+    message = messages.SysEx(data=b"\x7d")
+    with midi.Output() as out:
+        out.send(events.with_gap(iter([message, message]), 0.1))
+    assert deadlines == [0, 100_000_000, 200_000_000]
+    assert transport.packets() == [b"\xf0\x7d\xf7"] * 2
 
 
 @pytest.mark.parametrize(

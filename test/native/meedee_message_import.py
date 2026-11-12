@@ -174,7 +174,7 @@ def main() -> None:
         tracker = topology.Tracker()
         assert tracker.observe([]).generation == 1
         assert list(sysex.Reader(BytesIO(b"\xf0\x7d\xf7")))[0].data == b"\x7d"
-        assert callable(sysex.send)
+        assert list(events.with_gap(iter(["item"]), 0.1)) == ["item", 0.1]
         from meedee import discovery
 
         poller = discovery.Poller(protocol="midi1")

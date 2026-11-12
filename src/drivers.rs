@@ -182,65 +182,6 @@ impl PlaybackClock for Clock<'_, '_> {
 }
 
 #[pyfunction]
-pub(crate) fn run_sysex_send(
-    py: Python<'_>,
-    output: Bound<'_, PyAny>,
-    messages: Bound<'_, PyAny>,
-    #[pyo3(from_py_with=crate::units::duration)] gap: u64,
-    cancel: Bound<'_, PyAny>,
-    now: Bound<'_, PyAny>,
-) -> PyResult<crate::playback::PlaybackReport> {
-    let calls = Calls::new(py);
-    let mut output = Output {
-        calls: &calls,
-        object: output,
-    };
-    let mut clock = Clock {
-        calls: &calls,
-        now,
-        cancel,
-        last: 0,
-    };
-    let mut iterator = messages.try_iter()?;
-    let source = std::iter::from_fn(|| {
-        iterator.next().map(|value| {
-            let value = value.and_then(|value| {
-                value
-                    .extract::<PyRef<'_, crate::messages::SysEx>>()
-                    .map(|value| value.value.clone())
-                    .map_err(Into::into)
-            });
-            calls.convert(value).map_err(io::Error::from)
-        })
-    });
-    let result =
-        meedee::sysex::send_with(&mut output, source, Duration::from_nanos(gap), &mut clock);
-    match result {
-        Ok(value) => Ok(crate::playback::PlaybackReport { value }),
-        Err(failure) => {
-            let error = calls
-                .failure
-                .borrow_mut()
-                .take()
-                .unwrap_or_else(|| PyOSError::new_err(failure.to_string()));
-            error
-                .value(py)
-                .setattr("completed_events", failure.report.sent_events)?;
-            error.value(py).setattr(
-                "report",
-                Py::new(
-                    py,
-                    crate::playback::PlaybackReport {
-                        value: failure.report,
-                    },
-                )?,
-            )?;
-            Err(error)
-        }
-    }
-}
-
-#[pyfunction]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_sysex_dump(
     py: Python<'_>,

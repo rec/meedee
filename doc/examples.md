@@ -174,7 +174,7 @@ import meedee as md
 print(md.Output().send(md.Reader("backup.meedee")))
 ```
 
-Alternatively, restore an untimed `.syx` file with a minimum pause between sends.
+Alternatively, restore an untimed `.syx` file with explicit waits in the sequence.
 Use the instrument's documented pause; restoration can replace sounds/settings.
 Successful handoff does not prove the instrument accepted the dump.
 
@@ -182,7 +182,7 @@ Successful handoff does not prove the instrument accepted the dump.
 import meedee as md
 
 with md.Output() as output:
-    print(md.sysex.send(output, md.sysex.Reader("backup.syx"), gap="100 ms"))
+    print(output.send(md.events.with_gap(md.sysex.Reader("backup.syx"), 0.1)))
 ```
 
 ### Request or capture an opaque instrument dump
@@ -217,9 +217,10 @@ This uses timestamps retained from the input, whose default timestamp mode is
 `Absolute`. It preserves observed message timing; it does not infer the synth's
 required receive gap. In particular, separately requested replies include request
 turnaround time. Saving to `.syx` discards timing. For an untimed `.syx` file, use
-the explicit `sysex.send(..., gap="100 ms")` example above, choosing the gap from
-the instrument's documentation. That pause is measured between send handoffs,
-not confirmed wire completion.
+the `events.with_gap(..., 0.1)` example above, choosing the gap in seconds from
+the instrument's documentation. It inserts a wait after every item, including
+the last. Output uses ordinary sequence timing, not completion-relative pacing.
+The helper itself only yields items and gap values; it does not sleep or send.
 
 ## 9. Export a just-intonation tuning
 
@@ -255,7 +256,8 @@ Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
 Only `md.tuning.convert()` needs uFor. The shared Rust builders `md.tuning.bulk_dump()` and `md.tuning.note_changes()` also accept `md.NoteTuning` values constructed directly.
-Use `md.sysex.send()` for paced delivery; `md.tuning.note_changes()` produces
+Use `output.send(md.events.with_gap(iter(messages), 0.1))` for explicit waits;
+`md.tuning.note_changes()` produces
 ordered messages of at most 127 keys each.
 
 ## 10. Bend one note of an MPE chord

@@ -1,6 +1,6 @@
 """SysEx preview, paced sending and duration-based recording commands."""
 
-from . import archive, messages, sysex
+from . import archive, events, messages, sysex
 from ._cli import SysexReceive, TransferPreview, TransferSend, emit
 
 
@@ -61,7 +61,7 @@ def run_transfer(config: TransferPreview) -> int:
         )
         port = select_port(client.ports(), config.port, direction="output")
         with client.connect(port) as output:
-            report = sysex.send(output, values, gap=config.gap)
+            report = output.send(events.with_gap(iter(values), config.gap))
             confirmed = report.sent_events
             completed = not report.cancelled
     except KeyboardInterrupt as error:

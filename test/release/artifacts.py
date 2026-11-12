@@ -189,7 +189,7 @@ def test_source_distribution_contains_build_typing_and_test_sources() -> None:
                 "test/test_tuning_cli.py",
                 "meedee/_ufor_cli.py",
                 "test/test_ufor_cli.py",
-                "test/test_sysex_send.py",
+                "test/test_with_gap.py",
                 "test/test_capture_cli.py",
                 "meedee/_transfer_cli.py",
                 "test/test_transfer_cli.py",

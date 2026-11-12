@@ -201,7 +201,6 @@ def test_ufor_numeric_overflow_and_underflow_cannot_generate_mts(detune: float) 
 def test_bulk_dump_can_be_sent_as_sysex_with_library_broadcast(
     bank: int | None,
 ) -> None:
-    from meedee import sysex
     from meedee.testing import Output
 
     result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
@@ -209,6 +208,6 @@ def test_bulk_dump_can_be_sent_as_sysex_with_library_broadcast(
     wire = codecs.encode(dump)
     message = messages.SysEx(data=wire[1:-1])
     output = Output(protocol="midi1")
-    report = sysex.send(output, [message], gap=0)  # ty: ignore[invalid-argument-type]
-    assert report.sent_events == 1 and output.take_packet() == wire
+    output.send(message)
+    assert output.take_packet() == wire
     output.close()

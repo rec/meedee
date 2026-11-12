@@ -1263,16 +1263,23 @@ languages. Recordings retain timing, source declarations and receive diagnostics
 There are no separate transfer Plan, Session or Capture interfaces for replay.
 `Output.send()` has no gap option.
 
-Python `sysex.send(output, messages, *, gap)` and Rust
-`sysex::send(&mut output, messages, Duration)` send untimed SysEx through the ordinary
-output. Rust accepts an iterator of fallible SysEx values; Python accepts an
-iterable of SysEx. Pacing waits at least gap after each successful handoff before
-the next, with no wait after the final message. Zero sends consecutively. The
-helper returns the ordinary playback report. Failures preserve typed send errors
-and the number of confirmed messages, without retrying or closing the output.
-Python exceptions carry report/completed_events; Rust returns playback::Failure.
-No instrument acknowledgement or delivery guarantee is inferred. Invalid later
-streaming input can fail after an already-sent prefix.
+Python `events.with_gap(items: Iterator[T], gap: float) -> Iterator[T | float]`
+and Rust `events::with_gap(items, Duration) -> impl Iterator<Item = GapItem<T>>`
+are lazy generic sequence adapters. They yield each item followed by the gap,
+including after the final item; empty input yields nothing. Python gaps are
+seconds. Rust distinguishes `GapItem::Item(T)` from `GapItem::Gap(Duration)`.
+The helper neither sends nor sleeps nor validates values. Sources remain lazy
+and keep their original items and errors.
+
+Pass the result to ordinary `Output.send` to schedule untimestamped messages and
+waits. Rust accepts fallible items such as `sysex::Reader` without discarding
+errors. Output prepares untimestamped sequences before sending; invalid input
+fails before sending that sequence. Gaps use the cumulative sequence timeline,
+not a pause measured after each handoff or wire completion. Timestamped recordings
+must be sent directly without inserted untimestamped waits. Send failures retain
+the ordinary playback report and confirmed progress, without automatic retries
+or inferred device acknowledgement. Python exceptions carry report/completed_events;
+Rust returns playback::Failure.
 
 `sysex.Reader` and `sysex.write` retain the strict `.syx` file helpers. The CLI retains
 `transfer-preview SOURCE --gap N` and `transfer-send SOURCE --gap N --port NAME`,
@@ -1943,18 +1950,18 @@ Additional work beyond the prompt: None.
 Each group has one public namespace per language layer. tuning contains codecs,
 values, the uFor adapter, query tracking and the
 live query driver; ci contains codecs, sessions, browser tracking and live
-browsing. SysEx file helpers, paced sending and opaque dump workflows live in
-sysex; recording/replay uses Input and Output.
+browsing. SysEx file helpers and opaque dump workflows live in sysex;
+recording/replay uses Input and Output. Generic gap insertion lives in events.
 Rust CI browser/session and tuning-query implementations are colocated with their
 public modules. The native Python tuning query binding is colocated with the
 other tuning bindings.
 
-The canonical workflow functions in both APIs are tuning.query, ci.browse,
-sysex.send and sysex.dump. Tuning and CI retain their fresh-session, cancellation and clock
-ownership rules. SysEx instead uses ordinary recording/replay plus a paced
-helper returning the standard playback report. Dump capture returns DumpReport.
-Rust keeps the corresponding query_with, browse_with,
-sysex::send_with and sysex::dump_with drivers for explicit clock/I/O adapters; CI Options
+The canonical workflow functions in both APIs are tuning.query, ci.browse
+and sysex.dump. Tuning and CI retain their fresh-session, cancellation and clock
+ownership rules. SysEx uses ordinary recording/replay and optional gap insertion
+through events.with_gap. Dump capture returns DumpReport.
+Rust keeps the corresponding query_with, browse_with
+and sysex::dump_with drivers for explicit clock/I/O adapters; CI Options
 now lives in ci. The former live/input/output modules are removed, with no
 compatibility aliases or forwarding modules. Root __all__ now contains the 24
 public submodules and the same 96 classes; functions remain module-qualified.

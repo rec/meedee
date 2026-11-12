@@ -63,7 +63,7 @@ def exercise(run_in_subprocess: bool, directory: Path) -> None:
             connect(names[0] + "-dump", run_in_subprocess) as dump_output,
         ):
             delivery = worker.submit(
-                sysex.send, dump_output, messages_to_capture, gap="1 ms"
+                dump_output.send, events.with_gap(iter(messages_to_capture), 0.001)
             )
             recording = dump_input.record(1)
         assert delivery.result(timeout=4).sent_events == 2
