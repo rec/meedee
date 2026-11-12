@@ -1,6 +1,8 @@
 //! Optional observations of one source's primitive stream. Never replaces raw
 //! messages or infers physical units, lost messages, or unknown absolute values.
 
+use std::collections::HashMap;
+
 pub use crate::event_views::{ControlInterpreter, VelocityInterpreter};
 use crate::messages::{AnyMessage, ControlChange};
 pub use crate::velocity::VelocityObservation;
@@ -93,8 +95,8 @@ impl From<&AnyMessage> for InputMessage {
     }
 }
 
-/// Fixed bounded state for 16 channels of one source. No timers, source registry
-/// or parameter-value cache. Input indexes saturate at usize::MAX.
+/// State for 16 channels of one source, with sparse observed parameter data.
+/// No timers or source registry. Input indexes saturate at usize::MAX.
 #[derive(Default)]
 pub(crate) struct ControlState {
     channels: [Channel; 16],
@@ -141,9 +143,9 @@ impl ControlState {
                     .iter()
                     .copied()
                     .chain(c.selectors.into_iter().flatten())
-                    .chain(c.data)
+                    .flatten()
+                    .chain(c.data.values().copied())
             })
-            .flatten()
             .map(|v| v.index)
             .collect()
     }
@@ -175,7 +177,7 @@ struct Channel {
     family: Option<ParameterFamily>,
     // Indexed by ParameterFamily, then MSB/LSB.
     selectors: [[Option<IndexedByte>; 2]; 2],
-    data: [Option<IndexedByte>; 2],
+    data: HashMap<(ParameterFamily, u16), IndexedByte>,
 }
 
 impl Channel {
@@ -210,11 +212,7 @@ impl Channel {
                 } else {
                     1
                 };
-                let selector = &mut self.selectors[family as usize][half];
-                if selector.map(|b| b.value) != Some(value) {
-                    self.data[family as usize] = None;
-                }
-                *selector = Some(byte);
+                self.selectors[family as usize][half] = Some(byte);
                 if self.selected() == Some((ParameterFamily::Rpn, 16383)) {
                     self.family = None;
                 }
@@ -239,7 +237,7 @@ impl Channel {
                 if controller == 96 || controller == 97 {
                     // Relative changes can cross a coarse boundary. A later LSB
                     // must not combine with the stale pre-step coarse value.
-                    self.data[family as usize] = None;
+                    self.data.remove(&(family, parameter));
                     return vec![Observation::Step(ParameterStep {
                         channel,
                         family,
@@ -254,9 +252,9 @@ impl Channel {
                     })];
                 }
                 let (value, resolution, first_index) = if controller == 6 {
-                    self.data[family as usize] = Some(byte);
+                    self.data.insert((family, parameter), byte);
                     (u16::from(value), 7, first_index)
-                } else if let Some(coarse) = self.data[family as usize] {
+                } else if let Some(coarse) = self.data.get(&(family, parameter)) {
                     (
                         (u16::from(coarse.value) << 7) | u16::from(value),
                         14,

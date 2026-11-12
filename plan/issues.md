@@ -100,9 +100,11 @@ the limit is not a total-memory or processing-time budget. Packet floods,
 oversized sends, discovery lists and
 allocation/process aborts remain resource risks. Rust/native allocation failures
 are not universally recoverable Python exceptions.
-The optional control interpreter has fixed state for 16 channels of one source;
-many application-created interpreters and retained observation lists still cost
-memory. Built-in commands expand to at most six messages, but their native
+The optional control interpreter tracks 16 channels of one source and caches
+observed coarse parameter data and provenance without eviction. Cache memory and
+per-message bookkeeping grow with observed channel/family/parameter combinations,
+up to the finite MIDI 1 parameter space. Many application-created interpreters and
+retained observation lists also cost memory. Built-in commands expand to at most six messages, but their native
 duration remains driver-dependent.
 
 MTS values have fixed limits (128 table entries, 127 single-note updates, 12

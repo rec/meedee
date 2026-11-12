@@ -118,17 +118,17 @@ def test_inactive_parameter_selectors_retain_their_contributor_times() -> None:
     )
 
     for index, (controller, value) in enumerate(
-        ((101, 0), (100, 0), (99, 1), (98, 3)), start=6
+        ((98, 4), (6, 40), (101, 0), (100, 0), (99, 1), (98, 3)), start=6
     ):
         interpreter.feed(
             event(messages.ControlChange(controller, value, channel=1), index * 10)
         )
     observation = interpreter.feed(
-        event(messages.ControlChange(38, 3, channel=1), 100)
+        event(messages.ControlChange(38, 3, channel=1), 120)
     )[0]
     assert isinstance(observation.value, controls.ParameterObservation)
     assert observation.value.value == 3843
-    assert (observation.first_index, observation.last_index) == (5, 10)
+    assert (observation.first_index, observation.last_index) == (5, 12)
     assert (
         observation.first_timestamp is not None
         and observation.first_timestamp.ticks == 50

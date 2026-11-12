@@ -378,9 +378,9 @@ def test_repeated_selectors_preserve_data_and_its_source_range(
         )
     for value in (3, 2):
         interpreter.feed(messages.ControlChange(lsb, value, channel=1))
-    missing = interpreter.feed(messages.ControlChange(38, 3, channel=1))[0].value
-    assert isinstance(missing, controls.Diagnostic)
-    assert missing.kind == controls.DiagnosticKind.MissingCoarse
+    restored = interpreter.feed(messages.ControlChange(38, 3, channel=1))[0].value
+    assert isinstance(restored, controls.ParameterObservation)
+    assert (restored.parameter, restored.value, restored.first_index) == (130, 1283, 2)
 
 
 @pytest.mark.parametrize(
@@ -432,7 +432,7 @@ def test_family_switches_retain_complete_and_partial_selectors(
 @pytest.mark.parametrize(
     ("msb", "lsb", "other_msb", "other_lsb"), ((99, 98, 101, 100), (101, 100, 99, 98))
 )
-def test_each_family_retains_data_only_for_its_current_parameter(
+def test_parameter_caches_are_independent_across_selections_and_families(
     msb: int, lsb: int, other_msb: int, other_lsb: int
 ) -> None:
     interpreter = controls.ControlInterpreter()
@@ -445,11 +445,13 @@ def test_each_family_retains_data_only_for_its_current_parameter(
         (msb, 1),
         (lsb, 2),
         (6, 10),
-        (other_msb, 3),
-        (other_lsb, 4),
+        (other_msb, 1),
+        (other_lsb, 2),
         (6, 20),
     ):
         cc(controller, value)
+    for controller, value in ((msb, 1), (lsb, 2), (6, 60)):
+        interpreter.feed(messages.ControlChange(controller, value, channel=2))
     cc(lsb, 2)
     restored = cc(38, 3)
     assert isinstance(restored, controls.ParameterObservation)
@@ -459,11 +461,22 @@ def test_each_family_retains_data_only_for_its_current_parameter(
         restored.resolution,
         restored.first_index,
     ) == (130, 1283, 14, 0)
+    for parameter_lsb, coarse in ((3, 11), (4, 12)):
+        cc(lsb, parameter_lsb)
+        cc(6, coarse)
+    cc(lsb, 2)
+    restored = cc(38, 4)
+    assert isinstance(restored, controls.ParameterObservation)
+    assert (restored.parameter, restored.value) == (130, 1284)
     cc(96, 0)
-    cc(other_lsb, 4)
+    cc(lsb, 3)
+    sibling = cc(38, 5)
+    assert isinstance(sibling, controls.ParameterObservation)
+    assert (sibling.parameter, sibling.value) == (131, 1413)
+    cc(other_lsb, 2)
     other = cc(38, 5)
     assert isinstance(other, controls.ParameterObservation)
-    assert (other.parameter, other.value) == (388, 2565)
+    assert (other.parameter, other.value) == (130, 2565)
     assert other.family != restored.family
     cc(lsb, 2)
     missing = cc(38, 6)
@@ -475,10 +488,22 @@ def test_each_family_retains_data_only_for_its_current_parameter(
     assert isinstance(missing, controls.Diagnostic)
     assert missing.kind == controls.DiagnosticKind.MissingCoarse
     cc(6, 40)
+    cc(other_msb, 1)
+    other = cc(38, 8)
+    assert isinstance(other, controls.ParameterObservation)
+    assert (other.parameter, other.value) == (130, 2568)
     cc(msb, 1)
     restored = cc(38, 7)
     assert isinstance(restored, controls.ParameterObservation)
     assert (restored.parameter, restored.value) == (130, 3847)
+    cc(121, 0)
+    other_channel = interpreter.feed(messages.ControlChange(38, 3, channel=2))[0].value
+    assert isinstance(other_channel, controls.ParameterObservation)
+    assert (other_channel.channel, other_channel.parameter, other_channel.value) == (
+        2,
+        130,
+        7683,
+    )
     interpreter.reset()
     for selector_msb, selector_lsb in ((msb, lsb), (other_msb, other_lsb)):
         cc(selector_msb, 1)
@@ -520,6 +545,8 @@ def test_relative_steps_do_not_invent_absolute_values_or_increment_magnitudes() 
 
 def test_rpn_null_deselects_nrpn_without_reserving_its_maximum_identifier() -> None:
     interpreter = controls.ControlInterpreter()
+    for controller, value in ((101, 0), (100, 0), (6, 5)):
+        interpreter.feed(messages.ControlChange(controller, value, channel=1))
     for controller in (99, 98):
         interpreter.feed(
             messages.ControlChange(channel=1, controller=controller, value=127)
@@ -553,6 +580,15 @@ def test_rpn_null_deselects_nrpn_without_reserving_its_maximum_identifier() -> N
     assert (restored.family, restored.parameter) == (
         controls.ParameterFamily.Nrpn,
         16383,
+    )
+    for controller in (101, 100):
+        interpreter.feed(messages.ControlChange(controller, 0, channel=1))
+    retained = interpreter.feed(messages.ControlChange(38, 3, channel=1))[0].value
+    assert isinstance(retained, controls.ParameterObservation)
+    assert (retained.family, retained.parameter, retained.value) == (
+        controls.ParameterFamily.Rpn,
+        0,
+        643,
     )
 
 

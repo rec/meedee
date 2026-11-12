@@ -107,9 +107,17 @@ fn inactive_parameter_selectors_retain_their_contributor_times() {
     );
     assert_eq!(result[0].first_timestamp.as_ref().unwrap().ticks, 0);
     assert_eq!(result[0].last_timestamp.as_ref().unwrap().ticks, 50);
-    for (index, (controller, value)) in [(101, 0), (100, 0), (99, 1), (98, 3), (38, 3)]
-        .into_iter()
-        .enumerate()
+    for (index, (controller, value)) in [
+        (98, 4),
+        (6, 40),
+        (101, 0),
+        (100, 0),
+        (99, 1),
+        (98, 3),
+        (38, 3),
+    ]
+    .into_iter()
+    .enumerate()
     {
         result = interpreter
             .feed(&event(
@@ -128,7 +136,7 @@ fn inactive_parameter_selectors_retain_their_contributor_times() {
     );
     assert_eq!(
         (result[0].first_index, result[0].last_index),
-        (Some(5), Some(10))
+        (Some(5), Some(12))
     );
     assert_eq!(result[0].first_timestamp.as_ref().unwrap().ticks, 50);
     interpreter

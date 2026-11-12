@@ -775,19 +775,20 @@ Command subtraits; free primitive encoding retains its behavior.
 
 The 2026-11-12 selector update supersedes the fresh-halves input policy above:
 single-half edits retain the other half within the same family. Selector messages
-retain cached Data Entry separately for each family's current selection;
+retain cached Data Entry separately for every channel/family/parameter;
 each family retains independent selector halves across switches. Both halves
-must be known initially. Changing or stepping a family's parameter clears only
-its cached Data Entry. Null selection disables updates and invalidates RPN data
-without erasing selector history or NRPN data. Reset/loss clears both histories.
+must be known initially. Selection changes and null selection preserve cached
+data. Stepping a parameter invalidates only its cached data. Null selection
+disables updates without erasing selector history. Reset/loss clears both histories.
 Matching Rust and Python regressions cover edits to either half for both families,
 observation indexes, missing coarse data and family-switch invalidation.
 Repeated-selector regressions also verify retained coarse data and its source
-range, and that changing away and back cannot restore stale data.
+range, including returning to earlier parameters after intervening selections.
 Family-switch regressions cover complete and partial selector history, edits to
 either half, retained contributor timestamps, null release/reactivation and reset.
-Per-family Data Entry regressions cover fine updates after switching back, isolated
-parameter-change/step invalidation, retained coarse timestamps, null and reset/loss.
+Per-parameter Data Entry regressions cover arbitrary reselection, equal parameter
+numbers across families, isolated step invalidation, channel isolation, retained
+coarse timestamps, null release/reactivation and channel/source reset/loss.
 Validation: 618 Python tests pass on Python 3.13.12 with the virtual environment's
 site-packages on `PYTHONPATH` for embedded Python callback tests. The eleven Rust
 controls tests and five event-view tests pass, as do Clippy, Rust formatting,

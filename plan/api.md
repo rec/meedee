@@ -310,7 +310,11 @@ guaranteed after failure. Python error construction occurs after dropping the
 connection mutex, so import hooks/exception constructors cannot run under it.
 
 `meedee.controls.ControlInterpreter()` is pure and optional. Use one instance per source;
-it has fixed state for 16 channels and no parameter cache or source registry.
+it tracks 16 channels and has no source registry. A sparse cache retains the latest
+observed coarse Data Entry and its provenance for each channel/family/parameter.
+It grows with observed parameters, without eviction, up to the finite MIDI 1
+parameter space (16 channels, two families, 16384 numbers; RPN-null is excluded).
+Retained timestamp markers and per-message bookkeeping also grow with this cache.
 `feed(message_or_diagnostic)` returns a list of `events.Observation` values.
 Their `value` contains ControlObservation, ParameterObservation, ParameterStep
 or Diagnostic; known-loss input retains its original StreamDiagnostic.
@@ -338,21 +342,22 @@ the new absolute value is unknown. Observation ranges include selector context
 for parameters and the contributing coarse/fine inputs for generic controls.
 
 Selector halves may arrive in either order. Editing one half retains the other
-half within the same family. Each family caches coarse Data Entry for its current
-parameter. Switching families preserves both caches; changing a selector's value
-clears only that family's cache. Increment/decrement also clears only the active
-family's cache. No values are remembered for older selections. Fine observation ranges include
+half within the same family. Coarse Data Entry is cached separately for each
+channel, family and parameter, and retained across arbitrary reselection.
+Increment/decrement invalidates only the selected parameter's cached coarse value.
+Fine input without a known coarse value still produces MissingCoarse and is not
+buffered for a future coarse input. Fine observation ranges include
 the retained coarse message even when both selectors were repeated later.
 Each channel retains independent RPN and NRPN selector pairs, including partial
 pairs. A selector message activates its family and updates only that family's
 corresponding half. Switching families emits SelectionInvalidated for the prior
-active selection, but preserves both families' selectors and Data Entry caches.
+active selection, but preserves both families' selectors and all cached values.
 Both halves must be known for the active family. Data received while selection is
 missing/partial yields MissingSelection/IncompleteSelection; a fine value without
 coarse data yields MissingCoarse. A normal first selector simply waits for its
 partner; the incomplete diagnostic is emitted if parameter data arrives too soon.
-RPN-null disables the active selection and invalidates RPN Data Entry without
-erasing selector history, clearing NRPN Data Entry or activating the other family.
+RPN-null disables the active selection without erasing selector history or cached
+Data Entry, or activating the other family.
 A later selector message can reactivate a family using its retained halves and
 coarse data. Reset/loss clears both families' selector and Data Entry history.
 Observation ranges retain inactive selectors' and coarse data's provenance.
