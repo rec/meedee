@@ -88,9 +88,7 @@ def test_bulk_requires_complete_resolution_or_explicit_preservation() -> None:
             bank=bank,
             preserve_unmapped=True,
         )
-        assert isinstance(
-            message, tuning.BulkDump if bank is None else tuning.KeyBasedDump
-        )
+        assert isinstance(message, tuning.BulkDump) and message.bank == bank
         assert message.table.values[69] == tuning.Pitch(semitone=69, fraction=0)
         assert all(
             isinstance(p, tuning.NoChange)
@@ -107,7 +105,7 @@ def test_unselected_keys_need_preservation_for_bulk_but_not_for_note_changes() -
     with pytest.raises(ValueError, match="128"):
         tuning.bulk_dump(result, device_id=1, program=0, name="partial")
     message = tuning.note_changes(result, device_id=1, program=0, realtime=True)[0]
-    assert isinstance(message, tuning.SingleNoteChange)
+    assert isinstance(message, tuning.NoteChange)
     assert [p.note for p in message.changes] == [69]
     assert codecs.encode(message) == bytes.fromhex(
         "F0 7F 01 08 02 00 01 45 45 00 00 F7"

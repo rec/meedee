@@ -63,7 +63,7 @@ print(dump)
 ```
 
 `bulk_dump(notes, *, device_id, program, name, bank=None,
-preserve_unmapped=False)` creates an ordinary `BulkDump` or banked `KeyBasedDump`.
+preserve_unmapped=False)` creates a `BulkDump` with an optional bank.
 It requires all 128 distinct MIDI keys unless preservation is explicitly enabled.
 With preservation enabled, omitted keys use `NoChange`. Callers may also supply
 `NoteTuning(note=..., pitch=NoChange())`, which requires the same opt-in.
@@ -71,7 +71,7 @@ NoChange leaves the receiver's value unchanged; it does not establish that value
 Names must contain at most 16 ASCII characters.
 
 `note_changes(notes, *, device_id, program, realtime, bank=None,
-preserve_unmapped=False)` builds `SingleNoteChange` or `BankedNoteChange` messages.
+preserve_unmapped=False)` builds `NoteChange` messages with an optional bank.
 It preserves caller order and splits 128 keys into messages of 127 and one key.
 The unbanked format requires `realtime=True`. A subset needs no preservation
 flag unless it contains explicit `NoChange` values. These messages do not form

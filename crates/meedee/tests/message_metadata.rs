@@ -63,8 +63,8 @@ fn metadata_is_ignored_by_equality_and_hash_across_message_families() {
     check_value(gm::Gm2On::new(1).unwrap());
     check_value(universal::MasterVolume::new(1, 123).unwrap());
     check_value(tuning::BulkDumpRequest::new(1, 2).unwrap());
-    check_value(tuning::TuningMessage::SingleNoteChange(
-        tuning::SingleNoteChange::new(
+    check_value(tuning::TuningMessage::NoteChange(
+        tuning::NoteChange::new(
             1,
             2,
             vec![tuning::NoteTuning::new(60, tuning::TuningValue::NoChange).unwrap()],

@@ -436,6 +436,16 @@ with md.Output() as out:
     out.send(md.ProgramChange(34, bank_msb=0, bank_lsb=8))
 ```
 
+## Change a tuning note
+
+```python
+import meedee as md
+
+pitch = md.NoteTuning(note=69, pitch=md.Pitch(semitone=69, fraction=0))
+with md.Output() as out:
+    out.send(md.tuning.NoteChange(device_id=1, program=2, changes=[pitch], bank=3))
+```
+
 ## Send controller values
 
 ```python

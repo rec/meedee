@@ -1680,4 +1680,4 @@ system_values!(gm: Gm1On, GmOff, Gm2On);
 system_values!(universal: IdentityRequest, IdentityReply, MasterVolume, MasterFineTuning, MasterCoarseTuning);
 system_values!(timecode: FullFrame);
 system_values!(ci: Management);
-system_values!(tuning: TuningMessage, BulkDumpRequest, BankedDumpRequest, BulkDump, KeyBasedDump, ScaleOctaveDump, SingleNoteChange, BankedNoteChange, ScaleOctaveChange);
+system_values!(tuning: TuningMessage, BulkDumpRequest, BulkDump, ScaleOctaveDump, NoteChange, ScaleOctaveChange);

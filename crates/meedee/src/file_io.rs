@@ -400,4 +400,4 @@ profile_records!(gm: Gm1On,GmOff,Gm2On);
 profile_records!(universal: IdentityRequest,IdentityReply,MasterVolume,MasterFineTuning,MasterCoarseTuning);
 profile_records!(timecode: FullFrame);
 profile_records!(ci: Management);
-profile_records!(tuning: TuningMessage,BulkDumpRequest,BankedDumpRequest,BulkDump,KeyBasedDump,ScaleOctaveDump,SingleNoteChange,BankedNoteChange,ScaleOctaveChange);
+profile_records!(tuning: TuningMessage,BulkDumpRequest,BulkDump,ScaleOctaveDump,NoteChange,ScaleOctaveChange);

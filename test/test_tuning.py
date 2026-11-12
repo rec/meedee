@@ -11,6 +11,32 @@ import pytest
 from meedee import codecs, controls, messages, tuning
 
 
+def test_bank_absence_is_distinct_from_zero_and_note_change_realtime_is_checked() -> (
+    None
+):
+    request = tuning.BulkDumpRequest(device_id=1, program=2)
+    banked = request.replace(bank=0)
+    assert request.bank is None and banked.bank == 0 and request != banked
+    assert codecs.encode(request) == b"\xf0\x7e\x01\x08\x00\x02\xf7"
+    assert codecs.encode(banked) == b"\xf0\x7e\x01\x08\x03\x00\x02\xf7"
+    assert banked.replace(bank=None) == request
+    note = tuning.NoteTuning(note=69, pitch=tuning.Pitch(semitone=69, fraction=0))
+    change = tuning.NoteChange(device_id=1, program=2, changes=[note])
+    assert change.realtime and change.bank is None
+    with pytest.raises(ValueError, match="real-time"):
+        change.replace(realtime=False)
+    quiet = change.replace(bank=0, realtime=False)
+    assert quiet.bank == 0 and not quiet.realtime
+    with pytest.raises(ValueError, match="real-time"):
+        quiet.replace(bank=None)
+    assert quiet.replace(realtime=True, bank=None) == change
+    for value in (request, banked, change, quiet):
+        decoded = tuning.decode(messages.SysEx(codecs.encode(value)[1:-1]))
+        assert decoded is not None and decoded.message == value
+    with pytest.raises(TypeError):
+        request.replace(bank=True)  # ty: ignore[invalid-argument-type]
+
+
 def test_tuning_values_and_message_generation_do_not_require_ufor() -> None:
     subprocess.run(
         [
@@ -46,16 +72,16 @@ def tuning_vectors() -> Iterator[tuple[messages.Message, bytes]]:
         match name:
             case "BulkDumpRequest":
                 value = tuning.BulkDumpRequest(device_id=1, program=2)
-            case "BankedDumpRequest":
-                value = tuning.BankedDumpRequest(device_id=1, bank=3, program=2)
+            case "BulkDumpRequestBanked":
+                value = tuning.BulkDumpRequest(device_id=1, bank=3, program=2)
             case "BulkDump":
                 value = tuning.BulkDump(device_id=1, program=2, name="", table=table)
-            case "KeyBasedDump":
-                value = tuning.KeyBasedDump(
+            case "BulkDumpBanked":
+                value = tuning.BulkDump(
                     device_id=1, bank=3, program=2, name="", table=table
                 )
-            case "SingleNoteChange":
-                value = tuning.SingleNoteChange(device_id=1, program=2, changes=changes)
+            case "NoteChange":
+                value = tuning.NoteChange(device_id=1, program=2, changes=changes)
             case _ if name.startswith("ScaleOctaveDump"):
                 value = tuning.ScaleOctaveDump(
                     device_id=1,
@@ -66,8 +92,8 @@ def tuning_vectors() -> Iterator[tuple[messages.Message, bytes]]:
                         resolution=14 if "14" in name else 7, values=[0] * 12
                     ),
                 )
-            case _ if name.startswith("BankedNoteChange"):
-                value = tuning.BankedNoteChange(
+            case _ if name.startswith("NoteChangeBanked"):
+                value = tuning.NoteChange(
                     device_id=1,
                     bank=3,
                     program=2,
@@ -170,7 +196,7 @@ def test_mutable_collections_are_snapshotted_and_wire_order_is_preserved() -> No
         tuning.NoteTuning(note=69, pitch=tuning.NoChange()),
         tuning.NoteTuning(note=69, pitch=tuning.Pitch(semitone=69, fraction=0)),
     ]
-    value = tuning.SingleNoteChange(device_id=127, program=127, changes=entries)
+    value = tuning.NoteChange(device_id=127, program=127, changes=entries)
     entries.clear()
     assert len(value.changes) == 2
     assert [c.note for c in value.changes] == [69, 69]
@@ -239,14 +265,12 @@ def test_quantization_reports_only_wire_precision_loss() -> None:
 
 def test_dump_checksum_policy_and_ascii_names() -> None:
     for m, b in tuning_vectors():
-        if not isinstance(
-            m, (tuning.BulkDump, tuning.KeyBasedDump, tuning.ScaleOctaveDump)
-        ):
+        if not isinstance(m, (tuning.BulkDump, tuning.ScaleOctaveDump)):
             continue
         assert m.name == " " * 16
         raw = bytearray(b[1:-1])
         raw[-1] ^= 1
-        if isinstance(m, tuning.BulkDump):
+        if isinstance(m, tuning.BulkDump) and m.bank is None:
             result = tuning.decode(messages.SysEx(data=raw))
             assert result is not None
             assert result.checksum == tuning.ChecksumStatus.LegacyMismatch
@@ -263,11 +287,11 @@ def test_dump_checksum_policy_and_ascii_names() -> None:
 
 
 def test_reply_tracker_matches_only_a_timely_reply_and_keeps_terminal_state() -> None:
-    request = tuning.BankedDumpRequest(device_id=1, bank=3, program=2)
+    request = tuning.BulkDumpRequest(device_id=1, bank=3, program=2)
     tracker = tuning.ReplyTracker(request=request, now_ns=100, timeout="10 ns")
     assert tracker.deadline_ns == 110
     assert tracker.status == tuning.RequestStatus.Pending
-    reply = tuning.KeyBasedDump(
+    reply = tuning.BulkDump(
         device_id=1,
         bank=3,
         program=2,

@@ -27,15 +27,9 @@ def report_data(report: tuning.QueryReport) -> dict[str, object]:
 
 
 def run_query(config: TuningPreview) -> int:
-    request: tuning.BulkDumpRequest | tuning.BankedDumpRequest
-    if config.bank is None:
-        request = tuning.BulkDumpRequest(
-            device_id=config.device_id, program=config.program
-        )
-    else:
-        request = tuning.BankedDumpRequest(
-            device_id=config.device_id, bank=config.bank, program=config.program
-        )
+    request = tuning.BulkDumpRequest(
+        device_id=config.device_id, bank=config.bank, program=config.program
+    )
     if not isinstance(config, TuningQuery):
         emit(
             {

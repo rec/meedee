@@ -532,15 +532,17 @@ Resolution 7 uses whole cents (-64 through 63); resolution 14 uses units of
 `ScaleConversion` with `offsets` and 12 signed `error_cents`, using the same
 rounding/range policy. Changing resolution with `replace` does not rescale units.
 
-Typed Message subclasses are `BulkDumpRequest`, `BankedDumpRequest`, `BulkDump`,
-`KeyBasedDump`, `ScaleOctaveDump`, `SingleNoteChange`, `BankedNoteChange` and
-`ScaleOctaveChange`. Constructors require keyword arguments. Device ID is always
+Typed Message subclasses are `BulkDumpRequest`, `BulkDump`, `ScaleOctaveDump`,
+`NoteChange` and `ScaleOctaveChange`. `BulkDumpRequest`, `BulkDump` and `NoteChange`
+accept `bank=None` for the original format or an explicit bank (including zero)
+for the banked format. Constructors require keyword arguments. Device ID is always
 explicit, 0–127; 127 deliberately addresses all devices. Tuning bank/program
 identifiers remain 0–127, distinct from the 1–128 ProgramChange API. Dump names
 accept up to 16 ASCII characters, right-padded with spaces; received 16-byte
 names retain all characters, including padding/NUL. Original single-note changes
-are real-time; banked changes and channel scale/octave changes require explicit
-`realtime: bool`. Scale resolution is carried by ScaleOffsets. Channel lists use
+are real-time; `NoteChange` defaults to `realtime=True` and rejects false without
+a bank. Channel scale/octave changes require explicit `realtime: bool`.
+Scale resolution is carried by ScaleOffsets. Channel lists use
 1–16 and are canonicalized to ascending order; duplicate channels are rejected.
 Zero changes or an empty channel mask represent no-op wire messages. A single
 message contains at most 127 note entries; no implicit splitting occurs.
@@ -1587,10 +1589,10 @@ the observation window ended, not that a device-specific dump completed.
 
 Rust `tuning::Query` and Python `tuning.Query` combine the existing MTS
 request codecs, ReplyTracker and decoder. Construction requires one typed
-BulkDumpRequest or BankedDumpRequest, an input stream and a positive timeout
+BulkDumpRequest with an optional bank, an input stream and a positive timeout
 (Python `timeout` in seconds, Rust `timeout_ns`).
 Broadcast device ID 127 is rejected; device IDs are 0..126, programs/banks 0..127.
-Banked requests match either KeyBasedDump or ScaleOctaveDump using the existing
+Banked requests match either BulkDump(bank=...) or ScaleOctaveDump using the existing
 tracker's device/bank/program rules. Ordinary requests match BulkDump. No new MTS
 wire format, generic transaction engine or instrument configuration write is added.
 

@@ -672,6 +672,17 @@ out.send(ProgramChange::new(34)?.with_bank(0, 8)?)?;
 out.close()?;
 ```
 
+## Change a tuning note
+
+```rust
+use meedee::{Output, tuning::{NoteChange, NoteTuning, Pitch, TuningValue}};
+
+let pitch = NoteTuning::new(69, TuningValue::Pitch(Pitch::new(69, 0)?))?;
+let mut out = Output::new();
+out.send(NoteChange::new(1, 2, vec![pitch])?.with_bank(3)?)?;
+out.close()?;
+```
+
 ## Send controller values
 
 ```rust

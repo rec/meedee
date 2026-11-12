@@ -89,7 +89,11 @@ class ScaleConversion:
     def __hash__(self) -> int: ...
 
 class BulkDumpRequest(messages.Message):
-    def __init__(self, *, device_id: int, program: int) -> None: ...
+    def __init__(
+        self, *, device_id: int, program: int, bank: int | None = None
+    ) -> None: ...
+    @property
+    def bank(self) -> int | None: ...
     @property
     def device_id(self) -> int: ...
     @property
@@ -99,6 +103,7 @@ class BulkDumpRequest(messages.Message):
         *,
         device_id: int = ...,
         program: int = ...,
+        bank: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
@@ -106,30 +111,15 @@ class BulkDumpRequest(messages.Message):
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
-class BankedDumpRequest(messages.Message):
-    def __init__(self, *, device_id: int, bank: int, program: int) -> None: ...
-    @property
-    def device_id(self) -> int: ...
-    @property
-    def bank(self) -> int: ...
-    @property
-    def program(self) -> int: ...
-    def replace(
-        self,
-        *,
-        device_id: int = ...,
-        bank: int = ...,
-        program: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> BankedDumpRequest: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
-
 class BulkDump(messages.Message):
     def __init__(
-        self, *, device_id: int, program: int, name: str, table: TuningTable
+        self,
+        *,
+        device_id: int,
+        program: int,
+        name: str,
+        table: TuningTable,
+        bank: int | None = None,
     ) -> None: ...
     @property
     def device_id(self) -> int: ...
@@ -139,6 +129,8 @@ class BulkDump(messages.Message):
     def name(self) -> str: ...
     @property
     def table(self) -> TuningTable: ...
+    @property
+    def bank(self) -> int | None: ...
     def replace(
         self,
         *,
@@ -146,39 +138,11 @@ class BulkDump(messages.Message):
         program: int = ...,
         name: str = ...,
         table: TuningTable = ...,
+        bank: int | None = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
     ) -> BulkDump: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
-
-class KeyBasedDump(messages.Message):
-    def __init__(
-        self, *, device_id: int, bank: int, program: int, name: str, table: TuningTable
-    ) -> None: ...
-    @property
-    def device_id(self) -> int: ...
-    @property
-    def bank(self) -> int: ...
-    @property
-    def program(self) -> int: ...
-    @property
-    def name(self) -> str: ...
-    @property
-    def table(self) -> TuningTable: ...
-    def replace(
-        self,
-        *,
-        device_id: int = ...,
-        bank: int = ...,
-        program: int = ...,
-        name: str = ...,
-        table: TuningTable = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> KeyBasedDump: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
@@ -217,13 +181,15 @@ class ScaleOctaveDump(messages.Message):
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
-class SingleNoteChange(messages.Message):
+class NoteChange(messages.Message):
     def __init__(
         self,
         *,
         device_id: int,
         program: int,
         changes: list[NoteTuning] | tuple[NoteTuning, ...],
+        bank: int | None = None,
+        realtime: bool = True,
     ) -> None: ...
     @property
     def device_id(self) -> int: ...
@@ -231,51 +197,22 @@ class SingleNoteChange(messages.Message):
     def program(self) -> int: ...
     @property
     def changes(self) -> tuple[NoteTuning, ...]: ...
-    def replace(
-        self,
-        *,
-        device_id: int = ...,
-        program: int = ...,
-        changes: list[NoteTuning] | tuple[NoteTuning, ...] = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> SingleNoteChange: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
-
-class BankedNoteChange(messages.Message):
-    def __init__(
-        self,
-        *,
-        device_id: int,
-        bank: int,
-        program: int,
-        realtime: bool,
-        changes: list[NoteTuning] | tuple[NoteTuning, ...],
-    ) -> None: ...
     @property
-    def device_id(self) -> int: ...
-    @property
-    def bank(self) -> int: ...
-    @property
-    def program(self) -> int: ...
+    def bank(self) -> int | None: ...
     @property
     def realtime(self) -> bool: ...
-    @property
-    def changes(self) -> tuple[NoteTuning, ...]: ...
     def replace(
         self,
         *,
         device_id: int = ...,
-        bank: int = ...,
         program: int = ...,
-        realtime: bool = ...,
         changes: list[NoteTuning] | tuple[NoteTuning, ...] = ...,
+        bank: int | None = ...,
+        realtime: bool = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
-    ) -> BankedNoteChange: ...
+    ) -> NoteChange: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
 
@@ -320,14 +257,7 @@ class Decoded:
     def message(
         self,
     ) -> (
-        BulkDumpRequest
-        | BankedDumpRequest
-        | BulkDump
-        | KeyBasedDump
-        | ScaleOctaveDump
-        | SingleNoteChange
-        | BankedNoteChange
-        | ScaleOctaveChange
+        BulkDumpRequest | BulkDump | ScaleOctaveDump | NoteChange | ScaleOctaveChange
     ): ...
     @property
     def checksum(self) -> ChecksumStatus: ...
@@ -346,7 +276,7 @@ class ReplyTracker:
     def __init__(
         self,
         *,
-        request: BulkDumpRequest | BankedDumpRequest,
+        request: BulkDumpRequest,
         now_ns: int | str,
         timeout: float | str,
     ) -> None: ...
@@ -359,12 +289,9 @@ class ReplyTracker:
     def observe(
         self,
         message: BulkDumpRequest
-        | BankedDumpRequest
         | BulkDump
-        | KeyBasedDump
         | ScaleOctaveDump
-        | SingleNoteChange
-        | BankedNoteChange
+        | NoteChange
         | ScaleOctaveChange,
         *,
         now_ns: int | str,
@@ -402,7 +329,7 @@ class Query:
     def __init__(
         self,
         *,
-        request: BulkDumpRequest | BankedDumpRequest,
+        request: BulkDumpRequest,
         stream: str,
         timeout: float | str,
     ) -> None: ...
@@ -426,7 +353,7 @@ def bulk_dump(
     name: str,
     bank: int | None = None,
     preserve_unmapped: bool = False,
-) -> BulkDump | KeyBasedDump: ...
+) -> BulkDump: ...
 def note_changes(
     result: list[NoteTuning],
     *,
@@ -435,7 +362,7 @@ def note_changes(
     realtime: bool,
     bank: int | None = None,
     preserve_unmapped: bool = False,
-) -> list[SingleNoteChange | BankedNoteChange]: ...
+) -> list[NoteChange]: ...
 def query(
     query: Query,
     receiver: midi.Input,

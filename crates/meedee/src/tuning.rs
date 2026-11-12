@@ -35,10 +35,11 @@ pub fn bulk_dump(
         values[change.note as usize] = change.pitch;
     }
     let table = TuningTable(values);
-    match bank {
-        None => Ok(BulkDump::new(device_id, program, name, table)?.into()),
-        Some(bank) => Ok(KeyBasedDump::new(device_id, bank, program, name, table)?.into()),
+    let mut value = BulkDump::new(device_id, program, name, table)?;
+    if let Some(bank) = bank {
+        value = value.with_bank(bank)?;
     }
+    Ok(value.into())
 }
 
 /// Build ordered messages of at most 127 keys each. Unbanked changes must
@@ -59,14 +60,12 @@ pub fn note_changes(
     check_selection(result, preserve_unmapped)?;
     result
         .chunks(127)
-        .map(|part| match bank {
-            None => Ok(SingleNoteChange::new(device_id, program, part.to_vec())?.into()),
-            Some(bank) => {
-                Ok(
-                    BankedNoteChange::new(device_id, bank, program, realtime, part.to_vec())?
-                        .into(),
-                )
+        .map(|part| {
+            let mut value = NoteChange::new(device_id, program, part.to_vec())?;
+            if let Some(bank) = bank {
+                value = value.with_bank(bank)?;
             }
+            Ok(value.with_realtime(realtime)?.into())
         })
         .collect()
 }
@@ -277,21 +276,105 @@ pub struct ScaleConversion {
     pub error_cents: [f64; 12],
 }
 
-macro_rules! requests {
-    ($($name:ident { $($field:ident),* };)*) => { $(
-        #[derive(Clone, Debug)]
-        pub struct $name { metadata: Option<Box<crate::messages::Metadata>>, device_id:u8, $($field:u8),* }
-        crate::messages::value_metadata!($name { device_id, $($field),* });
-        impl $name {
-            pub fn new(device_id:i64, $($field:i64),*) -> Result<Self,ValueError> {
-                Ok(Self {metadata: None, device_id:range(device_id,127,"device_id")? as u8, $($field:range($field,127,stringify!($field))? as u8),*})
-            }
-            pub fn device_id(&self)->u8 {self.device_id}
-            $(pub fn $field(&self)->u8 {self.$field})*
-        }
-    )* };
+#[derive(Clone, Debug)]
+pub struct BulkDumpRequest {
+    metadata: Option<Box<crate::messages::Metadata>>,
+    device_id: u8,
+    program: u8,
+    bank: Option<u8>,
 }
-requests! { BulkDumpRequest {program}; BankedDumpRequest {bank,program}; }
+crate::messages::value_metadata!(BulkDumpRequest {
+    device_id,
+    program,
+    bank
+});
+impl BulkDumpRequest {
+    pub fn new(device_id: i64, program: i64) -> Result<Self, ValueError> {
+        Ok(Self {
+            metadata: None,
+            device_id: range(device_id, 127, "device_id")? as u8,
+            program: range(program, 127, "program")? as u8,
+            bank: None,
+        })
+    }
+    pub fn device_id(&self) -> u8 {
+        self.device_id
+    }
+    pub fn program(&self) -> u8 {
+        self.program
+    }
+    pub fn bank(&self) -> Option<u8> {
+        self.bank
+    }
+    pub fn with_bank(mut self, bank: i64) -> Result<Self, ValueError> {
+        self.bank = Some(range(bank, 127, "bank")? as u8);
+        Ok(self)
+    }
+    pub fn without_bank(mut self) -> Self {
+        self.bank = None;
+        self
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BulkDump {
+    metadata: Option<Box<crate::messages::Metadata>>,
+    device_id: u8,
+    program: u8,
+    bank: Option<u8>,
+    name: String,
+    table: TuningTable,
+}
+crate::messages::value_metadata!(BulkDump {
+    device_id,
+    program,
+    bank,
+    name,
+    table
+});
+impl BulkDump {
+    pub fn new(
+        device_id: i64,
+        program: i64,
+        name: String,
+        table: TuningTable,
+    ) -> Result<Self, ValueError> {
+        if !name.is_ascii() || name.len() > 16 {
+            return Err(error("tuning name must be at most 16 ASCII characters"));
+        }
+        Ok(Self {
+            metadata: None,
+            device_id: range(device_id, 127, "device_id")? as u8,
+            program: range(program, 127, "program")? as u8,
+            bank: None,
+            name: format!("{name:<16}"),
+            table,
+        })
+    }
+    pub fn device_id(&self) -> u8 {
+        self.device_id
+    }
+    pub fn program(&self) -> u8 {
+        self.program
+    }
+    pub fn bank(&self) -> Option<u8> {
+        self.bank
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn table(&self) -> &TuningTable {
+        &self.table
+    }
+    pub fn with_bank(mut self, bank: i64) -> Result<Self, ValueError> {
+        self.bank = Some(range(bank, 127, "bank")? as u8);
+        Ok(self)
+    }
+    pub fn without_bank(mut self) -> Self {
+        self.bank = None;
+        self
+    }
+}
 
 macro_rules! dumps {
     ($($name:ident {$($extra:ident),*} $value:ident : $ty:ty;)*) => { $(
@@ -312,24 +395,26 @@ macro_rules! dumps {
     )* };
 }
 dumps! {
-    BulkDump {} table:TuningTable;
-    KeyBasedDump {bank} table:TuningTable;
     ScaleOctaveDump {bank} offsets:ScaleOffsets;
 }
 #[derive(Clone, Debug)]
-pub struct SingleNoteChange {
+pub struct NoteChange {
     metadata: Option<Box<crate::messages::Metadata>>,
     device_id: u8,
     program: u8,
+    bank: Option<u8>,
+    realtime: bool,
     changes: Box<[NoteTuning]>,
 }
-impl SingleNoteChange {
+impl NoteChange {
     pub fn new(device_id: i64, program: i64, changes: Vec<NoteTuning>) -> Result<Self, ValueError> {
         check_changes(&changes)?;
         Ok(Self {
             metadata: None,
             device_id: range(device_id, 127, "device_id")? as u8,
             program: range(program, 127, "program")? as u8,
+            bank: None,
+            realtime: true,
             changes: changes.into_boxed_slice(),
         })
     }
@@ -342,48 +427,29 @@ impl SingleNoteChange {
     pub fn changes(&self) -> &[NoteTuning] {
         &self.changes
     }
-}
-#[derive(Clone, Debug)]
-pub struct BankedNoteChange {
-    metadata: Option<Box<crate::messages::Metadata>>,
-    device_id: u8,
-    bank: u8,
-    program: u8,
-    realtime: bool,
-    changes: Box<[NoteTuning]>,
-}
-impl BankedNoteChange {
-    pub fn new(
-        device_id: i64,
-        bank: i64,
-        program: i64,
-        realtime: bool,
-        changes: Vec<NoteTuning>,
-    ) -> Result<Self, ValueError> {
-        check_changes(&changes)?;
-        Ok(Self {
-            metadata: None,
-            device_id: range(device_id, 127, "device_id")? as u8,
-            bank: range(bank, 127, "bank")? as u8,
-            program: range(program, 127, "program")? as u8,
-            realtime,
-            changes: changes.into_boxed_slice(),
-        })
-    }
-    pub fn device_id(&self) -> u8 {
-        self.device_id
-    }
-    pub fn bank(&self) -> u8 {
+    pub fn bank(&self) -> Option<u8> {
         self.bank
-    }
-    pub fn program(&self) -> u8 {
-        self.program
     }
     pub fn realtime(&self) -> bool {
         self.realtime
     }
-    pub fn changes(&self) -> &[NoteTuning] {
-        &self.changes
+    pub fn with_bank(mut self, bank: i64) -> Result<Self, ValueError> {
+        self.bank = Some(range(bank, 127, "bank")? as u8);
+        Ok(self)
+    }
+    pub fn without_bank(mut self) -> Result<Self, ValueError> {
+        if !self.realtime {
+            return Err(error("unbanked note changes must be real-time"));
+        }
+        self.bank = None;
+        Ok(self)
+    }
+    pub fn with_realtime(mut self, realtime: bool) -> Result<Self, ValueError> {
+        if self.bank.is_none() && !realtime {
+            return Err(error("unbanked note changes must be real-time"));
+        }
+        self.realtime = realtime;
+        Ok(self)
     }
 }
 #[derive(Clone, Debug)]
@@ -451,12 +517,9 @@ macro_rules! message_types {
 }
 message_types!(
     BulkDumpRequest,
-    BankedDumpRequest,
     BulkDump,
-    KeyBasedDump,
     ScaleOctaveDump,
-    SingleNoteChange,
-    BankedNoteChange,
+    NoteChange,
     ScaleOctaveChange
 );
 impl PrimitiveMessage for TuningMessage {
@@ -465,19 +528,18 @@ impl PrimitiveMessage for TuningMessage {
         let mut checksum = false;
         match self {
             Self::BulkDumpRequest(value) => {
-                payload.extend([126, value.device_id, 8, 0, value.program])
-            }
-            Self::BankedDumpRequest(value) => {
-                payload.extend([126, value.device_id, 8, 3, value.bank, value.program])
+                if let Some(bank) = value.bank {
+                    payload.extend([126, value.device_id, 8, 3, bank, value.program]);
+                } else {
+                    payload.extend([126, value.device_id, 8, 0, value.program]);
+                }
             }
             Self::BulkDump(value) => {
-                payload.extend([126, value.device_id, 8, 1, value.program]);
-                payload.extend(value.name.bytes());
-                push_table(&mut payload, &value.table);
-                checksum = true;
-            }
-            Self::KeyBasedDump(value) => {
-                payload.extend([126, value.device_id, 8, 4, value.bank, value.program]);
+                if let Some(bank) = value.bank {
+                    payload.extend([126, value.device_id, 8, 4, bank, value.program]);
+                } else {
+                    payload.extend([126, value.device_id, 8, 1, value.program]);
+                }
                 payload.extend(value.name.bytes());
                 push_table(&mut payload, &value.table);
                 checksum = true;
@@ -495,27 +557,28 @@ impl PrimitiveMessage for TuningMessage {
                 payload.extend(value.offsets.bytes());
                 checksum = true;
             }
-            Self::SingleNoteChange(value) => {
-                payload.extend([
-                    127,
-                    value.device_id,
-                    8,
-                    2,
-                    value.program,
-                    value.changes.len() as u8,
-                ]);
-                push_changes(&mut payload, &value.changes);
-            }
-            Self::BankedNoteChange(value) => {
-                payload.extend([
-                    if value.realtime { 127 } else { 126 },
-                    value.device_id,
-                    8,
-                    7,
-                    value.bank,
-                    value.program,
-                    value.changes.len() as u8,
-                ]);
+            Self::NoteChange(value) => {
+                let rt = if value.realtime { 127 } else { 126 };
+                if let Some(bank) = value.bank {
+                    payload.extend([
+                        rt,
+                        value.device_id,
+                        8,
+                        7,
+                        bank,
+                        value.program,
+                        value.changes.len() as u8,
+                    ]);
+                } else {
+                    payload.extend([
+                        rt,
+                        value.device_id,
+                        8,
+                        2,
+                        value.program,
+                        value.changes.len() as u8,
+                    ]);
+                }
                 push_changes(&mut payload, &value.changes);
             }
             Self::ScaleOctaveChange(value) => {
@@ -587,7 +650,9 @@ pub fn decode(message: &SysEx) -> Result<Option<Decoded>, ValueError> {
         }
         3 => {
             length(p, 6)?;
-            BankedDumpRequest::new(id, p[4] as i64, p[5] as i64)?.into()
+            BulkDumpRequest::new(id, p[5] as i64)?
+                .with_bank(p[4] as i64)?
+                .into()
         }
         1 | 4 | 5 | 6 => {
             let header = if kind == 1 { 5 } else { 6 };
@@ -609,7 +674,8 @@ pub fn decode(message: &SysEx) -> Result<Option<Decoded>, ValueError> {
             let data = &p[header + 16..p.len() - 1];
             match kind {
                 1 => BulkDump::new(id, p[4] as i64, name, decode_table(data))?.into(),
-                4 => KeyBasedDump::new(id, p[4] as i64, p[5] as i64, name, decode_table(data))?
+                4 => BulkDump::new(id, p[5] as i64, name, decode_table(data))?
+                    .with_bank(p[4] as i64)?
                     .into(),
                 _ => ScaleOctaveDump::new(
                     id,
@@ -636,9 +702,12 @@ pub fn decode(message: &SysEx) -> Result<Option<Decoded>, ValueError> {
                 })
                 .collect();
             if kind == 2 {
-                SingleNoteChange::new(id, p[4] as i64, changes)?.into()
+                NoteChange::new(id, p[4] as i64, changes)?.into()
             } else {
-                BankedNoteChange::new(id, p[4] as i64, p[5] as i64, rt, changes)?.into()
+                NoteChange::new(id, p[5] as i64, changes)?
+                    .with_bank(p[4] as i64)?
+                    .with_realtime(rt)?
+                    .into()
             }
         }
         _ => {
@@ -680,10 +749,7 @@ pub struct ReplyTracker {
 impl ReplyTracker {
     pub fn new(request: &TuningMessage, now_ns: u64, timeout_ns: u64) -> Result<Self, ValueError> {
         let (device_id, bank, program) = match request {
-            TuningMessage::BulkDumpRequest(value) => (value.device_id, None, value.program),
-            TuningMessage::BankedDumpRequest(value) => {
-                (value.device_id, Some(value.bank), value.program)
-            }
+            TuningMessage::BulkDumpRequest(value) => (value.device_id, value.bank, value.program),
             _ => return Err(error("tracker requires a dump request")),
         };
         if device_id == 127 {
@@ -734,12 +800,7 @@ impl ReplyTracker {
         }
         let matches = match message {
             TuningMessage::BulkDump(value) => {
-                self.bank.is_none()
-                    && value.device_id == self.device_id
-                    && value.program == self.program
-            }
-            TuningMessage::KeyBasedDump(value) => {
-                self.bank == Some(value.bank)
+                self.bank == value.bank
                     && value.device_id == self.device_id
                     && value.program == self.program
             }
@@ -817,13 +878,7 @@ fn decode_table(data: &[u8]) -> TuningTable {
     TuningTable(values)
 }
 
-crate::messages::value_metadata!(SingleNoteChange {
-    device_id,
-    program,
-    changes
-});
-
-crate::messages::value_metadata!(BankedNoteChange {
+crate::messages::value_metadata!(NoteChange {
     device_id,
     bank,
     program,

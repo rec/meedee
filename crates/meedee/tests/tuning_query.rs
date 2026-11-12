@@ -6,7 +6,7 @@ use meedee::{
     },
     messages::SysEx,
     tuning::Query,
-    tuning::{BankedDumpRequest, BulkDumpRequest, ChecksumStatus},
+    tuning::{BulkDumpRequest, ChecksumStatus},
 };
 
 fn dump(kind: &str) -> SysEx {
@@ -71,9 +71,12 @@ fn matched_legacy_bytes_are_retained_without_checksum_normalization() {
 }
 #[test]
 fn existing_banked_matching_accepts_both_dump_kinds_and_ignores_wrong_programs() {
-    for kind in ["KeyBasedDump", "ScaleOctaveDump7", "ScaleOctaveDump14"] {
+    for kind in ["BulkDumpBanked", "ScaleOctaveDump7", "ScaleOctaveDump14"] {
         let mut q = Query::new(
-            BankedDumpRequest::new(1, 3, 2).unwrap().into(),
+            BulkDumpRequest::new(1, 2)
+                .and_then(|v| v.with_bank(3))
+                .unwrap()
+                .into(),
             "s".into(),
             10,
         )

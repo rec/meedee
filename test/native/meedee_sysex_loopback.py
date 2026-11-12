@@ -25,7 +25,7 @@ def connect(name: str, run_in_subprocess: bool) -> midi.Output:
 def respond(
     receiver: midi.Input,
     output: midi.Output,
-    request: tuning.BulkDumpRequest | tuning.BankedDumpRequest,
+    request: tuning.BulkDumpRequest,
     reply: messages.SysEx,
 ) -> None:
     received = receiver.receive(timeout=3)
@@ -76,21 +76,19 @@ def exercise(run_in_subprocess: bool, directory: Path) -> None:
         assert capture_path.read_bytes() == expected
 
         table = tuning.TuningTable(values=[tuning.NoChange() for _ in range(128)])
-        cases: list[
-            tuple[tuning.BulkDumpRequest | tuning.BankedDumpRequest, messages.Message]
-        ] = [
+        cases: list[tuple[tuning.BulkDumpRequest, messages.Message]] = [
             (
                 tuning.BulkDumpRequest(device_id=1, program=2),
                 tuning.BulkDump(device_id=1, program=2, name="virtual", table=table),
             ),
             (
-                tuning.BankedDumpRequest(device_id=1, bank=3, program=2),
-                tuning.KeyBasedDump(
+                tuning.BulkDumpRequest(device_id=1, bank=3, program=2),
+                tuning.BulkDump(
                     device_id=1, bank=3, program=2, name="virtual", table=table
                 ),
             ),
             (
-                tuning.BankedDumpRequest(device_id=1, bank=3, program=2),
+                tuning.BulkDumpRequest(device_id=1, bank=3, program=2),
                 tuning.ScaleOctaveDump(
                     device_id=1,
                     bank=3,

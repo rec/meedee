@@ -1066,11 +1066,9 @@ impl Universe {
             return;
         }
         let (device, bank, program) = match message {
-            BulkDump(v) => (v.device_id(), None, v.program()),
-            KeyBasedDump(v) => (v.device_id(), Some(v.bank()), v.program()),
+            BulkDump(v) => (v.device_id(), v.bank(), v.program()),
             ScaleOctaveDump(v) => (v.device_id(), Some(v.bank()), v.program()),
-            SingleNoteChange(v) => (v.device_id(), None, v.program()),
-            BankedNoteChange(v) => (v.device_id(), Some(v.bank()), v.program()),
+            NoteChange(v) => (v.device_id(), v.bank(), v.program()),
             _ => return,
         };
         let state = entry(
@@ -1089,21 +1087,11 @@ impl Universe {
             BulkDump(v) => {
                 update_table(state, v.table());
             }
-            KeyBasedDump(v) => {
-                update_table(state, v.table());
-            }
             ScaleOctaveDump(v) => {
                 state.notes.clear();
                 state.offsets = Some(v.offsets().clone());
             }
-            SingleNoteChange(v) => {
-                for change in v.changes() {
-                    if change.pitch() != tuning::TuningValue::NoChange {
-                        state.notes.insert(change.note(), change.pitch());
-                    }
-                }
-            }
-            BankedNoteChange(v) => {
+            NoteChange(v) => {
                 for change in v.changes() {
                     if change.pitch() != tuning::TuningValue::NoChange {
                         state.notes.insert(change.note(), change.pitch());

@@ -107,9 +107,7 @@ def test_complete_bulk_export_is_transfer_ready_and_refuses_overwrite(
     assert len(plan) == 1
     decoded = tuning.decode(plan[0])
     assert decoded is not None and decoded.checksum == tuning.ChecksumStatus.Matches
-    assert isinstance(
-        decoded.message, tuning.BulkDump if bank is None else tuning.KeyBasedDump
-    )
+    assert isinstance(decoded.message, tuning.BulkDump) and decoded.message.bank == bank
     before = destination.read_bytes()
     assert invoke(args) == 2 and capsys.readouterr().err
     assert destination.read_bytes() == before

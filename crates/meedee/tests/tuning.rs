@@ -14,17 +14,24 @@ fn changes() -> Vec<NoteTuning> {
 
 #[test]
 fn bulk_builders_preserve_unmapped_keys_and_exact_transfer_bytes() {
+    let request = BulkDumpRequest::new(1, 2).unwrap();
+    assert_eq!(request.bank(), None);
+    let banked = request.clone().with_bank(0).unwrap();
+    assert_ne!(request, banked);
+    assert_eq!(banked.without_bank(), request);
+    let change = NoteChange::new(1, 2, changes()).unwrap();
+    assert!(change.realtime() && change.bank().is_none());
+    assert!(change.clone().with_realtime(false).is_err());
+    let quiet = change.with_bank(0).unwrap().with_realtime(false).unwrap();
+    assert!(quiet.clone().without_bank().is_err());
+    assert!(quiet.with_realtime(true).unwrap().without_bank().is_ok());
     let notes = changes();
     assert!(bulk_dump(&notes, 1, 2, "partial".into(), None, false).is_err());
     for bank in [None, Some(3)] {
         let dump = bulk_dump(&notes, 127, 2, "partial".into(), bank, true).unwrap();
         let table = match &dump {
             TuningMessage::BulkDump(d) => {
-                assert!(bank.is_none());
-                d.table()
-            }
-            TuningMessage::KeyBasedDump(d) => {
-                assert_eq!(Some(i64::from(d.bank())), bank);
+                assert_eq!(d.bank().map(i64::from), bank);
                 d.table()
             }
             _ => panic!("expected bulk dump"),
@@ -59,11 +66,8 @@ fn full_keyboard_builders_preserve_order_and_split_at_127_keys() {
             let batches: Vec<_> = messages
                 .iter()
                 .map(|m| match m {
-                    TuningMessage::SingleNoteChange(m) => {
-                        assert!(bank.is_none());
-                        m.changes()
-                    }
-                    TuningMessage::BankedNoteChange(m) => {
+                    TuningMessage::NoteChange(m) => {
+                        assert_eq!(m.bank().map(i64::from), bank);
                         assert_eq!(m.realtime(), realtime);
                         m.changes()
                     }
@@ -103,9 +107,13 @@ fn builders_reject_invalid_selections_and_require_explicit_preservation() {
 fn message(name: &str) -> TuningMessage {
     match name {
         "BulkDumpRequest" => BulkDumpRequest::new(1, 2).unwrap().into(),
-        "BankedDumpRequest" => BankedDumpRequest::new(1, 3, 2).unwrap().into(),
+        "BulkDumpRequestBanked" => BulkDumpRequest::new(1, 2)
+            .and_then(|v| v.with_bank(3))
+            .unwrap()
+            .into(),
         "BulkDump" => BulkDump::new(1, 2, "".into(), table()).unwrap().into(),
-        "KeyBasedDump" => KeyBasedDump::new(1, 3, 2, "".into(), table())
+        "BulkDumpBanked" => BulkDump::new(1, 2, "".into(), table())
+            .and_then(|v| v.with_bank(3))
             .unwrap()
             .into(),
         "ScaleOctaveDump7" | "ScaleOctaveDump14" => ScaleOctaveDump::new(
@@ -117,12 +125,12 @@ fn message(name: &str) -> TuningMessage {
         )
         .unwrap()
         .into(),
-        "SingleNoteChange" => SingleNoteChange::new(1, 2, changes()).unwrap().into(),
-        "BankedNoteChangeTrue" | "BankedNoteChangeFalse" => {
-            BankedNoteChange::new(1, 3, 2, name.ends_with("True"), changes())
-                .unwrap()
-                .into()
-        }
+        "NoteChange" => NoteChange::new(1, 2, changes()).unwrap().into(),
+        "NoteChangeBankedTrue" | "NoteChangeBankedFalse" => NoteChange::new(1, 2, changes())
+            .and_then(|v| v.with_bank(3))
+            .and_then(|v| v.with_realtime(name.ends_with("True")))
+            .unwrap()
+            .into(),
         _ => ScaleOctaveChange::new(
             1,
             name.ends_with("True"),
@@ -179,14 +187,12 @@ fn recognized_payloads_require_exact_lengths_and_modern_checksums() {
         assert!(decode(&SysEx::new(extra).unwrap()).is_err());
         if matches!(
             message,
-            TuningMessage::BulkDump(_)
-                | TuningMessage::KeyBasedDump(_)
-                | TuningMessage::ScaleOctaveDump(_)
+            TuningMessage::BulkDump(_) | TuningMessage::ScaleOctaveDump(_)
         ) {
             let mut bad = data.to_vec();
             *bad.last_mut().unwrap() ^= 1;
             let result = decode(&SysEx::new(bad).unwrap());
-            if matches!(message, TuningMessage::BulkDump(_)) {
+            if matches!(&message, TuningMessage::BulkDump(v) if v.bank().is_none()) {
                 assert_eq!(
                     result.unwrap().unwrap().checksum,
                     ChecksumStatus::LegacyMismatch
@@ -251,7 +257,7 @@ fn exact_pitch_sentinel_and_quantization_boundaries() {
         NoteTuning::new(0, TuningValue::NoChange).unwrap(),
         NoteTuning::new(127, TuningValue::Pitch(Pitch::new(127, 16382).unwrap())).unwrap(),
     ];
-    let message: TuningMessage = SingleNoteChange::new(127, 127, notes).unwrap().into();
+    let message: TuningMessage = NoteChange::new(127, 127, notes).unwrap().into();
     let wire = message.encode().unwrap();
     assert_eq!(&wire[8..11], &[127, 127, 127]);
     assert_eq!(&wire[12..15], &[127, 127, 126]);
@@ -310,17 +316,18 @@ fn scale_offsets_use_signed_exact_units_and_report_error() {
     assert!(TuningTable::new(vec![TuningValue::NoChange; 127]).is_err());
     assert!(BulkDump::new(1, 0, "é".into(), table()).is_err());
     assert!(BulkDump::new(1, 0, "abcdefghijklmnopq".into(), table()).is_err());
-    assert!(SingleNoteChange::new(0, 0, vec![changes()[0].clone(); 128]).is_err());
+    assert!(NoteChange::new(0, 0, vec![changes()[0].clone(); 128]).is_err());
     assert!(ScaleOctaveChange::new(0, false, vec![1, 1], scale(7)).is_err());
 }
 #[test]
 fn request_matching_is_bounded_unicast_and_terminal() {
-    let request = message("BankedDumpRequest");
+    let request = message("BulkDumpRequestBanked");
     let mut tracker = ReplyTracker::new(&request, 100, 10).unwrap();
     assert!(!tracker.observe(&message("BulkDump"), 101).unwrap());
     assert!(!tracker
         .observe(
-            &KeyBasedDump::new(2, 3, 2, "".into(), table())
+            &BulkDump::new(2, 2, "".into(), table())
+                .and_then(|v| v.with_bank(3))
                 .unwrap()
                 .into(),
             102
@@ -328,7 +335,8 @@ fn request_matching_is_bounded_unicast_and_terminal() {
         .unwrap());
     assert!(!tracker
         .observe(
-            &KeyBasedDump::new(1, 4, 2, "".into(), table())
+            &BulkDump::new(1, 2, "".into(), table())
+                .and_then(|v| v.with_bank(4))
                 .unwrap()
                 .into(),
             103
@@ -336,7 +344,8 @@ fn request_matching_is_bounded_unicast_and_terminal() {
         .unwrap());
     assert!(!tracker
         .observe(
-            &KeyBasedDump::new(1, 3, 3, "".into(), table())
+            &BulkDump::new(1, 3, "".into(), table())
+                .and_then(|v| v.with_bank(3))
                 .unwrap()
                 .into(),
             104
@@ -344,10 +353,10 @@ fn request_matching_is_bounded_unicast_and_terminal() {
         .unwrap());
     assert!(tracker.observe(&message("ScaleOctaveDump7"), 109).unwrap());
     assert_eq!(tracker.status(), RequestStatus::Completed);
-    assert!(!tracker.observe(&message("KeyBasedDump"), 110).unwrap());
+    assert!(!tracker.observe(&message("BulkDumpBanked"), 110).unwrap());
     assert_eq!(tracker.cancel(), RequestStatus::Completed);
     let mut tracker = ReplyTracker::new(&request, 100, 10).unwrap();
-    assert!(!tracker.observe(&message("KeyBasedDump"), 110).unwrap());
+    assert!(!tracker.observe(&message("BulkDumpBanked"), 110).unwrap());
     assert_eq!(tracker.status(), RequestStatus::TimedOut);
     assert!(tracker.poll(109).is_err());
     let mut tracker = ReplyTracker::new(&message("BulkDumpRequest"), 0, 10).unwrap();

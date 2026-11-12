@@ -199,21 +199,28 @@ impl ScaleConversion {
     }
 }
 
+macro_rules! tuning_annotation {
+    (optional_int, $py:ident, $annotation:ty) => {
+        $py.import("typing")?
+            .getattr("Optional")?
+            .get_item($py.get_type::<$annotation>())?
+    };
+    ($read:ident, $py:ident, $annotation:ty) => {
+        $py.get_type::<$annotation>().into_any()
+    };
+}
+fn optional_number(py: Python<'_>, value: Option<u8>) -> PyResult<Bound<'_, PyAny>> {
+    value.into_bound_py_any(py)
+}
+
 macro_rules! message_classes {
-    ($($name:ident { $($field:ident : $read:ident => $write:ident : $annotation:ty),* };)*) => {
+    ($($name:ident { $($field:ident : $read:ident => $write:ident : $annotation:ty),* } {$($constructor:item)*};)*) => {
         $(
             #[pyclass(frozen, extends = Message, module = "meedee.tuning")]
             struct $name { value: model::$name }
             #[pymethods]
             impl $name {
-                #[new]
-                #[pyo3(signature = (*, $($field),*))]
-                fn new($($field: &Bound<'_, PyAny>),*) -> PyResult<PyClassInitializer<Self>> {
-                    Ok(PyClassInitializer::from(Message::default()).add_subclass(Self {
-                        value: model::$name::new($(self::$read($field)?),*)
-                            .map_err(value_error)?,
-                    }))
-                }
+                $($constructor)*
                 $(#[getter]
                 fn $field<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
                     $write(py, self.value.$field())
@@ -242,7 +249,7 @@ macro_rules! message_classes {
                 #[classattr]
                 fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
                     let fields = PyDict::new(py);
-                    $(fields.set_item(stringify!($field), py.get_type::<$annotation>())?;)*
+                    $(fields.set_item(stringify!($field), tuning_annotation!($read, py, $annotation))?;)*
                     Ok(fields)
                 }
             }
@@ -272,14 +279,45 @@ macro_rules! message_classes {
     };
 }
 message_classes! {
-    BulkDumpRequest {device_id:int=>number:PyInt,program:int=>number:PyInt};
-    BankedDumpRequest {device_id:int=>number:PyInt,bank:int=>number:PyInt,program:int=>number:PyInt};
-    BulkDump {device_id:int=>number:PyInt,program:int=>number:PyInt,name:text=>string:PyString,table:table=>table_object:TuningTable};
-    KeyBasedDump {device_id:int=>number:PyInt,bank:int=>number:PyInt,program:int=>number:PyInt,name:text=>string:PyString,table:table=>table_object:TuningTable};
-    ScaleOctaveDump {device_id:int=>number:PyInt,bank:int=>number:PyInt,program:int=>number:PyInt,name:text=>string:PyString,offsets:offsets=>offsets_object:ScaleOffsets};
-    SingleNoteChange {device_id:int=>number:PyInt,program:int=>number:PyInt,changes:changes=>changes_tuple:PyTuple};
-    BankedNoteChange {device_id:int=>number:PyInt,bank:int=>number:PyInt,program:int=>number:PyInt,realtime:flag=>boolean:PyBool,changes:changes=>changes_tuple:PyTuple};
-    ScaleOctaveChange {device_id:int=>number:PyInt,realtime:flag=>boolean:PyBool,channels:channels=>integer_tuple:PyTuple,offsets:offsets=>offsets_object:ScaleOffsets};
+    BulkDumpRequest {device_id:int=>number:PyInt,program:int=>number:PyInt,bank:optional_int=>optional_number:PyInt} {
+        #[new] #[pyo3(signature=(*,device_id,program,bank=None))]
+        fn new(device_id: &Bound<'_, PyAny>, program: &Bound<'_, PyAny>, bank: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
+            let mut value = model::BulkDumpRequest::new(int(device_id)?, int(program)?).map_err(value_error)?;
+            if let Some(bank) = bank { value = value.with_bank(int(bank)?).map_err(value_error)?; }
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+    };
+    BulkDump {device_id:int=>number:PyInt,program:int=>number:PyInt,name:text=>string:PyString,table:table=>table_object:TuningTable,bank:optional_int=>optional_number:PyInt} {
+        #[new] #[pyo3(signature=(*,device_id,program,name,table,bank=None))]
+        fn new(device_id: &Bound<'_, PyAny>, program: &Bound<'_, PyAny>, name: &Bound<'_, PyAny>, table: &Bound<'_, PyAny>, bank: Option<&Bound<'_, PyAny>>) -> PyResult<PyClassInitializer<Self>> {
+            let mut value = model::BulkDump::new(int(device_id)?, int(program)?, text(name)?, self::table(table)?).map_err(value_error)?;
+            if let Some(bank) = bank { value = value.with_bank(int(bank)?).map_err(value_error)?; }
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+    };
+    ScaleOctaveDump {device_id:int=>number:PyInt,bank:int=>number:PyInt,program:int=>number:PyInt,name:text=>string:PyString,offsets:offsets=>offsets_object:ScaleOffsets} {
+        #[new] #[pyo3(signature=(*,device_id,bank,program,name,offsets))]
+        fn new(device_id: &Bound<'_, PyAny>, bank: &Bound<'_, PyAny>, program: &Bound<'_, PyAny>, name: &Bound<'_, PyAny>, offsets: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
+            let value = model::ScaleOctaveDump::new(int(device_id)?, int(bank)?, int(program)?, text(name)?, self::offsets(offsets)?).map_err(value_error)?;
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+    };
+    NoteChange {device_id:int=>number:PyInt,program:int=>number:PyInt,changes:changes=>changes_tuple:PyTuple,bank:optional_int=>optional_number:PyInt,realtime:flag=>boolean:PyBool} {
+        #[new] #[pyo3(signature=(*,device_id,program,changes,bank=None,realtime=true))]
+        fn new(device_id: &Bound<'_, PyAny>, program: &Bound<'_, PyAny>, changes: &Bound<'_, PyAny>, bank: Option<&Bound<'_, PyAny>>, #[pyo3(from_py_with=flag)] realtime: bool) -> PyResult<PyClassInitializer<Self>> {
+            let mut value = model::NoteChange::new(int(device_id)?, int(program)?, self::changes(changes)?).map_err(value_error)?;
+            if let Some(bank) = bank { value = value.with_bank(int(bank)?).map_err(value_error)?; }
+            value = value.with_realtime(realtime).map_err(value_error)?;
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+    };
+    ScaleOctaveChange {device_id:int=>number:PyInt,realtime:flag=>boolean:PyBool,channels:channels=>integer_tuple:PyTuple,offsets:offsets=>offsets_object:ScaleOffsets} {
+        #[new] #[pyo3(signature=(*,device_id,realtime,channels,offsets))]
+        fn new(device_id: &Bound<'_, PyAny>, realtime: &Bound<'_, PyAny>, channels: &Bound<'_, PyAny>, offsets: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
+            let value = model::ScaleOctaveChange::new(int(device_id)?, flag(realtime)?, self::channels(channels)?, self::offsets(offsets)?).map_err(value_error)?;
+            Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+        }
+    };
 }
 #[pyclass(eq, frozen, from_py_object, module = "meedee.tuning")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
