@@ -325,14 +325,14 @@ bytes do not become an amount. A step invalidates cached coarse data because
 the new absolute value is unknown. Observation ranges include selector context
 for parameters and the contributing coarse/fine inputs for generic controls.
 
-Selector halves may arrive in either order. After a complete selection is edited,
-or a family changes, both halves must be observed afresh. Previous selection/data
-context is invalidated with a diagnostic. Data received while selection is
+Selector halves may arrive in either order. Editing one half retains the other
+half within the same family. Every selector message clears cached Data Entry.
+Switching families clears both selector halves and emits SelectionInvalidated,
+so both halves must be observed afresh. Data received while selection is
 missing/partial yields MissingSelection/IncompleteSelection; a fine value without
 coarse data yields MissingCoarse. A normal first selector simply waits for its
 partner; the incomplete diagnostic is emitted if parameter data arrives too soon.
-This intentionally declines compliant devices that change only one selector
-half, rather than guessing inherited context. RPN-null clears both families.
+RPN-null clears both families.
 
 `reset()` clears source binding, clock and interpretation state, returning nothing.
 Clock changes emit a StateReset diagnostic on an enclosing observation carrying

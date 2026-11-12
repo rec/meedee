@@ -160,8 +160,8 @@ the failed step may have effects, and process loss/timeouts leave progress unkno
 There is no retry or post-failure cleanup send, so parameter selection can remain
 active or partially changed. In-process failed connections retain ownership until
 teardown, even while rejecting sends. The optional interpreter cannot repair
-unknown loss and deliberately declines single-half edits to a completed parameter
-selection. Callers retain raw messages and reset source state after known loss.
+unknown loss. It retains selector halves for single-half edits within a family;
+callers retain raw messages and reset source state after known loss.
 
 MTS interpretation is explicit; the byte decoder continues to return SysEx.
 Original bulk-dump checksum mismatches are accepted with status because the

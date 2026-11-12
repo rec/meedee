@@ -619,6 +619,10 @@ words and raises an exception on failure.
 
 The same interpreter accepts plain `events::Payload` messages and messages with
 source/timing metadata. Keep one instance per source.
+For example, CC 99=1 and CC 98=2 select NRPN 130. A later CC 98=3
+selects NRPN 131 using the retained MSB. Send a fresh CC 6 before CC 38;
+selector messages clear cached Data Entry. Switching to RPN requires both
+RPN selector halves.
 
 ```rust
 use meedee::controls::ControlInterpreter;

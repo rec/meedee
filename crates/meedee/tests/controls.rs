@@ -134,38 +134,46 @@ fn fine_controls_follow_wire_order_and_keep_only_the_known_coarse_component() {
 }
 
 #[test]
-fn edited_and_switched_selectors_require_fresh_halves_and_never_donate_data() {
-    let mut interpreter = ControlInterpreter::new(None).unwrap();
-    cc(&mut interpreter, 1, 99, 1);
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 6, 2)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::IncompleteSelection)
-    );
-    cc(&mut interpreter, 1, 98, 2);
-    cc(&mut interpreter, 1, 6, 3);
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 38, 4)[0], Observation::Parameter(v) if v.parameter == 130 && v.value == 388 && v.first_index == 0 && v.last_index == 4)
-    );
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 98, 3)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::SelectionInvalidated)
-    );
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 6, 7)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::IncompleteSelection)
-    );
-    cc(&mut interpreter, 1, 99, 1);
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 38, 4)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
-    );
-    cc(&mut interpreter, 1, 6, 7);
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 100, 2)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::SelectionInvalidated)
-    );
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 38, 3)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::IncompleteSelection)
-    );
-    cc(&mut interpreter, 1, 101, 0);
-    assert!(
-        matches!(&cc(&mut interpreter, 1, 38, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
-    );
+fn selector_edits_retain_the_other_half_but_not_data() {
+    for (family, msb, lsb, other_msb, other_lsb) in [
+        (ParameterFamily::Nrpn, 99, 98, 101, 100),
+        (ParameterFamily::Rpn, 101, 100, 99, 98),
+    ] {
+        let mut interpreter = ControlInterpreter::new(None).unwrap();
+        cc(&mut interpreter, 1, msb, 1);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 6, 2)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::IncompleteSelection)
+        );
+        cc(&mut interpreter, 1, lsb, 2);
+        cc(&mut interpreter, 1, 6, 3);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 4)[0], Observation::Parameter(v) if v.parameter == 130 && v.value == 388 && v.first_index == 0 && v.last_index == 4)
+        );
+        assert!(cc(&mut interpreter, 1, lsb, 3).is_empty());
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 4)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 6, 7)[0], Observation::Parameter(v) if v.family == family && v.parameter == 131 && v.value == 7 && v.resolution == 7 && v.first_index == 0 && v.last_index == 7)
+        );
+        assert!(cc(&mut interpreter, 1, msb, 2).is_empty());
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 4)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 6, 8)[0], Observation::Parameter(v) if v.family == family && v.parameter == 259 && v.value == 8 && v.first_index == 5 && v.last_index == 10)
+        );
+        assert!(
+            matches!(&cc(&mut interpreter, 1, other_lsb, 2)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::SelectionInvalidated)
+        );
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 3)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::IncompleteSelection)
+        );
+        cc(&mut interpreter, 1, other_msb, 0);
+        assert!(
+            matches!(&cc(&mut interpreter, 1, 38, 1)[0], Observation::Diagnostic(d) if d.kind == DiagnosticKind::MissingCoarse)
+        );
+    }
 }
 
 #[test]

@@ -615,10 +615,10 @@ can still interleave traffic on the device.
 The optional interpreter returns frozen, indexed observations and diagnostics
 alongside your retained raw stream. It never fabricates a missing fine value or
 an absolute value from a relative step. A new coarse CC forgets old fine state;
-repeated fine updates can use that known coarse value. A changed complete RPN/
-NRPN selection requires both halves afresh, a deliberate conservative policy
-that declines single-half selector edits. Bank Select and Data Entry are not
-presented as generic knobs. Reset after known loss/reconnect; SystemReset and
+repeated fine updates can use that known coarse value. RPN/NRPN selector edits
+retain the other half within the same family and clear cached Data Entry.
+Switching families requires both selector halves afresh. Bank Select and Data
+Entry are not presented as generic knobs. Reset after known loss/reconnect; SystemReset and
 Reset All Controllers invalidate the applicable local state automatically.
 Observations preserve available source and timing metadata. Plain messages need
 no metadata. Source identity changes require reset; clock changes and reported

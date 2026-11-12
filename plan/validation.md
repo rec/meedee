@@ -773,6 +773,16 @@ reset. Raw transport, primitive codecs and timestamps retain their existing
 surface. Rust's approved common Message marker now has PrimitiveMessage and
 Command subtraits; free primitive encoding retains its behavior.
 
+The 2026-11-12 selector update supersedes the fresh-halves input policy above:
+single-half edits retain the other half within the same family. Every selector
+message still clears cached Data Entry, and family changes require fresh halves.
+Matching Rust and Python regressions cover edits to either half for both families,
+observation indexes, missing coarse data and family-switch invalidation.
+Validation: 600 Python tests pass on Python 3.13.12 with the virtual environment's
+site-packages on `PYTHONPATH` for embedded Python callback tests. The seven Rust
+controls tests and four event-view tests pass, as do Clippy, Rust formatting,
+Ruff, `ty check meedee`, the changed Python test's type check and pyupgrade.
+
 Python 3.11.7 and 3.15.0 each pass 183 tests. The Rust workspace passes 69
 ordinary tests with five ignored cases; pytest separately runs the three
 finalization cases. Six new pure Rust control tests and Python tests consume

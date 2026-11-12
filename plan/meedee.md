@@ -687,8 +687,8 @@ and wire evidence before stateful interpretation or live writes.
    Seven frozen commands expand into primitive CCs; send serializes all
    steps including RPN-null release and reports known/unknown progress without
    retries. The optional pure interpreter has one fixed 16-channel state table
-   per source, indexed immutable observations, conservative fresh selector halves
-   and explicit reset/loss diagnostics. Generic CC pairing follows wire order;
+   per source, indexed immutable observations, retained selector halves within a
+   family and explicit reset/loss diagnostics. Generic CC pairing follows wire order;
    relative parameter steps do not invent absolute values. The API contract
    records the approved Rust Message/PrimitiveMessage/Command trait split.
 5. **MTS.** Implement tuning values and the selected standard message families.

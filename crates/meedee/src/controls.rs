@@ -193,10 +193,8 @@ impl Channel {
                     ParameterFamily::Nrpn
                 };
                 let mut result = Vec::new();
-                // A completed selection never donates a half to its successor.
-                if self.family.is_some()
-                    && (self.family != Some(family) || self.selected().is_some())
-                {
+                // Selector halves persist within a family, but never cross families.
+                if self.family.is_some() && self.family != Some(family) {
                     let first = self.selection_start(index);
                     self.selector_msb = None;
                     self.selector_lsb = None;

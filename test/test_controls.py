@@ -176,7 +176,16 @@ def test_fine_control_observations_preserve_wire_order_and_source_ranges() -> No
     assert (fresh.value, fresh.first_index, fresh.last_index) == (388, 6, 7)
 
 
-def test_selection_changes_cannot_reuse_selector_or_data_halves() -> None:
+@pytest.mark.parametrize(
+    ("family", "msb", "lsb", "other_msb", "other_lsb"),
+    (
+        (controls.ParameterFamily.Nrpn, 99, 98, 101, 100),
+        (controls.ParameterFamily.Rpn, 101, 100, 99, 98),
+    ),
+)
+def test_selector_edits_retain_the_other_half_but_not_data(
+    family: controls.ParameterFamily, msb: int, lsb: int, other_msb: int, other_lsb: int
+) -> None:
     interpreter = controls.ControlInterpreter()
 
     def cc(controller: int, value: int) -> list[object]:
@@ -187,17 +196,17 @@ def test_selection_changes_cannot_reuse_selector_or_data_halves() -> None:
             )
         ]
 
-    assert cc(99, 1) == []
+    assert cc(msb, 1) == []
     partial = cc(6, 2)[0]
     assert (
         isinstance(partial, controls.Diagnostic)
         and partial.kind == controls.DiagnosticKind.IncompleteSelection
     )
-    assert cc(98, 2) == []
+    assert cc(lsb, 2) == []
     coarse = cc(6, 3)[0]
     assert isinstance(coarse, controls.ParameterObservation)
     assert (coarse.family, coarse.parameter, coarse.value, coarse.resolution) == (
-        controls.ParameterFamily.Nrpn,
+        family,
         130,
         3,
         7,
@@ -210,30 +219,42 @@ def test_selection_changes_cannot_reuse_selector_or_data_halves() -> None:
         0,
         4,
     )
-    invalidated = cc(98, 3)[0]
-    assert (
-        isinstance(invalidated, controls.Diagnostic)
-        and invalidated.kind == controls.DiagnosticKind.SelectionInvalidated
-    )
-    partial = cc(6, 7)[0]
-    assert (
-        isinstance(partial, controls.Diagnostic)
-        and partial.kind == controls.DiagnosticKind.IncompleteSelection
-    )
-    assert cc(99, 1) == []
+    assert cc(lsb, 3) == []
     missing = cc(38, 4)[0]
     assert (
         isinstance(missing, controls.Diagnostic)
         and missing.kind == controls.DiagnosticKind.MissingCoarse
     )
-    cc(6, 7)
-    cc(100, 2)
+    edited = cc(6, 7)[0]
+    assert isinstance(edited, controls.ParameterObservation)
+    assert (edited.family, edited.parameter, edited.value, edited.resolution) == (
+        family,
+        131,
+        7,
+        7,
+    )
+    assert (edited.first_index, edited.last_index) == (0, 7)
+    assert cc(msb, 2) == []
+    missing = cc(38, 4)[0]
+    assert (
+        isinstance(missing, controls.Diagnostic)
+        and missing.kind == controls.DiagnosticKind.MissingCoarse
+    )
+    edited = cc(6, 8)[0]
+    assert isinstance(edited, controls.ParameterObservation)
+    assert (edited.family, edited.parameter, edited.value) == (family, 259, 8)
+    assert (edited.first_index, edited.last_index) == (5, 10)
+    invalidated = cc(other_lsb, 2)[0]
+    assert (
+        isinstance(invalidated, controls.Diagnostic)
+        and invalidated.kind == controls.DiagnosticKind.SelectionInvalidated
+    )
     partial = cc(38, 3)[0]
     assert (
         isinstance(partial, controls.Diagnostic)
         and partial.kind == controls.DiagnosticKind.IncompleteSelection
     )
-    cc(101, 0)
+    cc(other_msb, 0)
     missing = cc(38, 1)[0]
     assert (
         isinstance(missing, controls.Diagnostic)
