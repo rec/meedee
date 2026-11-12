@@ -78,6 +78,38 @@ fn anonymous_controls_preserve_timing_and_require_reset_before_source_changes() 
 }
 
 #[test]
+fn inactive_parameter_selectors_retain_their_contributor_times() {
+    use meedee::controls::{ControlInterpreter, Observation, ParameterFamily};
+    let mut interpreter = ControlInterpreter::new(None).unwrap();
+    let mut result = Vec::new();
+    for (index, (controller, value)) in [(99, 1), (98, 2), (101, 0), (100, 0), (98, 3), (6, 30)]
+        .into_iter()
+        .enumerate()
+    {
+        result = interpreter
+            .feed(&event(
+                AnyMessage::ControlChange(
+                    ControlChange::new(controller, value)
+                        .unwrap()
+                        .with_channel(1)
+                        .unwrap(),
+                ),
+                index as i64 * 10,
+            ))
+            .unwrap();
+    }
+    assert!(
+        matches!(&result[0].value, Value::Control(Observation::Parameter(v)) if v.family == ParameterFamily::Nrpn && v.parameter == 131)
+    );
+    assert_eq!(
+        (result[0].first_index, result[0].last_index),
+        (Some(0), Some(5))
+    );
+    assert_eq!(result[0].first_timestamp.as_ref().unwrap().ticks, 0);
+    assert_eq!(result[0].last_timestamp.as_ref().unwrap().ticks, 50);
+}
+
+#[test]
 fn ump_finish_retains_group_and_last_contributing_timestamp() {
     let mut assembler = ump::Assembler::new(1024, 2048, 4).unwrap();
     let packets = ump::packetize_sysex7(3, &(0..20).collect::<Vec<u8>>()).unwrap();

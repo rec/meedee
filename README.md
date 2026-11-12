@@ -620,7 +620,9 @@ an absolute value from a relative step. A new coarse CC forgets old fine state;
 repeated fine updates can use that known coarse value. RPN/NRPN selector edits
 retain the other half within the same family. Cached Data Entry is retained
 when the complete selection is unchanged and cleared otherwise.
-Switching families requires both selector halves afresh. Bank Select and Data
+Each family retains its own selector halves across family switches. Both halves
+must be known before interpreting data for that family. RPN-null disables updates
+without erasing selector history or activating the other family. Bank Select and Data
 Entry are not presented as generic knobs. Reset after known loss/reconnect; SystemReset and
 Reset All Controllers invalidate the applicable local state automatically.
 Observations preserve available source and timing metadata. Plain messages need

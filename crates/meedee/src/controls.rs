@@ -140,7 +140,8 @@ impl ControlState {
                 c.coarse
                     .iter()
                     .copied()
-                    .chain([c.selector_msb, c.selector_lsb, c.data])
+                    .chain(c.selectors.into_iter().flatten())
+                    .chain([c.data])
             })
             .flatten()
             .map(|v| v.index)
@@ -172,8 +173,8 @@ struct IndexedByte {
 struct Channel {
     coarse: [Option<IndexedByte>; 32],
     family: Option<ParameterFamily>,
-    selector_msb: Option<IndexedByte>,
-    selector_lsb: Option<IndexedByte>,
+    // Indexed by ParameterFamily, then MSB/LSB.
+    selectors: [[Option<IndexedByte>; 2]; 2],
     data: Option<IndexedByte>,
 }
 
@@ -194,11 +195,8 @@ impl Channel {
                     ParameterFamily::Nrpn
                 };
                 let mut result = Vec::new();
-                // Selector halves persist within a family, but never cross families.
                 if self.family.is_some() && self.family != Some(family) {
                     let first = self.selection_start(index);
-                    self.selector_msb = None;
-                    self.selector_lsb = None;
                     result.push(diagnostic(
                         DiagnosticKind::SelectionInvalidated,
                         channel,
@@ -208,15 +206,14 @@ impl Channel {
                     ));
                 }
                 self.family = Some(family);
-                if controller == 99 || controller == 101 {
-                    self.selector_msb = Some(byte);
+                let half = if controller == 99 || controller == 101 {
+                    0
                 } else {
-                    self.selector_lsb = Some(byte);
-                }
+                    1
+                };
+                self.selectors[family as usize][half] = Some(byte);
                 if self.selected() == Some((ParameterFamily::Rpn, 16383)) {
                     self.family = None;
-                    self.selector_msb = None;
-                    self.selector_lsb = None;
                 }
                 if previous.is_none() || self.selected() != previous {
                     self.data = None;
@@ -321,14 +318,16 @@ impl Channel {
     }
 
     fn selected(&self) -> Option<(ParameterFamily, u16)> {
-        Some((
-            self.family?,
-            (u16::from(self.selector_msb?.value) << 7) | u16::from(self.selector_lsb?.value),
-        ))
+        let family = self.family?;
+        let [msb, lsb] = self.selectors[family as usize];
+        Some((family, (u16::from(msb?.value) << 7) | u16::from(lsb?.value)))
     }
 
     fn selection_start(&self, fallback: usize) -> usize {
-        [self.selector_msb, self.selector_lsb]
+        let Some(family) = self.family else {
+            return fallback;
+        };
+        self.selectors[family as usize]
             .into_iter()
             .flatten()
             .map(|b| b.index)

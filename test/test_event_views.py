@@ -93,6 +93,31 @@ def test_anonymous_clock_changes_report_reset_without_inventing_a_source(
         assert result.value.kind == controls.DiagnosticKind.MissingCoarse
 
 
+def test_inactive_parameter_selectors_retain_their_contributor_times() -> None:
+    interpreter = controls.ControlInterpreter()
+    for index, (controller, value) in enumerate(
+        ((99, 1), (98, 2), (101, 0), (100, 0), (98, 3))
+    ):
+        interpreter.feed(
+            event(messages.ControlChange(controller, value, channel=1), index * 10)
+        )
+    observation = interpreter.feed(event(messages.ControlChange(6, 30, channel=1), 50))[
+        0
+    ]
+    assert isinstance(observation.value, controls.ParameterObservation)
+    assert observation.value.family == controls.ParameterFamily.Nrpn
+    assert observation.value.parameter == 131
+    assert (observation.first_index, observation.last_index) == (0, 5)
+    assert (
+        observation.first_timestamp is not None
+        and observation.first_timestamp.ticks == 0
+    )
+    assert (
+        observation.last_timestamp is not None
+        and observation.last_timestamp.ticks == 50
+    )
+
+
 def test_control_and_velocity_views_keep_contributor_times_after_long_gaps() -> None:
     view = controls.ControlInterpreter()
     view.feed(event(messages.ControlChange(channel=1, controller=7, value=64), 10))

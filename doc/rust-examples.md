@@ -669,7 +669,9 @@ source/timing metadata. Keep one instance per source.
 For example, CC 99=1 and CC 98=2 select NRPN 130. A later CC 98=3
 selects NRPN 131 using the retained MSB and clears cached Data Entry, so send
 a fresh CC 6 before CC 38. Repeating selectors for the same complete selection
-preserves cached Data Entry. Switching to RPN requires both RPN selector halves.
+preserves cached Data Entry. RPN and NRPN retain separate selector halves across
+switches; each family needs both halves initially. Switching families clears Data
+Entry. RPN-null disables updates until a later selector activates a family.
 
 ```rust
 use meedee::controls::ControlInterpreter;

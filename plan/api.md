@@ -342,12 +342,18 @@ half within the same family. Selector messages retain cached Data Entry only
 when the complete family and parameter selection is unchanged. Changing,
 incomplete or released selections clear it. Fine observation ranges include
 the retained coarse message even when both selectors were repeated later.
-Switching families clears both selector halves and emits SelectionInvalidated,
-so both halves must be observed afresh. Data received while selection is
+Each channel retains independent RPN and NRPN selector pairs, including partial
+pairs. A selector message activates its family and updates only that family's
+corresponding half. Switching families emits SelectionInvalidated for the prior
+active selection and clears Data Entry, but preserves both families' selectors.
+Both halves must be known for the active family. Data received while selection is
 missing/partial yields MissingSelection/IncompleteSelection; a fine value without
 coarse data yields MissingCoarse. A normal first selector simply waits for its
 partner; the incomplete diagnostic is emitted if parameter data arrives too soon.
-RPN-null clears both families.
+RPN-null disables the active selection and clears Data Entry without erasing
+selector history or activating the other family. A later selector message can
+reactivate a family using its retained halves. Reset/loss clears both families'
+selector history. Observation ranges retain inactive selectors' provenance.
 
 `reset()` clears source binding, clock and interpretation state, returning nothing.
 Clock changes emit a StateReset diagnostic on an enclosing observation carrying
