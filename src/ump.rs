@@ -721,6 +721,13 @@ fn register_helpers(module: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 fn midi1_message(message: &Bound<'_, PyAny>) -> PyResult<meedee::messages::AnyMessage> {
+    if let Ok(meedee::messages::AnyCommand::ControlChange(value)) =
+        messages::extract_command(message)
+    {
+        if value.version() == 1 {
+            return Ok(meedee::messages::AnyMessage::ControlChange(value));
+        }
+    }
     if let Ok(value) = messages::extract_primitive(message) {
         return Ok(value);
     }

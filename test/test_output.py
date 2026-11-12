@@ -26,7 +26,7 @@ class NativeConnection:
         self.sink.send(packet)
 
     def send_command(
-        self, command: messages.ControlChange14 | messages.ParameterStep
+        self, command: messages.ControlChange | messages.ParameterStep
     ) -> None:
         for i, message in enumerate(codecs.expand(command)):
             if self.partial == i:
@@ -255,7 +255,7 @@ def test_compound_failure_cleanup_uses_confirmed_prefix(
     transport.partial = 1
     with pytest.raises(midi.CompoundSendError):
         with midi.Output() as out:
-            out.send(messages.ControlChange14(1, 128))
+            out.send(messages.ControlChange(1, 128, resolution=14))
     assert transport.packets() == [b"\xb0\x01\x01", b"\xb0\x01\x00"]
     assert transport.closed
 

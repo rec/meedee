@@ -20,7 +20,7 @@ def values() -> list[object]:
         first_packet=1, last_packet=2, first_timestamp=time, last_timestamp=time
     )
     commands = [
-        messages.ControlChange14(channel=1, controller=7, value=16383),
+        messages.ControlChange(resolution=14, channel=1, controller=7, value=16383),
         messages.RpnSet(channel=2, parameter=0, value=8192, resolution=14),
         messages.NrpnSet(channel=3, parameter=16383, value=127, resolution=7),
         messages.ParameterStep(0, channel=1),

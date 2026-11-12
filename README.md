@@ -597,7 +597,8 @@ observations = [o for m in primitives for o in interpreter.feed(m)]
 # connection.send(command)
 ```
 
-`ControlChange14` emits a coarse/fine CC pair. RPN/NRPN set commands require
+`ControlChange(..., resolution=14)` emits a coarse/fine CC pair; the MIDI 1
+default is 7 bits, and MIDI 2 uses 32 bits. RPN/NRPN set commands require
 explicit 7-/14-bit resolution. Increment/decrement commands represent one
 directional operation, with no guessed amount or physical unit. Each parameter
 command selects afresh and finishes with RPN-null, without reserving an NRPN

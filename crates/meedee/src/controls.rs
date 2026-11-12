@@ -113,7 +113,7 @@ impl ControlState {
             InputMessage::Other => Vec::new(),
             InputMessage::SystemReset => self.clear(None, index),
             InputMessage::ControlChange(message) => {
-                if message.version() != 1 {
+                if message.resolution() != 7 {
                     return Vec::new();
                 }
                 let Some(channel) = message.channel() else {

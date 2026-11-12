@@ -290,7 +290,166 @@ versioned_message! { PolyPressure (note, pressure=None, channel=None, *, version
         transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
     }
 }
-versioned_message! { ControlChange (controller, value, channel=None, *, version=1, group=None) {controller,value} {} {} }
+#[pyclass(frozen, extends = Message, module = "meedee.messages")]
+pub(crate) struct ControlChange {
+    value: messages::ControlChange,
+}
+impl ControlChange {
+    fn from_value(value: messages::ControlChange) -> Self {
+        Self { value }
+    }
+    fn resolved(&self) -> PyResult<&messages::ControlChange> {
+        if self.value.version() != 1 {
+            return Err(PyValueError::new_err("expected MIDI 1; convert explicitly"));
+        }
+        if self.value.channel().is_none() {
+            return Err(PyValueError::new_err("message channel is unassigned"));
+        }
+        if self.value.resolution() == 14 {
+            return Err(PyValueError::new_err(
+                "14-bit ControlChange requires expansion into two messages",
+            ));
+        }
+        Ok(&self.value)
+    }
+}
+#[pymethods]
+impl ControlChange {
+    #[new]
+    #[pyo3(signature=(controller, value, channel=None, *, version=1, group=None, resolution=None))]
+    fn new(
+        controller: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyAny>,
+        channel: Option<&Bound<'_, PyAny>>,
+        #[pyo3(from_py_with=strict_integer)] version: i64,
+        group: Option<&Bound<'_, PyAny>>,
+        resolution: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let controller = integer(controller, "controller")?;
+        let number = integer(value, "value")?;
+        let resolution = resolution.map(|v| integer(v, "resolution")).transpose()?;
+        let mut value = match version {
+            1 => messages::ControlChange::new_with_resolution(
+                controller,
+                number,
+                resolution.unwrap_or(7),
+            ),
+            2 => messages::ControlChange::new_midi2(controller, number)
+                .and_then(|v| v.with_resolution(resolution.unwrap_or(32))),
+            _ => return Err(PyValueError::new_err("version must be 1 or 2")),
+        }
+        .map_err(value_error)?;
+        if let Some(v) = channel {
+            value = value
+                .with_channel(integer(v, "channel")?)
+                .map_err(value_error)?;
+        }
+        if let Some(v) = group {
+            value = value
+                .with_group(integer(v, "group")?)
+                .map_err(value_error)?;
+        }
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+    }
+    #[getter]
+    fn controller(&self) -> u8 {
+        self.value.controller()
+    }
+    #[getter]
+    fn value(&self) -> u32 {
+        self.value.value()
+    }
+    #[getter]
+    fn channel(&self) -> Option<u8> {
+        self.value.channel()
+    }
+    #[getter]
+    fn version(&self) -> u8 {
+        self.value.version()
+    }
+    #[getter]
+    fn group(&self) -> Option<u8> {
+        self.value.group()
+    }
+    #[getter]
+    fn resolution(&self) -> u8 {
+        self.value.resolution()
+    }
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, Self>>()
+            .is_ok_and(|v| self.value == v.value)
+    }
+    fn __hash__(&self) -> u64 {
+        value_hash(&self.value)
+    }
+    fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
+        let py = slf.py();
+        let fields = if slf.value.version() == 2 {
+            vec![
+                "controller",
+                "value",
+                "channel",
+                "version",
+                "group",
+                "resolution",
+            ]
+        } else {
+            vec!["controller", "value", "channel", "resolution"]
+        };
+        crate::tuning::render(slf.into_pyobject(py)?.as_any(), "ControlChange", &fields)
+    }
+    #[pyo3(signature=(**changes))]
+    fn replace<'py>(
+        slf: PyRef<'py, Self>,
+        changes: Option<&Bound<'py, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if let Some(v) = changes
+            .map(|c| c.get_item("version"))
+            .transpose()?
+            .flatten()
+        {
+            if integer(&v, "version")? != i64::from(slf.value.version()) {
+                return Err(PyValueError::new_err(
+                    "version cannot change through replace; convert explicitly",
+                ));
+            }
+        }
+        let py = slf.py();
+        crate::tuning::replacement(
+            slf.into_pyobject(py)?.as_any(),
+            &[
+                "controller",
+                "value",
+                "channel",
+                "version",
+                "group",
+                "resolution",
+            ],
+            changes,
+        )
+    }
+    #[classattr]
+    fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+        let fields = PyDict::new(py);
+        for name in ["controller", "value", "version", "resolution"] {
+            fields.set_item(name, py.get_type::<PyInt>())?;
+        }
+        for name in ["channel", "group"] {
+            fields.set_item(
+                name,
+                py.import("typing")?
+                    .getattr("Optional")?
+                    .get_item(py.get_type::<PyInt>())?,
+            )?;
+        }
+        Ok(fields)
+    }
+    #[classattr]
+    fn __match_args__() -> (&'static str, &'static str, &'static str) {
+        ("controller", "value", "channel")
+    }
+}
 versioned_message! { ProgramChange (program, channel=None, *, version=1, group=None, options=None, bank_msb=None, bank_lsb=None) {program} {} {options => with_options, bank_msb => with_bank_msb, bank_lsb => with_bank_lsb} }
 versioned_message! { ChannelPressure (pressure=None, channel=None, *, version=1, group=None) {} {pressure => with_pressure} {} }
 versioned_message! { PitchBend (value=None, channel=None, *, version=1, group=None) {} {value => with_value} {} }
@@ -443,6 +602,11 @@ macro_rules! command_messages {
             Ok(())
         }
         pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyCommand> {
+            if let Ok(command) = command.extract::<PyRef<'_, ControlChange>>() {
+                if command.value.version() != 1 { return Err(PyTypeError::new_err("MIDI 2 controller values require UMP encoding")); }
+                if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
+                return Ok(messages::AnyCommand::ControlChange(command.value.clone()));
+            }
             if let Ok(command) = command.extract::<PyRef<'_, ParameterStep>>() {
                 if command.value.channel().is_none() { return Err(PyValueError::new_err("message channel is unassigned")); }
                 return Ok(messages::AnyCommand::ParameterStep(command.value.clone()));
@@ -455,6 +619,15 @@ macro_rules! command_messages {
         }
         pub fn command_wire(py: Python<'_>, command: &messages::AnyCommand) -> PyResult<(String, Py<PyDict>)> {
             let kwargs = PyDict::new(py);
+            if let messages::AnyCommand::ControlChange(value) = command {
+                kwargs.set_item("controller", value.controller())?;
+                kwargs.set_item("value", value.value())?;
+                kwargs.set_item("channel", value.channel())?;
+                kwargs.set_item("version", value.version())?;
+                kwargs.set_item("group", value.group())?;
+                kwargs.set_item("resolution", value.resolution())?;
+                return Ok(("ControlChange".into(), kwargs.unbind()));
+            }
             if let messages::AnyCommand::ParameterStep(value) = command {
                 let value = ParameterStep { value: value.clone() };
                 kwargs.set_item("parameter", value.parameter())?;
@@ -475,7 +648,6 @@ macro_rules! command_messages {
 }
 
 command_messages! {
-    ControlChange14 (controller, value, channel=None) { channel, controller, value };
     RpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
     NrpnSet (parameter, value, resolution=14, channel=None) { channel, parameter, value, resolution };
 }

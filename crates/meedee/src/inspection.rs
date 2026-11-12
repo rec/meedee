@@ -440,7 +440,7 @@ fn midi1_kind(value: &messages::AnyMessage) -> &'static str {
 fn command_kind(value: &messages::AnyCommand) -> &'static str {
     use messages::AnyCommand::*;
     match value {
-        ControlChange14(_) => "ControlChange14",
+        ControlChange(_) => "ControlChange",
         RpnSet(_) => "RpnSet",
         NrpnSet(_) => "NrpnSet",
         ParameterStep(_) => "ParameterStep",

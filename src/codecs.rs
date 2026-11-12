@@ -125,10 +125,17 @@ fn encode<'py>(py: Python<'py>, message: &Bound<'py, PyAny>) -> PyResult<Bound<'
 
 #[pyfunction]
 fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
-    codecs::expand(&messages::extract_command(command)?)
+    let payload = crate::event_values::with_metadata(
+        command,
+        meedee::events::Payload::Command(messages::extract_command(command)?),
+    )?;
+    let meedee::events::Payload::Command(value) = payload else {
+        unreachable!()
+    };
+    codecs::expand(&value)
         .map_err(|e| PyValueError::new_err(e.to_string()))?
         .into_iter()
-        .map(|message| messages::to_python(py, message))
+        .map(|message| crate::event_values::to_python(py, meedee::events::Payload::Midi1(message)))
         .collect()
 }
 

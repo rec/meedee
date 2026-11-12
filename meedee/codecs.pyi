@@ -7,7 +7,7 @@ from .messages import Message
 
 def encode(message: Message) -> bytes: ...
 def expand(
-    command: messages.ControlChange14
+    command: messages.ControlChange
     | messages.RpnSet
     | messages.NrpnSet
     | messages.ParameterStep

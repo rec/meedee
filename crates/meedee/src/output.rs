@@ -563,6 +563,9 @@ impl Output {
     }
     fn prepare_message(&self, message: Payload) -> io::Result<Prepared> {
         match message {
+            Payload::Midi1(AnyMessage::ControlChange(v)) if v.resolution() == 14 => {
+                self.prepare_message(Payload::Command(AnyCommand::ControlChange(v)))
+            }
             Payload::Midi1(message) if self.options.protocol == Protocol::Midi1 => {
                 Ok(Prepared::Packet(Packet::Bytes(
                     resolve_message(message, self.channel)?.encode()?,
@@ -897,7 +900,7 @@ fn resolve_command(command: AnyCommand, channel: Option<u8>) -> io::Result<AnyCo
         m => Ok(m),
     } }; }
     resolve!(
-        ControlChange14,
+        ControlChange,
         RpnSet,
         NrpnSet,
         ParameterStep,
@@ -1092,7 +1095,7 @@ midi1_values!(
     SysEx
 );
 macro_rules! command_values {($($name:ident),*)=>{$(impl From<messages::$name> for OutputValue {fn from(v:messages::$name)->Self {AnyCommand::$name(v).into()}})*};}
-command_values!(ControlChange14, RpnSet, NrpnSet, ParameterStep);
+command_values!(RpnSet, NrpnSet, ParameterStep);
 impl From<crate::gm::BankProgramSelect> for OutputValue {
     fn from(v: crate::gm::BankProgramSelect) -> Self {
         AnyCommand::BankProgramSelect(v).into()
@@ -1490,7 +1493,7 @@ mod tests {
         f.output.connection = Some(Connection::Test(f.sink.clone()));
         let error = f
             .output
-            .send(messages::ControlChange14::new(1, 128).unwrap())
+            .send(messages::ControlChange::new_with_resolution(1, 128, 14).unwrap())
             .unwrap_err();
         assert!(matches!(
             error.cause,

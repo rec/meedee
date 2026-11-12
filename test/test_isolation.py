@@ -690,7 +690,9 @@ def test_compound_worker_loss_reports_unknown_progress(
     source = output_client(mode, timeout=1)
     connection = source.connect(source.ports()[0])
     with pytest.raises(midi.CompoundSendError) as error:
-        connection.send(messages.ControlChange14(channel=1, controller=7, value=10000))
+        connection.send(
+            messages.ControlChange(resolution=14, channel=1, controller=7, value=10000)
+        )
     assert error.value.completed_messages is None
     assert error.value.total_messages == 2
     assert connection.closed
@@ -712,7 +714,9 @@ def test_compound_wire_roundtrip_and_validation_precede_worker_operations(
     with ump.connect(ump.ports()[0]) as connection:
         with pytest.raises(midi.CapabilityError):
             connection.send(
-                messages.ControlChange14(channel=1, controller=7, value=10000)
+                messages.ControlChange(
+                    resolution=14, channel=1, controller=7, value=10000
+                )
             )
         assert not connection.closed
 
@@ -831,13 +835,17 @@ def test_output_mixes_packets_messages_commands_and_playback_on_one_connection(
     with client.connect(client.ports()[0]) as output:
         output.send(b"\x90\x3c\x64")
         output.send(note)
-        output.send(messages.ControlChange14(channel=1, controller=7, value=128))
+        output.send(
+            messages.ControlChange(resolution=14, channel=1, controller=7, value=128)
+        )
         report = output.send(
             [
                 (note).replace(stream="test", timestamp=origin),
-                (messages.ControlChange14(channel=1, controller=7, value=128)).replace(
-                    stream="test", timestamp=origin
-                ),
+                (
+                    messages.ControlChange(
+                        resolution=14, channel=1, controller=7, value=128
+                    )
+                ).replace(stream="test", timestamp=origin),
             ],
             origin=origin,
             metrics=True,

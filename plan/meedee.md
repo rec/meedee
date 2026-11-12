@@ -170,7 +170,7 @@ NoteOn(channel=1, note=60, velocity=100)
 NoteOff(channel=1, note=60, velocity=64)
 ProgramChange(channel=1, program=1)
 ControlChange(channel=1, controller=7, value=100)
-ControlChange14(channel=1, controller=7, value=10000)
+ControlChange(channel=1, controller=7, value=10000, resolution=14)
 NrpnSet(channel=1, parameter=1234, value=10000, resolution=14)
 SysEx(data=...)
 ```
@@ -300,8 +300,8 @@ bounded subscopes before claiming broad coverage.
 
 ### Paired 14-bit CC
 
-`ControlChange14` is one semantic command with a base controller and an exact
-14-bit integer. Its MIDI 1.0 encoder emits the ordered coarse/fine pair, using
+`ControlChange(..., resolution=14)` is one semantic command with a base controller
+and an exact 14-bit integer. Command expansion emits the ordered coarse/fine pair, using
 the standardized controller pairing. It is not a new on-wire MIDI 1.0 message.
 Controller-specific protocols such as bank selection and data entry must retain
 their own meaning rather than being indiscriminately presented as knobs.

@@ -258,7 +258,9 @@ def test_output_accepts_messages_packets_and_compound_commands() -> None:
     note = messages.NoteOn(channel=1, note=60, velocity=100)
     output.send(note)
     output.send(b"\x90\x3c\x64")
-    output.send(messages.ControlChange14(channel=1, controller=7, value=128))
+    output.send(
+        messages.ControlChange(resolution=14, channel=1, controller=7, value=128)
+    )
     assert [output.take_packet() for _ in range(4)] == [
         b"\x90\x3c\x64",
         b"\x90\x3c\x64",
@@ -271,7 +273,9 @@ def test_output_accepts_messages_packets_and_compound_commands() -> None:
 def test_compound_output_failure_preserves_prefix_and_reports_progress() -> None:
     output = testing.Output(protocol="midi1", packet_limit=1)
     with pytest.raises(midi.CompoundSendError) as failure:
-        output.send(messages.ControlChange14(channel=1, controller=7, value=128))
+        output.send(
+            messages.ControlChange(resolution=14, channel=1, controller=7, value=128)
+        )
     assert failure.value.completed_messages == 1
     assert failure.value.total_messages == 2
     assert isinstance(failure.value.__cause__, midi.ResourceError)

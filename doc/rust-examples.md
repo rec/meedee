@@ -579,6 +579,17 @@ continues; terminal failures return an error with progress retained in
 open. Use `|_| Ok(())` when only the report is needed. The final boolean enables
 host delivery metrics. The library retains no payload history or formatted text.
 
+## Send controller values
+
+```rust
+use meedee::{ControlChange, Output};
+
+let mut out = Output::new();
+out.send(ControlChange::new(1, 90)?)?;
+out.send(ControlChange::new_with_resolution(1, 9000, 14)?)?;
+out.close()?;
+```
+
 ## Step an RPN or NRPN parameter
 
 Use the same single-step command with typed family and direction builders:

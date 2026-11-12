@@ -67,6 +67,8 @@ def test_new_messages_preserve_the_frozen_field_and_replacement_contract() -> No
         assert not hasattr(m, "__dict__")
         values = {k: getattr(m, k) for k in fields}
         rendered = ", ".join(f"{k}={v}" for k, v in values.items())
+        if isinstance(m, messages.ControlChange):
+            rendered += f", resolution={m.resolution}"
         assert repr(m) == f"{constructor.__name__}({rendered})"
         assert hash(m) == hash(m.replace())
         assert m == m.replace()

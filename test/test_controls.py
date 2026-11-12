@@ -6,7 +6,49 @@ from pathlib import Path
 
 import pytest
 
-from meedee import codecs, controls, messages
+from meedee import codecs, controls, events, messages, ump
+
+
+def test_controller_resolution_is_explicit_and_preserved() -> None:
+    coarse = messages.ControlChange(1, 90, channel=2)
+    fine = messages.ControlChange(1, 90, channel=2, resolution=14)
+    native = messages.ControlChange(1, 90, channel=2, version=2)
+    assert (coarse.resolution, fine.resolution, native.resolution) == (7, 14, 32)
+    assert len({coarse, fine, native}) == 3
+    assert fine.replace() == fine
+    assert fine.replace(value=16383).resolution == 14
+    assert fine.replace(resolution=7) == coarse
+    assert messages.ControlChange(7, 1).channel is None
+    stamp = events.Timestamp(ticks=3, clock=events.Clock(identity="cc"))
+    marked = fine.replace(timestamp=stamp, stream="controller")
+    assert marked.replace(value=100).timestamp == stamp
+    pair = codecs.expand(marked)
+    assert pair == [messages.ControlChange(1, 0, 2), messages.ControlChange(33, 90, 2)]
+    assert all(p.timestamp == stamp and p.stream == "controller" for p in pair)
+    wire = b"".join(codecs.encode(p) for p in pair)
+    assert codecs.Decoder().feed(wire) == pair
+    with pytest.raises(ValueError, match="expansion"):
+        codecs.encode(fine)
+    with pytest.raises((TypeError, ValueError)):
+        ump.encode(fine)
+    assert ump.decode(ump.encode(native)) == native
+    converted = ump.to_midi2(fine, group=1)
+    assert converted.messages == [
+        messages.ControlChange(
+            1, ump.scale_up(value=90, source_bits=14, destination_bits=32), 2, version=2
+        )
+    ]
+    for version, resolution in [(1, 8), (1, 32), (2, 7), (2, 14)]:
+        with pytest.raises(ValueError):
+            messages.ControlChange(1, 0, version=version, resolution=resolution)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(TypeError):
+        messages.ControlChange(1, 0, resolution=True)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(ValueError):
+        fine.replace(value=128, resolution=7)
+    with pytest.raises(ValueError):
+        fine.replace(controller=32)
+    with pytest.raises(ValueError, match="unassigned"):
+        codecs.expand(messages.ControlChange(1, 128, resolution=14))
 
 
 def command_vectors() -> Iterator[tuple[object, bytes]]:
@@ -20,6 +62,13 @@ def command_vectors() -> Iterator[tuple[object, bytes]]:
         fields, wire = line.split("|")
         name, *values = fields.split()
         constructor = getattr(messages, name)
+        if name == "ControlChange":
+            channel, controller, value = (int(v) for v in values)
+            yield (
+                constructor(controller, value, channel, resolution=14),
+                bytes.fromhex(wire),
+            )
+            continue
         if name == "ParameterStep":
             channel, parameter, direction, family = values
             yield (
@@ -54,16 +103,18 @@ def test_commands_expand_to_shared_independent_wire_vectors() -> None:
         assert all(type(p) is messages.ControlChange for p in primitives)
         assert b"".join(codecs.encode(p) for p in primitives) == b
         # A compound command must not masquerade as one raw transport packet.
-        with pytest.raises(TypeError):
+        with pytest.raises(
+            ValueError if isinstance(c, messages.ControlChange) else TypeError
+        ):
             codecs.encode(c)  # ty: ignore[invalid-argument-type]
-    with pytest.raises(TypeError):
-        codecs.expand(messages.ControlChange(channel=1, controller=7, value=1))  # ty: ignore[invalid-argument-type]
+    message = messages.ControlChange(7, 1, channel=1)
+    assert codecs.expand(message) == [message]
 
 
 def test_commands_are_frozen_positional_values_with_checked_replacement() -> None:
     for c, _ in command_vectors():
-        if isinstance(c, messages.ParameterStep):
-            continue  # Its keyword-only family is covered separately below.
+        if isinstance(c, (messages.ParameterStep, messages.ControlChange)):
+            continue  # These have keyword-only fields covered separately.
         constructor = getattr(messages, type(c).__name__)
         assert isinstance(c, messages.Message)
         fields = constructor.__annotations__
@@ -108,13 +159,17 @@ def test_commands_are_frozen_positional_values_with_checked_replacement() -> Non
 def test_command_ranges_and_null_parameter_are_explicit() -> None:
     for channel in (0, 17, 10**100):
         with pytest.raises(ValueError):
-            messages.ControlChange14(channel=channel, controller=7, value=0)
+            messages.ControlChange(
+                resolution=14, channel=channel, controller=7, value=0
+            )
     for controller in (-1, 32):
         with pytest.raises(ValueError):
-            messages.ControlChange14(channel=1, controller=controller, value=0)
+            messages.ControlChange(
+                resolution=14, channel=1, controller=controller, value=0
+            )
     for value in (-1, 16384):
         with pytest.raises(ValueError):
-            messages.ControlChange14(channel=1, controller=0, value=value)
+            messages.ControlChange(resolution=14, channel=1, controller=0, value=value)
     for name in ("RpnSet", "NrpnSet"):
         constructor = getattr(messages, name)
         for resolution in (0, 8, 13, 15):
@@ -374,7 +429,7 @@ def test_observations_are_frozen_owned_values_and_raw_input_is_unchanged() -> No
         controls.ControlObservation()
     for value in (
         b"\xb0\x07\x01",
-        messages.ControlChange14(channel=1, controller=7, value=2),
+        messages.ControlChange(resolution=14, channel=1, controller=7, value=2),
     ):
         with pytest.raises((TypeError, ValueError)):
             interpreter.feed(value)  # ty: ignore[invalid-argument-type]

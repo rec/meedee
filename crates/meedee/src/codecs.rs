@@ -371,8 +371,17 @@ fn parameter_command(channel: u8, parameter: u16, msb: u8, data: &[(u8, u8)]) ->
         .collect()
 }
 
-impl Command for ControlChange14 {
+impl Command for ControlChange {
     fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        if self.version() != 1 {
+            return Err(ValueError(
+                "MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into(),
+            ));
+        }
+        if self.resolution() != 14 {
+            self.resolved_channel()?;
+            return Ok(vec![AnyMessage::ControlChange(self.clone())]);
+        }
         inherit_metadata(
             self,
             vec![
@@ -409,7 +418,7 @@ macro_rules! parameter_commands {
         impl Command for AnyCommand {
             fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
                 match self {
-                    Self::ControlChange14(command) => command.expand(),
+                    Self::ControlChange(command) => command.expand(),
                     Self::BankProgramSelect(command) => command.expand(),
                     Self::ZoneConfiguration(command) => command.expand(),
                     $(Self::$set(command) => command.expand(),)*

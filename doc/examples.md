@@ -392,6 +392,16 @@ for a summary alone. Callbacks must not reenter the same monitor. No payload
 history is retained by the library; the CLI owns bounded previews and display
 history. Metrics use host delivery times, independently of source timestamps.
 
+## Send controller values
+
+```python
+import meedee as md
+
+with md.Output() as out:
+    out.send(md.ControlChange(1, 90))
+    out.send(md.ControlChange(1, 9000, resolution=14))
+```
+
 ## Step an RPN or NRPN parameter
 
 Increment registered parameter 7 once, then decrement non-registered parameter 7

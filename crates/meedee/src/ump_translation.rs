@@ -142,7 +142,7 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<UmpMessa
             let value = if matches!(v.controller(), 84 | 126) {
                 v.value() << 25
             } else {
-                up(v.value(), 7, 32)
+                up(v.value(), v.resolution(), 32)
             };
             UmpMessage::ControlChange(
                 crate::messages::ControlChange::new_midi2(v.controller().into(), value.into())

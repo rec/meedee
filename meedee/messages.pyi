@@ -186,6 +186,7 @@ class ControlChange(Message):
         *,
         version: Literal[1, 2] = 1,
         group: int | None = None,
+        resolution: Literal[7, 14, 32] | None = None,
     ) -> None: ...
     @property
     def version(self) -> Literal[1, 2]: ...
@@ -197,6 +198,8 @@ class ControlChange(Message):
     def controller(self) -> int: ...
     @property
     def value(self) -> int: ...
+    @property
+    def resolution(self) -> Literal[7, 14, 32]: ...
     def replace(
         self,
         *,
@@ -205,6 +208,7 @@ class ControlChange(Message):
         value: int = ...,
         version: Literal[1, 2] = ...,
         group: int | None = ...,
+        resolution: Literal[7, 14, 32] = ...,
         timestamp: events.Timestamp | None = ...,
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
@@ -420,27 +424,6 @@ class SystemReset(Message):
         stream: str | None = ...,
         span: events.SourceSpan | None = ...,
     ) -> SystemReset: ...
-
-class ControlChange14(Message):
-    def __init__(
-        self, controller: int, value: int, channel: int | None = None
-    ) -> None: ...
-    @property
-    def channel(self) -> int | None: ...
-    @property
-    def controller(self) -> int: ...
-    @property
-    def value(self) -> int: ...
-    def replace(
-        self,
-        *,
-        channel: int | None = ...,
-        controller: int = ...,
-        value: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> ControlChange14: ...
 
 class RpnSet(Message):
     def __init__(

@@ -237,8 +237,9 @@ provided by slice 4 below and tuning by slice 5; GM profiles and files retain la
 
 ### Slice 4 compound commands and observations, approved 2026-10-14
 
-Four frozen command subclasses are provided in `meedee.messages`:
-ControlChange14(controller, value, channel=None), RpnSet/NrpnSet(parameter,
+Frozen controller and command subclasses are provided in `meedee.messages`:
+ControlChange(controller, value, channel=None, *, version=1, group=None,
+resolution=None), RpnSet/NrpnSet(parameter,
 value, resolution=14, channel=None), and ParameterStep(parameter, direction=1,
 channel=None, *, family="rpn"). Direction is exactly -1 or 1; family is "rpn"
 or "nrpn". Rust uses `ParameterStep::new(parameter)` with `with_family` and
@@ -247,14 +248,23 @@ RPN increment. Builders validate each result: select NRPN before setting paramet
 16383. The separate `controls.ParameterStep` represents incoming observations.
 Payload integer fields are positional strict integers, with an optional trailing channel and checked
 replacement, annotations and class patterns as for primitive messages.
-ControlChange14 uses controller 0–31 and value 0–16383. Parameter identifiers
+ControlChange defaults to resolution 7 for MIDI 1 (controller/value 0–127),
+or resolution 32 for MIDI 2 (controller 0–127, value 0–4294967295).
+Explicit MIDI 1 resolution 14 uses controller 0–31 and value 0–16383 and expands
+to two primitive messages. Other version/resolution combinations are rejected.
+Resolution is never inferred from the value and changing it does not rescale.
+Rust uses `ControlChange::new(controller, value)`, `new_with_resolution(controller,
+value, resolution)` for MIDI 1 and `new_midi2(controller, value)` for MIDI 2.
+Parameter identifiers
 are 0–16383 except RPN 16383, which is null selection and cannot be set/stepped;
 NRPN 16383 remains a legitimate identifier. Set resolution defaults to 14 and is
 exactly 7 or 14, with value 0–127 or 0–16383 respectively. Changing resolution
 does not rescale a value. All commands retain channel numbering 1–16.
 
 `codecs.expand(command)` returns a fresh list of frozen primitive ControlChange
-messages. `codecs.encode` stays primitive-only and rejects commands. A fine-CC
+messages. It also accepts a 7-bit ControlChange and returns that single message.
+`codecs.encode` stays primitive-only and rejects 14-bit controller values and
+compound commands. A fine-CC
 command emits MSB followed by LSB. Parameter commands always send both selectors
 MSB first, then Data Entry MSB (and LSB for resolution 14), or one Data Increment/
 Decrement with data byte zero. They finish with RPN 127/127 to release selection,

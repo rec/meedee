@@ -5,6 +5,44 @@ use meedee::controls::{
 use meedee::messages::*;
 
 #[test]
+fn controller_resolution_preserves_wire_values_and_rejects_incompatible_formats() {
+    let coarse = ControlChange::new(1, 90).unwrap().with_channel(2).unwrap();
+    let fine = ControlChange::new_with_resolution(1, 90, 14)
+        .unwrap()
+        .with_channel(2)
+        .unwrap();
+    let native = ControlChange::new_midi2(1, 90)
+        .unwrap()
+        .with_channel(2)
+        .unwrap();
+    assert_eq!(
+        (coarse.resolution(), fine.resolution(), native.resolution()),
+        (7, 14, 32)
+    );
+    assert_ne!(coarse, fine);
+    assert_eq!(fine.clone().with_resolution(7).unwrap(), coarse);
+    assert!(encode(&fine).is_err());
+    let pair = expand(&fine).unwrap();
+    assert_eq!(
+        pair,
+        vec![
+            AnyMessage::ControlChange(ControlChange::new(1, 0).unwrap().with_channel(2).unwrap()),
+            AnyMessage::ControlChange(ControlChange::new(33, 90).unwrap().with_channel(2).unwrap())
+        ]
+    );
+    assert!(native.clone().with_resolution(14).is_err());
+    assert!(expand(&native).is_err());
+    assert!(fine.clone().with_controller(32).is_err());
+    assert!(fine.clone().with_value(16384).is_err());
+    assert!(fine.with_value(128).unwrap().with_resolution(7).is_err());
+    assert!(ControlChange::new_with_resolution(1, 128, 14)
+        .unwrap()
+        .expand()
+        .is_err());
+    assert!(ControlChange::new_with_resolution(1, 0, 32).is_err());
+}
+
+#[test]
 fn commands_expand_to_independent_wire_vectors() {
     for line in include_str!("fixtures/commands.txt").lines() {
         if line.starts_with('#') || line.is_empty() {
@@ -24,8 +62,8 @@ fn commands_expand_to_independent_wire_vectors() {
             .map(|v| v.parse().unwrap())
             .collect();
         let command = match name {
-            "ControlChange14" => AnyCommand::ControlChange14(
-                ControlChange14::new(v[1], v[2])
+            "ControlChange" => AnyCommand::ControlChange(
+                ControlChange::new_with_resolution(v[1], v[2], 14)
                     .and_then(|m| m.with_channel(v[0]))
                     .unwrap(),
             ),
@@ -95,13 +133,13 @@ fn commands_expand_to_independent_wire_vectors() {
         .and_then(|m| m.with_resolution(7))
         .and_then(|m| m.with_channel(1))
         .is_err());
-    assert!(ControlChange14::new(0, 0)
+    assert!(ControlChange::new_with_resolution(0, 0, 14)
         .and_then(|m| m.with_channel(0))
         .is_err());
-    assert!(ControlChange14::new(32, 0)
+    assert!(ControlChange::new_with_resolution(32, 0, 14)
         .and_then(|m| m.with_channel(1))
         .is_err());
-    assert!(ControlChange14::new(0, 16384)
+    assert!(ControlChange::new_with_resolution(0, 16384, 14)
         .and_then(|m| m.with_channel(1))
         .is_err());
 }

@@ -61,6 +61,32 @@ fn saved() -> Vec<u8> {
     }
     bytes
 }
+
+#[test]
+fn fourteen_bit_controller_retains_the_existing_command_encoding_and_budget() {
+    use meedee::messages::{AnyCommand, ControlChange, Metadata};
+    let value = ControlChange::new_with_resolution(7, 10000, 14)
+        .unwrap()
+        .with_channel(2)
+        .unwrap();
+    let metadata = Metadata {
+        stream: Some("source".into()),
+        ..Metadata::default()
+    };
+    let message = Record::Event(Box::new(
+        Payload::Midi1(AnyMessage::ControlChange(value.clone()))
+            .with_metadata(metadata.clone())
+            .unwrap(),
+    ));
+    let command = Record::Event(Box::new(
+        Payload::Command(AnyCommand::ControlChange(value))
+            .with_metadata(metadata)
+            .unwrap(),
+    ));
+    let bytes = archive::encode(&message).unwrap();
+    assert_eq!(bytes, archive::encode(&command).unwrap());
+    assert!(archive::payload_size(&message).unwrap() >= bytes.len());
+}
 #[test]
 fn archive_integrity_order_exact_time_and_verified_recovery() {
     assert_eq!(archive::crc32(b"123456789"), 0xcbf43926);

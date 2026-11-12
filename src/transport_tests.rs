@@ -78,8 +78,9 @@ fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
                 fields.set_item("channel", 1).unwrap();
                 fields.set_item("controller", 7).unwrap();
                 fields.set_item("value", 10000).unwrap();
+                fields.set_item("resolution", 14).unwrap();
                 let command = messages
-                    .getattr("ControlChange14")
+                    .getattr("ControlChange")
                     .unwrap()
                     .call((), Some(&fields))
                     .unwrap();
@@ -179,8 +180,9 @@ fn python_compound_error_retains_progress_and_invalidates_the_connection() {
         fields.set_item("channel", 1).unwrap();
         fields.set_item("controller", 7).unwrap();
         fields.set_item("value", 10000).unwrap();
+        fields.set_item("resolution", 14).unwrap();
         let command = messages
-            .getattr("ControlChange14")
+            .getattr("ControlChange")
             .unwrap()
             .call((), Some(&fields))
             .unwrap();

@@ -679,7 +679,6 @@ class Output(_Client, frozen=True):
                         messages.ProgramChange,
                         messages.ChannelPressure,
                         messages.PitchBend,
-                        messages.ControlChange14,
                         messages.RpnSet,
                         messages.NrpnSet,
                         messages.ParameterStep,

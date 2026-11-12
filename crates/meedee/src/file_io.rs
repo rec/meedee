@@ -102,7 +102,7 @@ impl Record {
                     matches!(words[0] >> 28, 2 | 4).then_some(((words[0] >> 16) as u8 & 15) + 1)
                 }
                 Payload::Command(command) => match command {
-                    AnyCommand::ControlChange14(v) => v.channel(),
+                    AnyCommand::ControlChange(v) => v.channel(),
                     AnyCommand::RpnSet(v) => v.channel(),
                     AnyCommand::NrpnSet(v) => v.channel(),
                     AnyCommand::ParameterStep(v) => v.channel(),

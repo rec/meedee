@@ -65,7 +65,7 @@ A long-running capture that exhausts these bounds must start another archive.
 
 | Command ID | Value | Fields |
 | --- | --- | --- |
-| 1 | ControlChange14 | channel, controller, value |
+| 1 | ControlChange with resolution=14 | channel, controller, value |
 | 2 | RpnSet | channel, parameter, value, resolution |
 | 3 | NrpnSet | channel, parameter, value, resolution |
 | 4 | ParameterStep (rpn, +1) | channel, parameter |

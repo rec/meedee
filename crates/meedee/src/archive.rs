@@ -290,7 +290,7 @@ fn timestamp(out: &mut Vec<u8>, t: Option<&Timestamp>) -> io::Result<()> {
 fn command(out: &mut Vec<u8>, c: &m::AnyCommand) -> io::Result<()> {
     use m::AnyCommand::*;
     let (id, fields): (u16, Vec<i64>) = match c {
-        ControlChange14(v) => (
+        ControlChange(v) if v.resolution() == 14 => (
             1,
             vec![
                 v.channel()
@@ -300,6 +300,9 @@ fn command(out: &mut Vec<u8>, c: &m::AnyCommand) -> io::Result<()> {
                 v.value().into(),
             ],
         ),
+        ControlChange(_) => {
+            return Err(invalid(0, "controller command requires 14-bit resolution"))
+        }
         RpnSet(v) => (
             2,
             vec![
@@ -417,6 +420,10 @@ pub fn encode(r: &Record) -> io::Result<Vec<u8>> {
                 timestamp(&mut out, s.last_timestamp.as_ref())?;
             }
             match e.as_ref() {
+                Payload::Midi1(m::AnyMessage::ControlChange(v)) if v.resolution() == 14 => {
+                    out.push(3);
+                    command(&mut out, &m::AnyCommand::ControlChange(v.clone()))?;
+                }
                 Payload::Midi1(v) => {
                     out.push(1);
                     out.extend(v.encode()?);
@@ -685,8 +692,8 @@ fn decode_command(b: &[u8]) -> io::Result<m::AnyCommand> {
             let channel = f.i64()?;
             let controller = f.i64()?;
             let value = f.i64()?;
-            ControlChange14(
-                m::ControlChange14::new(controller, value)
+            ControlChange(
+                m::ControlChange::new_with_resolution(controller, value, 14)
                     .and_then(|m| m.with_channel(channel))
                     .map_err(|e| invalid(0, e))?,
             )
@@ -790,6 +797,7 @@ pub fn payload_size(r: &Record) -> io::Result<usize> {
         } => 11 + id.len() + label.len() + clock_identity.as_ref().map_or(0, |id| 4 + id.len()),
         Record::Event(e) => {
             let p = match e.as_ref() {
+                Payload::Midi1(m::AnyMessage::ControlChange(v)) if v.resolution() == 14 => 34,
                 Payload::Midi1(m::AnyMessage::SysEx(v)) => v.data().len() + 2,
                 Payload::Midi1(v) => v.encoded_len(),
                 Payload::Ump(v) => v.encode_words()?.len() * 4,

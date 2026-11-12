@@ -88,8 +88,8 @@ fn metadata_is_ignored_by_equality_and_hash_across_message_families() {
 #[test]
 fn expanded_commands_retain_the_original_provenance() {
     let commands = [
-        AnyCommand::ControlChange14(
-            meedee::messages::ControlChange14::new(1, 1234)
+        AnyCommand::ControlChange(
+            meedee::messages::ControlChange::new_with_resolution(1, 1234, 14)
                 .unwrap()
                 .with_channel(2)
                 .unwrap(),

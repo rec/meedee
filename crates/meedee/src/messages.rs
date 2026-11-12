@@ -227,7 +227,6 @@ macro_rules! check_parameter {
     };
 }
 channel_messages! {
-    ControlChange14(controller, value) { controller: u8 => with_controller = 0..=31 => controller, value: u16 => with_value = 0..=16383 => value };
     RpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16382 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
     NrpnSet(parameter, value) { parameter: u16 => with_parameter = 0..=16383 => parameter, value: u16 => with_value = 0..=16383 => value, resolution: u8 => with_resolution = 7..=14 => 14 };
 }
@@ -325,15 +324,160 @@ channel_values! {
         note: u8 => with_note = (0,127,0,127) => (note,note),
         pressure: u32 => with_pressure = (0,127,0,4294967295) => (0,0)
     } {};
-    ControlChange(controller,value) {
-        controller: u8 => with_controller = (0,127,0,127) => (controller,controller),
-        value: u32 => with_value = (0,127,0,4294967295) => (value,value)
-    } {};
     ProgramChange(program) {
         program: u8 => with_program = (1,128,1,128) => (program,program)
     } { options: u8 => with_options = 1, bank_msb: u8 => with_bank_msb = 127, bank_lsb: u8 => with_bank_lsb = 127 };
     ChannelPressure() { pressure: u32 => with_pressure = (0,127,0,4294967295) => (0,0) } {};
     PitchBend() { value: i32 => with_value = (-8192,8191,-2147483648,2147483647) => (0,0) } {};
+}
+
+/// A controller value with an explicit wire resolution.
+#[derive(Clone, Debug)]
+pub struct ControlChange {
+    metadata: Option<Box<Metadata>>,
+    format: ChannelFormat,
+    channel: Option<u8>,
+    controller: u8,
+    value: u32,
+    resolution: u8,
+}
+value_metadata!(ControlChange {
+    format,
+    channel,
+    controller,
+    value,
+    resolution
+});
+impl ControlChange {
+    pub fn new(controller: i64, value: i64) -> Result<Self, ValueError> {
+        Self::new_with_resolution(controller, value, 7)
+    }
+    pub fn new_with_resolution(
+        controller: i64,
+        value: i64,
+        resolution: i64,
+    ) -> Result<Self, ValueError> {
+        validate_resolution(value, resolution)?;
+        Ok(Self {
+            metadata: None,
+            format: ChannelFormat::Midi1,
+            channel: None,
+            controller: bounded(
+                controller,
+                "controller",
+                0,
+                if resolution == 14 { 31 } else { 127 },
+            )? as u8,
+            value: value as u32,
+            resolution: resolution as u8,
+        })
+    }
+    pub fn new_midi2(controller: i64, value: i64) -> Result<Self, ValueError> {
+        Ok(Self {
+            metadata: None,
+            format: ChannelFormat::Midi2 { group: 1 },
+            channel: None,
+            controller: bounded(controller, "controller", 0, 127)? as u8,
+            value: bounded(value, "value", 0, u32::MAX.into())? as u32,
+            resolution: 32,
+        })
+    }
+    pub fn channel(&self) -> Option<u8> {
+        self.channel
+    }
+    pub fn controller(&self) -> u8 {
+        self.controller
+    }
+    pub fn value(&self) -> u32 {
+        self.value
+    }
+    pub fn resolution(&self) -> u8 {
+        self.resolution
+    }
+    pub fn version(&self) -> u8 {
+        if self.resolution == 32 {
+            2
+        } else {
+            1
+        }
+    }
+    pub fn group(&self) -> Option<u8> {
+        match self.format {
+            ChannelFormat::Midi1 => None,
+            ChannelFormat::Midi2 { group } => Some(group),
+        }
+    }
+    pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
+        self.channel = Some(bounded(channel, "channel", 1, 16)? as u8);
+        Ok(self)
+    }
+    pub fn without_channel(mut self) -> Self {
+        self.channel = None;
+        self
+    }
+    pub fn with_group(mut self, group: i64) -> Result<Self, ValueError> {
+        if self.version() != 2 {
+            return Err(ValueError(
+                "group requires MIDI 2; use Midi1Packet for MIDI 1 UMP".into(),
+            ));
+        }
+        self.format = ChannelFormat::Midi2 {
+            group: bounded(group, "group", 1, 16)? as u8,
+        };
+        Ok(self)
+    }
+    pub fn with_controller(mut self, controller: i64) -> Result<Self, ValueError> {
+        self.controller = bounded(
+            controller,
+            "controller",
+            0,
+            if self.resolution == 14 { 31 } else { 127 },
+        )? as u8;
+        Ok(self)
+    }
+    pub fn with_value(mut self, value: i64) -> Result<Self, ValueError> {
+        let max = match self.resolution {
+            7 => 127,
+            14 => 16383,
+            _ => u32::MAX.into(),
+        };
+        self.value = bounded(value, "value", 0, max)? as u32;
+        Ok(self)
+    }
+    pub fn with_resolution(mut self, resolution: i64) -> Result<Self, ValueError> {
+        if self.version() == 2 {
+            if resolution != 32 {
+                return Err(ValueError("MIDI 2 controller resolution must be 32".into()));
+            }
+        } else {
+            validate_resolution(self.value.into(), resolution)?;
+            bounded(
+                self.controller.into(),
+                "controller",
+                0,
+                if resolution == 14 { 31 } else { 127 },
+            )?;
+        }
+        self.resolution = resolution as u8;
+        Ok(self)
+    }
+    pub(crate) fn resolved_channel(&self) -> Result<u8, ValueError> {
+        self.channel
+            .ok_or_else(|| ValueError("message channel is unassigned".into()))
+    }
+    pub(crate) fn midi1_channel(&self) -> Result<u8, ValueError> {
+        if self.version() != 1 {
+            return Err(ValueError(
+                "MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into(),
+            ));
+        }
+        if self.resolution == 14 {
+            return Err(ValueError(
+                "14-bit ControlChange requires expansion into two messages".into(),
+            ));
+        }
+        self.resolved_channel()
+    }
 }
 
 /// A single relative step of a registered or non-registered parameter.
@@ -491,6 +635,7 @@ impl AnyMessage {
         }
         match self {
             Self::SysEx(v) => v.data().len() + 2,
+            Self::ControlChange(v) if v.resolution() == 14 => 6,
             Self::NoteOn(_)
             | Self::NoteOff(_)
             | Self::PolyPressure(_)
@@ -516,7 +661,7 @@ crate::messages::value_metadata!(SysEx { data });
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AnyCommand {
-    ControlChange14(ControlChange14),
+    ControlChange(ControlChange),
     RpnSet(RpnSet),
     NrpnSet(NrpnSet),
     ParameterStep(ParameterStep),
@@ -524,7 +669,7 @@ pub enum AnyCommand {
     ZoneConfiguration(crate::mpe::ZoneConfiguration),
 }
 enum_metadata!(AnyCommand {
-    ControlChange14,
+    ControlChange,
     RpnSet,
     NrpnSet,
     ParameterStep,
