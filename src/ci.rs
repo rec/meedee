@@ -1,13 +1,13 @@
 //! Frozen MIDI-CI management values and the shared caller-driven session.
 use crate::files::{bytes, frozen, limit, uint};
 use crate::messages::{integer, Message};
-use middi::messages::PrimitiveMessage;
-use middi::{ci as model, ci as session};
+use middy::messages::PrimitiveMessage;
+use middy::{ci as model, ci as session};
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
 
-#[pyclass(frozen, skip_from_py_object, module = "middi.ci")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.ci")]
 #[derive(Clone)]
 struct Address {
     value: model::Address,
@@ -49,7 +49,7 @@ impl Address {
         crate::tuning::hash(&self.value)
     }
 }
-#[pyclass(frozen, skip_from_py_object, module = "middi.ci")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.ci")]
 #[derive(Clone)]
 struct Header {
     value: model::Header,
@@ -62,7 +62,7 @@ frozen!(Header;source_muid,destination_muid,version,address;{
     #[getter]fn version(&self)->u8{self.value.version()}
     #[getter]fn address(&self)->Address{Address{value:self.value.address()}}
 });
-#[pyclass(frozen, skip_from_py_object, module = "middi.ci")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.ci")]
 #[derive(Clone)]
 struct Identity {
     value: model::Identity,
@@ -75,7 +75,7 @@ frozen!(Identity;manufacturer,family,model,revision;{
     #[getter]fn model(&self)->u16{self.value.model()}
     #[getter]fn revision<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.revision())}
 });
-#[pyclass(frozen, skip_from_py_object, module = "middi.ci")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.ci")]
 #[derive(Clone)]
 struct DiscoveryInfo {
     value: model::DiscoveryInfo,
@@ -88,7 +88,7 @@ frozen!(DiscoveryInfo;identity,capabilities,max_sysex,output_path;{
     #[getter]fn max_sysex(&self)->u32{self.value.max_sysex()}
     #[getter]fn output_path(&self)->Option<u8>{self.value.output_path()}
 });
-#[pyclass(frozen, skip_from_py_object, module = "middi.ci")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.ci")]
 #[derive(Clone)]
 struct Notice {
     value: model::Notice,
@@ -104,7 +104,7 @@ frozen!(Notice;original,status,status_data,details,message_text;{
 });
 macro_rules! management_class {
     ($name:ident; $($field:ident),*; {$($method:item)*})=>{
-        #[pyclass(frozen,extends=Message,module="middi.ci")]
+        #[pyclass(frozen,extends=Message,module="middy.ci")]
         struct $name {value:model::Management}
         frozen!($name;header,$($field,)*extensions;{
             $($method)*
@@ -148,7 +148,7 @@ management_class!(Nak;notice;{
     fn new(header:PyRef<'_,Header>,notice:Option<PyRef<'_,Notice>>,extensions:Option<&Bound<'_,PyAny>>)->PyResult<PyClassInitializer<Self>>{Ok(PyClassInitializer::from(Message::default()).add_subclass(Self{value:build(&header,model::Body::Nak(notice.map(|v|v.value.clone())),extensions)?}))}
     #[getter]fn notice(&self)->Option<Notice>{let model::Body::Nak(value)=self.value.body()else{unreachable!()};value.clone().map(|value|Notice{value})}
 });
-#[pyclass(frozen, skip_from_py_object, module = "middi.ci")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.ci")]
 #[derive(Clone)]
 struct Route {
     value: session::Route,
@@ -160,7 +160,7 @@ frozen!(Route;input,output,group;{
     #[getter]fn output(&self)->&str{self.value.output()}
     #[getter]fn group(&self)->Option<u8>{self.value.group()}
 });
-#[pyclass(frozen, module = "middi.ci")]
+#[pyclass(frozen, module = "middy.ci")]
 struct Peer {
     value: session::Peer,
 }
@@ -197,7 +197,7 @@ impl Peer {
         crate::tuning::hash(&self.value)
     }
 }
-#[pyclass(frozen, module = "middi.ci")]
+#[pyclass(frozen, module = "middy.ci")]
 struct Action {
     value: session::Action,
 }
@@ -235,7 +235,7 @@ impl Action {
         crate::tuning::hash(&self.value)
     }
 }
-#[pyclass(frozen, module = "middi.ci")]
+#[pyclass(frozen, module = "middy.ci")]
 struct Observation {
     value: session::Observation,
 }
@@ -280,7 +280,7 @@ impl Observation {
         crate::tuning::hash(&self.value)
     }
 }
-#[pyclass(module = "middi.ci")]
+#[pyclass(module = "middy.ci")]
 struct Session {
     value: session::Session,
 }
@@ -521,13 +521,13 @@ fn optional_byte(value: Option<&Bound<'_, PyAny>>) -> PyResult<Option<u8>> {
 fn int(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     integer(value, "value")
 }
-fn error(e: middi::messages::ValueError) -> PyErr {
+fn error(e: middy::messages::ValueError) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
 
-#[pyclass(module = "middi.ci")]
+#[pyclass(module = "middy.ci")]
 pub(crate) struct Browser {
-    pub(crate) value: middi::ci::Browser,
+    pub(crate) value: middy::ci::Browser,
 }
 #[pymethods]
 impl Browser {
@@ -568,7 +568,7 @@ impl Browser {
         )
         .map_err(error)?;
         Ok(Self {
-            value: middi::ci::Browser::new(
+            value: middy::ci::Browser::new(
                 session,
                 discovery_timeout,
                 endpoint_timeout,
@@ -648,9 +648,9 @@ impl Browser {
         }
     }
 }
-#[pyclass(frozen, module = "middi.ci")]
+#[pyclass(frozen, module = "middy.ci")]
 pub(crate) struct BrowseReport {
-    pub(crate) value: middi::ci::BrowseReport,
+    pub(crate) value: middy::ci::BrowseReport,
 }
 #[pymethods]
 impl BrowseReport {
@@ -705,9 +705,9 @@ impl BrowseReport {
         self.value.reason.as_deref()
     }
 }
-#[pyclass(frozen, module = "middi.ci")]
+#[pyclass(frozen, module = "middy.ci")]
 struct BrowseDiagnostic {
-    value: middi::ci::BrowseDiagnostic,
+    value: middy::ci::BrowseDiagnostic,
 }
 #[pymethods]
 impl BrowseDiagnostic {

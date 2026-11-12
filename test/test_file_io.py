@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-import middi as md
+import middy as md
 
 
 def midi_file(path: Path) -> tuple[md.smf.Header, list[md.smf.Event]]:
@@ -66,7 +66,7 @@ def test_detection_uses_contents_and_borrowed_streams_remain_open(
 ) -> None:
     path = tmp_path / "song.mid"
     header, records = midi_file(path)
-    renamed = tmp_path / "not-an-archive.middi"
+    renamed = tmp_path / "not-an-archive.middy"
     renamed.write_bytes(path.read_bytes())
     assert list(md.Reader(renamed)) == [header, *records]
     stream = BytesIO(path.read_bytes())

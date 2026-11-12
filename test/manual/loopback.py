@@ -13,9 +13,9 @@ from uuid import uuid4
 
 import pytest
 
-from middi import midi
-from middi._clients import Input, Output
-from middi.events import ReceivedPacket
+from middy import midi
+from middy._clients import Input, Output
+from middy.events import ReceivedPacket
 
 
 @pytest.fixture(params=[True, False], autouse=True)
@@ -55,7 +55,7 @@ def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
     receiver = Collector()
     source = midi.Input(raw=True, encoding=encoding, timestamps=timestamps)
     target = midi.Output(encoding=encoding)
-    token = f"middi-{uuid4().hex}"
+    token = f"middy-{uuid4().hex}"
     with ExitStack() as stack:
         if direction == "input":
             incoming = stack.enter_context(source.create_virtual(token, receiver))
@@ -81,7 +81,7 @@ def test_virtual_loopback_preserves_raw_packets_and_clock_metadata(
 
 def test_duplicate_names_have_distinct_snapshots() -> None:
     require_unix()
-    token = f"middi-duplicate-{uuid4().hex}"
+    token = f"middy-duplicate-{uuid4().hex}"
     first = midi.Output()
     second = midi.Output()
     observer = midi.Input(
@@ -99,7 +99,7 @@ def test_duplicate_names_have_distinct_snapshots() -> None:
 def test_new_resource_after_close_uses_a_new_clock() -> None:
     require_unix()
     receiver = Collector()
-    token = f"middi-reopen-{uuid4().hex}"
+    token = f"middy-reopen-{uuid4().hex}"
     clocks = []
     for _ in range(2):
         source = midi.Input(raw=True)
@@ -123,7 +123,7 @@ def test_disappeared_endpoint_fails_open_and_requires_a_fresh_client() -> None:
     )
     target = midi.Output()
     receiver = Collector()
-    token = f"middi-disappearance-{uuid4().hex}"
+    token = f"middy-disappearance-{uuid4().hex}"
     with source.create_virtual(token, receiver):
         port = next(p for p in target.ports() if p.name == token)
     with pytest.raises((midi.MidiError, ValueError)):
@@ -149,7 +149,7 @@ def test_sysex_byte_stream_preserves_fragments_without_assembling_in_the_binding
         raw=True,
     )
     target = midi.Output()
-    token = f"middi-sysex-{uuid4().hex}"
+    token = f"middy-sysex-{uuid4().hex}"
     message = b"\xf0\x7d" + bytes(i % 128 for i in range(size - 3)) + b"\xf7"
     with source.create_virtual(token, receiver):
         port = next(p for p in target.ports() if p.name == token)
@@ -165,7 +165,7 @@ def test_burst_preserves_raw_byte_stream() -> None:
         raw=True,
     )
     target = midi.Output()
-    token = f"middi-burst-{uuid4().hex}"
+    token = f"middy-burst-{uuid4().hex}"
     messages = [bytes((0xB0, i // 128, i % 128)) for i in range(1000)]
     with source.create_virtual(token, receiver) as incoming:
         port = next(p for p in target.ports() if p.name == token)
@@ -182,7 +182,7 @@ def test_native_interpreter_exit_drains_live_connections(isolation: bool) -> Non
         [sys.executable, str(Path(__file__).with_name("shutdown.py"))],
         check=True,
         timeout=20,
-        env={**environ, "MIDDI_TEST_ISOLATED": "1" if isolation else "0"},
+        env={**environ, "MIDDY_TEST_ISOLATED": "1" if isolation else "0"},
     )
 
 

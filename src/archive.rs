@@ -1,11 +1,11 @@
 //! Streaming Python archive bridge; schema and validation live in Rust core.
 use crate::files::{bytes, closed, frozen, os_error, uint, Stream as IoStream};
 use crate::packets::Clock;
-use middi::archive as model;
+use middy::archive as model;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 pub struct Stream {
     value: (String, String, Option<String>),
 }
@@ -14,7 +14,7 @@ frozen!(Stream;id,label,clock_identity;{
 #[getter]fn id(&self)->&str{&self.value.0}#[getter]fn label(&self)->&str{&self.value.1}
 #[getter]fn clock_identity(&self)->Option<&str>{self.value.2.as_deref()}
 });
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 pub struct Gap {
     pub value: (String, u64, String),
 }
@@ -22,7 +22,7 @@ frozen!(Gap;stream,lost,reason;{
 #[new]#[pyo3(signature=(*,stream,lost,reason))]fn new(stream:String,lost:&Bound<'_,PyAny>,reason:String)->PyResult<Self>{Ok(Self{value:(stream,uint(lost)?,reason)})}
 #[getter]fn stream(&self)->&str{&self.value.0}#[getter]fn lost(&self)->u64{self.value.1}#[getter]fn reason(&self)->&str{&self.value.2}
 });
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 pub struct Discontinuity {
     value: (String, String),
 }
@@ -30,13 +30,13 @@ frozen!(Discontinuity;stream,reason;{
 #[new]#[pyo3(signature=(*,stream,reason))]fn new(stream:String,reason:String)->Self{Self{value:(stream,reason)}}
 #[getter]fn stream(&self)->&str{&self.value.0}#[getter]fn reason(&self)->&str{&self.value.1}
 });
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 pub struct Metadata {
     value: (
         String,
         Vec<u8>,
         Option<String>,
-        Option<middi::events::Timestamp>,
+        Option<middy::events::Timestamp>,
     ),
 }
 frozen!(Metadata;key,data,stream,timestamp;{
@@ -45,7 +45,7 @@ frozen!(Metadata;key,data,stream,timestamp;{
 #[getter]fn stream(&self)->Option<&str>{self.value.2.as_deref()}
 #[getter]fn timestamp(&self)->Option<crate::event_values::Timestamp>{self.value.3.clone().map(|value|crate::event_values::Timestamp{value})}
 });
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 pub struct Opaque {
     value: (u16, Vec<u8>),
 }
@@ -152,7 +152,7 @@ pub fn to_python(py: Python<'_>, r: model::Record) -> PyResult<Py<PyAny>> {
         .into_any()),
     }
 }
-#[pyclass(module = "middi.archive")]
+#[pyclass(module = "middy.archive")]
 struct Reader {
     value: Option<model::Reader<IoStream>>,
     complete: bool,
@@ -207,7 +207,7 @@ impl Reader {
         self.problem.as_deref()
     }
 }
-#[pyclass(module = "middi.archive")]
+#[pyclass(module = "middy.archive")]
 struct Writer {
     value: Option<model::Writer<IoStream>>,
 }

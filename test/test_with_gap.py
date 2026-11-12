@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from middi.events import with_gap
+from middy.events import with_gap
 
 
 def test_each_item_is_followed_by_gap_including_the_last() -> None:

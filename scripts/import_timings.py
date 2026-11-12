@@ -15,7 +15,7 @@ from time import perf_counter_ns
 
 
 def measure(modules: list[str]) -> None:
-    importlib.import_module("middi._core")
+    importlib.import_module("middy._core")
     before = set(sys.modules)
     started = perf_counter_ns()
     for module in modules:
@@ -36,11 +36,11 @@ def main() -> None:
 
     options = tyro.cli(Options)
     root = Path(__file__).resolve().parents[1]
-    files = {"middi": root / "middi" / "__init__.py"}
+    files = {"middy": root / "middy" / "__init__.py"}
     files.update(
         {
-            f"middi.{p.stem}": p
-            for p in sorted((root / "middi").glob("*.py"))
+            f"middy.{p.stem}": p
+            for p in sorted((root / "middy").glob("*.py"))
             if not p.name.startswith("_")
         }
     )
@@ -51,7 +51,7 @@ def main() -> None:
         f"Python {sys.version.split()[0]}; {options.samples} fresh processes per module"
     )
     print("Rust preloaded; process startup excluded; filesystem caches warm.")
-    print("middi itself is already loaded by the Rust preload.")
+    print("middy itself is already loaded by the Rust preload.")
     print("Lines: public .py files only, including comments and blank lines.")
     print(
         f"{'Module':28} {'Median ms':>10} {'Min ms':>10} "

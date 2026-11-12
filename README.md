@@ -1,10 +1,10 @@
-# middi
+# middy
 
 A Rust MIDI toolkit with matching Python bindings for macOS, Windows and Linux,
 using vendored [libremidi](https://github.com/celtera/libremidi) for native transport.
-Use `import middi as md` for common classes such as `md.Input`, `md.Output`,
+Use `import middy as md` for common classes such as `md.Input`, `md.Output`,
 `md.Note` and `md.NoteOn`. All public submodules are also available, for example
-`md.tuning`, `md.ump` and `md.archive`. The explicit `middi.__all__` contains
+`md.tuning`, `md.ump` and `md.archive`. The explicit `middy.__all__` contains
 classes and submodules; functions remain module-qualified. The Python convenience
 API uses reccy for unit parsing; the Rust crate needs no Python interpreter.
 
@@ -36,13 +36,13 @@ are available, along with GM sound maps and selected profile codecs/helpers.
 UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
-tracked in [the plan](plan/middi.md).
+tracked in [the plan](plan/middy.md).
 `out.send(...)` accepts message objects, compound control/bank/MPE
 commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
 
 ```python
-import middi as md
+import middy as md
 
 md.Output().send(md.Note("500 ms", 60))
 ```
@@ -66,13 +66,13 @@ full-note values or automatic cleanup.
 ## Files, typed I/O and exact time
 
 Rust users can start with the [practical Rust examples](doc/rust-examples.md).
-The Rust crate also exposes common types at its root: `middi::{Input, Output,
+The Rust crate also exposes common types at its root: `middy::{Input, Output,
 Note, Rest, Beats, Reader}`. The canonical submodule paths remain available.
 Use `Duration` for elapsed time and `Beats` with output tempo for music.
 For a function body returning `Result<(), Box<dyn std::error::Error>>`:
 
 ```rust
-use middi::{Note, Output};
+use middy::{Note, Output};
 use std::time::Duration;
 
 Output::new().send(Note::new(Duration::from_millis(500), 60)?)?;
@@ -85,16 +85,16 @@ same archive records. Connections close on drop, with checked explicit `close()`
 available for cleanup errors. The `transport` module retains advanced native I/O.
 
 ```python
-from middi import archive, events, messages, smf
+from middy import archive, events, messages, smf
 
 clock = events.Clock(identity="score", tick_numerator=1, tick_denominator=480)
 note = (messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="piano", timestamp=events.Timestamp(ticks=480, clock=clock))
-writer = archive.Writer("take.middi")
+writer = archive.Writer("take.middy")
 writer.write(clock)
 writer.write(archive.Stream(id="piano", label="Piano", clock_identity=clock.identity))
 writer.write(note)
 writer.finish()
-reader = archive.Reader("take.middi")
+reader = archive.Reader("take.middy")
 records = list(reader)  # Completion and every record CRC are checked.
 assert reader.complete
 reader.close()
@@ -177,7 +177,7 @@ with Input() as receiver:
 ```
 
 ```rust,no_run
-let mut receiver = middi::midi::Input::new();
+let mut receiver = middy::midi::Input::new();
 let recorder = receiver.start(None::<&std::path::Path>, &Default::default())?;
 // Other application work can run while recording continues.
 let report = receiver.stop(std::time::Duration::from_secs(5))?;
@@ -205,8 +205,8 @@ records/payload bytes, including in-flight writes. Pass it to `output.play` for
 successful handoffs. Defaults leave these fields `None`. These observations do
 not establish device acceptance or physical latency.
 
-`middi monitor --metrics` adds host delivery rate and interval statistics to its
-final summary, before display filters. `middi.metrics` also exposes reusable
+`middy monitor --metrics` adds host delivery rate and interval statistics to its
+final summary, before display filters. `middy.metrics` also exposes reusable
 Rust-backed `Histogram` and caller-timed `Delivery` accumulators, with independent
 frozen snapshots and no native client initialization. See
 [timing and load diagnostics](plan/api.md#timing-and-load-diagnostics) for units,
@@ -217,7 +217,7 @@ histogram boundaries and measurement windows.
 To receive a dump initiated on an instrument, use the optional CLI:
 
 ```bash
-middi sysex-receive backup.syx --port "Synth MIDI Out" --duration 30.0
+middy sysex-receive backup.syx --port "Synth MIDI Out" --duration 30.0
 ```
 
 This records MIDI 1 for the requested duration, closes the input, then exports
@@ -229,7 +229,7 @@ See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
 
 ## Offline uFor tuning
 
-Python 3.13 users with `middi[cli,ufor]` can run `middi ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
+Python 3.13 users with `middy[cli,ufor]` can run `middy ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
 root note/frequency. Export creates an ordinary or banked bulk `.syx` file without
 overwriting; sending remains a separate `transfer-send` action. See the
 [offline tuning workflow](plan/ufor-tuning.md#offline-file-export).
@@ -237,8 +237,8 @@ overwriting; sending remains a separate `transfer-send` action. See the
 ## Request an MTS tuning dump
 
 ```bash
-middi tuning-preview --device-id 1 --program 2 --timeout 3.0
-middi tuning-query tuning.syx --input-port "Synth Out" --output-port "Synth In" --device-id 1 --program 2 --timeout 3.0
+middy tuning-preview --device-id 1 --program 2 --timeout 3.0
+middy tuning-query tuning.syx --input-port "Synth Out" --output-port "Synth In" --device-id 1 --program 2 --timeout 3.0
 ```
 
 Add `--bank` for a banked request. Preview opens no ports; query sends one MIDI 1
@@ -251,9 +251,9 @@ retry. Library users can drive `tuning.Query` with `tuning.query`. See
 ## File inspection and capture validation
 
 ```python
-from middi import inspection
+from middy import inspection
 
-report = inspection.inspect_file("take.middi", format="archive")
+report = inspection.inspect_file("take.middy", format="archive")
 print(report.complete, report.problem)
 print(report.message_counts)
 print(report.gap_records, report.lost_events, report.discontinuities)
@@ -264,7 +264,7 @@ for source in report.streams:
 Choose `format="archive"`, `"smf"`, `"syx"` or `"clip"` explicitly. Paths and
 binary streams are accepted; borrowed streams stay open and are read from their
 current position. Inspection starts no MIDI workers and sends nothing. Rust
-applications use `middi::inspection::inspect` with the corresponding `Format`.
+applications use `middy::inspection::inspect` with the corresponding `Format`.
 
 The frozen report counts successfully decoded records and messages without
 retaining the event payloads. It retains archive clock/stream descriptors and,
@@ -327,13 +327,13 @@ retain the full files or change either source.
 
 ### Optional command-line tools
 
-Install `middi[cli]` (in this checkout: `uv sync --extra cli`). The extra adds
+Install `middy[cli]` (in this checkout: `uv sync --extra cli`). The extra adds
 Tyro; Pydantic is also used by the ordinary library's resource configuration.
 
 ```sh
-middi inspect take.middi --format archive
-middi validate take.middi --format archive --output json
-middi compare before.middi after.middi --format archive --tick-tolerance 1000
+middy inspect take.middy --format archive
+middy validate take.middy --format archive --output json
+middy compare before.middy after.middy --format archive --tick-tolerance 1000
 ```
 
 `inspect` prints full summaries and timing detail; `validate` prints a compact
@@ -349,8 +349,8 @@ regressions are quality findings. No offline command opens a MIDI client.
 ### Passive live monitoring
 
 ```sh
-middi monitor "Exact input port name" --encoding bytes --duration 30
-middi monitor "Exact UMP input name" --encoding ump --group 16 --channel 1 --output json
+middy monitor "Exact input port name" --encoding bytes --duration 30
+middy monitor "Exact UMP input name" --encoding ump --group 16 --channel 1 --output json
 ```
 
 The name must match exactly one input in the selected backend's current discovery
@@ -389,7 +389,7 @@ outside these observations.
 
 ## MIDI-CI management
 
-`middi.ci` provides immutable MIDI-CI 1.2.1 Discovery/Reply, Endpoint Inquiry/Reply,
+`middy.ci` provides immutable MIDI-CI 1.2.1 Discovery/Reply, Endpoint Inquiry/Reply,
 InvalidateMuid and ACK/NAK values, encoded with `codecs.encode`. Interpretation
 is explicit through `ci.decode(SysEx)`; raw input still supplies primitive SysEx.
 `ci.Session` is a caller-driven management state machine with explicit random
@@ -404,8 +404,8 @@ native UMP availability, peer responsiveness or successful device configuration.
 ## Messages and byte codecs
 
 ```python
-from middi.codecs import Decoder, encode
-from middi.messages import NoteOn
+from middy.codecs import Decoder, encode
+from middy.messages import NoteOn
 
 note = NoteOn(channel=1, note=60, velocity=100)
 wire = encode(note)  # b'\x90\x3c\x64'
@@ -442,7 +442,7 @@ protocol boundaries are in [the API contract](plan/api.md).
 ## MIDI Tuning Standard
 
 ```python
-from middi import codecs, messages, tuning
+from middy import codecs, messages, tuning
 
 conversion = tuning.Pitch.from_frequency(frequency_hz=441.123456)
 change = tuning.SingleNoteChange(
@@ -476,7 +476,7 @@ for units, names, checksum behavior and request tracking.
 ## Optional uFor tuning bridge
 
 Install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
-`middi.tuning.convert(source, note)` converts one note from an existing uFor
+`middy.tuning.convert(source, note)` converts one note from an existing uFor
 `Tuning` to a native `NoteTuning`. Missing source notes raise `KeyError`; invalid
 frequencies and evaluation failures raise errors. Collect notes with a comprehension
 when building a multi-key message. `bulk_dump()` and `note_changes()` accept those
@@ -485,7 +485,7 @@ settings. They open no ports and send nothing. Omitted bulk keys or explicit
 `NoChange` values require `preserve_unmapped=True`. See the
 [bridge contract](plan/ufor-tuning.md).
 
-middi supports Python 3.13 and newer. Ordinary installs
+middy supports Python 3.13 and newer. Ordinary installs
 use reccy for unit-aware Python inputs; uFor remains an optional extra.
 
 `Input`, `Output` and `discovery.Poller` are frozen Pydantic configuration models.
@@ -513,7 +513,7 @@ seconds; for example, `gap=0.1` and `gap="100 ms"` are equivalent.
 
 Integer fields require exact conversions. A nonintegral nanosecond or byte
 count is rejected rather than rounded. Beats, ticks and seconds are distinct;
-middi does not infer a tempo or clock mapping to convert between them. Raw MIDI
+middy does not infer a tempo or clock mapping to convert between them. Raw MIDI
 values such as velocity and controller values retain their protocol ranges.
 
 CLI quantity options accept the same expressions, quoted as one shell argument:
@@ -526,7 +526,7 @@ Native messages, clocks and archive records retain their existing representation
 ## General MIDI and profile helpers
 
 ```python
-from middi import codecs, controls, gm, mpe
+from middy import codecs, controls, gm, mpe
 
 matches = gm.find_programs("acoustic grand piano")  # All GM1/GM2 matches.
 entry = gm.gm2_program(bank_lsb=4, program=6)
@@ -556,8 +556,8 @@ musical state and requires settling time (the standard specifies up to 100 ms).
 The library inserts no sleeps. GM1 initialization varies by device. GM2 bank
 selection can change a channel's melodic/rhythm role, including channel 10.
 
-`middi.universal` provides identity request/reply, master volume and signed
-master fine/coarse tuning. `middi.timecode` provides full-frame MTC values with
+`middy.universal` provides identity request/reply, master volume and signed
+master fine/coarse tuning. `middy.timecode` provides full-frame MTC values with
 an explicit rate code and broadcast device ID 127, plus explicit quarter-frame
 assembly and SMPTE position arithmetic. Their `decode(SysEx)` functions interpret
 complete messages explicitly; the byte decoder continues to return raw SysEx.
@@ -585,9 +585,9 @@ allocation, sustain, entry limits and sequence-lock behavior.
 ## Fine controls and parameters
 
 ```python
-from middi.codecs import expand
-from middi.controls import ControlInterpreter
-from middi.messages import ParameterSet
+from middy.codecs import expand
+from middy.controls import ControlInterpreter
+from middy.messages import ParameterSet
 
 command = ParameterSet(1234, 10000, channel=1, family="nrpn")
 primitives = expand(command)
@@ -641,7 +641,7 @@ PrimitiveMessage and Command subtraits for encoding and expansion.
 
 ## Universe state cache
 
-`middi.universe.Universe` tracks one ordered input source, including its UMP
+`middy.universe.Universe` tracks one ordered input source, including its UMP
 groups. Feed received messages and loss diagnostics into it. Full retention is
 the default. Typed lookups and `snapshot()` expose observed values, including
 partial RPN and NRPN components.
@@ -649,7 +649,7 @@ partial RPN and NRPN components.
 `CacheOptions` resolves an application default, a universe override and category
 overrides. `Retention.Minimum` omits optional snapshots while retaining decoder
 state, including values needed after arbitrary parameter reselection.
-Rust exposes the same operations in `middi::universe`.
+Rust exposes the same operations in `middy::universe`.
 
 Timecode uses a one-second timeout and a local monotonic clock. For replay, supply
 `now_ns` consistently to `feed` and `poll`. Configure MPE explicitly with
@@ -660,7 +660,7 @@ Timecode uses a one-second timeout and a local monotonic clock. For replay, supp
 ## UMP and MIDI 2.0
 
 ```python
-from middi import messages, translation, ump
+from middy import messages, translation, ump
 
 note = messages.NoteOn(60, 50_000, channel=1, version=2)
 words = ump.encode(note)  # Immutable tuple of 32-bit words.
@@ -711,7 +711,7 @@ MIDI 2.0 device compatibility remain unqualified.
 ## Python transport
 
 ```python
-from middi.midi import Output
+from middy.midi import Output
 
 output = Output()
 ports = output.ports()
@@ -746,7 +746,7 @@ real-connection names are not configurable through the pinned C API. CoreMIDI
 virtual names still use the fork's existing ASCII input conversion.
 
 Decoded callbacks accept a `Message` or `StreamDiagnostic`. With `raw=True`,
-callbacks accept one immutable `ReceivedPacket` from `middi.events`.
+callbacks accept one immutable `ReceivedPacket` from `middy.events`.
 Its `packet` is owned `bytes` or an immutable `UmpPacket` whose `words` are a
 tuple of unsigned 32-bit integers. Its `timestamp_ns` is an exact signed integer
 or `None` when capture is disabled. Zero is a valid captured timestamp. `clock`
@@ -796,9 +796,9 @@ worker failure, not endpoint health. `run_in_subprocess=False` uses the same Rus
 transport in-process with fewer resources and no native-operation deadline.
 Python defaults to `subprocess_worker="python"`, which launches a fresh Python
 interpreter whose worker module enters the Rust service. Set
-`subprocess_worker="rust"` to launch `middi-worker` directly. The optional
+`subprocess_worker="rust"` to launch `middy-worker` directly. The optional
 `subprocess_executable` selects the interpreter or worker executable; otherwise
-Python uses its current interpreter or searches PATH for `middi-worker`.
+Python uses its current interpreter or searches PATH for `middy-worker`.
 No application main guard is needed, and neither launcher maintains a second
 transport implementation.
 
@@ -808,7 +808,7 @@ program, arguments and operation timeout (five seconds by default). These settin
 must be selected before discovery or connection. In-process remains the default;
 empty sends never start a worker. Rust applications do not require Python.
 From this checkout, install the standalone worker with
-`cargo install --path crates/middi --bin middi-worker`, or provide its executable
+`cargo install --path crates/middy --bin middy-worker`, or provide its executable
 path explicitly.
 
 Live CLI commands expose `--run-in-subprocess` and `--no-run-in-subprocess`, plus
@@ -860,7 +860,7 @@ including retained clients; the Python cleanup registry permits 32 connections
 and has four workers. Stalled callbacks or teardown can occupy all cleanup
 workers. There is no global quota across isolated processes.
 
-Importing middi eagerly loads public submodules and validates interpreter
+Importing middy eagerly loads public submodules and validates interpreter
 compatibility, without starting cleanup workers or opening a MIDI device.
 Constructing Input/Output also starts no workers. Native cleanup workers start
 when the first native client is created; isolated-process cleanup is registered
@@ -872,8 +872,8 @@ Python, subinterpreters and forking with imported/live MIDI state are unsupporte
 
 ## Build and qualification
 
-`crates/middi` is the Rust toolkit; the root crate binds it using PyO3 in one
-private `middi._core` extension. Rust use requires no Python. Both languages
+`crates/middy` is the Rust toolkit; the root crate binds it using PyO3 in one
+private `middy._core` extension. Rust use requires no Python. Both languages
 use the same libremidi implementation; midir has been removed.
 
 Source builds require Rust 1.87+, CMake 3.22+, a C++20 toolchain and CPython 3.13+.
@@ -927,16 +927,16 @@ synthetic workloads and supervised test-owned virtual-port measurements in Rust
 and Python. Mac software baselines do not establish Windows/Linux performance,
 physical device behavior or live MIDI 2.0 support on other backends. See the
 [feature matrix and evidence](plan/validation.md).
-middi targets macOS, Windows and Linux. Raspberry Pi systems are ordinary Linux
+middy targets macOS, Windows and Linux. Raspberry Pi systems are ordinary Linux
 hosts, with no separate project milestone or required model. The
 [Linux qualification procedure](plan/linux-qualification.md) separates host
 inventory, device-free builds, authorized software loopback and physical tests.
 
 ```sh
 uv run --frozen pytest
-uv run --frozen ruff check --select B,E,F,I middi test
-uv run --frozen ruff format --check middi test
-uv run --frozen ty check middi test
+uv run --frozen ruff check --select B,E,F,I middy test
+uv run --frozen ruff format --check middy test
+uv run --frozen ty check middy test
 cargo fmt --all --check
 PYO3_PYTHON="$PWD/.venv/bin/python" cargo test --locked --workspace -- --test-threads=1
 uv run maturin build --release --locked --sdist --out dist
@@ -946,16 +946,16 @@ On Windows set `PYO3_PYTHON` to `.venv/Scripts/python.exe`. Native software-port
 checks in `test/manual/loopback.py` and `test/manual/windows.py` are explicit
 opt-ins and require target-host authorization. No unit test selects hardware.
 
-middi is MIT licensed. See [third-party notices](crates/middi/THIRD_PARTY_NOTICES.md) and
-[vendored provenance](crates/middi/third_party/libremidi/SOURCE.md). Publication is a separate
+middy is MIT licensed. See [third-party notices](crates/middy/THIRD_PARTY_NOTICES.md) and
+[vendored provenance](crates/middy/third_party/libremidi/SOURCE.md). Publication is a separate
 decision after the remaining qualification gates.
 ### Observed note activity
 
-`middi.notes` observes MIDI 1 bytes, MIDI 1 in UMP and native MIDI 2 without
+`middy.notes` observes MIDI 1 bytes, MIDI 1 in UMP and native MIDI 2 without
 opening a device. For example:
 
 ```python
-from middi import events, messages, notes
+from middy import events, messages, notes
 
 tracker = notes.Tracker(stream="keyboard")
 tracker.feed((messages.NoteOn(channel=1, note=60, velocity=100)).replace(stream="keyboard"))
@@ -981,7 +981,7 @@ for reset, channel-mode and uncertainty policies.
 
 ### Static routing and patch bay
 
-`middi.routing` provides caller-driven Rust/Python routes, bounded arrival-order
+`middy.routing` provides caller-driven Rust/Python routes, bounded arrival-order
 merging and fan-out. Routes select exact sources and optionally filter/remap
 channels and UMP groups. Channel voice is forwarded by default; other traffic
 requires opt-in. Source/timestamp/span provenance stays attached to each delivery,
@@ -989,7 +989,7 @@ and native MIDI 2 values are preserved. There is no automatic protocol conversio
 timestamp scheduling, reconnect or cleanup send.
 
 ```python
-from middi import events, messages, routing
+from middy import events, messages, routing
 
 router = routing.Router(routes=[routing.Route(
     name="keys-to-synth", source="keys", destination="synth",
@@ -1005,8 +1005,8 @@ delivery = router.peek()
 Install the optional CLI extra for offline archive preview or live forwarding:
 
 ```bash
-middi route-preview capture.middi --stream keys --encoding bytes --destinations synth --remap-channel 2
-middi patch "Keyboard" --encoding bytes --destinations "Synthesizer" --remap-channel 2
+middy route-preview capture.middy --stream keys --encoding bytes --destinations synth --remap-channel 2
+middy patch "Keyboard" --encoding bytes --destinations "Synthesizer" --remap-channel 2
 ```
 
 Preview opens no ports and labels simulated deliveries `planned`. Patch uses exact
@@ -1029,8 +1029,8 @@ remain unqualified. See [the routing contract](plan/api.md#static-protocol-aware
 The optional CLI can list ports or watch discovery without opening endpoints:
 
 ```bash
-middi ports --encoding bytes --output json
-middi watch-ports --encoding ump --interval 1 --duration 60
+middy ports --encoding bytes --output json
+middy watch-ports --encoding ump --interval 1 --duration 60
 ```
 
 Watch prints an initial baseline, changes and a final bounded summary. Unchanged
@@ -1039,17 +1039,17 @@ status 2 and retains the last complete snapshot; ordinary topology changes and
 clean completion/Ctrl-C return 0. Failed initial discovery is explicitly marked
 uninitialized rather than presented as an empty port list.
 
-`middi.topology` provides the same pure Rust/Python snapshot/change model.
+`middy.topology` provides the same pure Rust/Python snapshot/change model.
 Descriptors compare backend, encoding, direction, backend ID and name, preserving
 duplicate counts. A rename is removal/addition, not proof of device continuity.
 `Tracker.observe(...)` accepts complete descriptor lists; the first accepted scan
 establishes a baseline without inventing arrivals.
 
-`middi.discovery.Poller` creates its existing isolated discovery clients only on
+`middy.discovery.Poller` creates its existing isolated discovery clients only on
 the first explicit poll, reuses them, and releases its references on close:
 
 ```python
-from middi.discovery import Poller
+from middy.discovery import Poller
 
 with Poller(encoding="bytes") as poller:
     report = poller.poll()
@@ -1069,14 +1069,14 @@ is performed. See [the topology contract](plan/api.md#topology-observations-and-
 Validate and preview a complete `.syx` file without opening MIDI ports:
 
 ```sh
-middi transfer-preview backup.syx --gap 0.1 --output json
+middy transfer-preview backup.syx --gap 0.1 --output json
 ```
 
 To send, choose a gap from the instrument's documented transfer requirements and
 an exact, unique output name. Sending may change instrument state:
 
 ```sh
-middi transfer-send backup.syx --gap 0.1 --port 'Exact output name'
+middy transfer-send backup.syx --gap 0.1 --port 'Exact output name'
 ```
 
 The 100 ms value is an example, not a device recommendation. `--gap` is
@@ -1110,7 +1110,7 @@ manufacturer, family, model and revision fields. For example, an explicitly
 experimental local identity can be used during development:
 
 ```sh
-middi ci-browse --input-port 'Exact input name' --output-port 'Exact output name' \
+middy ci-browse --input-port 'Exact input name' --output-port 'Exact output name' \
   --encoding bytes --manufacturer 7d0000 --family 1 --model 1 --revision 00000000
 ```
 
@@ -1133,11 +1133,11 @@ for bounds, cancellation, reporting, local identity and qualification limits.
 
 ### Deterministic transport tests
 
-`middi.testing` supplies in-memory inputs, recording outputs and an explicit
+`middy.testing` supplies in-memory inputs, recording outputs and an explicit
 manual clock. It opens no devices and starts no threads or MIDI lifecycle:
 
 ```python
-from middi import events, messages, testing
+from middy import events, messages, testing
 
 clock = events.Clock(identity="test-clock", origin="manual")
 receiver = testing.Input(stream="keys", encoding="bytes")

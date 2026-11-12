@@ -1,10 +1,10 @@
 use crate::files::{limit, os_error, uint, Stream};
-use middi::inspection;
+use middy::inspection;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
-#[pyclass(frozen, module = "middi.inspection")]
+#[pyclass(frozen, module = "middy.inspection")]
 struct ComparisonReport {
     value: inspection::ComparisonReport,
 }
@@ -51,7 +51,7 @@ impl ComparisonReport {
             .collect()
     }
 }
-#[pyclass(frozen, module = "middi.inspection")]
+#[pyclass(frozen, module = "middy.inspection")]
 struct Difference {
     value: inspection::Difference,
 }

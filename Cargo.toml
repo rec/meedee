@@ -1,10 +1,10 @@
 [package]
-name = "middi-python"
+name = "middy-python"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.87"
-description = "Python bindings for the middi Rust MIDI toolkit"
-repository = "https://github.com/rec/middi"
+description = "Python bindings for the middy Rust MIDI toolkit"
+repository = "https://github.com/rec/middy"
 publish = false
 license = "MIT"
 
@@ -13,13 +13,13 @@ name = "_core"
 crate-type = ["cdylib", "rlib"]
 
 [workspace]
-members = ["crates/middi"]
+members = ["crates/middy"]
 default-members = ["."]
 resolver = "2"
 
 [dependencies]
-middi = { path = "crates/middi" }
+middy = { path = "crates/middy" }
 pyo3 = "=0.29.3"
 
 [target.'cfg(target_os = "macos")'.dev-dependencies]
-middi-coremidi-fixture = { path = "crates/middi/tests/coremidi-fixture" }
+middy-coremidi-fixture = { path = "crates/middy/tests/coremidi-fixture" }

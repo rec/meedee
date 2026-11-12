@@ -3,9 +3,9 @@ use crate::event_values::{Rational, Timestamp};
 use crate::files::{closed, limit, os_error, uint, Event as SmfEvent, Header, Stream};
 use crate::packets::Clock;
 use crate::playback::ClockMapping;
-use middi::{clip, smf};
+use middy::{clip, smf};
 use pyo3::prelude::*;
-#[pyclass(name = "Timeline", module = "middi.smf")]
+#[pyclass(name = "Timeline", module = "middy.smf")]
 struct SmfTimeline {
     value: smf::Timeline,
 }
@@ -60,7 +60,7 @@ impl SmfTimeline {
             .collect()
     }
 }
-#[pyclass(name = "Timeline", module = "middi.clip")]
+#[pyclass(name = "Timeline", module = "middy.clip")]
 struct ClipTimeline {
     value: clip::Timeline,
 }
@@ -105,7 +105,7 @@ impl ClipTimeline {
     }
 }
 
-#[pyclass(module = "middi.smf")]
+#[pyclass(module = "middy.smf")]
 struct MergedReader {
     value: Option<smf::MergedReader<Stream>>,
 }
@@ -169,7 +169,7 @@ impl MergedReader {
         self.value = None;
     }
 }
-#[pyclass(name = "TimedReader", module = "middi.smf")]
+#[pyclass(name = "TimedReader", module = "middy.smf")]
 struct SmfTimedReader {
     value: Option<smf::TimedReader<Stream>>,
 }
@@ -251,7 +251,7 @@ impl SmfTimedReader {
         self.value = None;
     }
 }
-#[pyclass(name = "TimedReader", module = "middi.clip")]
+#[pyclass(name = "TimedReader", module = "middy.clip")]
 struct ClipTimedReader {
     value: Option<clip::TimedReader<Stream>>,
 }
@@ -269,7 +269,7 @@ impl ClipTimedReader {
         let value = py
             .detach(move || {
                 clip::TimedReader::new(
-                    middi::clip::Reader::new(source, false)?,
+                    middy::clip::Reader::new(source, false)?,
                     stream,
                     include_configuration,
                 )
@@ -308,7 +308,7 @@ impl ClipTimedReader {
         self.value = None;
     }
 }
-#[pyclass(frozen, module = "middi.smf")]
+#[pyclass(frozen, module = "middy.smf")]
 struct ExportReport {
     value: smf::ExportReport,
 }
@@ -316,7 +316,7 @@ struct ExportReport {
 impl ExportReport {
     #[getter]
     fn status(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        Ok(PyModule::import(py, "middi.translation")?
+        Ok(PyModule::import(py, "middy.translation")?
             .getattr("TranslationStatus")?
             .getattr(format!("{:?}", self.value.status))?
             .unbind())

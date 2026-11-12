@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from middi import archive, events, messages, midi, mpe
+from middy import archive, events, messages, midi, mpe
 
 
 def values() -> list[object]:
@@ -64,7 +64,7 @@ def save(records: Sequence[object], complete: bool = True) -> bytes:
 def test_archive_roundtrip_preserves_all_commands_exact_ticks_and_absence() -> None:
     records = values()
     data = save(records)
-    assert data.startswith(b"MIDDI\0\r\n\x00\x02\x00\x00")
+    assert data.startswith(b"MIDDY\0\r\n\x00\x02\x00\x00")
     reader = archive.Reader(BytesIO(data), preserve_unknown=True)
     restored = list(reader)
     assert restored == records and reader.complete and reader.problem is None
@@ -142,7 +142,7 @@ def test_clock_units_and_checked_values_are_distinct_from_raw_nanoseconds() -> N
 def test_v2_independent_vectors_check_future_headers_and_preserve_exact_bytes() -> None:
     fixture = (
         Path(__file__).resolve().parents[1]
-        / "crates/middi/tests/fixtures/archive-v2.txt"
+        / "crates/middy/tests/fixtures/archive-v2.txt"
     )
     for line in fixture.read_text().splitlines():
         if line.startswith("#"):

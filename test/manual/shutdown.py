@@ -5,8 +5,8 @@ from os import environ
 from threading import Event
 from uuid import uuid4
 
-from middi import midi
-from middi.events import ReceivedPacket
+from middy import midi
+from middy.events import ReceivedPacket
 
 started = Event()
 release = Event()
@@ -19,8 +19,8 @@ def receive(packet: ReceivedPacket) -> None:
 
 
 def open_connections() -> tuple[midi.Input[ReceivedPacket], midi.Output]:
-    token = f"middi-shutdown-{uuid4().hex}"
-    run_in_subprocess = environ.get("MIDDI_TEST_ISOLATED", "1") == "1"
+    token = f"middy-shutdown-{uuid4().hex}"
+    run_in_subprocess = environ.get("MIDDY_TEST_ISOLATED", "1") == "1"
     source = midi.Input(raw=True, run_in_subprocess=run_in_subprocess)
     incoming = source.create_virtual(token, receive)
     target = midi.Output(run_in_subprocess=run_in_subprocess)

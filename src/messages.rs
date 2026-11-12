@@ -3,23 +3,23 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use middi::messages;
-use middi::messages::PrimitiveMessage;
+use middy::messages;
+use middy::messages::PrimitiveMessage;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyInt, PyTuple};
 
-#[pyclass(frozen, subclass, module = "middi.messages")]
+#[pyclass(frozen, subclass, module = "middy.messages")]
 #[derive(Default)]
 pub(crate) struct Message {
     metadata: std::sync::OnceLock<Metadata>,
 }
 #[derive(Clone, Default)]
 pub(crate) struct Metadata {
-    pub timestamp: Option<middi::events::Timestamp>,
+    pub timestamp: Option<middy::events::Timestamp>,
     pub stream: Option<String>,
-    pub span: Option<middi::events::SourceSpan>,
+    pub span: Option<middy::events::SourceSpan>,
 }
 impl Message {
     pub(crate) fn metadata(&self) -> Metadata {
@@ -72,7 +72,7 @@ impl Message {
     }
 }
 
-#[pyclass(frozen, extends = Message, module = "middi.messages")]
+#[pyclass(frozen, extends = Message, module = "middy.messages")]
 pub(crate) struct SysEx {
     pub(crate) value: messages::SysEx,
 }
@@ -151,7 +151,7 @@ impl SysEx {
 
 macro_rules! versioned_message {
     ($name:ident $signature:tt { $($required:ident),* } { $($optional:ident => $setter:ident),* } { $($extra:ident => $extra_setter:ident),* } $(; $($method:item)*)?) => {
-        #[pyclass(frozen, extends=Message, module="middi.messages")]
+        #[pyclass(frozen, extends=Message, module="middy.messages")]
         struct $name { value: messages::$name }
         impl $name {
             fn from_value(value: messages::$name) -> Self { Self { value } }
@@ -245,7 +245,7 @@ versioned_message! { PolyPressure (note, pressure=None, channel=None, *, version
         transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
     }
 }
-#[pyclass(frozen, extends = Message, module = "middi.messages")]
+#[pyclass(frozen, extends = Message, module = "middy.messages")]
 pub(crate) struct ControlChange {
     value: messages::ControlChange,
 }
@@ -417,7 +417,7 @@ impl ControlChange {
         ("controller", "value", "channel")
     }
 }
-#[pyclass(frozen, extends = Message, module = "middi.messages")]
+#[pyclass(frozen, extends = Message, module = "middy.messages")]
 struct ProgramChange {
     value: messages::ProgramChange,
 }
@@ -585,7 +585,7 @@ macro_rules! message_classes {
     (ChannelPressure $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
     (PitchBend $signature:tt { $($field:ident),* }; $($rest:tt)*) => { message_classes! { $($rest)* } };
     ($name:ident $signature:tt { $($field:ident),* }; $($rest:tt)*) => {
-            #[pyclass(frozen, extends = Message, module = "middi.messages")]
+            #[pyclass(frozen, extends = Message, module = "middy.messages")]
             struct $name { value: messages::$name }
             impl $name {
                 fn from_value(value: messages::$name) -> Self { Self { value } }
@@ -787,21 +787,21 @@ pub fn command_wire(
     };
     Ok((name, kwargs.unbind()))
 }
-fn family_name(family: middi::controls::ParameterFamily) -> &'static str {
+fn family_name(family: middy::controls::ParameterFamily) -> &'static str {
     match family {
-        middi::controls::ParameterFamily::Rpn => "rpn",
-        middi::controls::ParameterFamily::Nrpn => "nrpn",
+        middy::controls::ParameterFamily::Rpn => "rpn",
+        middy::controls::ParameterFamily::Nrpn => "nrpn",
     }
 }
-fn parameter_family(family: &str) -> PyResult<middi::controls::ParameterFamily> {
+fn parameter_family(family: &str) -> PyResult<middy::controls::ParameterFamily> {
     match family {
-        "rpn" => Ok(middi::controls::ParameterFamily::Rpn),
-        "nrpn" => Ok(middi::controls::ParameterFamily::Nrpn),
+        "rpn" => Ok(middy::controls::ParameterFamily::Rpn),
+        "nrpn" => Ok(middy::controls::ParameterFamily::Nrpn),
         _ => Err(PyValueError::new_err("family must be rpn or nrpn")),
     }
 }
 
-#[pyclass(frozen, extends = Message, module = "middi.messages")]
+#[pyclass(frozen, extends = Message, module = "middy.messages")]
 struct ParameterSet {
     value: messages::ParameterSet,
 }
@@ -928,7 +928,7 @@ impl ParameterSet {
     }
 }
 
-#[pyclass(frozen, extends = Message, module = "middi.messages")]
+#[pyclass(frozen, extends = Message, module = "middy.messages")]
 struct ParameterStep {
     value: messages::ParameterStep,
 }
@@ -947,7 +947,7 @@ impl ParameterStep {
         family: &str,
         group: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyClassInitializer<Self>> {
-        use middi::controls::StepDirection;
+        use middy::controls::StepDirection;
         let family = parameter_family(family)?;
         let direction = match direction {
             1 => StepDirection::Increment,
@@ -978,15 +978,15 @@ impl ParameterStep {
     #[getter]
     fn direction(&self) -> i8 {
         match self.value.direction() {
-            middi::controls::StepDirection::Increment => 1,
-            middi::controls::StepDirection::Decrement => -1,
+            middy::controls::StepDirection::Increment => 1,
+            middy::controls::StepDirection::Decrement => -1,
         }
     }
     #[getter]
     fn family(&self) -> &'static str {
         match self.value.family() {
-            middi::controls::ParameterFamily::Rpn => "rpn",
-            middi::controls::ParameterFamily::Nrpn => "nrpn",
+            middy::controls::ParameterFamily::Rpn => "rpn",
+            middy::controls::ParameterFamily::Nrpn => "nrpn",
         }
     }
     #[getter]
@@ -1091,7 +1091,7 @@ pub(crate) fn value_hash(value: &impl Hash) -> u64 {
 }
 
 /// A performed note: the existing NoteOn value plus an authored duration.
-#[pyclass(frozen, module = "middi.messages")]
+#[pyclass(frozen, module = "middy.messages")]
 struct Note {
     duration: Py<PyAny>,
     attack: Py<NoteOn>,
@@ -1152,7 +1152,7 @@ impl Note {
     }
 }
 
-#[pyclass(frozen, module = "middi.messages")]
+#[pyclass(frozen, module = "middy.messages")]
 struct Rest {
     duration: Py<PyAny>,
 }
@@ -1178,7 +1178,7 @@ impl Rest {
 fn validate_duration(value: &Bound<'_, PyAny>) -> PyResult<()> {
     value
         .py()
-        .import("middi._units")?
+        .import("middy._units")?
         .getattr("musical_duration")?
         .call1((value,))?;
     Ok(())
@@ -1200,7 +1200,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 fn python_representation_contract_and_measurements() {
     Python::initialize();
     Python::attach(|py| {
-        let module = PyModule::new(py, "middi.messages").unwrap();
+        let module = PyModule::new(py, "middy.messages").unwrap();
         register(&module).unwrap();
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test/native");
         PyModule::import(py, "sys")
@@ -1209,7 +1209,7 @@ fn python_representation_contract_and_measurements() {
             .unwrap()
             .call_method1("insert", (0, path.to_str().unwrap()))
             .unwrap();
-        let fixture = PyModule::import(py, "middi_messages").unwrap();
+        let fixture = PyModule::import(py, "middy_messages").unwrap();
         fixture
             .getattr("verify")
             .unwrap()

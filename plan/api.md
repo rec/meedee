@@ -1,4 +1,4 @@
-# middi API contract and representation prototype
+# middy API contract and representation prototype
 
 Slices 1–4, updated 2026-10-14. This document records the approved API choices,
 the original device-free prototype, and the MIDI 1.0 byte codec.
@@ -20,30 +20,30 @@ Public definitions belong to these modules, without top-level re-exports:
 
 | Module | Responsibility |
 | --- | --- |
-| `middi.messages` | `Message` and concrete musical values/commands |
-| `middi.codecs` | Pure byte encoding and incremental decoding; no native I/O |
-| `middi.controls` | Optional per-source control and parameter observations |
-| `middi.events` | `Timestamp`, source spans, diagnostics, and clock descriptors |
-| `middi.midi` | Discovery, transport capabilities, clients, connections and transport errors |
+| `middy.messages` | `Message` and concrete musical values/commands |
+| `middy.codecs` | Pure byte encoding and incremental decoding; no native I/O |
+| `middy.controls` | Optional per-source control and parameter observations |
+| `middy.events` | `Timestamp`, source spans, diagnostics, and clock descriptors |
+| `middy.midi` | Discovery, transport capabilities, clients, connections and transport errors |
 
 Keep `__init__.py` empty. Rust modules mirror responsibilities, using idiomatic
 snake_case functions and typed structs. The current transport API remains in
 place during this slice and may be replaced in slice 2 without aliases.
 
-The installed binary is `middi._core`. Public loaders register native values
+The installed binary is `middy._core`. Public loaders register native values
 without initializing MIDI for message/event imports. Both Python transport modes
 now use the shared Rust libremidi wrapper. There are no old transport aliases.
 
 Slice 2 transport choices, approved 2026-10-14:
 
-- `middi.midi.Input`, `Output`, immutable `Port` snapshots and connection types.
+- `middy.midi.Input`, `Output`, immutable `Port` snapshots and connection types.
   Constructors take keyword-only settings; discovery refresh invalidates old
   snapshots. `backend_id` is metadata, not a unique persistent identity.
 - Remove native naming parameters except the virtual endpoint name, and remove
   ID lookup. The pinned C API cannot honor the former and IDs cannot guarantee
   the latter. Retain per-client process isolation as an option; input defaults to in-process
   and output defaults to in-process transport.
-- Raw-mode callbacks take an immutable `middi.events.ReceivedPacket`: exact optional
+- Raw-mode callbacks take an immutable `middy.events.ReceivedPacket`: exact optional
   signed `timestamp_ns`, connection `clock`, and raw `packet`. Bytes remain
   bytes; UMP uses an immutable UmpPacket with a tuple of 32-bit words.
 - Raw mode exposes chunks/batches without assembly. Decoded mode, now the
@@ -171,9 +171,9 @@ Approved choices: ordered messages/diagnostics with recovery, a configurable
 1 MiB SysEx default, pure byte codecs with later timestamp integration, and
 signed pitch bend centered at zero.
 
-`middi.codecs` is pure: importing it or constructing a decoder starts no MIDI
-workers. The Rust equivalent is `middi::codecs`, with immutable structs,
-the `Message` trait and inline `AnyMessage` variants in `middi::messages`.
+`middy.codecs` is pure: importing it or constructing a decoder starts no MIDI
+workers. The Rust equivalent is `middy::codecs`, with immutable structs,
+the `Message` trait and inline `AnyMessage` variants in `middy::messages`.
 No Python dependency is involved in Rust use.
 
 The primitive inventory is NoteOn, NoteOff, PolyPressure, ControlChange,
@@ -237,7 +237,7 @@ provided by slice 4 below and tuning by slice 5; GM profiles and files retain la
 
 ### Slice 4 compound commands and observations, approved 2026-10-14
 
-Frozen controller and command subclasses are provided in `middi.messages`:
+Frozen controller and command subclasses are provided in `middy.messages`:
 ControlChange(controller, value, channel=None, *, version=1, group=None,
 resolution=None), ParameterSet(parameter,
 value, resolution=14, channel=None, *, family="rpn"), and ParameterStep(parameter, direction=1,
@@ -309,7 +309,7 @@ even though the failed connection already rejects sends. Release cannot be
 guaranteed after failure. Python error construction occurs after dropping the
 connection mutex, so import hooks/exception constructors cannot run under it.
 
-`middi.controls.ControlInterpreter()` is pure and optional. Use one instance per source;
+`middy.controls.ControlInterpreter()` is pure and optional. Use one instance per source;
 it tracks 16 channels and has no source registry. A sparse cache retains the latest
 observed coarse and fine Data Entry and their provenance for each channel/family/parameter.
 It grows with observed parameters, without eviction, up to the finite MIDI 1
@@ -449,10 +449,10 @@ API supplies explicit mappings, rounding, cancellation and metrics.
 ## Evidence and measurements
 
 The native wrappers now live in `src/messages.rs`, registering production
-classes in `middi.messages` through the private `middi._core` binary. Their
-values and validation live in the dependency-free `crates/middi` Rust toolkit.
+classes in `middy.messages` through the private `middy._core` binary. Their
+values and validation live in the dependency-free `crates/middy` Rust toolkit.
 The existing Python lifecycle harness runs the native representation test. Its Python fixture
-is `test/native/middi_messages.py`, using standard-library assertions because
+is `test/native/middy_messages.py`, using standard-library assertions because
 an embedded interpreter does not automatically import the development venv's
 pytest installation.
 
@@ -508,7 +508,7 @@ Normative baselines and acquisition evidence are in [specifications.md](specific
 
 ### Slice 5 MIDI Tuning Standard, approved 2026-10-15
 
-`middi.tuning` is a pure loader for Rust-owned frozen values and typed messages;
+`middy.tuning` is a pure loader for Rust-owned frozen values and typed messages;
 importing it starts no MIDI runtime. `Pitch(semitone, fraction)` stores the exact
 21-bit MTS frequency representation: semitone 0–127 and fraction 0–16383 in
 1/16384-semitone units. The all-127 triplet is a separate `NoChange()` value,
@@ -588,9 +588,9 @@ and banks without adding an automatic selection operation here.
 
 ### Slice 6 GM and selected profiles, approved 2026-10-15
 
-Pure public modules are `middi.gm`, `middi.universal`, `middi.mpe` and
-`middi.timecode`; named controllers and RPN/channel-mode helpers remain in
-`middi.controls`. Imports initialize no MIDI workers. Native message/command
+Pure public modules are `middy.gm`, `middy.universal`, `middy.mpe` and
+`middy.timecode`; named controllers and RPN/channel-mode helpers remain in
+`middy.controls`. Imports initialize no MIDI workers. Native message/command
 classes inherit Message and retain frozen fields, strict constructors,
 checked replacement, equality/hash, annotations and pattern matching. Lookup
 entries are frozen, non-constructible records; list results are caller-owned
@@ -825,7 +825,7 @@ helpers live in `translation`, independently of UMP framing. Archives use the
 single current v2 format in [archive-format.md](archive-format.md), retaining
 semantic/packet/command identity, group and occurrence metadata.
 
-The pure `middi.ump` namespace exposes frozen native Message subclasses backed
+The pure `middy.ump` namespace exposes frozen native Message subclasses backed
 by Rust values. It creates no transport clients, initializes no workers, performs no I/O and does not
 attach host timestamps. `encode` returns an immutable tuple of 32-bit words;
 `decode` requires exactly one UMP. Decoder.feed accepts word lists/tuples and
@@ -961,7 +961,7 @@ open. File codec finish flushes successful output; garbage collection does not
 assert successful completion. File operations surface I/O and malformed-data
 errors, including read byte positions. A failed writer cannot be resumed.
 
-The custom `.middi` archive is binary, versioned and length-prefixed, with
+The custom `.middy` archive is binary, versioned and length-prefixed, with
 per-record CRC-32 and an explicit completion trailer. Normal reading requires
 completion; recovery is explicit and returns only verified complete records.
 Native clock values and absent timestamps remain exact, with rational units and
@@ -1071,7 +1071,7 @@ sends. MIDI-CI profile negotiation remains slice 11.
 
 ## Slice 11 management scope
 
-middi.ci adds frozen management Message values and an explicit decode(SysEx),
+middy.ci adds frozen management Message values and an explicit decode(SysEx),
 plus a pure caller-driven Session backed by Rust ci/ci. Raw receive,
 codec, message metadata and archive behavior stay primitive. Callers supply randomized
 MUIDs and explicit routes; channels/groups remain 1–16. Format 1/2 management,
@@ -1086,7 +1086,7 @@ budgets. Native UMP qualification is separate from this software capability.
 
 ## File inspection and capture validation
 
-`middi.inspection.inspect_file(source, *, format, payload_limit=1048576,
+`middy.inspection.inspect_file(source, *, format, payload_limit=1048576,
 preserve_unknown=False, detail_limit=128)` uses the shared Rust `inspection::inspect` pass over
 the existing archive/SMF/SYX/Clip readers. Format is explicit. Inspection is
 read-only, opens no MIDI resources and adds no parser, scheduler or dependencies.
@@ -1151,7 +1151,7 @@ opened source clock as Python `Input.clock`.
 
 ## Observed note activity
 
-`middi.notes.Tracker(stream=..., detail_limit=128)` accepts `Message` or
+`middy.notes.Tracker(stream=..., detail_limit=128)` accepts `Message` or
 `StreamDiagnostic` through `feed`, returns frozen `notes.Report` snapshots, and
 offers explicit `invalidate()` for asynchronous loss. It owns no transport.
 Rust `notes::Tracker` supplies the same state machine, taking an explicit source,
@@ -1431,7 +1431,7 @@ CLI contract are documented in [ci.md](ci.md#one-scan-management-browser).
 
 ## Deterministic in-memory testing transports
 
-The public Rust `testing` module and Python `middi.testing` provide `ManualClock`,
+The public Rust `testing` module and Python `middy.testing` provide `ManualClock`,
 `Input`, `Output` and independent frozen Python `InputReport` / `OutputReport`
 snapshots. They initialize no native lifecycle, clients, threads, timers or sleeps.
 Python constructors require `encoding="bytes"|"ump"` so even test construction
@@ -1560,7 +1560,7 @@ reserved archive payload bytes, excluding framing, metadata and object overhead.
 Live snapshots are independent values. Final metrics survive failed/incomplete
 recording and do not change structural completeness or best-effort rules.
 
-`middi monitor --metrics` adds a `metrics` object to its final summary. It counts
+`middy monitor --metrics` adds a `metrics` object to its final summary. It counts
 all decoded messages delivered to the host before display filters, excluding
 StreamDiagnostic items. `clock="host_monotonic"`, events, elapsed_ns,
 events_per_second and delivery_intervals describe host receive observations;
@@ -1580,7 +1580,7 @@ duration-only; there is no expected-count stopping rule. Receive queue and decod
 limits still apply; the returned recording grows with received traffic and has
 no independent total recording-memory budget.
 
-`middi sysex-receive DESTINATION --port NAME --duration SECONDS` selects one exact,
+`middy sysex-receive DESTINATION --port NAME --duration SECONDS` selects one exact,
 unique MIDI 1 input and uses subprocess execution by default. It records for the
 requested duration, closes input, checks gaps/discontinuities, selects SysEx,
 checks export bytes and writes exclusively. An empty SysEx recording or any input
@@ -1642,7 +1642,7 @@ reply using the existing SYX writer and flushes. Rust accepts a caller-owned wri
 Python paths use exclusive creation and binary streams remain open. Final write
 errors may leave a partial file; flush is not fsync or power-loss durability.
 
-`middi.tuning.query(query, receiver, output, cancel=None)` drives a fresh query
+`middy.tuning.query(query, receiver, output, cancel=None)` drives a fresh query
 on the caller thread using existing MIDI 1 queued typed input/output connections.
 The caller supplies the query's selected stream and owns/closes both connections.
 Known loss/failure is checked before sending and before/after receive. Receive
@@ -1652,9 +1652,9 @@ query. No extra decoder, timer, worker or cleanup traffic is created. Already
 queued input is eligible; there is no automatic drain or time alignment. Blocking
 in-process drivers or arbitrary caller code can exceed the observation deadline.
 
-`middi tuning-preview --device-id ID --program P [--bank B] --timeout SECONDS`
+`middy tuning-preview --device-id ID --program P [--bank B] --timeout SECONDS`
 prints the exact request bytes and deadline duration without initializing native MIDI resources
-or opening ports. `middi tuning-query DESTINATION` takes those same fields plus
+or opening ports. `middy tuning-query DESTINATION` takes those same fields plus
 required `--input-port NAME --output-port NAME`. It uses process isolation by
 default and resolves both exact, unique names before opening either endpoint.
 Only one request is sent, after both connections are ready; no tuning changes,
@@ -2020,7 +2020,7 @@ Additional work beyond the prompt: None.
 ## Common package-root classes
 
 Python eagerly imports all public submodules and re-exports a curated set of
-common classes through middi.__all__. Functions remain module-qualified; this
+common classes through middy.__all__. Functions remain module-qualified; this
 iteration adds no function exports or renames. Root classes are the exact same
 objects as their canonical submodule classes, retaining __module__, identity,
 serialization and typing behavior. Reader/Writer select the unified file_io
@@ -2078,7 +2078,7 @@ tracking without opening devices. Public-symbols.txt remains uncommitted.
 ## Unified file editing
 
 The package-root Reader and Writer live in file_io in both languages. Reader
-sniffs file contents for Standard MIDI Files, SysEx streams and middi archives.
+sniffs file contents for Standard MIDI Files, SysEx streams and middy archives.
 Empty input is an empty SysEx stream, and a leading F0 selects strict SysEx
 parsing, including messages shorter than four bytes. MIDI-file
 iteration yields the original smf.Header followed by smf.Event values, preserving
@@ -2091,7 +2091,7 @@ record types. SysEx streams yield raw messages in Python and Archive(Event)
 records in Rust. The format-specific SysEx codec is internal; its former public
 Reader/write interface is removed.
 
-Writer selects .mid/.midi, .syx or .middi from the destination filename and exclusively
+Writer selects .mid/.midi, .syx or .middy from the destination filename and exclusively
 creates it. MIDI output requires the header first. Python borrowed output streams
 retain the previous archive default and accept format="syx" (or another supported
 format) explicitly. Format applies only to stream destinations; paths use their
@@ -2115,7 +2115,7 @@ It preserves message bytes but does not store timestamps or completion reports.
 Process isolation is no longer Python-only. Rust midi::Input and midi::Output use
 with_run_in_subprocess(bool), defaulting to false, and with_subprocess_options
 for a SubprocessOptions { program, args, timeout } value. Defaults select
-middi-worker on PATH and a five-second Duration. Low-level transport clients
+middy-worker on PATH and a five-second Duration. Low-level transport clients
 expose new_subprocess for explicit transport ownership. Worker diagnostics retain
 terminal errors independently of the child and native handles.
 

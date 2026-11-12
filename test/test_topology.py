@@ -2,7 +2,7 @@
 
 import pytest
 
-from middi import topology
+from middy import topology
 
 
 def endpoint(name: str = "keys") -> topology.Endpoint:

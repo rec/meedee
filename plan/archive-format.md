@@ -1,6 +1,6 @@
-# middi binary archive version 2
+# middy binary archive version 2
 
-Approved binary format for slices 9–10. Extension: `.middi`.
+Approved binary format for slices 9–10. Extension: `.middy`.
 
 Additional work beyond the prompt
 
@@ -10,7 +10,7 @@ None.
 
 All integers and UMP words are big endian. Integers have the widths below;
 there are no host-layout structs, floats, pickles or implicit compression.
-The 12-byte header is ASCII `MIDDI`, NUL, CR LF, version u16 `2`, reserved u16 `0`.
+The 12-byte header is ASCII `MIDDY`, NUL, CR LF, version u16 `2`, reserved u16 `0`.
 Other headers/versions are rejected. A frame consists of payload length u32,
 that many payload bytes, then CRC u32. CRC is CRC-32/ISO-HDLC over the payload
 only: polynomial 0x04C11DB7 (reflected 0xEDB88320), initial/final XOR 0xFFFFFFFF.
@@ -131,9 +131,9 @@ The review compared this layout with the Rust encoder/decoder, Python bridge,
 existing corruption/recovery checks and independent byte vectors. Header/version,
 integer widths/endianness, record/command IDs, timestamp absence, signed ticks,
 CRC framing and completion counts agree. The new shared fixture
-`crates/middi/tests/fixtures/archive-v2.txt` is framed independently using fixed
+`crates/middy/tests/fixtures/archive-v2.txt` is framed independently using fixed
 field values, struct packing and the standard CRC implementation, rather than
-middi's writer. Rust and Python read the same vectors and rewrite valid inputs
+middy's writer. Rust and Python read the same vectors and rewrite valid inputs
 byte for byte, including all nine commands and future Event representations/IDs.
 
 The review found and corrected malformed-input acceptance in preservation mode:

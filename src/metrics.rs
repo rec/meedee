@@ -1,9 +1,9 @@
 //! Pure Python metric snapshots and caller-driven accumulators.
-use middi::metrics;
+use middy::metrics;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-#[pyclass(frozen, module = "middi.metrics")]
+#[pyclass(frozen, module = "middy.metrics")]
 pub struct Distribution {
     pub value: metrics::Distribution,
 }
@@ -34,7 +34,7 @@ impl Distribution {
         self.value.buckets().to_vec()
     }
 }
-#[pyclass(module = "middi.metrics")]
+#[pyclass(module = "middy.metrics")]
 struct Histogram {
     value: metrics::Histogram,
 }
@@ -58,7 +58,7 @@ impl Histogram {
         }
     }
 }
-#[pyclass(frozen, module = "middi.metrics")]
+#[pyclass(frozen, module = "middy.metrics")]
 pub struct Pressure {
     pub value: metrics::Pressure,
 }
@@ -81,7 +81,7 @@ impl Pressure {
         self.value.peak_reserved_bytes()
     }
 }
-#[pyclass(frozen, module = "middi.metrics")]
+#[pyclass(frozen, module = "middy.metrics")]
 pub(crate) struct DeliveryReport {
     pub(crate) value: metrics::DeliveryReport,
 }
@@ -102,7 +102,7 @@ impl DeliveryReport {
         }
     }
 }
-#[pyclass(module = "middi.metrics")]
+#[pyclass(module = "middy.metrics")]
 struct Delivery {
     value: metrics::Delivery,
 }

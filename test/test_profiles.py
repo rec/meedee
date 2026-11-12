@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from middi import codecs, controls, gm, messages, mpe, timecode, universal
+from middy import codecs, controls, gm, messages, mpe, timecode, universal
 
 
 def profile_vectors() -> Iterator[tuple[object, bytes]]:
     fixture = (
-        Path(__file__).resolve().parents[1] / "crates/middi/tests/fixtures/profiles.txt"
+        Path(__file__).resolve().parents[1] / "crates/middy/tests/fixtures/profiles.txt"
     )
     modules = {
         "ProgramChange": messages,
@@ -86,10 +86,10 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
             continue  # The banked message contract is covered in test_messages.
         cls = getattr(
             {
-                "middi.gm": gm,
-                "middi.mpe": mpe,
-                "middi.universal": universal,
-                "middi.timecode": timecode,
+                "middy.gm": gm,
+                "middy.mpe": mpe,
+                "middy.universal": universal,
+                "middy.timecode": timecode,
             }[type(value).__module__],
             type(value).__name__,
         )

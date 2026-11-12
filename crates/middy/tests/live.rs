@@ -1,0 +1,485 @@
+use middy::messages::Message;
+use middy::{
+    archive as recording,
+    archive::{self, Record},
+    events::{self as playback, Cancellation, PlaybackClock},
+    events::{Clock, Payload, Rational, Timestamp},
+    events::{InputItem as Item, PacketDecoder as Decoder, StreamDiagnosticKind as DiagnosticKind},
+    messages::{AnyMessage, NoteOn},
+    transport::{Encoding, Packet},
+};
+use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+fn clock() -> Clock {
+    Clock::new(
+        "c".into(),
+        1,
+        1_000_000_000,
+        "backend_absolute".into(),
+        None,
+    )
+    .unwrap()
+    .with_transport(1, true)
+}
+fn event(ticks: i64) -> Payload {
+    (Payload::Message(AnyMessage::NoteOn(
+        NoteOn::new(60)
+            .and_then(|m| m.with_velocity(100))
+            .and_then(|m| m.with_channel(1))
+            .unwrap(),
+    )))
+    .with_metadata(middy::messages::Metadata {
+        stream: Some("s".into()),
+        timestamp: Some(Timestamp {
+            ticks,
+            clock: clock(),
+        }),
+        span: None,
+    })
+    .unwrap()
+}
+#[test]
+fn completion_timestamps_and_spans_survive_realtime_and_running_status() {
+    let mut d = Decoder::new("s".into(), Encoding::Bytes, 1024).unwrap();
+    assert!(d
+        .feed(&Packet::Bytes(vec![0x90, 60]), &clock(), Some(10), Some(0))
+        .unwrap()
+        .is_empty());
+    let out = d
+        .feed(
+            &Packet::Bytes(vec![0xf8, 100, 61, 101]),
+            &clock(),
+            Some(20),
+            Some(1),
+        )
+        .unwrap();
+    assert_eq!(out.len(), 3);
+    let Item::Message(e) = &out[1] else { panic!() };
+    assert_eq!(e.timestamp().unwrap().ticks, 20);
+    let span = e.span().unwrap();
+    assert_eq!((span.first_packet, span.last_packet), (0, 1));
+    assert_eq!(span.first_timestamp.as_ref().unwrap().ticks, 10);
+    let Item::Message(rt) = &out[0] else { panic!() };
+    assert_eq!(rt.span().unwrap().first_packet, 1);
+    let Item::Message(running) = &out[2] else {
+        panic!()
+    };
+    assert_eq!(running.span().unwrap().first_packet, 1);
+    assert!(d.finish().is_empty());
+}
+#[test]
+fn gaps_protocol_errors_and_clock_changes_cannot_join_old_fragments() {
+    let mut d = Decoder::new("s".into(), Encoding::Bytes, 1024).unwrap();
+    d.feed(&Packet::Bytes(vec![0x90, 60]), &clock(), Some(1), Some(0))
+        .unwrap();
+    let out = d
+        .feed(&Packet::Bytes(vec![100]), &clock(), Some(2), Some(2))
+        .unwrap();
+    assert!(matches!(&out[0],Item::Diagnostic(v)if v.kind==DiagnosticKind::Loss&&v.lost==1));
+    assert!(out.iter().all(|v| !matches!(v, Item::Message(_))));
+    let c = Clock::new(
+        "new".into(),
+        1,
+        1_000_000_000,
+        "backend_absolute".into(),
+        None,
+    )
+    .unwrap()
+    .with_transport(1, true);
+    let out = d
+        .feed(&Packet::Bytes(vec![0x90, 60, 100]), &c, None, Some(3))
+        .unwrap();
+    assert!(matches!(&out[0],Item::Diagnostic(v)if v.kind==DiagnosticKind::ClockChange));
+    let Item::Message(e) = &out[1] else { panic!() };
+    assert!(e.timestamp().is_none());
+    let mut d = Decoder::new("u".into(), Encoding::Ump, 1024).unwrap();
+    assert!(d
+        .feed(&Packet::Ump(vec![0x40903c00]), &clock(), Some(4), Some(0))
+        .unwrap()
+        .is_empty());
+    let out = d
+        .feed(&Packet::Ump(vec![0xffff0000]), &clock(), Some(5), Some(1))
+        .unwrap();
+    let Item::Message(e) = &out[0] else { panic!() };
+    assert_eq!(e.span().unwrap().first_packet, 0);
+}
+#[derive(Default)]
+struct FakeClock {
+    now: u64,
+    waits: Vec<u64>,
+}
+impl PlaybackClock for FakeClock {
+    fn now_ns(&mut self) -> u64 {
+        self.now
+    }
+    fn wait_until(&mut self, n: u64, c: &Cancellation) -> io::Result<bool> {
+        self.waits.push(n);
+        self.now = self.now.max(n);
+        Ok(!c.cancelled())
+    }
+}
+#[test]
+fn scheduler_keeps_absolute_order_reports_lateness_and_stops_at_failure() {
+    let mut clock = FakeClock {
+        now: 7,
+        waits: vec![],
+    };
+    let mut sent = 0;
+    let report = playback::play(
+        vec![Ok(event(100)), Ok(event(100)), Ok(event(120))].into_iter(),
+        playback::PlaybackPlan::new(
+            Timestamp {
+                ticks: 100,
+                clock: self::clock(),
+            },
+            vec![],
+            false,
+        )
+        .unwrap(),
+        &mut clock,
+        &Cancellation::default(),
+        |_| {
+            sent += 1;
+            Ok::<_, io::Error>(())
+        },
+        true,
+    )
+    .unwrap();
+    assert_eq!(clock.waits, [0, 0, 20]);
+    assert_eq!(report.sent_events, 3);
+    assert_eq!(report.max_lateness_ns, 7);
+    assert_eq!(sent, 3);
+    let lateness = report.lateness.as_ref().unwrap();
+    assert_eq!(lateness.count(), 3);
+    assert_eq!(lateness.sum_ns(), 14);
+    assert_eq!(lateness.buckets()[0], 1);
+    let mut sent = 0;
+    let failure = playback::play(
+        vec![Ok(event(0)), Ok(event(1)), Ok(event(2))].into_iter(),
+        playback::PlaybackPlan::new(
+            Timestamp {
+                ticks: 0,
+                clock: self::clock(),
+            },
+            vec![],
+            false,
+        )
+        .unwrap(),
+        &mut FakeClock::default(),
+        &Cancellation::default(),
+        |_| {
+            sent += 1;
+            if sent == 2 {
+                Err(io::Error::other("device failed"))
+            } else {
+                Ok(())
+            }
+        },
+        true,
+    )
+    .unwrap_err();
+    assert_eq!(failure.report.sent_events, 1);
+    assert_eq!(failure.report.lateness.as_ref().unwrap().count(), 1);
+    assert_eq!(sent, 2);
+    let cancel = Cancellation::default();
+    cancel.cancel();
+    assert!(
+        playback::play(
+            std::iter::once(Ok(event(0))),
+            playback::PlaybackPlan::new(
+                Timestamp {
+                    ticks: 0,
+                    clock: self::clock()
+                },
+                vec![],
+                false
+            )
+            .unwrap(),
+            &mut FakeClock::default(),
+            &cancel,
+            |_| Ok::<_, io::Error>(()),
+            false,
+        )
+        .unwrap()
+        .cancelled
+    );
+}
+#[test]
+fn explicit_mappings_and_quantization_preserve_clock_boundaries() {
+    let c = Clock::new("fraction".into(), 1, 3, "test".into(), None).unwrap();
+    let mapping = playback::ClockMapping::new(
+        c.clone(),
+        clock(),
+        Rational::new(1, 1).unwrap(),
+        Rational::new(0, 1).unwrap(),
+        None,
+    )
+    .unwrap();
+    let mut p = playback::PlaybackPlan::new(
+        Timestamp {
+            ticks: 0,
+            clock: clock(),
+        },
+        vec![mapping],
+        false,
+    )
+    .unwrap();
+    let mut a = event(0);
+    a = a
+        .with_timestamp(Timestamp {
+            ticks: 0,
+            clock: c.clone(),
+        })
+        .unwrap();
+    assert_eq!(p.deadline(&a).unwrap().delay_ns, 0);
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 1,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
+    assert!(p.deadline(&a).is_err());
+    let mut p = playback::PlaybackPlan::new(
+        Timestamp {
+            ticks: 0,
+            clock: c.clone(),
+        },
+        vec![],
+        true,
+    )
+    .unwrap();
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 0,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
+    p.deadline(&a).unwrap();
+    a = a
+        .clone()
+        .with_timestamp(Timestamp {
+            ticks: 1,
+            ..a.timestamp().unwrap().clone()
+        })
+        .unwrap();
+    let planned = p.deadline(&a).unwrap();
+    assert_eq!(planned.delay_ns, 333_333_333);
+    assert_eq!(planned.rounding_error_ns, Rational::new(-1, 3).unwrap());
+    assert!(playback::PlaybackPlan::new(
+        Timestamp {
+            ticks: 0,
+            clock: clock()
+        },
+        vec![],
+        false
+    )
+    .unwrap()
+    .deadline(&a)
+    .is_err());
+}
+#[derive(Clone)]
+struct Buffer(Arc<Mutex<Vec<u8>>>);
+impl Write for Buffer {
+    fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+        self.0.lock().unwrap().extend(b);
+        Ok(b.len())
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+#[test]
+fn memory_recording_retains_diagnostics_and_stops_admission() {
+    let r = recording::Recorder::memory(
+        vec![
+            Record::Clock(clock()),
+            Record::Stream {
+                id: "s".into(),
+                label: String::new(),
+                clock_identity: None,
+            },
+        ],
+        false,
+    )
+    .unwrap();
+    assert!(r.records().is_none());
+    assert!(r.record(Record::Event(Box::new(event(1)))));
+    assert!(r.record(Record::Gap {
+        stream: "s".into(),
+        lost: 1,
+        reason: "lost input".into()
+    }));
+    assert!(r.record(Record::Discontinuity {
+        stream: "s".into(),
+        reason: "clock changed".into()
+    }));
+    assert!(r.record(Record::Event(Box::new(event(2)))));
+    let report = r.stop(Duration::from_secs(1)).unwrap();
+    assert!(!report.complete);
+    assert_eq!(report.failure.as_deref(), Some("lost input"));
+    assert_eq!((report.records, report.gap_records), (6, 1));
+    let records = r.records().unwrap();
+    assert_eq!(
+        records
+            .iter()
+            .filter(|r| matches!(r, Record::Event(_)))
+            .count(),
+        2
+    );
+    assert!(!r.record(Record::Event(Box::new(event(3)))));
+    assert_eq!(r.stop(Duration::from_secs(1)).unwrap(), report);
+    assert_eq!(r.records().unwrap(), records);
+}
+
+#[test]
+fn recording_finishes_verified_data_and_marks_loss_without_blocking_admission() {
+    let saved = Arc::new(Mutex::new(vec![]));
+    let r = recording::Recorder::new(
+        Buffer(Arc::clone(&saved)),
+        vec![
+            Record::Clock(clock()),
+            Record::Stream {
+                id: "s".into(),
+                label: "keys".into(),
+                clock_identity: None,
+            },
+        ],
+        1024,
+        128,
+        8192,
+        false,
+        false,
+    )
+    .unwrap();
+    assert!(r.record(Record::Event(Box::new(event(1)))));
+    let report = r.stop(Duration::from_secs(2)).unwrap();
+    assert!(report.complete);
+    assert!(r.records().is_none());
+    assert!(report.pressure.is_none());
+    let data = saved.lock().unwrap().clone();
+    let mut reader = archive::Reader::new(&data[..], 1024, false, false).unwrap();
+    assert_eq!(reader.by_ref().count(), 3);
+    assert!(reader.complete);
+    let saved = Arc::new(Mutex::new(vec![]));
+    let r = recording::Recorder::new(
+        Buffer(Arc::clone(&saved)),
+        vec![
+            Record::Clock(clock()),
+            Record::Stream {
+                id: "s".into(),
+                label: "".into(),
+                clock_identity: None,
+            },
+        ],
+        1024,
+        128,
+        8192,
+        false,
+        false,
+    )
+    .unwrap();
+    assert!(!r.record(Record::Gap {
+        stream: "s".into(),
+        lost: 1,
+        reason: "input loss".into()
+    }));
+    assert!(!r.stop(Duration::from_secs(2)).unwrap().complete);
+    assert!(
+        archive::Reader::new(&saved.lock().unwrap()[..], 1024, false, false)
+            .unwrap()
+            .collect::<io::Result<Vec<_>>>()
+            .is_err()
+    );
+}
+
+struct GatedWriter {
+    buffer: Buffer,
+    gate: Arc<(Mutex<(bool, bool)>, std::sync::Condvar)>,
+}
+impl Write for GatedWriter {
+    fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+        let (mut state, changed) = (self.gate.0.lock().unwrap(), &self.gate.1);
+        if state.0 {
+            state.1 = true;
+            changed.notify_all();
+            while state.0 {
+                state = changed.wait(state).unwrap();
+            }
+        }
+        drop(state);
+        self.buffer.write(b)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+#[test]
+fn a_blocked_file_cannot_block_record_admission_or_exceed_stop_deadline() {
+    let gate = Arc::new((Mutex::new((false, false)), std::sync::Condvar::new()));
+    let bytes = Arc::new(Mutex::new(vec![]));
+    let r = recording::Recorder::new(
+        GatedWriter {
+            buffer: Buffer(Arc::clone(&bytes)),
+            gate: Arc::clone(&gate),
+        },
+        vec![
+            Record::Clock(clock()),
+            Record::Stream {
+                id: "s".into(),
+                label: "".into(),
+                clock_identity: None,
+            },
+        ],
+        1024,
+        2,
+        8192,
+        false,
+        true,
+    )
+    .unwrap();
+    gate.0.lock().unwrap().0 = true;
+    assert!(r.record(Record::Event(Box::new(event(0)))));
+    let (s, wait) = gate
+        .1
+        .wait_timeout_while(gate.0.lock().unwrap(), Duration::from_secs(2), |s| !s.1)
+        .unwrap();
+    assert!(!wait.timed_out());
+    drop(s);
+    assert!(r.record(Record::Event(Box::new(event(1)))));
+    assert!(!r.record(Record::Event(Box::new(event(2)))));
+    let pressure = r.pressure().unwrap();
+    assert_eq!(pressure.accepted_records(), 2);
+    assert_eq!(pressure.capacity_rejections(), 1);
+    assert_eq!(pressure.peak_reserved_records(), 2);
+    assert_eq!(
+        pressure.peak_reserved_bytes(),
+        2 * archive::payload_size(&Record::Event(Box::new(event(0)))).unwrap()
+    );
+    assert_eq!(
+        r.stop(Duration::from_millis(10)).unwrap_err().kind(),
+        io::ErrorKind::TimedOut
+    );
+    gate.0.lock().unwrap().0 = false;
+    gate.1.notify_all();
+    let report = r.stop(Duration::from_secs(2)).unwrap();
+    assert!(!report.complete && report.failure.is_some());
+    assert_eq!(report.pressure, Some(pressure));
+}
+
+#[test]
+fn playback_timing_does_not_require_a_source_identity() {
+    let message = event(0)
+        .without_metadata()
+        .with_timestamp(Timestamp {
+            ticks: 123,
+            clock: clock(),
+        })
+        .unwrap();
+    let mut planner =
+        playback::PlaybackPlan::new(message.timestamp().unwrap().clone(), vec![], false).unwrap();
+    assert_eq!(planner.deadline(&message).unwrap().delay_ns, 0);
+    assert_eq!(message.stream(), None);
+}

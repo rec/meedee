@@ -1,10 +1,10 @@
 //! Explicit protocol conversion, independent of packet framing.
 use crate::messages;
 use crate::ump::{boolean, error};
-use middi::translation as model;
+use middy::translation as model;
 use pyo3::prelude::*;
 
-#[pyclass(eq, frozen, from_py_object, module = "middi.translation")]
+#[pyclass(eq, frozen, from_py_object, module = "middy.translation")]
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TranslationStatus {
     Exact,
@@ -24,9 +24,9 @@ impl From<model::TranslationStatus> for TranslationStatus {
         }
     }
 }
-#[pyclass(frozen, module = "middi.translation")]
+#[pyclass(frozen, module = "middy.translation")]
 struct Translation {
-    value: model::Translation<middi::messages::AnyMessage>,
+    value: model::Translation<middy::messages::AnyMessage>,
 }
 #[pymethods]
 impl Translation {
@@ -71,9 +71,9 @@ fn to_midi1(
 #[pyo3(signature=(message,*,group))]
 fn to_midi2(message: &Bound<'_, PyAny>, group: &Bound<'_, PyAny>) -> PyResult<Translation> {
     let value = match crate::event_values::extract(message)? {
-        middi::events::Payload::Message(v) => v,
-        middi::events::Payload::Command(middi::messages::AnyCommand::ControlChange(v)) => {
-            middi::messages::AnyMessage::ControlChange(v)
+        middy::events::Payload::Message(v) => v,
+        middy::events::Payload::Command(middy::messages::AnyCommand::ControlChange(v)) => {
+            middy::messages::AnyMessage::ControlChange(v)
         }
         _ => {
             return Err(pyo3::exceptions::PyTypeError::new_err(

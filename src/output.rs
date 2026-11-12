@@ -4,7 +4,7 @@ use crate::lifecycle::{self, Managed, Resource};
 use crate::packets::{extract_packet, Backend, Encoding};
 use crate::ports::Port;
 use crate::state::Client;
-use middi::transport;
+use middy::transport;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::{PyTraverseError, PyVisit};
@@ -12,9 +12,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 /// Binding to the same confirmed-output tracker used by Rust's Output.
-#[pyclass(module = "middi._native")]
+#[pyclass(module = "middy._native")]
 pub(crate) struct OutputState {
-    value: middi::midi::OutputState,
+    value: middy::midi::OutputState,
 }
 #[pymethods]
 impl OutputState {
@@ -35,7 +35,7 @@ impl OutputState {
     }
 }
 
-#[pyclass(frozen, module = "middi._native")]
+#[pyclass(frozen, module = "middy._native")]
 pub struct Output {
     state: Arc<Client<transport::Output>>,
     identity: String,
@@ -134,7 +134,7 @@ impl Output {
         OutputConnection::open(py, slf, move |native| native.create_virtual(&name))
     }
 }
-#[pyclass(frozen, weakref, module = "middi._native")]
+#[pyclass(frozen, weakref, module = "middy._native")]
 pub struct OutputConnection {
     resource: Arc<Managed<transport::Output, transport::OutputConnection>>,
     client: Py<Output>,
@@ -157,14 +157,14 @@ impl OutputConnection {
         // Validate before entering Managed::send: preparation errors must not
         // retire a healthy connection as though a backend send had failed.
         if self.encoding == Encoding::Ump {
-            let words = middi::ump::encode(&middi::events::Payload::Command(command.clone()))
+            let words = middy::ump::encode(&middy::events::Payload::Command(command.clone()))
                 .map_err(|e| PyValueError::new_err(e.to_string()))?;
             transport::validate_packet(self.encoding.native(), &transport::Packet::Ump(words))
                 .map_err(|e| transport_error(e, "send"))?;
         } else {
-            use middi::messages::PrimitiveMessage;
+            use middy::messages::PrimitiveMessage;
             for message in
-                middi::codecs::expand(&command).map_err(|e| PyValueError::new_err(e.to_string()))?
+                middy::codecs::expand(&command).map_err(|e| PyValueError::new_err(e.to_string()))?
             {
                 message
                     .encode()

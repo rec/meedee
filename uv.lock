@@ -88,7 +88,7 @@ wheels = [
 ]
 
 [[package]]
-name = "middi"
+name = "middy"
 source = { editable = "." }
 dependencies = [
     { name = "pydantic" },

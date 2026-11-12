@@ -4,7 +4,7 @@ Use existing connections. Supplying an output requests a dump; omitting it
 captures a dump you start on the instrument. The payload remains opaque.
 
 ```python
-from middi import file_io, midi, sysex
+from middy import file_io, midi, sysex
 
 with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
     result = sysex.dump(receiver, output)
@@ -27,7 +27,7 @@ with midi.Input(port="Subsequent") as receiver:
 The equivalent Rust API uses an optional output and options with defaults:
 
 ```rust,no_run
-use middi::{midi, sysex};
+use middy::{midi, sysex};
 
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let mut receiver = midi::Input::new().with_port("VL70")?;
@@ -60,7 +60,7 @@ cancellation and limit reports retain any admitted reply prefix. Connections
 remain open and buffered input is discarded before the inquiry.
 
 ```python
-from middi import universal
+from middy import universal
 
 identities = universal.identify(receiver, output)
 print(identities.status, identities.reason)

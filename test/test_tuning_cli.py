@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-pytest.importorskip("tyro", reason="install middi[cli]")
-pytest.importorskip("pydantic", reason="install middi[cli]")
+pytest.importorskip("tyro", reason="install middy[cli]")
+pytest.importorskip("pydantic", reason="install middy[cli]")
 
-from middi import cli, codecs, events, messages, midi, testing, tuning
+from middy import cli, codecs, events, messages, midi, testing, tuning
 
 
 def invoke(args: list[str]) -> int:

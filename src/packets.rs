@@ -3,20 +3,20 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use middi::transport;
+use middy::transport;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyInt, PyList, PyTuple};
 
-#[pyclass(eq, frozen, from_py_object, module = "middi.midi")]
+#[pyclass(eq, frozen, from_py_object, module = "middy.midi")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Encoding {
     Bytes,
     Ump,
 }
 
-#[pyclass(eq, frozen, from_py_object, module = "middi.midi")]
+#[pyclass(eq, frozen, from_py_object, module = "middy.midi")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Backend {
     CoreMidi,
@@ -29,14 +29,14 @@ pub enum Backend {
     WindowsMidiServices,
 }
 
-#[pyclass(eq, frozen, from_py_object, module = "middi.midi")]
+#[pyclass(eq, frozen, from_py_object, module = "middy.midi")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TimestampMode {
     Absolute,
     Off,
 }
 
-#[pyclass(frozen, skip_from_py_object, module = "middi.midi")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.midi")]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct UmpPacket {
     pub words: Vec<u32>,
@@ -82,15 +82,15 @@ impl UmpPacket {
     }
 }
 
-#[pyclass(frozen, skip_from_py_object, module = "middi.events")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.events")]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Clock {
-    pub value: middi::events::Clock,
+    pub value: middy::events::Clock,
 }
 impl Clock {
     pub fn native(identity: String, backend: Backend, mode: TimestampMode) -> Self {
         Self {
-            value: middi::events::Clock::new(
+            value: middy::events::Clock::new(
                 identity,
                 1,
                 1_000_000_000,
@@ -136,7 +136,7 @@ impl Clock {
             }
             .into()
         });
-        let mut value = middi::events::Clock::new(
+        let mut value = middy::events::Clock::new(
             identity,
             tick_numerator,
             tick_denominator,
@@ -223,7 +223,7 @@ impl Clock {
     }
 }
 
-#[pyclass(frozen, skip_from_py_object, module = "middi.events")]
+#[pyclass(frozen, skip_from_py_object, module = "middy.events")]
 #[derive(Clone)]
 pub struct ReceivedPacket {
     #[pyo3(get)]

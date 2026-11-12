@@ -14,7 +14,7 @@ from time import perf_counter_ns, process_time_ns, sleep
 
 import pytest
 
-from middi import archive, clip, codecs, events, messages, tuning, ump
+from middy import archive, clip, codecs, events, messages, tuning, ump
 
 
 def emit(name: str, **values: object) -> None:
@@ -75,7 +75,7 @@ def test_environment_and_import() -> None:
         machine=platform.machine(),
         libc=platform.libc_ver(),
         python=sys.version,
-        middi=version("middi"),
+        middy=version("middy"),
         startup=json.loads(result.stdout),
     )
 
@@ -162,7 +162,7 @@ def test_clip_and_archive(tmp_path: Path) -> None:
 
     measure("python_clip_read", 2048, read_clip)
     clock = events.Clock(identity="qualification")
-    path = tmp_path / "streams.middi"
+    path = tmp_path / "streams.middy"
     note1 = messages.NoteOn(channel=1, note=60, velocity=100)
 
     def archive_roundtrip() -> None:
@@ -203,7 +203,7 @@ def test_recording_admission(tmp_path: Path) -> None:
     for paced in (True, False):
         recorders = [
             archive.Recorder(
-                tmp_path / f"{paced}-{n}.middi", clock=clock, stream=str(n)
+                tmp_path / f"{paced}-{n}.middy", clock=clock, stream=str(n)
             )
             for n in range(4)
         ]
@@ -233,7 +233,7 @@ def test_recording_admission(tmp_path: Path) -> None:
             failures=[r.failure for r in reports],
         )
         for i, report in enumerate(reports):
-            reader = archive.Reader(tmp_path / f"{paced}-{i}.middi", recover=True)
+            reader = archive.Reader(tmp_path / f"{paced}-{i}.middy", recover=True)
             try:
                 count = sum(isinstance(e, messages.Message) for e in reader)
                 assert reader.complete == report.complete
@@ -259,10 +259,10 @@ def test_native_supervised(mode: str) -> None:
         command = [str(executable)]
     elif mode in ("typed", "ump_ci", "reopen", "sysex"):
         fixture = {
-            "typed": "middi_typed_loopback.py",
-            "ump_ci": "middi_ci_loopback.py",
-            "reopen": "middi_reopen.py",
-            "sysex": "middi_sysex_loopback.py",
+            "typed": "middy_typed_loopback.py",
+            "ump_ci": "middy_ci_loopback.py",
+            "reopen": "middy_reopen.py",
+            "sysex": "middy_sysex_loopback.py",
         }[mode]
         command = [sys.executable, str(project / "test/native" / fixture)]
     else:

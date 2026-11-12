@@ -3,7 +3,7 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use middi::codecs;
+use middy::codecs;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
@@ -11,7 +11,7 @@ use pyo3::types::PyBytes;
 
 use crate::messages;
 
-#[pyclass(eq, frozen, from_py_object, module = "middi.codecs")]
+#[pyclass(eq, frozen, from_py_object, module = "middy.codecs")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum DiagnosticKind {
     UnexpectedData,
@@ -24,7 +24,7 @@ enum DiagnosticKind {
     TruncatedSysEx,
 }
 
-#[pyclass(frozen, module = "middi.codecs")]
+#[pyclass(frozen, module = "middy.codecs")]
 struct Diagnostic {
     value: codecs::Diagnostic,
 }
@@ -73,7 +73,7 @@ impl Diagnostic {
     }
 }
 
-#[pyclass(module = "middi.codecs")]
+#[pyclass(module = "middy.codecs")]
 struct Decoder {
     value: codecs::Decoder,
 }
@@ -127,15 +127,15 @@ fn encode<'py>(py: Python<'py>, message: &Bound<'py, PyAny>) -> PyResult<Bound<'
 fn expand(py: Python<'_>, command: &Bound<'_, PyAny>) -> PyResult<Vec<Py<PyAny>>> {
     let payload = crate::event_values::with_metadata(
         command,
-        middi::events::Payload::Command(messages::extract_command(command)?),
+        middy::events::Payload::Command(messages::extract_command(command)?),
     )?;
-    let middi::events::Payload::Command(value) = payload else {
+    let middy::events::Payload::Command(value) = payload else {
         unreachable!()
     };
     codecs::expand(&value)
         .map_err(|e| PyValueError::new_err(e.to_string()))?
         .into_iter()
-        .map(|message| crate::event_values::to_python(py, middi::events::Payload::Message(message)))
+        .map(|message| crate::event_values::to_python(py, middy::events::Payload::Message(message)))
         .collect()
 }
 
@@ -151,7 +151,7 @@ pub fn prepare_command(
         ));
     }
     let messages = codecs::expand(&command).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    use middi::messages::PrimitiveMessage;
+    use middy::messages::PrimitiveMessage;
     for message in &messages {
         message
             .encode()

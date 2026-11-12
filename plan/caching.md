@@ -8,7 +8,7 @@ A universe follows one ordered stream of received events. An application reading
 
 Within the universe, keep the existing group addressing: ungrouped MIDI 1 has its own scope, and each UMP group has its own scope. Channel and per-note state live under the appropriate group. Keep protocol-specific values at native resolution. Sharing a channel number does not justify combining MIDI 1 Data Entry bytes with a native MIDI 2 parameter value.
 
-Feed each accepted event once. Reuse the state machines behind the existing event views, including the control interpreter in `crates/middi/src/event_views.rs` and its per-channel state in `controls.rs`. A control observation and a lookup of the same parameter must read the same underlying state. Keep standalone interpreter entry points and their existing semantics.
+Feed each accepted event once. Reuse the state machines behind the existing event views, including the control interpreter in `crates/middy/src/event_views.rs` and its per-channel state in `controls.rs`. A control observation and a lookup of the same parameter must read the same underlying state. Keep standalone interpreter entry points and their existing semantics.
 
 ## What full retention covers
 
@@ -94,7 +94,7 @@ the MPE tracker exposes its existing held, sustained and ambiguous note state.
 
 ## Memory qualification
 
-`crates/middi/tests/universe_memory.rs` measures live delegated allocator bytes
+`crates/middy/tests/universe_memory.rs` measures live delegated allocator bytes
 plus the universe value itself, excluding allocator metadata. It uses an
 isolated test binary. These are macOS arm64 development-build measurements.
 

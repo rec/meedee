@@ -1,4 +1,4 @@
-"""Regenerate the archive v2 wire fixtures without importing middi.
+"""Regenerate the archive v2 wire fixtures without importing middy.
 
 Run with ``uv run --extra cli scripts/archive_vectors.py``.
 Fields follow plan/archive-format.md; framing uses the standard CRC implementation.
@@ -111,7 +111,7 @@ class Generate(BaseModel, frozen=True):
         lines.extend(f"{n}|{e}|{archive(r).hex()}" for n, e, r in cases)
         path = (
             Path(__file__).resolve().parents[1]
-            / "crates/middi/tests/fixtures/archive-v2.txt"
+            / "crates/middy/tests/fixtures/archive-v2.txt"
         )
         path.write_text("\n".join(lines) + "\n")
 
@@ -174,7 +174,7 @@ def event(
 
 def archive(records: list[bytes]) -> bytes:
     trailer = pack(">HQ", 65535, len(records)) + b"\x01" + blob(b"")
-    return b"MIDDI\0\r\n\x00\x02\x00\x00" + b"".join(
+    return b"MIDDY\0\r\n\x00\x02\x00\x00" + b"".join(
         pack(">I", len(r)) + r + pack(">I", crc32(r)) for r in [*records, trailer]
     )
 

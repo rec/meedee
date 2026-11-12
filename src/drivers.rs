@@ -1,5 +1,5 @@
 //! Python connection, clock and exception adapters for shared Rust workflow loops.
-use middi::{
+use middy::{
     drivers::{Receiver, Sender},
     events::{Cancellation, InputItem, Payload, PlaybackClock},
     midi,
@@ -103,7 +103,7 @@ impl Receiver for Input<'_, '_> {
                 .and_then(|v| v.extract()),
         )?;
         if dropped != 0 {
-            return Err(midi::Error::Transport(middi::transport::Error::Resource(
+            return Err(midi::Error::Transport(middy::transport::Error::Resource(
                 "input packet loss reported by transport counter".into(),
             )));
         }
@@ -129,7 +129,7 @@ impl Receiver for Input<'_, '_> {
     }
 }
 impl Sender for Output<'_, '_> {
-    fn send_management(&mut self, message: middi::ci::Management) -> midi::Result<()> {
+    fn send_management(&mut self, message: middy::ci::Management) -> midi::Result<()> {
         self.calls.check()?;
         let message = self
             .calls
@@ -215,11 +215,11 @@ pub(crate) fn run_identify(
         cancel,
         last: 0,
     };
-    let result = middi::universal::identify_with(
+    let result = middy::universal::identify_with(
         &mut receiver,
         &mut output,
         &stream,
-        &middi::universal::IdentityOptions {
+        &middy::universal::IdentityOptions {
             device_id,
             timeout: Duration::from_nanos(timeout),
             message_limit,
@@ -277,7 +277,7 @@ pub(crate) fn run_sysex_dump(
         cancel,
         last: 0,
     };
-    let options = middi::sysex::DumpOptions {
+    let options = middy::sysex::DumpOptions {
         scope,
         device_id,
         timeout: Duration::from_nanos(timeout),
@@ -288,7 +288,7 @@ pub(crate) fn run_sysex_dump(
         payload_limit,
         cancel: token,
     };
-    let result = middi::sysex::dump_with(
+    let result = middy::sysex::dump_with(
         &mut receiver,
         output.as_mut(),
         &stream,
@@ -333,7 +333,7 @@ pub(crate) fn run_tuning(
         cancel,
         last: 0,
     };
-    if let Err(error) = middi::tuning::query_with(
+    if let Err(error) = middy::tuning::query_with(
         &mut query.value,
         &mut receiver,
         &mut output,
@@ -389,12 +389,12 @@ pub(crate) fn run_ci(
         cancel,
         last: 0,
     };
-    let options = middi::ci::Options {
+    let options = middy::ci::Options {
         cancel: token,
         message_limit,
         byte_limit,
     };
-    let result = middi::ci::browse_with(
+    let result = middy::ci::browse_with(
         &mut browser.value,
         &mut receiver,
         &mut output,
@@ -427,7 +427,7 @@ pub(crate) fn run_routing(
         calls: &calls,
         object: receiver,
     };
-    let result = middi::routing::run_with(
+    let result = middy::routing::run_with(
         &mut router.value,
         &mut receiver,
         |delivery| {
@@ -440,7 +440,7 @@ pub(crate) fn run_routing(
             }
             .send(delivery.event.clone())
         },
-        &mut middi::events::MonotonicClock::default(),
+        &mut middy::events::MonotonicClock::default(),
         duration,
         &token,
     );
@@ -452,9 +452,9 @@ pub(crate) fn run_routing(
         .map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-#[pyclass(module = "middi._core")]
+#[pyclass(module = "middy._core")]
 pub(crate) struct DiscoveryPollState {
-    value: middi::discovery::PollState,
+    value: middy::discovery::PollState,
     encoding: String,
 }
 #[pymethods]
@@ -467,7 +467,7 @@ impl DiscoveryPollState {
         #[pyo3(from_py_with=crate::files::limit)] history_limit: usize,
     ) -> PyResult<Self> {
         Ok(Self {
-            value: middi::discovery::PollState::new(port_limit, detail_limit, history_limit)
+            value: middy::discovery::PollState::new(port_limit, detail_limit, history_limit)
                 .map_err(|e| PyValueError::new_err(e.to_string()))?,
             encoding,
         })
@@ -493,7 +493,7 @@ impl DiscoveryPollState {
                 let id: u64 =
                     calls.convert(port.getattr("backend_id").and_then(|v| v.extract()))?;
                 let name: String = calls.convert(port.getattr("name").and_then(|v| v.extract()))?;
-                endpoints.push(middi::topology::Endpoint::new(
+                endpoints.push(middy::topology::Endpoint::new(
                     format!("{:?}", backend.native()),
                     self.encoding.clone(),
                     direction.into(),
@@ -560,7 +560,7 @@ pub(crate) fn run_monitor(
         cancel,
         last: 0,
     };
-    let result = middi::inspection::run_with(
+    let result = middy::inspection::run_with(
         &mut monitor.value,
         &mut receiver,
         |entry| {

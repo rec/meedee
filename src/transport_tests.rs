@@ -6,11 +6,11 @@ use crate::packets::{Encoding, TimestampMode, UmpPacket};
 
 #[test]
 fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
-    middi_coremidi_fixture::enable();
+    middy_coremidi_fixture::enable();
     Python::initialize();
     Python::attach(|py| {
         crate::lifecycle::initialize(py).unwrap();
-        let messages = PyModule::new(py, "middi.messages").unwrap();
+        let messages = PyModule::new(py, "middy.messages").unwrap();
         crate::messages::register(&messages).unwrap();
         for encoding in [Encoding::Bytes, Encoding::Ump] {
             for mode in [TimestampMode::Absolute, TimestampMode::Off] {
@@ -120,7 +120,7 @@ fn python_adapter_preserves_native_bytes_ump_clocks_and_owner_reuse() {
 
 #[test]
 fn python_compound_error_retains_progress_and_invalidates_the_connection() {
-    middi_coremidi_fixture::enable();
+    middy_coremidi_fixture::enable();
     Python::initialize();
     Python::attach(|py| {
         // Exercise the real Python exception helper alongside the built package,
@@ -132,7 +132,7 @@ fn python_compound_error_retains_progress_and_invalidates_the_connection() {
             .call_method1("insert", (0, env!("CARGO_MANIFEST_DIR")))
             .unwrap();
         crate::lifecycle::initialize(py).unwrap();
-        let messages = PyModule::new(py, "middi.messages").unwrap();
+        let messages = PyModule::new(py, "middy.messages").unwrap();
         crate::messages::register(&messages).unwrap();
         let options = PyDict::new(py);
         options
@@ -186,7 +186,7 @@ fn python_compound_error_retains_progress_and_invalidates_the_connection() {
             .unwrap()
             .call((), Some(&fields))
             .unwrap();
-        middi_coremidi_fixture::fail_send_after(endpoint, 1);
+        middy_coremidi_fixture::fail_send_after(endpoint, 1);
         let error = outgoing
             .call_method1("send_command", (command,))
             .unwrap_err();
@@ -235,12 +235,12 @@ fn worker_and_capacity_failures_keep_distinct_python_categories() {
     Python::initialize();
     Python::attach(|py| {
         let worker = crate::errors::transport_error(
-            middi::transport::Error::Worker("thread startup failed".into()),
+            middy::transport::Error::Worker("thread startup failed".into()),
             "init",
         );
         assert!(worker.is_instance_of::<crate::errors::WorkerError>(py));
         let resource = crate::errors::transport_error(
-            middi::transport::Error::Resource("client capacity exhausted".into()),
+            middy::transport::Error::Resource("client capacity exhausted".into()),
             "init",
         );
         assert!(resource.is_instance_of::<crate::errors::ResourceError>(py));

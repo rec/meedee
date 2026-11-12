@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 
-from middi import (
+from middy import (
     Reader,
     Writer,
     archive,

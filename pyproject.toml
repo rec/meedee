@@ -3,14 +3,14 @@ requires = ["maturin==1.15.0"]
 build-backend = "maturin"
 
 [project]
-name = "middi"
+name = "middy"
 dynamic = ["version"]
-description = "Python bindings for the middi Rust MIDI toolkit"
+description = "Python bindings for the middy Rust MIDI toolkit"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["pydantic>=2", "reccy>=0.2.0"]
 license = "MIT"
-license-files = ["LICENSE", "crates/middi/THIRD_PARTY_NOTICES.md", "crates/middi/third_party/libremidi/LICENSE.md"]
+license-files = ["LICENSE", "crates/middy/THIRD_PARTY_NOTICES.md", "crates/middy/third_party/libremidi/LICENSE.md"]
 classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Rust",
@@ -26,11 +26,11 @@ cli = [
 ]
 
 [project.urls]
-Repository = "https://github.com/rec/middi"
-Issues = "https://github.com/rec/middi/issues"
+Repository = "https://github.com/rec/middy"
+Issues = "https://github.com/rec/middy/issues"
 
 [project.scripts]
-middi = "middi.cli:main"
+middy = "middy.cli:main"
 
 [dependency-groups]
 dev = [
@@ -47,7 +47,7 @@ reccy = { git = "https://github.com/rec/reccy.git", branch = "main" }
 
 [tool.maturin]
 python-source = "."
-module-name = "middi._core"
+module-name = "middy._core"
 locked = true
 
 [tool.uv]
@@ -58,11 +58,11 @@ cache-keys = [
     { file = "src/**/*.rs" },
     { file = "crates/**/*.rs" },
     { file = "crates/**/Cargo.toml" },
-    { file = "crates/middi/native/**/*" },
-    { file = "crates/middi/third_party/libremidi/**/*" },
-    { file = "middi/*.py" },
-    { file = "middi/*.pyi" },
-    { file = "middi/py.typed" },
+    { file = "crates/middy/native/**/*" },
+    { file = "crates/middy/third_party/libremidi/**/*" },
+    { file = "middy/*.py" },
+    { file = "middy/*.pyi" },
+    { file = "middy/py.typed" },
     { file = "README.md" },
 ]
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from middi import codecs, controls, events, messages, translation, ump
+from middy import codecs, controls, events, messages, translation, ump
 
 
 def test_controller_resolution_is_explicit_and_preserved() -> None:
@@ -56,7 +56,7 @@ def test_controller_resolution_is_explicit_and_preserved() -> None:
 
 def command_vectors() -> Iterator[tuple[object, bytes]]:
     fixture = (
-        Path(__file__).resolve().parents[1] / "crates/middi/tests/fixtures/commands.txt"
+        Path(__file__).resolve().parents[1] / "crates/middy/tests/fixtures/commands.txt"
     )
     for line in fixture.read_text().splitlines():
         if not line or line.startswith("#"):
@@ -110,7 +110,7 @@ def test_commands_are_frozen_positional_values_with_checked_replacement() -> Non
         constructor = getattr(messages, type(c).__name__)
         assert isinstance(c, messages.Message)
         fields = constructor.__annotations__
-        assert constructor.__module__ == "middi.messages"
+        assert constructor.__module__ == "middy.messages"
         assert not hasattr(c, "__dict__")
         values = {k: getattr(c, k) for k in fields}
         rendered = ", ".join(f"{k}={v!r}" for k, v in values.items())
@@ -772,7 +772,7 @@ def test_observations_are_frozen_owned_values_and_raw_input_is_unchanged() -> No
 
 
 def test_parameter_step_defaults_validation_and_metadata_replacement() -> None:
-    from middi import events
+    from middy import events
 
     default = messages.ParameterStep(7)
     assert (default.parameter, default.direction, default.channel, default.family) == (

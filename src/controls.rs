@@ -2,14 +2,14 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
-use middi::controls;
+use middy::controls;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
 macro_rules! enums {
     ($($name:ident { $($variant:ident),* };)*) => {
         $(
-            #[pyclass(eq, frozen, from_py_object, module = "middi.controls")]
+            #[pyclass(eq, frozen, from_py_object, module = "middy.controls")]
             #[derive(Clone, Copy, Debug, PartialEq, Eq)]
             enum $name { $($variant),* }
             impl From<controls::$name> for $name {
@@ -34,7 +34,7 @@ enums! {
 macro_rules! observations {
     ($($name:ident { $($field:ident: $ty:ty),* };)*) => {
         $(
-            #[pyclass(frozen, module = "middi.controls")]
+            #[pyclass(frozen, module = "middy.controls")]
             struct $name { value: controls::$name }
             #[pymethods]
             impl $name {
@@ -118,7 +118,7 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 macro_rules! controllers {
     ($($name:ident),*) => {
-        #[pyclass(eq,frozen,from_py_object,module="middi.controls")]
+        #[pyclass(eq,frozen,from_py_object,module="middy.controls")]
         #[derive(Clone,Copy,PartialEq,Eq)]
         enum Controller {$($name),*}
         #[pymethods]
@@ -128,8 +128,8 @@ macro_rules! controllers {
             #[pyo3(signature=(*,channel,value))]
             fn message(&self,py:Python<'_>,channel:&Bound<'_,PyAny>,value:&Bound<'_,PyAny>)->PyResult<Py<PyAny>> {
                 let channel = crate::messages::integer(channel,"channel")?;
-                let value=middi::messages::ControlChange::new(self.number().into(), crate::messages::integer(value,"value")?).and_then(|m| m.with_channel(channel)).map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
-                crate::messages::to_python(py,middi::messages::AnyMessage::ControlChange(value))
+                let value=middy::messages::ControlChange::new(self.number().into(), crate::messages::integer(value,"value")?).and_then(|m| m.with_channel(channel)).map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+                crate::messages::to_python(py,middy::messages::AnyMessage::ControlChange(value))
             }
         }
     };
@@ -197,7 +197,7 @@ macro_rules! helpers {
         fn $cc(py:Python<'_>,$($arg:&Bound<'_,PyAny>),*)->PyResult<Py<PyAny>> {
             let value=controls::$cc($(crate::messages::integer($arg,stringify!($arg))?),*)
                 .map_err(|error|pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
-            crate::messages::to_python(py,middi::messages::AnyMessage::ControlChange(value))
+            crate::messages::to_python(py,middy::messages::AnyMessage::ControlChange(value))
         })*
         fn register_helpers(module:&Bound<'_,PyModule>)->PyResult<()> {
             $(module.add_function(wrap_pyfunction!($rpn,module)?)?;)*
@@ -230,5 +230,5 @@ fn local_control(
         enabled.extract()?,
     )
     .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
-    crate::messages::to_python(py, middi::messages::AnyMessage::ControlChange(value))
+    crate::messages::to_python(py, middy::messages::AnyMessage::ControlChange(value))
 }

@@ -1,9 +1,9 @@
 //! Identity inquiry reports; codecs remain in the profile bindings.
 use pyo3::prelude::*;
 
-#[pyclass(frozen, module = "middi.universal")]
+#[pyclass(frozen, module = "middy.universal")]
 pub(crate) struct IdentityReport {
-    pub(crate) value: middi::universal::IdentityReport,
+    pub(crate) value: middy::universal::IdentityReport,
 }
 #[pymethods]
 impl IdentityReport {
@@ -12,7 +12,7 @@ impl IdentityReport {
         self.value
             .messages
             .iter()
-            .map(|m| crate::messages::to_python(py, middi::messages::AnyMessage::SysEx(m.clone())))
+            .map(|m| crate::messages::to_python(py, middy::messages::AnyMessage::SysEx(m.clone())))
             .collect()
     }
     #[getter]

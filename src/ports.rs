@@ -1,4 +1,4 @@
-use middi::transport;
+use middy::transport;
 use pyo3::prelude::*;
 
 use crate::packets::Backend;
@@ -13,7 +13,7 @@ pub(crate) fn select_port(
 ) -> PyResult<Py<Port>> {
     let names: Vec<_> = ports.iter().map(|p| p.borrow(py).name.clone()).collect();
     let index =
-        middi::midi::select_port_index(names.iter().map(String::as_str), pattern).map_err(|e| {
+        middy::midi::select_port_index(names.iter().map(String::as_str), pattern).map_err(|e| {
             if pattern.is_none() {
                 crate::errors::ConnectError::new_err(format!("No MIDI {direction} ports available"))
             } else {
@@ -23,7 +23,7 @@ pub(crate) fn select_port(
     Ok(ports.into_iter().nth(index).expect("selected port index"))
 }
 
-#[pyclass(frozen, module = "middi.midi")]
+#[pyclass(frozen, module = "middy.midi")]
 pub struct Port {
     pub native: Option<transport::Port>,
     pub owner: String,

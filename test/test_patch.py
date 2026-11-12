@@ -6,12 +6,12 @@ from typing import Self
 
 import pytest
 
-pytest.importorskip("tyro", reason="install middi[cli]")
-pytest.importorskip("pydantic", reason="install middi[cli]")
+pytest.importorskip("tyro", reason="install middy[cli]")
+pytest.importorskip("pydantic", reason="install middy[cli]")
 
-from middi import cli, events, messages, midi
-from middi._cli import Patch
-from middi._patch import run_patch
+from middy import cli, events, messages, midi
+from middy._cli import Patch
+from middy._patch import run_patch
 
 
 def test_patch_cli_parses_static_routes_before_invoking_host(
@@ -23,7 +23,7 @@ def test_patch_cli_parses_static_routes_before_invoking_host(
         calls.append(config)
         return 0
 
-    monkeypatch.setattr("middi._patch.run_patch", accept)
+    monkeypatch.setattr("middy._patch.run_patch", accept)
     with pytest.raises(SystemExit) as result:
         cli.main(
             [

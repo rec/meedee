@@ -8,7 +8,7 @@ reusable public Python clients. Public Input/Output closure is now terminal.
 > Input now defaults to decoded events; use `raw=True` for the raw callbacks
 > described below. See [the API contract](api.md#unified-python-input).
 
-# middi implementation plan
+# middy implementation plan
 
 ## Purpose and current state
 
@@ -133,7 +133,7 @@ None.
 
 These are proposed product decisions, not requirements supplied by the user:
 
-- Distribution name: `middi`, subject to package-index name availability.
+- Distribution name: `middy`, subject to package-index name availability.
 - Use PyO3 for the extension and maturin as the Python build backend.
 - Support standard, GIL-enabled CPython 3.13 and newer. Keep Python 3.13 as the
   local development interpreter and minimum syntax/type-checking target.
@@ -197,7 +197,7 @@ src/
     input.rs               # Input client, connection, callback bridge
     output.rs              # Output client and connection
     errors.rs              # Error translation
-middi/
+middy/
     __init__.py            # Empty
     midi.pyi               # Public native API signatures and docstrings
     py.typed
@@ -214,10 +214,10 @@ plan/
 ```
 
 Configure maturin with `python-source = "."` and
-`module-name = "middi.midi"`. Set the Rust module name accordingly and build a
-`cdylib`. The canonical import is `from middi.midi import MidiInput`.
+`module-name = "middy.midi"`. Set the Rust module name accordingly and build a
+`cdylib`. The canonical import is `from middy.midi import MidiInput`.
 Keep `__init__.py` empty and define native objects' Python module as
-`middi.midi`, so documentation and exceptions agree with imports.
+`middy.midi`, so documentation and exceptions agree with imports.
 
 Use the [maturin mixed-project and typing guidance](https://www.maturin.rs/project_layout.html).
 Inspect the built wheel to verify the extension, stub, and `py.typed` are present.

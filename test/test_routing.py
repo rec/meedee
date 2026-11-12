@@ -5,7 +5,7 @@ from typing import Literal
 
 import pytest
 
-from middi import archive, events, messages, midi, routing, testing, ump
+from middy import archive, events, messages, midi, routing, testing, ump
 
 
 def route(

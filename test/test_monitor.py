@@ -5,12 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-pytest.importorskip("tyro", reason="install middi[cli] for monitor tests")
-pytest.importorskip("pydantic", reason="install middi[cli] for monitor tests")
+pytest.importorskip("tyro", reason="install middy[cli] for monitor tests")
+pytest.importorskip("pydantic", reason="install middy[cli] for monitor tests")
 
-from middi import events, inspection, messages, midi
-from middi._cli import Monitor
-from middi._monitor import Session, select_port, watch
+from middy import events, inspection, messages, midi
+from middy._cli import Monitor
+from middy._monitor import Session, select_port, watch
 
 
 def event(message: messages.Message, ticks: int = 0) -> messages.Message:
@@ -114,7 +114,7 @@ def test_monitor_duration_interrupt_and_terminal_failure_close_the_input(
 ) -> None:
     feed = Feed([event(messages.TimingClock())])
     monkeypatch.setattr(
-        "middi.inspection.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
+        "middy.inspection.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
     )
     config = Monitor(port="keys", encoding="bytes", duration=0.5, output="json")
     assert watch(feed, config) == 0  # ty: ignore[invalid-argument-type]
@@ -155,7 +155,7 @@ def test_monitor_metrics_count_filtered_events_without_comparing_source_clocks(
         ]
     )
     monkeypatch.setattr(
-        "middi.inspection.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
+        "middy.inspection.monotonic_ns", lambda: int(feed.elapsed * 1_000_000_000)
     )
     config = Monitor(
         port="keys", encoding="bytes", metrics=True, types=["NoteOn"], output="json"

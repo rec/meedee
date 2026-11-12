@@ -15,22 +15,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
-name = "middi"
+name = "middy"
 version = "0.2.0"
 dependencies = [
- "middi-coremidi-fixture",
+ "middy-coremidi-fixture",
 ]
 
 [[package]]
-name = "middi-coremidi-fixture"
+name = "middy-coremidi-fixture"
 version = "0.2.0"
 
 [[package]]
-name = "middi-python"
+name = "middy-python"
 version = "0.2.0"
 dependencies = [
- "middi",
- "middi-coremidi-fixture",
+ "middy",
+ "middy-coremidi-fixture",
  "pyo3",
 ]
 

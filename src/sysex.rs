@@ -1,9 +1,9 @@
 //! Public Python values for opaque SysEx dump capture.
 use pyo3::prelude::*;
 
-#[pyclass(frozen, module = "middi.sysex")]
+#[pyclass(frozen, module = "middy.sysex")]
 pub(crate) struct DumpReport {
-    pub(crate) value: middi::sysex::DumpReport,
+    pub(crate) value: middy::sysex::DumpReport,
 }
 #[pymethods]
 impl DumpReport {
@@ -48,13 +48,13 @@ impl DumpReport {
         self.value
             .messages
             .iter()
-            .map(|m| crate::messages::to_python(py, middi::messages::AnyMessage::SysEx(m.clone())))
+            .map(|m| crate::messages::to_python(py, middy::messages::AnyMessage::SysEx(m.clone())))
             .collect()
     }
 }
 #[pyfunction]
 fn models() -> Vec<&'static str> {
-    middi::sysex::models()
+    middy::sysex::models()
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

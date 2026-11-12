@@ -1,9 +1,9 @@
 //! Frozen Python discovery observations, independent of native client startup.
-use middi::topology;
+use middy::topology;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-#[pyclass(frozen, module = "middi.topology")]
+#[pyclass(frozen, module = "middy.topology")]
 struct Endpoint {
     value: topology::Endpoint,
 }
@@ -52,7 +52,7 @@ impl Endpoint {
         crate::tuning::hash(&self.value)
     }
 }
-#[pyclass(frozen, module = "middi.topology")]
+#[pyclass(frozen, module = "middy.topology")]
 struct PortCount {
     value: topology::PortCount,
 }
@@ -69,7 +69,7 @@ impl PortCount {
         self.value.count
     }
 }
-#[pyclass(frozen, module = "middi.topology")]
+#[pyclass(frozen, module = "middy.topology")]
 struct Change {
     value: topology::Change,
 }
@@ -90,7 +90,7 @@ impl Change {
         self.value.count
     }
 }
-#[pyclass(frozen, module = "middi.topology")]
+#[pyclass(frozen, module = "middy.topology")]
 struct Delta {
     value: topology::Delta,
 }
@@ -121,7 +121,7 @@ impl Delta {
         self.value.omitted_changes
     }
 }
-#[pyclass(frozen, module = "middi.topology")]
+#[pyclass(frozen, module = "middy.topology")]
 pub(crate) struct Report {
     pub(crate) value: topology::Report,
 }
@@ -168,7 +168,7 @@ impl Report {
         self.value.reason.as_deref()
     }
 }
-#[pyclass(module = "middi.topology")]
+#[pyclass(module = "middy.topology")]
 struct Tracker {
     value: topology::Tracker,
 }

@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 
-from middi import clip, file_io, messages, smf, ump
+from middy import clip, file_io, messages, smf, ump
 
 SMF = bytes.fromhex(
     "4d546864000000060000000101e04d54726b0000001300ff510307a12000903c6483603c0000ff2f00"

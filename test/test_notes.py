@@ -2,7 +2,7 @@
 
 import pytest
 
-from middi import events, messages, midi, notes
+from middy import events, messages, midi, notes
 
 
 def event(

@@ -1,0 +1,15 @@
+[package]
+name = "middy"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.87"
+description = "Immutable MIDI values and native MIDI toolkit"
+repository = "https://github.com/rec/middy"
+license = "MIT"
+readme = "../../README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+middy-coremidi-fixture = { path = "tests/coremidi-fixture" }

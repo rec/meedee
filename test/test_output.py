@@ -10,7 +10,7 @@ from time import monotonic
 
 import pytest
 
-from middi import codecs, events, messages, midi, testing
+from middy import codecs, events, messages, midi, testing
 
 
 class NativeConnection:
@@ -48,7 +48,7 @@ class NativeConnection:
 
 @pytest.fixture
 def transport(monkeypatch: pytest.MonkeyPatch) -> Iterator[NativeConnection]:
-    from middi import _native
+    from middy import _native
 
     connection = NativeConnection()
 
@@ -120,7 +120,7 @@ def test_parameter_step_uses_output_channel_and_preserves_nrpn_family(
 def test_ump_channel_override_covers_every_musical_family_and_grouped_commands(
     transport: NativeConnection,
 ) -> None:
-    from middi import ump
+    from middy import ump
 
     transport.sink = testing.Output(encoding="ump")
     values = [
@@ -168,7 +168,7 @@ def test_call_schedules_cumulative_delays_including_trailing_time(
     transport: NativeConnection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     deadlines: list[int] = []
 
@@ -208,7 +208,7 @@ def test_delay_only_call_waits_without_sending(transport: NativeConnection) -> N
 def test_with_gap_schedules_sysex_and_trailing_wait(
     transport: NativeConnection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     deadlines: list[int] = []
 
@@ -360,7 +360,7 @@ def test_full_notes_and_rests_schedule_beats_and_release_before_next_attack(
     transport: NativeConnection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     deadlines: list[int] = []
 
@@ -408,7 +408,7 @@ def test_full_note_defaults_to_seconds_and_interrupt_cleanup_releases_it(
     transport: NativeConnection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     def sequence(
         send: Callable[[object], None],
@@ -432,7 +432,7 @@ def test_fractional_beat_deadlines_round_totals_without_drift(
     transport: NativeConnection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     deadlines: list[int] = []
 
@@ -473,7 +473,7 @@ def test_bare_delays_follow_tempo_but_explicit_seconds_do_not(
     transport: NativeConnection,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     deadlines: list[int] = []
 
@@ -515,10 +515,10 @@ def test_output_distinguishes_no_channel_from_explicit_channel_one(
 def test_client_play_infers_origin_and_closes_reader_and_output(
     transport: NativeConnection, tmp_path: Path
 ) -> None:
-    from middi import archive, events
+    from middy import archive, events
 
     clock = events.Clock(identity="capture")
-    path = tmp_path / "rec.middi"
+    path = tmp_path / "rec.middy"
     writer = archive.Writer(path)
     writer.write(clock)
     writer.write(archive.Stream(id="s", label=""))
@@ -546,7 +546,7 @@ def test_client_play_accepts_empty_capture(transport: NativeConnection) -> None:
 def test_playback_keeps_a_retained_output_available_for_reuse(
     transport: NativeConnection,
 ) -> None:
-    from middi import events
+    from middy import events
 
     timestamp = events.Timestamp(ticks=0, clock=events.Clock(identity="capture"))
     note = messages.NoteOn(60, channel=1).replace(timestamp=timestamp)
@@ -591,7 +591,7 @@ def test_output_is_automatically_collected_and_releases_notes(
 def test_playback_accepts_timing_without_source_metadata(
     transport: NativeConnection,
 ) -> None:
-    from middi import events
+    from middy import events
 
     note = messages.NoteOn(60, channel=1).replace(
         timestamp=events.Timestamp(ticks=100, clock=events.Clock(identity="score"))
@@ -606,7 +606,7 @@ def test_playback_accepts_timing_without_source_metadata(
 def test_empty_playback_does_not_initialize_transport(
     monkeypatch: pytest.MonkeyPatch, run_in_subprocess: bool, declarations: bool
 ) -> None:
-    from middi import _native, archive, events
+    from middy import _native, archive, events
 
     def fail_initialization(*args: object, **kwargs: object) -> None:
         raise AssertionError("empty playback opened a MIDI client")
@@ -627,7 +627,7 @@ def test_empty_playback_does_not_initialize_transport(
 def test_send_combines_notes_recorded_timing_and_immediate_messages(
     transport: NativeConnection,
 ) -> None:
-    from middi import events
+    from middy import events
 
     clock = events.Clock(identity="recording")
     notes = [
@@ -658,7 +658,7 @@ def test_send_combines_notes_recorded_timing_and_immediate_messages(
 def test_send_rejects_mixed_timing_and_retains_confirmed_progress(
     transport: NativeConnection, timed_first: bool
 ) -> None:
-    from middi import events
+    from middy import events
 
     plain = messages.NoteOn(60, channel=1)
     timed = plain.replace(
@@ -678,7 +678,7 @@ def test_send_rejects_mixed_timing_and_retains_confirmed_progress(
 def test_cancelled_send_does_not_consume_source_or_open_ports(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from middi import _native, events
+    from middy import _native, events
 
     def no_ports(**settings: object) -> None:
         raise AssertionError("cancelled send opened a client")
@@ -718,7 +718,7 @@ def test_scalar_note_report_counts_rounded_deadlines(
 
 
 def test_root_api_sends_a_full_note(transport: NativeConnection) -> None:
-    import middi as md
+    import middy as md
 
     report = md.Output().send(md.Note("500 ms", 60))
     assert report.sent_events == 2

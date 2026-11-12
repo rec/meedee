@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use middi::transport;
+use middy::transport;
 use pyo3::prelude::*;
 use pyo3::{PyTraverseError, PyVisit};
 
@@ -12,7 +12,7 @@ use crate::packets::{Backend, Clock, Encoding, ReceivedPacket, TimestampMode};
 use crate::ports::Port;
 use crate::state::Client;
 
-#[pyclass(frozen, module = "middi._native")]
+#[pyclass(frozen, module = "middy._native")]
 pub struct Input {
     state: Arc<Client<transport::Input>>,
     identity: String,
@@ -135,7 +135,7 @@ impl Input {
     }
 }
 
-#[pyclass(frozen, weakref, module = "middi._native")]
+#[pyclass(frozen, weakref, module = "middy._native")]
 pub struct InputConnection {
     resource: Arc<Managed<transport::Input, transport::InputConnection>>,
     client: Py<Input>,

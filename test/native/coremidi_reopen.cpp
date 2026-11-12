@@ -134,9 +134,9 @@ struct Probe
     if (command == 'c')
     {
       MIDIPortRef port{};
-      require(MIDIClientCreate(CFSTR("middi-churn-output"), nullptr, nullptr, &client) == noErr,
+      require(MIDIClientCreate(CFSTR("middy-churn-output"), nullptr, nullptr, &client) == noErr,
               "create consumer client");
-      require(MIDIOutputPortCreate(client, CFSTR("middi-churn-output"), &port) == noErr,
+      require(MIDIOutputPortCreate(client, CFSTR("middy-churn-output"), &port) == noErr,
               "create consumer port");
       require(MIDIPortDispose(port) == noErr, "dispose consumer port");
       require(MIDIClientDispose(client) == noErr, "dispose consumer client");
@@ -186,10 +186,10 @@ struct Probe
     reply = {};
     if (command == 'c')
     {
-      reply.status = MIDIClientCreate(CFSTR("middi-churn-input"), nullptr, nullptr, &client);
+      reply.status = MIDIClientCreate(CFSTR("middy-churn-input"), nullptr, nullptr, &client);
       if (reply.status == noErr)
         reply.status = MIDIDestinationCreate(
-            client, CFSTR("middi-churn-test-owned"),
+            client, CFSTR("middy-churn-test-owned"),
             +[](const MIDIPacketList*, void*, void*) {}, nullptr, &endpoint);
       expected = endpoint;
       reply.endpoint = endpoint;
@@ -233,7 +233,7 @@ struct Probe
 
   void run()
   {
-    const auto status = MIDIClientCreate(CFSTR("middi-churn-keeper"), notification, this, &keeper);
+    const auto status = MIDIClientCreate(CFSTR("middy-churn-keeper"), notification, this, &keeper);
     std::fprintf(log(), "%s MIDIClientCreate=%d keeper=%u\n", role(), status, keeper);
     require(status == noErr, "create notification client");
     CFFileDescriptorContext context{0, this, nullptr, nullptr, nullptr};

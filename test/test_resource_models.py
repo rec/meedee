@@ -7,8 +7,8 @@ from collections.abc import Callable
 import pytest
 from pydantic import ValidationError
 
-from middi import discovery, midi
-from middi._resource import ResourceModel
+from middy import discovery, midi
+from middy._resource import ResourceModel
 
 
 @pytest.mark.parametrize(

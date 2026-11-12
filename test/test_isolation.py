@@ -20,11 +20,11 @@ from unittest.mock import patch
 
 import pytest
 
-from middi import events, messages, midi, mpe
-from middi._clients import Input, Output
-from middi._native import CallbackBridge
-from middi._transport import ReceiveQueue
-from middi.events import Clock, ReceivedPacket
+from middy import events, messages, midi, mpe
+from middy._clients import Input, Output
+from middy._native import CallbackBridge
+from middy._transport import ReceiveQueue
+from middy.events import Clock, ReceivedPacket
 
 
 @pytest.fixture(scope="session")
@@ -38,7 +38,7 @@ def worker_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
             "rustc",
             "--edition=2021",
             "-O",
-            str(project / "crates/middi/tests/support/subprocess_worker.rs"),
+            str(project / "crates/middy/tests/support/subprocess_worker.rs"),
             "-o",
             str(path),
         ],
@@ -141,7 +141,7 @@ def test_send_snapshots_mutable_and_strided_buffers(
         def connect(self, port: object) -> LocalConnection:
             return LocalConnection()
 
-    with patch("middi._native.Output", LocalClient):
+    with patch("middy._native.Output", LocalClient):
         output = output_client("check_bytes", run_in_subprocess=run_in_subprocess)
         connection = output.connect(output.ports()[0])
         connection.send(message)
@@ -226,7 +226,7 @@ def test_last_message_time_uses_monotonic_clock_and_survives_close(
                 bridge.deliver(packet_value(17, b"\xf8"))
             return LocalConnection(bridge)
 
-    with patch("middi._native.Input", LocalClient):
+    with patch("middy._native.Input", LocalClient):
         source = input_client(
             "early" if delivered else "quiet", run_in_subprocess=run_in_subprocess
         )
@@ -267,7 +267,7 @@ def test_incompatible_callback_signatures_do_not_consume_the_client(
         def ports(self) -> list[object]:
             return [local_port()]
 
-    with patch("middi._native.Input", LocalClient):
+    with patch("middy._native.Input", LocalClient):
         source = input_client("early", run_in_subprocess=run_in_subprocess)
         for c in (one_argument, extra_argument, keyword_only):
             with pytest.raises(TypeError, match="one positional ReceivedPacket"):
@@ -311,7 +311,7 @@ def test_deferred_callbacks_are_rejected_without_consuming_the_client(
         def ports(self) -> list[object]:
             return [local_port()]
 
-    with patch("middi._native.Input", LocalClient):
+    with patch("middy._native.Input", LocalClient):
         source = input_client("early", run_in_subprocess=run_in_subprocess)
         for c in (callback, partial(callback), Receiver(), partial(Receiver())):
             with pytest.raises(TypeError, match="synchronous and not a generator"):
@@ -446,7 +446,7 @@ def test_deferred_results_stop_delivery_without_execution(
             return LocalConnection(bridge)
 
     with (
-        patch("middi._native.Input", LocalClient),
+        patch("middy._native.Input", LocalClient),
         patch("sys.unraisablehook", error_hook),
         warnings.catch_warnings(record=True) as warning_records,
     ):
@@ -527,7 +527,7 @@ def test_invalid_deadlines_are_rejected_before_starting_a_worker(
 
 def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPacket]:
     """Discover while the child fixture's selected mode is in the environment."""
-    with patch.dict(os.environ, {"MIDDI_TEST_MODE": mode}):
+    with patch.dict(os.environ, {"MIDDY_TEST_MODE": mode}):
         client = cast(Callable[..., Input[events.ReceivedPacket]], midi.Input)(
             **(
                 {
@@ -546,7 +546,7 @@ def input_client(mode: str, **settings: object) -> midi.Input[events.ReceivedPac
 
 def output_client(mode: str, **settings: object) -> midi.Output:
     """Discover while the child fixture's selected mode is in the environment."""
-    with patch.dict(os.environ, {"MIDDI_TEST_MODE": mode}):
+    with patch.dict(os.environ, {"MIDDY_TEST_MODE": mode}):
         client = cast(Callable[..., Output], midi.Output)(
             **(
                 {
@@ -750,7 +750,7 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
 def test_typed_input_exposes_receive_drops_without_another_packet(
     workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("MIDDI_TEST_MODE", "native_drop_idle")
+    monkeypatch.setenv("MIDDY_TEST_MODE", "native_drop_idle")
     source = midi.Input(run_in_subprocess=True, timeout=1)
     with source.connect(source.ports()[0]) as connection:
         deadline = monotonic() + 3
@@ -768,7 +768,7 @@ def test_typed_queue_reports_overflow_and_retains_primitive_events(
     workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
-    monkeypatch.setenv("MIDDI_TEST_MODE", "twice")
+    monkeypatch.setenv("MIDDY_TEST_MODE", "twice")
     source = midi.Input(run_in_subprocess=True, timeout=1, event_limit=1)
     with source.connect(source.ports()[0]) as connection:
         deadline = monotonic() + 2
@@ -785,9 +785,9 @@ def test_typed_queue_reports_overflow_and_retains_primitive_events(
 def test_typed_receive_wakes_on_cancellation_and_close(
     workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from middi.events import Cancellation
+    from middy.events import Cancellation
 
-    monkeypatch.setenv("MIDDI_TEST_MODE", "input")
+    monkeypatch.setenv("MIDDY_TEST_MODE", "input")
     source = midi.Input(run_in_subprocess=True, timeout=1)
     connection = source.connect(source.ports()[0])
     cancel = Cancellation()
@@ -816,7 +816,7 @@ def test_typed_callback_retains_the_blocking_operation_guard(
     workers: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
-    monkeypatch.setenv("MIDDI_TEST_MODE", "early")
+    monkeypatch.setenv("MIDDY_TEST_MODE", "early")
     called = Event()
 
     def callback(value: messages.Message | events.StreamDiagnostic) -> None:
@@ -870,7 +870,7 @@ def test_python_bootstrap_runs_the_rust_worker_without_native_initialization() -
     magic = b"MDWORK\x00\x01"
     request = b"\x06" + (2).to_bytes(8) + string("shutdown") + b"\x05" + bytes(8)
     with subprocess.Popen(
-        [sys.executable, "-m", "middi._worker"],
+        [sys.executable, "-m", "middy._worker"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -907,7 +907,7 @@ def test_python_bootstrap_runs_the_rust_worker_without_native_initialization() -
 def test_launcher_selection_is_lazy_and_reaches_the_shared_rust_binding(
     worker: str, direction: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from middi import _native
+    from middy import _native
 
     seen: dict[str, object] = {}
 
@@ -930,7 +930,7 @@ def test_launcher_selection_is_lazy_and_reaches_the_shared_rust_binding(
     assert client.ports() == []
     assert seen["worker_program"] == "chosen-worker"
     assert seen["worker_args"] == (
-        ["-m", "middi._worker"] if worker == "python" else []
+        ["-m", "middy._worker"] if worker == "python" else []
     )
     assert seen["worker_timeout"] == 5
     client.close()

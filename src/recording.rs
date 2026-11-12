@@ -1,14 +1,14 @@
 //! File and memory recording backed by the shared recorder lifecycle.
 use crate::files::{limit, os_error};
 use crate::packets::Clock;
-use middi::messages::Message;
-use middi::{archive as model, archive::Record};
+use middy::messages::Message;
+use middy::{archive as model, archive::Record};
 use pyo3::exceptions::{PyTimeoutError, PyValueError};
 use pyo3::prelude::*;
 use std::fs::File;
 use std::path::PathBuf;
 use std::time::Duration;
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 struct RecordingReport {
     value: model::RecordingReport,
 }
@@ -38,7 +38,7 @@ impl RecordingReport {
         self.value.failure.as_deref()
     }
 }
-#[pyclass(frozen, module = "middi.archive")]
+#[pyclass(frozen, module = "middy.archive")]
 pub struct Recorder {
     pub value: model::Recorder,
     stream: String,
@@ -106,7 +106,7 @@ impl Recorder {
     }
     fn record(&self, record: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(d) = record.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
-            if d.value.kind == middi::events::StreamDiagnosticKind::ClockChange {
+            if d.value.kind == middy::events::StreamDiagnosticKind::ClockChange {
                 return Ok(self.value.record(Record::Discontinuity {
                     stream: d.value.stream.clone(),
                     reason: d.value.reason.clone(),

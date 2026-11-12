@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("tyro", reason="install middi[cli] for CLI tests")
-pytest.importorskip("pydantic", reason="install middi[cli] for CLI tests")
+pytest.importorskip("tyro", reason="install middy[cli] for CLI tests")
+pytest.importorskip("pydantic", reason="install middy[cli] for CLI tests")
 
-from middi import archive, cli, events, messages
+from middy import archive, cli, events, messages
 
 
 def test_route_preview_is_offline_and_labels_simulated_deliveries(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    path = tmp_path / "capture.middi"
+    path = tmp_path / "capture.middy"
     writer = archive.Writer(path)
     writer.write(archive.Stream(id="s", label=""))
     writer.write(

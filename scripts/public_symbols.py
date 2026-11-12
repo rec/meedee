@@ -10,7 +10,7 @@ Private modules, imported helpers and root re-exports are excluded, matching the
 previous inventory's Python scope. Rust includes public re-export paths, but not
 traits, aliases, constants, fields or methods. The inventory describes the current
 Rust target/configuration, not all platform-specific APIs or behavioral parity.
-No middi modules are imported and no MIDI runtime is started.
+No middy modules are imported and no MIDI runtime is started.
 """
 
 from __future__ import annotations
@@ -89,7 +89,7 @@ def rust_symbols(index: Path) -> dict[str, str]:
         listing = Listing()
         listing.feed(page.read_text())
         for kind, href, title, name in listing.links:
-            if not title.startswith(f"{kind} middi::") or not name.isidentifier():
+            if not title.startswith(f"{kind} middy::") or not name.isidentifier():
                 continue
             path = f"{module}.{name}".lstrip(".")
             if kind == "mod":
@@ -139,7 +139,7 @@ def render(
         "- Names do not establish behavioral parity. "
         "Preserved annotations are historical, not revalidated.",
         "- See plan/fix-differences.md for the reviewed mappings and their scope.",
-        "- No middi import, MIDI runtime or device flow was run.",
+        "- No middy import, MIDI runtime or device flow was run.",
         "- Keep public-symbols.txt uncommitted.",
         "",
         "COUNTS",
@@ -187,7 +187,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     notes = read_notes(root / "public-symbols.txt")
     subprocess.run(
-        ["cargo", "doc", "--locked", "-p", "middi", "--no-deps"], cwd=root, check=True
+        ["cargo", "doc", "--locked", "-p", "middy", "--no-deps"], cwd=root, check=True
     )
     metadata = json.loads(
         subprocess.check_output(
@@ -196,8 +196,8 @@ def main() -> None:
             text=True,
         )
     )
-    index = Path(metadata["target_directory"]) / "doc" / "middi" / "index.html"
-    python = python_symbols(root / "middi")
+    index = Path(metadata["target_directory"]) / "doc" / "middy" / "index.html"
+    python = python_symbols(root / "middy")
     rust = rust_symbols(index)
     commit = subprocess.check_output(
         ["git", "rev-parse", "--short", "HEAD"], cwd=root, text=True

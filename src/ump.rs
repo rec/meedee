@@ -1,14 +1,14 @@
 //! One pure UMP namespace backed by Rust-owned values. No native MIDI runtime.
 use crate::messages::{self, integer, Message};
 use crate::tuning::{render, replacement};
-use middi::ump as model;
+use middy::ump as model;
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyDict, PyInt, PyList, PyTuple};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-include!("../crates/middi/src/ump_values.rs");
+include!("../crates/middy/src/ump_values.rs");
 
 macro_rules! note_methods {
     ($name:ident; [$($all:ident),*]; [note $(, $rest:ident)*]; {$($methods:item)*}) => {
@@ -48,10 +48,10 @@ macro_rules! value_methods_impl {
 }
 macro_rules! scalar {
     (Noop [$first:expr,$second:expr] {}; $($name:ident [$a:expr,$b:expr] {$($field:ident:$ty:ty = $lo:literal ..= $hi:literal => [$word:literal,$shift:literal,$mask:literal,$bias:literal]),*};)*)=>{
-        #[pyclass(frozen,extends=Message,module="middi.ump")]
+        #[pyclass(frozen,extends=Message,module="middy.ump")]
         struct Noop {value:model::Noop}
         value_methods!(Noop;;{#[new]fn new()->PyClassInitializer<Self>{PyClassInitializer::from(Message::default()).add_subclass(Self{value:model::Noop::new().expect("constant Noop")})}});
-        $(#[pyclass(frozen,extends=Message,module="middi.ump")]
+        $(#[pyclass(frozen,extends=Message,module="middy.ump")]
         struct $name{value:model::$name}
         value_methods!($name;$($field),*;{
             #[new]#[pyo3(signature=(*,$($field),*))]
@@ -80,7 +80,7 @@ macro_rules! scalar {
     };
 }
 scalar_values!(scalar);
-#[pyclass(frozen,extends=Message,module="middi.ump")]
+#[pyclass(frozen,extends=Message,module="middy.ump")]
 struct SysEx7Packet {
     value: model::SysEx7Packet,
 }
@@ -90,7 +90,7 @@ value_methods!(SysEx7Packet;group,format,data;{
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn format(&self)->u8{self.value.format()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
-#[pyclass(frozen,extends=Message,module="middi.ump")]
+#[pyclass(frozen,extends=Message,module="middy.ump")]
 struct SysEx8Packet {
     value: model::SysEx8Packet,
 }
@@ -100,7 +100,7 @@ value_methods!(SysEx8Packet;group,format,stream_id,data,aborted;{
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn format(&self)->u8{self.value.format()}#[getter]fn stream_id(&self)->u8{self.value.stream_id()}#[getter]fn aborted(&self)->bool{self.value.aborted()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
-#[pyclass(frozen,extends=Message,module="middi.ump")]
+#[pyclass(frozen,extends=Message,module="middy.ump")]
 struct MixedDataSet {
     value: model::MixedDataSet,
 }
@@ -110,7 +110,7 @@ value_methods!(MixedDataSet;group,header,mds_id,data;{
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn header(&self)->bool{self.value.header()}#[getter]fn mds_id(&self)->u8{self.value.mds_id()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
-#[pyclass(frozen,extends=Message,module="middi.ump")]
+#[pyclass(frozen,extends=Message,module="middy.ump")]
 struct FlexData {
     value: model::FlexData,
 }
@@ -120,7 +120,7 @@ value_methods!(FlexData;group,format,channel,status_bank,status,data;{
     #[getter]fn group(&self)->u8{self.value.group()}#[getter]fn format(&self)->u8{self.value.format()}#[getter]fn channel(&self)->Option<u8>{self.value.channel()}#[getter]fn status_bank(&self)->u8{self.value.status_bank()}#[getter]fn status(&self)->u8{self.value.status()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->PyResult<Bound<'py,PyTuple>>{tuple(py,self.value.data())}
 });
-#[pyclass(frozen,extends=Message,module="middi.ump")]
+#[pyclass(frozen,extends=Message,module="middy.ump")]
 struct StreamMessage {
     value: model::StreamMessage,
 }
@@ -130,7 +130,7 @@ value_methods!(StreamMessage;format,status,data;{
     #[getter]fn format(&self)->u8{self.value.format()}#[getter]fn status(&self)->u16{self.value.status()}
     #[getter]fn data<'py>(&self,py:Python<'py>)->Bound<'py,PyBytes>{PyBytes::new(py,self.value.data())}
 });
-#[pyclass(frozen,extends=Message,module="middi.ump")]
+#[pyclass(frozen,extends=Message,module="middy.ump")]
 struct OpaquePacket {
     value: model::OpaquePacket,
 }
@@ -158,7 +158,7 @@ fn extract_packet(value: &Bound<'_, PyAny>) -> PyResult<model::PacketValue> {
     if let Ok(v) = value.extract::<PyRef<'_, OpaquePacket>>() {
         return Ok(model::PacketValue::Opaque(v.value.clone()));
     }
-    Err(PyTypeError::new_err("expected a middi.ump message"))
+    Err(PyTypeError::new_err("expected a middy.ump message"))
 }
 #[pyfunction]
 fn encode<'py>(py: Python<'py>, message: &Bound<'_, PyAny>) -> PyResult<Bound<'py, PyTuple>> {
@@ -276,7 +276,7 @@ fn packetize_stream_text(
         .collect()
 }
 
-#[pyclass(frozen, module = "middi.ump")]
+#[pyclass(frozen, module = "middy.ump")]
 struct DecodeDiagnostic {
     value: model::DecodeDiagnostic,
 }
@@ -299,7 +299,7 @@ impl DecodeDiagnostic {
         hash(&self.value)
     }
 }
-#[pyclass(module = "middi.ump")]
+#[pyclass(module = "middy.ump")]
 struct Decoder {
     value: model::Decoder,
 }
@@ -335,14 +335,14 @@ fn decode_outputs(py: Python<'_>, values: Vec<model::DecodeOutput>) -> PyResult<
 }
 macro_rules! enums {
     ($($name:ident{$($variant:ident),*};)*)=>{$(
-        #[pyclass(eq,frozen,from_py_object,module="middi.ump")]
+        #[pyclass(eq,frozen,from_py_object,module="middy.ump")]
         #[derive(Clone,Copy,PartialEq,Eq)]
         enum $name{$($variant),*}
         impl From<model::$name> for $name{fn from(v:model::$name)->Self{match v{$(model::$name::$variant=>Self::$variant),*}}}
     )*};
 }
 enums! {DataKind{SysEx7,SysEx8,FlexData,StreamText};AssemblyDiagnostic{Interrupted,UnexpectedContinuation,Aborted,PayloadLimit,StreamLimit,MalformedText,TooManyPackets,Truncated};}
-#[pyclass(frozen, module = "middi.ump")]
+#[pyclass(frozen, module = "middy.ump")]
 struct AssembledData {
     value: model::AssembledData,
 }
@@ -409,7 +409,7 @@ pub(crate) fn assembly_outputs(
         })
         .collect()
 }
-#[pyclass(frozen, module = "middi.ump")]
+#[pyclass(frozen, module = "middy.ump")]
 struct Capabilities {
     value: model::Capabilities,
 }
@@ -450,7 +450,7 @@ fn object<T: pyo3::PyClass<BaseType = Message>>(py: Python<'_>, value: T) -> PyR
     )?
     .into_any())
 }
-pub(crate) fn error(v: middi::messages::ValueError) -> PyErr {
+pub(crate) fn error(v: middy::messages::ValueError) -> PyErr {
     PyValueError::new_err(v.to_string())
 }
 fn int(v: &Bound<'_, PyAny>) -> PyResult<i64> {
@@ -600,7 +600,7 @@ fn register_helpers(module: &Bound<'_, PyModule>) -> PyResult<()> {
 fn tempo_period(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     int(&value
         .py()
-        .import("middi._units")?
+        .import("middy._units")?
         .getattr("tempo")?
         .call1((value, 100_000_000))?)
 }

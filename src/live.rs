@@ -1,11 +1,11 @@
 //! Native pure packet decoder and typed-send preparation.
 use crate::files::{os_error, uint};
 use crate::packets::{Encoding, ReceivedPacket, UmpPacket};
-use middi::{events as model, events::Payload};
+use middy::{events as model, events::Payload};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-#[pyclass(frozen, module = "middi.events")]
+#[pyclass(frozen, module = "middy.events")]
 pub struct StreamDiagnostic {
     pub value: model::StreamDiagnostic,
 }
@@ -47,7 +47,7 @@ impl StreamDiagnostic {
         )
     }
 }
-#[pyclass(module = "middi.events")]
+#[pyclass(module = "middy.events")]
 struct PacketDecoder {
     value: model::PacketDecoder,
 }
@@ -165,7 +165,7 @@ fn prepare_message(
                 ));
             }
             (Encoding::Bytes, Payload::Message(v)) => {
-                use middi::messages::PrimitiveMessage;
+                use middy::messages::PrimitiveMessage;
                 return Ok(PyBytes::new(
                     py,
                     &v.encode()
@@ -174,7 +174,7 @@ fn prepare_message(
                 .into_any()
                 .unbind());
             }
-            (Encoding::Ump, Payload::Ump(middi::ump::PacketValue::Opaque(_))) => {
+            (Encoding::Ump, Payload::Ump(middy::ump::PacketValue::Opaque(_))) => {
                 return Err(crate::errors::CapabilityError::new_err(
                     "opaque UMP requires deliberate raw sending; typed support is unknown",
                 ))
@@ -182,15 +182,15 @@ fn prepare_message(
             (
                 Encoding::Ump,
                 Payload::Ump(
-                    middi::ump::PacketValue::DeltaClockstamp(_)
-                    | middi::ump::PacketValue::DeltaClockstampTicksPerQuarter(_),
+                    middy::ump::PacketValue::DeltaClockstamp(_)
+                    | middy::ump::PacketValue::DeltaClockstampTicksPerQuarter(_),
                 ),
             ) => {
                 return Err(crate::errors::CapabilityError::new_err(
                     "file timing records are not live messages",
                 ))
             }
-            (Encoding::Ump, Payload::Ump(middi::ump::PacketValue::Stream(v)))
+            (Encoding::Ump, Payload::Ump(middy::ump::PacketValue::Stream(v)))
                 if matches!(v.status(), 32 | 33) =>
             {
                 return Err(crate::errors::CapabilityError::new_err(
@@ -198,7 +198,7 @@ fn prepare_message(
                 ))
             }
             (Encoding::Ump, v) => {
-                use middi::ump::UmpValue;
+                use middy::ump::UmpValue;
                 return Ok(Py::new(
                     py,
                     UmpPacket {
@@ -242,14 +242,14 @@ pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
         return Ok(match &v {
             Payload::Message(v) => v.encoded_len(),
             Payload::Ump(v) => {
-                use middi::ump::UmpValue;
+                use middy::ump::UmpValue;
                 v.encode_words()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?
                     .len()
                     * 4
             }
             Payload::Command(v) => {
-                use middi::messages::Command;
+                use middy::messages::Command;
                 v.expand()
                     .map_err(|e| PyValueError::new_err(e.to_string()))?
                     .iter()

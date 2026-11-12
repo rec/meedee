@@ -4,12 +4,12 @@ from fractions import Fraction
 
 import pytest
 
-pytest.importorskip("ufor", reason="install middi[ufor] for tuning integration tests")
+pytest.importorskip("ufor", reason="install middy[ufor] for tuning integration tests")
 
 from ufor import scala
 from ufor.tuning import Computed, FrequencyTable, IntervalPattern, RatioTable, Tuning
 
-from middi import codecs, messages, tuning
+from middy import codecs, messages, tuning
 
 
 def test_conversion_returns_a_native_note_tuning() -> None:
@@ -199,7 +199,7 @@ def test_ufor_numeric_overflow_and_underflow_cannot_generate_mts(detune: float) 
 def test_bulk_dump_can_be_sent_as_sysex_with_library_broadcast(
     bank: int | None,
 ) -> None:
-    from middi.testing import Output
+    from middy.testing import Output
 
     result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
     dump = tuning.bulk_dump(result, device_id=127, program=2, name="dump", bank=bank)

@@ -1,12 +1,12 @@
 //! Public Python testing transports backed by the shared deterministic core.
 use crate::files::{limit, uint};
 use crate::packets::{extract_packet, Clock, Encoding, UmpPacket};
-use middi::{testing, transport};
+use middy::{testing, transport};
 use pyo3::exceptions::{PyInterruptedError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyBytes, PyInt, PyTuple};
 
-#[pyclass(module = "middi.testing")]
+#[pyclass(module = "middy.testing")]
 struct ManualClock {
     value: testing::ManualClock,
 }
@@ -30,7 +30,7 @@ impl ManualClock {
         self.value.advance(nanoseconds).map_err(error)
     }
 }
-#[pyclass(module = "middi.testing")]
+#[pyclass(module = "middy.testing")]
 struct Input {
     value: testing::Input,
 }
@@ -158,7 +158,7 @@ impl Input {
         self.value.close();
     }
 }
-#[pyclass(frozen, module = "middi.testing")]
+#[pyclass(frozen, module = "middy.testing")]
 struct InputReport {
     value: testing::InputReport,
 }
@@ -197,7 +197,7 @@ impl InputReport {
         self.value.failure.as_deref()
     }
 }
-#[pyclass(module = "middi.testing")]
+#[pyclass(module = "middy.testing")]
 struct Output {
     value: testing::Output,
     encoding: Encoding,
@@ -225,9 +225,9 @@ impl Output {
         let packet = crate::live::prepare_output(py, self.encoding, value)?;
         if packet.bind(py).is_instance_of::<PyTuple>() {
             let command = crate::messages::extract_command(value)?;
-            let packets = middi::codecs::expand(&command)
+            let packets = middy::codecs::expand(&command)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            use middi::messages::PrimitiveMessage;
+            use middy::messages::PrimitiveMessage;
             for (index, message) in packets.iter().enumerate() {
                 if let Err(cause) = self.value.send(transport::Packet::Bytes(
                     message
@@ -293,7 +293,7 @@ impl Output {
         self.value.close();
     }
 }
-#[pyclass(frozen, module = "middi.testing")]
+#[pyclass(frozen, module = "middy.testing")]
 struct OutputReport {
     value: testing::OutputReport,
 }

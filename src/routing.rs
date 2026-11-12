@@ -1,11 +1,11 @@
 //! Python routing surfaces; policies and admission are owned by the Rust core.
 use crate::files::{limit, os_error, Stream};
-use middi::routing;
+use middy::routing;
 use pyo3::exceptions::{PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use std::collections::BTreeMap;
 
-#[pyclass(frozen, module = "middi.routing")]
+#[pyclass(frozen, module = "middy.routing")]
 struct Route {
     value: routing::Route,
 }
@@ -31,8 +31,8 @@ impl Route {
                 source,
                 destination,
                 match encoding {
-                    "bytes" => middi::transport::Encoding::Bytes,
-                    "ump" => middi::transport::Encoding::Ump,
+                    "bytes" => middy::transport::Encoding::Bytes,
+                    "ump" => middy::transport::Encoding::Ump,
                     _ => return Err(PyValueError::new_err("encoding must be bytes or ump")),
                 },
                 channel,
@@ -59,8 +59,8 @@ impl Route {
     #[getter]
     fn encoding(&self) -> &str {
         match self.value.encoding() {
-            middi::transport::Encoding::Bytes => "bytes",
-            middi::transport::Encoding::Ump => "ump",
+            middy::transport::Encoding::Bytes => "bytes",
+            middy::transport::Encoding::Ump => "ump",
         }
     }
     #[getter]
@@ -85,7 +85,7 @@ impl Route {
     }
 }
 
-#[pyclass(module = "middi.routing")]
+#[pyclass(module = "middy.routing")]
 pub(crate) struct Router {
     pub(crate) value: routing::Router,
 }
@@ -139,7 +139,7 @@ impl Router {
     }
 }
 
-#[pyclass(frozen, module = "middi.routing")]
+#[pyclass(frozen, module = "middy.routing")]
 struct Delivery {
     value: routing::Delivery,
 }
@@ -166,7 +166,7 @@ impl Delivery {
         self.value.wire_bytes
     }
 }
-#[pyclass(frozen, module = "middi.routing")]
+#[pyclass(frozen, module = "middy.routing")]
 struct RouteReport {
     value: routing::RouteReport,
 }
@@ -185,7 +185,7 @@ impl RouteReport {
         self.value.capacity_rejections
     }
 }
-#[pyclass(frozen, module = "middi.routing")]
+#[pyclass(frozen, module = "middy.routing")]
 pub(crate) struct Report {
     pub(crate) value: routing::Report,
 }
@@ -248,7 +248,7 @@ impl Report {
             .collect()
     }
 }
-#[pyclass(frozen, module = "middi.routing")]
+#[pyclass(frozen, module = "middy.routing")]
 struct Preview {
     value: routing::Preview,
 }

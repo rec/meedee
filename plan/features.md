@@ -1,9 +1,9 @@
-# Suggested features and integrations for middi
+# Suggested features and integrations for middy
 
-Updated 2026-10-21 against middi and the sibling integration sources. Implemented
+Updated 2026-10-21 against middy and the sibling integration sources. Implemented
 foundations are identified below; remaining proposals are for discussion, not
 implementation commitments or a replacement for
-[the existing plan](middi.md). Priorities reflect practical usefulness to MIDI
+[the existing plan](middy.md). Priorities reflect practical usefulness to MIDI
 programmers and hobbyists, rather than a fixed release sequence.
 
 Additional work beyond the prompt
@@ -12,7 +12,7 @@ None.
 
 ## Existing capabilities and ownership
 
-middi already provides immutable Rust/Python messages, MIDI 1 and UMP codecs,
+middy already provides immutable Rust/Python messages, MIDI 1 and UMP codecs,
 fine controls and RPN/NRPN, MTS, General MIDI, selected universal messages, MPE
 helpers and tracking, time-code assembly, standard files, exact event archives,
 typed live I/O, recording/playback and MIDI-CI management. Build on these rather
@@ -26,7 +26,7 @@ The surrounding projects already supply much of the musical layer:
 | arpeg | Python/Rust pattern execution, rhythms, swing/groove, phrase capture, musical transformations, note scheduling and MIDI clock following | Musical decisions and owned-note policy remain in arpeg |
 | enveLFO | Python/Rust envelopes, LFOs, control graphs, delayed events and retained state | Hosts supply clocks, observation cadence and output delivery |
 | enge | Synthesis, sampling, modulation realization and audio voice execution | Hosts supply device I/O; audio lifetime is not MIDI note-state observation |
-| middi | MIDI protocols, device transport, files, timestamp identity and protocol diagnostics | No second composition, pattern, modulation or audio engine |
+| middy | MIDI protocols, device transport, files, timestamp identity and protocol diagnostics | No second composition, pattern, modulation or audio engine |
 
 uFor's [capability matrix](../../ufor/doc/capabilities.md) distinguishes definitions,
 reference behavior and host work. arpeg's [engine description](../../arpeg/README.md)
@@ -35,7 +35,7 @@ and [enveLFO bridge contract](../../arpeg/doc/envelfo.md), and enveLFO's
 available. These sibling-checkout links record the local review context; they
 are not runtime dependencies or assumptions about installed package locations.
 
-Keep middi's core MIDI behavior shared in Rust and exposed through Python.
+Keep middy's core MIDI behavior shared in Rust and exposed through Python.
 Integrations should be optional, with placement decided for each concrete use
 case. Do not make the standalone Rust library require Python or make ordinary
 Python MIDI use import every musical engine. No new mandatory dependencies or
@@ -43,11 +43,11 @@ workspace restructuring are proposed here.
 
 CLI, TUI, GUI and notebook tools may present the same underlying operations.
 Start with whichever interface serves a selected workflow; there is no need to
-build every interface. middi targets macOS, Windows and Linux; headless and
+build every interface. middy targets macOS, Windows and Linux; headless and
 interactive applications share the same core. No particular board or machine
 is a project requirement.
 
-## Independent middi features
+## Independent middy features
 
 ### 1. MIDI inspector and diagnostic monitor
 
@@ -71,7 +71,7 @@ and archive facilities.
 
 ### 2. Capture comparison and file validation
 
-**Implemented foundation:** `middi.inspection.inspect_file` and the shared Rust
+**Implemented foundation:** `middy.inspection.inspect_file` and the shared Rust
 `inspection::inspect` summarize archive/SMF/SYX/Clip files and report verified
 prefixes, completion, capture gaps/discontinuities, source/clock descriptors and
 opaque content. Same-format comparison now supports explicit source/clock maps,
@@ -187,7 +187,7 @@ for untimed sequences with explicit waits. Retain original bytes and report conf
 arbitrary manufacturer protocols or retry uncertain state-changing commands.
 
 Device descriptions and librarian organization belong to the integration work
-below. middi's independent contribution is transport and transfer execution,
+below. middy's independent contribution is transport and transfer execution,
 plus generic packet inspection. Successful byte delivery does not establish
 that an instrument accepted or completed a restore.
 
@@ -259,53 +259,53 @@ loss, scheduling lateness and process-tree resources. Include backend, mode and
 clock conditions. Round-trip loopback timing is not one-way physical latency;
 the latter needs additional instrumentation or a justified clock relationship.
 
-Reuse arpeg/enveLFO performance work for their engines. middi should measure
+Reuse arpeg/enveLFO performance work for their engines. middy should measure
 its transport and integration contribution. Any emitted MIDI needs explicitly
 selected destinations and bounded runs. This does not replace open Windows,
 Linux or physical-fault qualification.
 
 ## Integration work
 
-### A. Use middi for arpeg's MIDI device boundary
+### A. Use middy for arpeg's MIDI device boundary
 
-**Use:** Exercise middi with a substantial real musical application while
+**Use:** Exercise middy with a substantial real musical application while
 keeping arpeg's existing engine and interfaces.
 
 **Implemented in arpeg:** its [Rust live host](../../arpeg/crates/arpeg-midi/src/live.rs)
-and [Python MIDI host](../../arpeg/arpeg/midi.py) now use middi/libremidi.
+and [Python MIDI host](../../arpeg/arpeg/midi.py) now use middy/libremidi.
 The committed sources at arpeg `ccf219a` contain both migrations; the checkout
 also has unrelated ongoing edits, which this review does not qualify or change.
-See [migration evidence](../../arpeg/doc/performance.md#middi-host-migration-2026-10-18)
-and [Python migration evidence](../../arpeg/doc/performance.md#python-middi-host-migration-2026-10-19).
+See [migration evidence](../../arpeg/doc/performance.md#middy-host-migration-2026-10-18)
+and [Python migration evidence](../../arpeg/doc/performance.md#python-middy-host-migration-2026-10-19).
 There is no remaining midir/Mido host replacement to implement here.
 
 Preserve held/latched/history behavior, expression ordering, bounded admission,
 output pacing and owned-note cleanup. arpeg already follows MIDI clock, handles
 transport and schedules notes; the migration should not move those decisions
-into middi. Preserve its existing CLI/browser roles rather than recreate them.
+into middy. Preserve its existing CLI/browser roles rather than recreate them.
 
 The hosts use explicit host arrival time rather than relabel native timestamps.
 Their framing, bounded admission, loss, output pacing and failure policies remain
 arpeg responsibilities. MIDI 2/MPE expansion and additional physical/platform
 qualification are separate from the completed MIDI 1 transport migration.
 
-### B. Adapt middi events to uFor performance bindings and enge
+### B. Adapt middy events to uFor performance bindings and enge
 
 **Use:** Drive the same instrument from a MIDI file or live input using declared
 musical rules.
 
 **Implemented in enge:** at `8c93502`, `enge.performance.MidiConverter` executes
 uFor's channel, repeated-key release, tuning and named-controller bindings over
-decoded middi messages. [File/live dispatch](../../enge/enge/midi.py) uses the
+decoded middy messages. [File/live dispatch](../../enge/enge/midi.py) uses the
 same converters. See [the binding contract](../../enge/doc/performance-binding.md).
-The importer uses middi for synchronous PPQN SMF 0/1, with explicit rational
+The importer uses middy for synchronous PPQN SMF 0/1, with explicit rational
 timing/frame rounding. Caller-polled `LiveInput` assigns the caller's frame;
 it does not pretend native timestamps are audio frames. This is no longer a
-missing Mido-to-middi migration or a missing performance-binding converter.
+missing Mido-to-middy migration or a missing performance-binding converter.
 
 Channel numbering and conversions to exact frame boundaries need explicit tests.
 Rounding belongs at the destination boundary and should be reported where
-material. uFor semantic events and middi protocol/archive events retain different
+material. uFor semantic events and middy protocol/archive events retain different
 purposes; integration need not replace either representation. enge continues to
 own audio realization and voice retirement.
 
@@ -315,7 +315,7 @@ own audio realization and voice retirement.
 graphs rather than add another modulation engine.
 
 **Implemented in enveLFO:** at `b892317`, optional Python `envelfo.midi` and Rust
-`envelfo-midi` map observed named values to middi CC, fine-CC and RPN/NRPN Set
+`envelfo-midi` map observed named values to middy CC, fine-CC and RPN/NRPN Set
 messages. Explicit ranges, integer quantization, wire-byte admission, confirmed
 suppression and uncertain-send recovery are covered by
 [the MIDI integration contract](../../envelfo/doc/midi.md). The mapper owns no
@@ -337,7 +337,7 @@ encoding a MIDI message.
 **Use:** Design a tuning once, audition it and prepare an explicit transfer.
 
 **Implemented foundation:** the optional Python
-[`middi.tuning` bridge](ufor-tuning.md) converts individual notes and constructs
+[`middy.tuning` bridge](ufor-tuning.md) converts individual notes and constructs
 ordinary/banked per-key MTS messages with explicit preservation and error policy.
 It opens no ports. Bulk-dump construction and optional offline
 CLI exclusive SYX export accepts existing uFor Tuning JSON and Scala
@@ -345,7 +345,7 @@ sources. Exported files use the existing explicit transfer workflow; no second
 sending host is added. Optional enge audition remains separate integration work.
 
 Use uFor's existing tuning/scales and Scala conversion. Sample or resolve the
-selected pitches into middi's MTS values, reporting range limitations, unmapped
+selected pitches into middy's MTS values, reporting range limitations, unmapped
 keys and protocol quantization. Additional keyboard-map formats should be separate
 gap-driven additions to the appropriate owner, not a second Scala/tuning stack.
 
@@ -363,18 +363,18 @@ SysEx descriptions. Its [VL70m proof of concept](../../ufor/doc/vl70m-sysex-exam
 already supports lossless dump inspection and bounded relocation; a complete
 librarian score or universal device-description engine is not thereby implemented.
 Use those established contracts and identify actual missing pieces before adding
-schema or device codecs. middi can supply protocol execution and transfer reports.
+schema or device codecs. middy can supply protocol execution and transfer reports.
 
 Controller learn could propose a supported uFor binding; pickup and hardware
 feedback would need explicit runtime ownership and known/unknown target state.
 Do not implement a second curve evaluator, parameter model or modulation graph.
 Use enveLFO for applicable time-varying control execution.
 
-For file editing and looping, adapt selected middi records to uFor's existing
+For file editing and looping, adapt selected middy records to uFor's existing
 sequence planning where semantics fit. Its raw captures are inert, while semantic
 triggers have ownership and cleanup rules. Do not blindly send every raw record
 or infer sounding duration from a release. An editor/looper may be a future
-integration client, not a second middi composition or playback-planning engine.
+integration client, not a second middy composition or playback-planning engine.
 
 ## Interface opportunities
 
@@ -393,7 +393,7 @@ clock relationships, security and recovery, rather than part of these integratio
 | --- | --- | --- |
 | Implemented | Inspector, capture comparison/validation, note observation | Shared Rust/Python foundations and optional CLI |
 | Implemented in siblings | arpeg MIDI hosts, enge performance conversion/input, enveLFO MIDI mapping | Existing owners supply musical execution; do not duplicate them |
-| Implemented | uFor note conversion and bulk export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in middi |
+| Implemented | uFor note conversion and bulk export and explicit transfer/query tools | Source resolution stays in uFor; delivery stays in middy |
 | Implemented foundation | Static routing, polling topology, bounded diagnostics and in-memory transports | Recovery and ownership cleanup are not implied |
 | Qualification gates | macOS/Windows/Linux backends, physical behavior and resource budgets | Build/software-loopback evidence cannot replace platform/backend evidence |
 | Standards gates | Deferred CI Profiles/Property Exchange, selected machine control | Acquire normative documents before dependent protocol implementation |
