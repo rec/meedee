@@ -361,7 +361,6 @@ def test_translation_reports_precision_and_never_guesses_compound_context() -> N
         group=16,
         channel=16,
         program=128,
-        options=1,
         bank_msb=121,
         bank_lsb=3,
     )

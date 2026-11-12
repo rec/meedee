@@ -368,15 +368,6 @@ macro_rules! validate_channel_extra {
     (NoteOff, $v:expr) => {
         validate_note_attributes($v.attribute_type.unwrap(), $v.attribute_data.unwrap())
     };
-    (ProgramChange, $v:expr) => {
-        if $v.options == Some(0) && ($v.bank_msb != Some(0) || $v.bank_lsb != Some(0)) {
-            Err(ValueError(
-                "bank bytes must be zero without bank-valid option".into(),
-            ))
-        } else {
-            Ok(())
-        }
-    };
 }
 fn validate_note_attributes(kind: u8, data: u16) -> Result<(), ValueError> {
     if kind == 0 && data != 0 {
@@ -400,11 +391,119 @@ channel_values! {
         note: u8 => with_note = (0,127,0,127) => (note,note),
         pressure: u32 => with_pressure = (0,127,0,4294967295) => (0,0)
     } {};
-    ProgramChange(program) {
-        program: u8 => with_program = (1,128,1,128) => (program,program)
-    } { options: u8 => with_options = 1, bank_msb: u8 => with_bank_msb = 127, bank_lsb: u8 => with_bank_lsb = 127 };
     ChannelPressure() { pressure: u32 => with_pressure = (0,127,0,4294967295) => (0,0) } {};
     PitchBend() { value: i32 => with_value = (-8192,8191,-2147483648,2147483647) => (0,0) } {};
+}
+
+#[derive(Clone, Debug)]
+pub struct ProgramChange {
+    metadata: Option<Box<Metadata>>,
+    format: ChannelFormat,
+    channel: Option<u8>,
+    program: u8,
+    bank: Option<(u8, u8)>,
+}
+value_metadata!(ProgramChange {
+    format,
+    channel,
+    program,
+    bank
+});
+impl ProgramChange {
+    pub fn new(program: i64) -> Result<Self, ValueError> {
+        Ok(Self {
+            metadata: None,
+            format: ChannelFormat::Midi1 { group: None },
+            channel: None,
+            program: bounded(program, "program", 1, 128)? as u8,
+            bank: None,
+        })
+    }
+    pub fn new_midi2(program: i64) -> Result<Self, ValueError> {
+        let mut value = Self::new(program)?;
+        value.format = ChannelFormat::Midi2 { group: 1 };
+        Ok(value)
+    }
+    pub fn program(&self) -> u8 {
+        self.program
+    }
+    pub fn channel(&self) -> Option<u8> {
+        self.channel
+    }
+    pub fn bank_msb(&self) -> Option<u8> {
+        self.bank.map(|v| v.0)
+    }
+    pub fn bank_lsb(&self) -> Option<u8> {
+        self.bank.map(|v| v.1)
+    }
+    pub fn version(&self) -> u8 {
+        match self.format {
+            ChannelFormat::Midi1 { .. } => 1,
+            ChannelFormat::Midi2 { .. } => 2,
+        }
+    }
+    pub fn group(&self) -> Option<u8> {
+        match self.format {
+            ChannelFormat::Midi1 { group } => group,
+            ChannelFormat::Midi2 { group } => Some(group),
+        }
+    }
+    pub fn with_program(mut self, program: i64) -> Result<Self, ValueError> {
+        self.program = bounded(program, "program", 1, 128)? as u8;
+        Ok(self)
+    }
+    pub fn with_bank(mut self, msb: i64, lsb: i64) -> Result<Self, ValueError> {
+        self.bank = Some((
+            bounded(msb, "bank_msb", 0, 127)? as u8,
+            bounded(lsb, "bank_lsb", 0, 127)? as u8,
+        ));
+        Ok(self)
+    }
+    pub fn without_bank(mut self) -> Self {
+        self.bank = None;
+        self
+    }
+    pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
+        self.channel = Some(bounded(channel, "channel", 1, 16)? as u8);
+        Ok(self)
+    }
+    pub fn without_channel(mut self) -> Self {
+        self.channel = None;
+        self
+    }
+    pub fn with_group(mut self, group: i64) -> Result<Self, ValueError> {
+        let group = bounded(group, "group", 1, 16)? as u8;
+        self.format = match self.format {
+            ChannelFormat::Midi1 { .. } => ChannelFormat::Midi1 { group: Some(group) },
+            ChannelFormat::Midi2 { .. } => ChannelFormat::Midi2 { group },
+        };
+        Ok(self)
+    }
+    pub fn without_group(mut self) -> Result<Self, ValueError> {
+        if self.version() != 1 {
+            return Err(ValueError("MIDI 2 requires a group".into()));
+        }
+        self.format = ChannelFormat::Midi1 { group: None };
+        Ok(self)
+    }
+    pub(crate) fn resolved_channel(&self) -> Result<u8, ValueError> {
+        self.channel
+            .ok_or_else(|| ValueError("message channel is unassigned".into()))
+    }
+    pub(crate) fn midi1_channel(&self) -> Result<u8, ValueError> {
+        if self.version() != 1 {
+            return Err(ValueError(
+                "MIDI 2 requires UMP encoding; convert explicitly for MIDI 1".into(),
+            ));
+        }
+        if self.bank.is_some() {
+            return Err(ValueError(
+                "banked ProgramChange requires command expansion".into(),
+            ));
+        }
+        require_ungrouped(self.group())?;
+        self.resolved_channel()
+    }
 }
 
 /// A controller value with an explicit wire resolution.
@@ -920,6 +1019,7 @@ impl AnyMessage {
             return match self {
                 Self::SysEx(v) => v.data().len().max(1).div_ceil(6) * 8,
                 Self::ControlChange(v) if v.resolution() == 14 => 8,
+                Self::ProgramChange(v) if v.bank_msb().is_some() => 12,
                 _ => 4,
             };
         }
@@ -932,6 +1032,7 @@ impl AnyMessage {
             | Self::ControlChange(_)
             | Self::PitchBend(_)
             | Self::SongPosition(_) => 3,
+            Self::ProgramChange(v) if v.bank_msb().is_some() => 8,
             Self::ProgramChange(_)
             | Self::ChannelPressure(_)
             | Self::QuarterFrame(_)
@@ -955,14 +1056,14 @@ pub enum AnyCommand {
     ControlChange(ControlChange),
     ParameterSet(ParameterSet),
     ParameterStep(ParameterStep),
-    BankProgramSelect(crate::gm::BankProgramSelect),
+    ProgramChange(ProgramChange),
     ZoneConfiguration(crate::mpe::ZoneConfiguration),
 }
 enum_metadata!(AnyCommand {
     ControlChange,
     ParameterSet,
     ParameterStep,
-    BankProgramSelect,
+    ProgramChange,
     ZoneConfiguration
 });
 impl AnyCommand {
@@ -971,7 +1072,7 @@ impl AnyCommand {
             Self::ControlChange(v) => v.channel(),
             Self::ParameterSet(v) => v.channel(),
             Self::ParameterStep(v) => v.channel(),
-            Self::BankProgramSelect(v) => v.channel(),
+            Self::ProgramChange(v) => v.channel(),
             Self::ZoneConfiguration(v) => Some(v.manager_channel()),
         }
     }
@@ -980,7 +1081,7 @@ impl AnyCommand {
             Self::ControlChange(v) => Ok(Self::ControlChange(v.with_channel(channel)?)),
             Self::ParameterSet(v) => Ok(Self::ParameterSet(v.with_channel(channel)?)),
             Self::ParameterStep(v) => Ok(Self::ParameterStep(v.with_channel(channel)?)),
-            Self::BankProgramSelect(v) => Ok(Self::BankProgramSelect(v.with_channel(channel)?)),
+            Self::ProgramChange(v) => Ok(Self::ProgramChange(v.with_channel(channel)?)),
             Self::ZoneConfiguration(v) => Ok(Self::ZoneConfiguration(v.with_channel(channel)?)),
         }
     }
@@ -989,7 +1090,7 @@ impl AnyCommand {
             Self::ControlChange(v) => v.group(),
             Self::ParameterSet(v) => v.group(),
             Self::ParameterStep(v) => v.group(),
-            Self::BankProgramSelect(v) => v.group(),
+            Self::ProgramChange(v) => v.group(),
             Self::ZoneConfiguration(v) => v.group(),
         }
     }
@@ -998,7 +1099,7 @@ impl AnyCommand {
             Self::ControlChange(v) => Ok(Self::ControlChange(v.with_group(group)?)),
             Self::ParameterSet(v) => Ok(Self::ParameterSet(v.with_group(group)?)),
             Self::ParameterStep(v) => Ok(Self::ParameterStep(v.with_group(group)?)),
-            Self::BankProgramSelect(v) => Ok(Self::BankProgramSelect(v.with_group(group)?)),
+            Self::ProgramChange(v) => Ok(Self::ProgramChange(v.with_group(group)?)),
             Self::ZoneConfiguration(v) => Ok(Self::ZoneConfiguration(v.with_group(group)?)),
         }
     }

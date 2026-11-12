@@ -108,7 +108,7 @@ impl Record {
                     AnyCommand::ControlChange(v) => v.channel(),
                     AnyCommand::ParameterSet(v) => v.channel(),
                     AnyCommand::ParameterStep(v) => v.channel(),
-                    AnyCommand::BankProgramSelect(v) => v.channel(),
+                    AnyCommand::ProgramChange(v) => v.channel(),
                     AnyCommand::ZoneConfiguration(v) => Some(v.manager_channel()),
                 },
             },

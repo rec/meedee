@@ -10,7 +10,7 @@ from time import monotonic
 
 import pytest
 
-from meedee import codecs, events, gm, messages, midi, testing
+from meedee import codecs, events, messages, midi, testing
 
 
 class NativeConnection:
@@ -347,7 +347,7 @@ def test_two_stage_connection_and_close_are_idempotent(
 
 
 def test_bank_selection_inherits_output_channel(transport: NativeConnection) -> None:
-    command = gm.BankProgramSelect(12, channel=7)
+    command = messages.ProgramChange(12, channel=7, bank_msb=0, bank_lsb=0)
     with midi.Output(channel=3) as out:
         out.send(command)
     assert command.channel == 7

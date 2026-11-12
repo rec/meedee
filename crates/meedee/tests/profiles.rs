@@ -17,10 +17,10 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
             .map(|v| u8::from_str_radix(v, 16).unwrap())
             .collect();
         let actual = match name {
-            "BankProgramSelect" => codecs::expand(
-                &gm::BankProgramSelect::new(v[3])
-                    .and_then(|m| m.with_bank_msb(v[1]))
-                    .and_then(|m| m.with_bank_lsb(v[2]))
+            "ProgramChange" => codecs::expand(
+                &meedee::messages::ProgramChange::new(v[3])
+                    .and_then(|m| m.with_bank(0, 0))
+                    .and_then(|m| m.with_bank(v[1], v[2]))
                     .and_then(|m| m.with_channel(v[0]))
                     .unwrap(),
             )
@@ -80,9 +80,9 @@ fn independent_vectors_preserve_expansion_order_and_primitive_wire_layouts() {
             }
         }
     }
-    let command = gm::BankProgramSelect::new(1)
-        .and_then(|m| m.with_bank_msb(0))
-        .and_then(|m| m.with_bank_lsb(0))
+    let command = meedee::messages::ProgramChange::new(1)
+        .and_then(|m| m.with_bank(0, 0))
+        .and_then(|m| m.with_bank(0, 0))
         .and_then(|m| m.with_channel(1))
         .unwrap();
     assert!(matches!(

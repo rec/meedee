@@ -464,10 +464,10 @@ fn compound_send_stops_at_each_failed_boundary_and_reports_known_progress() {
                 .and_then(|m| m.with_channel(1))
                 .unwrap(),
         ),
-        meedee::messages::AnyCommand::BankProgramSelect(
-            meedee::gm::BankProgramSelect::new(128)
-                .and_then(|m| m.with_bank_msb(121))
-                .and_then(|m| m.with_bank_lsb(3))
+        meedee::messages::AnyCommand::ProgramChange(
+            meedee::messages::ProgramChange::new(128)
+                .and_then(|m| m.with_bank(0, 0))
+                .and_then(|m| m.with_bank(121, 3))
                 .and_then(|m| m.with_channel(1))
                 .unwrap(),
         ),

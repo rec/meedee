@@ -616,8 +616,8 @@ Pan positions/exclusion-group synthesis rules are not implemented by these name
 lookups. `GM1_DRUM_CHANNEL=10` is a convention, not a restriction on GM2 channels;
 GM2 permits melodic channel 10 and rhythm channel 11, and optionally others.
 
-`BankProgramSelect(channel, bank_msb, bank_lsb, program)` is a semantic command
-in meedee.gm. Both bank values are mandatory, either explicitly chosen by the
+`ProgramChange(program, channel=None, *, bank_msb=None, bank_lsb=None)` accepts
+either both bank values or neither. A bank pair is explicitly chosen by the
 caller or copied from a GM2 entry. It expands into CC0, CC32, ProgramChange in
 that order. It never chooses a GM mode or inherits an unobserved bank. GM1
 callers can send the existing ProgramChange primitive or deliberately specify
@@ -634,7 +634,7 @@ Rust `Command.expand()` and `codecs::expand()` return
 `Result<Vec<AnyMessage>, ValueError>`. An unassigned channel must be resolved
 before expansion. Primitive encoding likewise returns `Result<Vec<u8>, ValueError>`. Python expand returns
 a fresh list of primitive Messages; existing CC commands produce the same CC
-objects and bytes. AnyCommand additionally carries BankProgramSelect and
+objects and bytes. AnyCommand additionally carries banked MIDI 1 ProgramChange and
 mpe::ZoneConfiguration. `send` accepts both types through the same
 in-process owner-thread operation or isolated worker protocol. Serialization,
 known completed-prefix/unknown-progress reporting and no retries are unchanged;
@@ -833,8 +833,9 @@ at zero. Relative controllers are signed two's-complement integers. Velocity and
 attribute data retain 16 bits; pressure and absolute controllers retain 32 bits.
 Attribute types 0–3 are represented; type 0 requires zero attribute data. Reserved
 registered per-note controller IDs are rejected by typed values for this baseline.
-Per-note management flags use protocol bits (1=detach, 2=reset). Program options
-use bit 0=bank valid; without it both bank bytes must be zero. A MIDI 2 NoteOn
+Per-note management flags use protocol bits (1=detach, 2=reset). Program bank-valid
+bit 0 is derived from the optional bank pair; absent banks encode as zero bytes.
+A MIDI 2 NoteOn
 velocity of zero is a sounding-note event, unlike MIDI 1 NoteOn zero.
 
 | Packet family | Representation and scope |
@@ -1685,8 +1686,7 @@ The existing timestamped sources use the same connection.
 MIDI 1 channel-message and compound-command constructors take positional payload
 fields, then `channel=None`. NoteOn velocity defaults to 90; NoteOff velocity,
 pressure and pitch bend default to zero; RPN/NRPN resolution defaults to 14.
-`gm.BankProgramSelect(program, bank_msb=0, bank_lsb=0, channel=None)` also inherits
-the output channel.
+`ProgramChange` also inherits the output channel, with optional paired bank bytes.
 Controller/value and parameter/value choices remain explicit. MIDI 1 system
 payloads are positional. Decoded values always carry explicit channels. An
 unresolved message cannot be encoded or serialized into an archive until

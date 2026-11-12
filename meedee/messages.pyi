@@ -227,7 +227,6 @@ class ProgramChange(Message):
         *,
         version: Literal[1, 2] = 1,
         group: int | None = None,
-        options: int | None = None,
         bank_msb: int | None = None,
         bank_lsb: int | None = None,
     ) -> None: ...
@@ -235,8 +234,6 @@ class ProgramChange(Message):
     def version(self) -> Literal[1, 2]: ...
     @property
     def group(self) -> int | None: ...
-    @property
-    def options(self) -> int | None: ...
     @property
     def bank_msb(self) -> int | None: ...
     @property
@@ -252,7 +249,6 @@ class ProgramChange(Message):
         program: int = ...,
         version: Literal[1, 2] = ...,
         group: int | None = ...,
-        options: int | None = ...,
         bank_msb: int | None = ...,
         bank_lsb: int | None = ...,
         timestamp: events.Timestamp | None = ...,

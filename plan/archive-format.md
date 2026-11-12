@@ -86,7 +86,7 @@ Command fields:
 | 5 | ParameterStep (rpn, -1) | channel, parameter |
 | 6 | ParameterStep (nrpn, +1) | channel, parameter |
 | 7 | ParameterStep (nrpn, -1) | channel, parameter |
-| 8 | BankProgramSelect | channel, bank_msb, bank_lsb, program |
+| 8 | Banked MIDI 1 ProgramChange | channel, bank_msb, bank_lsb, program |
 | 9 | ZoneConfiguration | manager_channel, members |
 
 Command fields use public musical numbering and their normal checked ranges;

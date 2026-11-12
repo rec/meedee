@@ -57,7 +57,7 @@ pub use events::{
     ReceivedPacket, SourceSpan, StreamDiagnostic, Timestamp,
 };
 pub use file_io::{Reader, Writer};
-pub use gm::{BankProgram, BankProgramSelect, DrumKit, Gm1On, Gm2On, GmOff, Percussion, Program};
+pub use gm::{BankProgram, DrumKit, Gm1On, Gm2On, GmOff, Percussion, Program};
 pub use inspection::{ComparisonReport, Monitor, MonitorReport};
 pub use messages::{
     ActiveSensing, AnyCommand, AnyMessage, Beats, ChannelPressure, Command, Continue,

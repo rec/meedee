@@ -1,5 +1,5 @@
 //! General MIDI profiles. Opening a port never selects a mode or bank.
-use crate::messages::{AnyMessage, Command, ControlChange, ProgramChange, ValueError};
+use crate::messages::{ControlChange, ProgramChange, ValueError};
 
 #[path = "gm_extensions.rs"]
 mod extensions;
@@ -7,99 +7,6 @@ pub use extensions::{
     chorus_parameter, reverb_parameter, ControllerDestination, GlobalParameterControl,
     KeyBasedControl,
 };
-
-#[derive(Clone, Debug)]
-pub struct BankProgramSelect {
-    metadata: Option<Box<crate::messages::Metadata>>,
-    group: Option<u8>,
-    channel: Option<u8>,
-    bank_msb: u8,
-    bank_lsb: u8,
-    program: u8,
-}
-impl BankProgramSelect {
-    crate::messages::group_methods!();
-    pub fn new(program: i64) -> Result<Self, ValueError> {
-        let program = ProgramChange::new(program)?.program();
-        Ok(Self {
-            metadata: None,
-            group: None,
-            channel: None,
-            bank_msb: 0,
-            bank_lsb: 0,
-            program,
-        })
-    }
-    pub fn with_channel(mut self, channel: i64) -> Result<Self, ValueError> {
-        self.channel = ProgramChange::new(self.program.into())?
-            .with_channel(channel)?
-            .channel();
-        Ok(self)
-    }
-    pub fn without_channel(mut self) -> Self {
-        self.channel = None;
-        self
-    }
-    pub fn with_bank_msb(mut self, value: i64) -> Result<Self, ValueError> {
-        self.bank_msb = ControlChange::new(0, value)?.value() as u8;
-        Ok(self)
-    }
-    pub fn with_bank_lsb(mut self, value: i64) -> Result<Self, ValueError> {
-        self.bank_lsb = ControlChange::new(32, value)?.value() as u8;
-        Ok(self)
-    }
-    pub fn with_program(mut self, program: i64) -> Result<Self, ValueError> {
-        self.program = ProgramChange::new(program)?.program();
-        Ok(self)
-    }
-    pub fn channel(&self) -> Option<u8> {
-        self.channel
-    }
-    pub fn bank_msb(&self) -> u8 {
-        self.bank_msb
-    }
-    pub fn bank_lsb(&self) -> u8 {
-        self.bank_lsb
-    }
-    pub fn program(&self) -> u8 {
-        self.program
-    }
-}
-crate::messages::value_metadata!(BankProgramSelect {
-    group,
-    channel,
-    bank_msb,
-    bank_lsb,
-    program
-});
-impl Command for BankProgramSelect {
-    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
-        let channel = self
-            .channel
-            .ok_or_else(|| ValueError("message channel is unassigned".into()))?;
-        crate::messages::inherit_command(
-            self,
-            self.group(),
-            vec![
-                AnyMessage::ControlChange(
-                    ControlChange::new(0, self.bank_msb.into())
-                        .and_then(|m| m.with_channel(channel.into()))
-                        .expect("validated bank"),
-                ),
-                AnyMessage::ControlChange(
-                    ControlChange::new(32, self.bank_lsb.into())
-                        .and_then(|m| m.with_channel(channel.into()))
-                        .expect("validated bank"),
-                ),
-                AnyMessage::ProgramChange(
-                    ProgramChange::new(self.program.into())
-                        .and_then(|m| m.with_channel(channel.into()))
-                        .expect("validated program"),
-                ),
-            ],
-        )
-    }
-}
 
 /// A GM1 program has no standardized bank address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

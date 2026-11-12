@@ -123,14 +123,15 @@ pub fn to_midi2(message: &AnyMessage, group: i64) -> Result<Translation<AnyMessa
                     m.with_value(i64::from(up((v.value() + 8192) as u32, 14, 32)) - 2147483648)
                 })?,
         ),
-        AnyMessage::ProgramChange(v) => AnyMessage::ProgramChange(
-            crate::messages::ProgramChange::new_midi2(v.program().into())
+        AnyMessage::ProgramChange(v) => {
+            let mut value = crate::messages::ProgramChange::new_midi2(v.program().into())
                 .and_then(|m| m.with_group(group))
-                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))
-                .and_then(|m| m.with_options(0))
-                .and_then(|m| m.with_bank_msb(0))
-                .and_then(|m| m.with_bank_lsb(0))?,
-        ),
+                .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?;
+            if let (Some(msb), Some(lsb)) = (v.bank_msb(), v.bank_lsb()) {
+                value = value.with_bank(msb.into(), lsb.into())?;
+            }
+            AnyMessage::ProgramChange(value)
+        }
         AnyMessage::ControlChange(v) => {
             if matches!(v.controller(), 0 | 6 | 32 | 38 | 88 | 96..=101) {
                 return Ok(report(
@@ -311,7 +312,7 @@ pub fn to_midi1(
         }
         ProgramChange(v) => {
             let mut output = vec![];
-            if v.options().unwrap() == 1 {
+            if v.bank_msb().is_some() {
                 output.push(AnyMessage::ControlChange(
                     m::ControlChange::new(0, v.bank_msb().unwrap().into())
                         .and_then(|m| m.with_channel(v.resolved_channel()?.into()))?,

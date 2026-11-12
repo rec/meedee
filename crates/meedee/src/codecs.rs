@@ -433,9 +433,29 @@ impl Command for AnyCommand {
             Self::ControlChange(command) => command.expand(),
             Self::ParameterSet(command) => command.expand(),
             Self::ParameterStep(command) => command.expand(),
-            Self::BankProgramSelect(command) => command.expand(),
+            Self::ProgramChange(command) => command.expand(),
             Self::ZoneConfiguration(command) => command.expand(),
         }
+    }
+}
+
+impl Command for ProgramChange {
+    fn expand(&self) -> Result<Vec<AnyMessage>, ValueError> {
+        if self.version() != 1 {
+            return Err(ValueError("MIDI 2 program changes use UMP encoding".into()));
+        }
+        let channel = self.resolved_channel()?;
+        let mut values = Vec::new();
+        if let (Some(msb), Some(lsb)) = (self.bank_msb(), self.bank_lsb()) {
+            values.extend([
+                AnyMessage::ControlChange(cc(channel, 0, msb)),
+                AnyMessage::ControlChange(cc(channel, 32, lsb)),
+            ]);
+        }
+        values.push(AnyMessage::ProgramChange(
+            ProgramChange::new(self.program().into())?.with_channel(channel.into())?,
+        ));
+        inherit_command(self, self.group(), values)
     }
 }
 

@@ -4,7 +4,6 @@ __all__: list[str] = [
     "ActiveSensing",
     "Backend",
     "BankProgram",
-    "BankProgramSelect",
     "CallbackThreadError",
     "Cancellation",
     "CapabilityError",
@@ -177,7 +176,6 @@ from .events import (
 from .file_io import Reader, Writer
 from .gm import (
     BankProgram,
-    BankProgramSelect,
     DrumKit,
     Gm1On,
     Gm2On,

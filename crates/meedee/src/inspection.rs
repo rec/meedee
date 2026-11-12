@@ -423,7 +423,7 @@ fn command_kind(value: &messages::AnyCommand) -> &'static str {
         ControlChange(_) => "ControlChange",
         ParameterSet(_) => "ParameterSet",
         ParameterStep(_) => "ParameterStep",
-        BankProgramSelect(_) => "BankProgramSelect",
+        ProgramChange(_) => "ProgramChange",
         ZoneConfiguration(_) => "ZoneConfiguration",
     }
 }

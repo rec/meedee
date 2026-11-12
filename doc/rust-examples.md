@@ -661,6 +661,17 @@ continues; terminal failures return an error with progress retained in
 open. Use `|_| Ok(())` when only the report is needed. The final boolean enables
 host delivery metrics. The library retains no payload history or formatted text.
 
+## Select a program and bank
+
+```rust
+use meedee::{Output, ProgramChange};
+
+let mut out = Output::new();
+out.send(ProgramChange::new(34)?)?;
+out.send(ProgramChange::new(34)?.with_bank(0, 8)?)?;
+out.close()?;
+```
+
 ## Send controller values
 
 ```rust

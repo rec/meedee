@@ -898,7 +898,7 @@ channel_encoding! {
     NoteOff(self) => (8, u32::from(self.note()) << 8 | u32::from(self.attribute_type().unwrap()), u32::from(self.velocity()) << 16 | u32::from(self.attribute_data().unwrap()));
     PolyPressure(self) => (10, u32::from(self.note()) << 8, self.pressure());
     ControlChange(self) => (11, u32::from(self.controller()) << 8, self.value());
-    ProgramChange(self) => (12, u32::from(self.options().unwrap()), u32::from(self.program() - 1) << 24 | u32::from(self.bank_msb().unwrap()) << 8 | u32::from(self.bank_lsb().unwrap()));
+    ProgramChange(self) => (12, u32::from(self.bank_msb().is_some()), u32::from(self.program() - 1) << 24 | u32::from(self.bank_msb().unwrap_or(0)) << 8 | u32::from(self.bank_lsb().unwrap_or(0)));
     ChannelPressure(self) => (13, 0, self.pressure());
     PitchBend(self) => (14, 0, (i64::from(self.value()) + 2147483648) as u32);
 }
@@ -940,14 +940,16 @@ fn channel_decode(words: &[u32]) -> Result<Option<AnyMessage>, ValueError> {
                 .with_group(group)?
                 .with_channel(channel)?,
         ),
-        12 => AnyMessage::ProgramChange(
-            m::ProgramChange::new_midi2(i64::from((words[1] >> 24) & 127) + 1)?
+        12 => {
+            let mut value = m::ProgramChange::new_midi2(i64::from((words[1] >> 24) & 127) + 1)?
                 .with_group(group)?
-                .with_channel(channel)?
-                .with_options(i64::from(words[0] & 1))?
-                .with_bank_msb(i64::from((words[1] >> 8) & 127))?
-                .with_bank_lsb(i64::from(words[1] & 127))?,
-        ),
+                .with_channel(channel)?;
+            if words[0] & 1 != 0 {
+                value =
+                    value.with_bank(i64::from((words[1] >> 8) & 127), i64::from(words[1] & 127))?;
+            }
+            AnyMessage::ProgramChange(value)
+        }
         13 => AnyMessage::ChannelPressure(
             m::ChannelPressure::new_midi2()?
                 .with_group(group)?

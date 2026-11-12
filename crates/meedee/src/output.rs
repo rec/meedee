@@ -1052,11 +1052,6 @@ midi1_values!(
 );
 macro_rules! command_values {($($name:ident),*)=>{$(impl From<messages::$name> for OutputValue {fn from(v:messages::$name)->Self {AnyCommand::$name(v).into()}})*};}
 command_values!(ParameterSet, ParameterStep);
-impl From<crate::gm::BankProgramSelect> for OutputValue {
-    fn from(v: crate::gm::BankProgramSelect) -> Self {
-        AnyCommand::BankProgramSelect(v).into()
-    }
-}
 impl From<crate::mpe::ZoneConfiguration> for OutputValue {
     fn from(v: crate::mpe::ZoneConfiguration) -> Self {
         AnyCommand::ZoneConfiguration(v).into()

@@ -79,9 +79,7 @@ fn independent_packets_cover_all_families_and_preserve_native_widths() {
             &meedee::messages::ProgramChange::new_midi2(128)
                 .and_then(|m| m.with_group(16))
                 .and_then(|m| m.with_channel(16))
-                .and_then(|m| m.with_options(1))
-                .and_then(|m| m.with_bank_msb(121))
-                .and_then(|m| m.with_bank_lsb(3))
+                .and_then(|m| m.with_bank(121, 3))
                 .unwrap()
         )
         .unwrap(),
@@ -395,9 +393,7 @@ fn translation_preserves_centers_and_requires_permission_for_precision_loss() {
         meedee::messages::ProgramChange::new_midi2(128)
             .and_then(|m| m.with_group(1))
             .and_then(|m| m.with_channel(16))
-            .and_then(|m| m.with_options(1))
-            .and_then(|m| m.with_bank_msb(121))
-            .and_then(|m| m.with_bank_lsb(3))
+            .and_then(|m| m.with_bank(121, 3))
             .unwrap(),
     );
     assert_eq!(

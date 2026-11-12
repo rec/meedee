@@ -15,7 +15,7 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
         / "crates/meedee/tests/fixtures/profiles.txt"
     )
     modules = {
-        "BankProgramSelect": gm,
+        "ProgramChange": messages,
         "ZoneConfiguration": mpe,
         "Gm1On": gm,
         "GmOff": gm,
@@ -35,7 +35,7 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
         values: dict[str, object] = dict(
             zip(
                 ["channel", "bank_msb", "bank_lsb", "program"]
-                if name == "BankProgramSelect"
+                if name == "ProgramChange"
                 else [
                     n for n in inspect.signature(constructor).parameters if n != "group"
                 ],
@@ -51,12 +51,14 @@ def profile_vectors() -> Iterator[tuple[object, bytes]]:
 def test_shared_vectors_and_explicit_interpretation_preserve_raw_messages() -> None:
     for v, b in profile_vectors():
         assert isinstance(v, messages.Message)
-        if isinstance(v, (gm.BankProgramSelect, mpe.ZoneConfiguration)):
+        if isinstance(v, (messages.ProgramChange, mpe.ZoneConfiguration)):
             primitives = codecs.expand(v)
             assert b"".join(codecs.encode(p) for p in primitives) == b
-            if isinstance(v, gm.BankProgramSelect):
+            if isinstance(v, messages.ProgramChange):
                 assert isinstance(primitives[-1], messages.ProgramChange)
-            with pytest.raises(TypeError):
+            with pytest.raises(
+                ValueError if isinstance(v, messages.ProgramChange) else TypeError
+            ):
                 codecs.encode(v)
         else:
             assert codecs.encode(v) == b
@@ -80,6 +82,8 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
     None
 ):
     for value, _ in profile_vectors():
+        if isinstance(value, messages.ProgramChange):
+            continue  # The banked message contract is covered in test_messages.
         cls = getattr(
             {
                 "meedee.gm": gm,
@@ -102,7 +106,7 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
         for f in fields:
             assert inspect.signature(cls).parameters[f].kind == (
                 inspect.Parameter.POSITIONAL_OR_KEYWORD
-                if cls is gm.BankProgramSelect and f != "group"
+                if cls is messages.ProgramChange and f != "group"
                 else inspect.Parameter.KEYWORD_ONLY
             )
             with pytest.raises(AttributeError):
@@ -120,8 +124,8 @@ def test_native_profile_values_are_frozen_strict_and_support_checked_replacement
     ):
         with pytest.raises(ValueError):
             mpe.ZoneConfiguration(**kwargs)
-    match gm.BankProgramSelect(channel=16, bank_msb=121, bank_lsb=3, program=128):
-        case gm.BankProgramSelect(128, 121, 3, 16):
+    match messages.ProgramChange(channel=16, bank_msb=121, bank_lsb=3, program=128):
+        case messages.ProgramChange(128, 16, bank_msb=121, bank_lsb=3):
             pass
         case _:
             pytest.fail("command pattern did not match")

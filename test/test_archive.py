@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from meedee import archive, events, gm, messages, midi, mpe
+from meedee import archive, events, messages, midi, mpe
 
 
 def values() -> list[object]:
@@ -29,7 +29,7 @@ def values() -> list[object]:
         messages.ParameterStep(1, -1, channel=1),
         messages.ParameterStep(2, channel=1, family="nrpn"),
         messages.ParameterStep(3, -1, channel=1, family="nrpn"),
-        gm.BankProgramSelect(channel=1, bank_msb=121, bank_lsb=0, program=128),
+        messages.ProgramChange(channel=1, bank_msb=121, bank_lsb=0, program=128),
         mpe.ZoneConfiguration(manager_channel=1, members=15),
     ]
     return [

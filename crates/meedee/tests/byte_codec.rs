@@ -225,7 +225,9 @@ fn commands_resolve_channels_before_expansion_and_builders_validate_ranges() {
     assert!(command.clone().with_resolution(8).is_err());
     let messages = command.with_channel(2).unwrap().expand().unwrap();
     assert!(messages.iter().all(|m| m.encode().unwrap()[0] == 0xb1));
-    let bank = meedee::gm::BankProgramSelect::new(34).unwrap();
+    let bank = meedee::messages::ProgramChange::new(34)
+        .and_then(|m| m.with_bank(0, 0))
+        .unwrap();
     assert!(bank.expand().is_err());
     let bytes: Vec<_> = bank
         .with_channel(2)

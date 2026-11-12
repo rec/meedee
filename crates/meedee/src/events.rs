@@ -160,6 +160,9 @@ crate::messages::enum_metadata!(Payload {
 impl From<AnyMessage> for Payload {
     fn from(value: AnyMessage) -> Self {
         match value {
+            AnyMessage::ProgramChange(v) if v.version() == 1 && v.bank_msb().is_some() => {
+                Self::Command(AnyCommand::ProgramChange(v))
+            }
             AnyMessage::ControlChange(v) if v.version() == 1 && v.resolution() == 14 => {
                 Self::Command(AnyCommand::ControlChange(v))
             }
@@ -216,7 +219,7 @@ macro_rules! command_payloads {
     })* };
 }
 command_payloads!(messages: ParameterSet,ParameterStep);
-command_payloads!(gm: BankProgramSelect);
+
 command_payloads!(mpe: ZoneConfiguration);
 macro_rules! packet_payloads {
     ($($name:ident => $variant:ident),*) => { $(impl From<crate::ump::$name> for Payload {
@@ -249,6 +252,20 @@ impl Payload {
     }
     pub fn validate(&self) -> Result<(), crate::messages::ValueError> {
         match self {
+            Self::Message(AnyMessage::ProgramChange(v))
+                if v.version() == 1 && v.bank_msb().is_some() =>
+            {
+                Err(crate::messages::ValueError(
+                    "banked MIDI 1 ProgramChange must be classified as a command".into(),
+                ))
+            }
+            Self::Command(AnyCommand::ProgramChange(v))
+                if v.version() != 1 || v.bank_msb().is_none() =>
+            {
+                Err(crate::messages::ValueError(
+                    "program command requires MIDI 1 with a bank".into(),
+                ))
+            }
             Self::Message(AnyMessage::ControlChange(v))
                 if v.version() == 1 && v.resolution() == 14 =>
             {

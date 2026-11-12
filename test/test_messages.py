@@ -9,6 +9,36 @@ from native import meedee_messages
 from meedee import messages
 
 
+def test_program_changes_preserve_bank_pairs_and_derive_midi2_bank_validity() -> None:
+    import pytest
+
+    from meedee import codecs, events, ump
+
+    plain = messages.ProgramChange(34, 2)
+    banked = plain.replace(bank_msb=0, bank_lsb=8)
+    assert plain.bank_msb is None and plain.bank_lsb is None
+    assert banked != plain and banked.replace(bank_msb=None, bank_lsb=None) == plain
+    for version in (1, 2):
+        with pytest.raises(ValueError, match="together"):
+            messages.ProgramChange(34, version=version, bank_msb=0)
+        with pytest.raises(ValueError, match="together"):
+            messages.ProgramChange(34, version=version, bank_lsb=8)
+    stamp = events.Timestamp(ticks=12, clock=events.Clock(identity="program"))
+    marked = banked.replace(timestamp=stamp, stream="keys")
+    pair = codecs.expand(marked)
+    assert (
+        b"".join(codecs.encode(p) for p in pair) == b"\xb1\x00\x00\xb1\x20\x08\xc1\x21"
+    )
+    assert all(p.timestamp == stamp and p.stream == "keys" for p in pair)
+    with pytest.raises(ValueError, match="expansion"):
+        codecs.encode(banked)
+    native = messages.ProgramChange(34, 2, version=2, bank_msb=0, bank_lsb=8)
+    assert ump.decode(ump.encode(native)) == native
+    assert ump.encode(native)[0] & 1 == 1
+    assert ump.encode(native.replace(bank_msb=None, bank_lsb=None))[0] & 1 == 0
+    assert banked.replace(program=35).bank_lsb == 8
+
+
 def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
     import pytest
 
@@ -64,8 +94,8 @@ def test_midi_versions_share_classes_without_reinterpreting_values() -> None:
     assert shifted.timestamp == timestamp
     with pytest.raises(ValueError):
         messages.NoteOn(60, attribute_type=0)
-    with pytest.raises(ValueError):
-        messages.ProgramChange(1, options=0)
+    with pytest.raises(TypeError):
+        messages.ProgramChange(1, options=0)  # ty: ignore[unknown-argument]
 
 
 def test_public_messages_preserve_the_frozen_representation_contract() -> None:
@@ -139,7 +169,7 @@ def test_note_transposition_clamps_and_preserves_channel_and_velocity() -> None:
 
 
 def test_transformations_preserve_metadata_and_payload_identity() -> None:
-    from meedee import codecs, events, gm
+    from meedee import codecs, events
 
     clock = events.Clock(identity="capture")
     timestamp = events.Timestamp(ticks=12, clock=clock)
@@ -148,7 +178,7 @@ def test_transformations_preserve_metadata_and_payload_identity() -> None:
         messages.NoteOn(60, channel=2),
         messages.SysEx(b"\x7d\x01"),
         messages.TimingClock(),
-        gm.BankProgramSelect(12, channel=2),
+        messages.ProgramChange(12, channel=2, bank_msb=0, bank_lsb=0),
         messages.NoteOn(60, channel=2).replace(group=1),
     ]:
         tagged = m.replace(timestamp=timestamp, stream="keyboard", span=span)

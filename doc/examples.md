@@ -426,6 +426,16 @@ for a summary alone. Callbacks must not reenter the same monitor. No payload
 history is retained by the library; the CLI owns bounded previews and display
 history. Metrics use host delivery times, independently of source timestamps.
 
+## Select a program and bank
+
+```python
+import meedee as md
+
+with md.Output() as out:
+    out.send(md.ProgramChange(34))
+    out.send(md.ProgramChange(34, bank_msb=0, bank_lsb=8))
+```
+
 ## Send controller values
 
 ```python

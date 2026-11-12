@@ -417,7 +417,162 @@ impl ControlChange {
         ("controller", "value", "channel")
     }
 }
-versioned_message! { ProgramChange (program, channel=None, *, version=1, group=None, options=None, bank_msb=None, bank_lsb=None) {program} {} {options => with_options, bank_msb => with_bank_msb, bank_lsb => with_bank_lsb} }
+#[pyclass(frozen, extends = Message, module = "meedee.messages")]
+struct ProgramChange {
+    value: messages::ProgramChange,
+}
+impl ProgramChange {
+    fn from_value(value: messages::ProgramChange) -> Self {
+        Self { value }
+    }
+    fn resolved(&self) -> PyResult<&messages::ProgramChange> {
+        Ok(&self.value)
+    }
+}
+#[pymethods]
+impl ProgramChange {
+    #[new]
+    #[pyo3(signature=(program, channel=None, *, version=1, group=None, bank_msb=None, bank_lsb=None))]
+    fn new(
+        #[pyo3(from_py_with=strict_integer)] program: i64,
+        channel: Option<&Bound<'_, PyAny>>,
+        #[pyo3(from_py_with=strict_integer)] version: i64,
+        group: Option<&Bound<'_, PyAny>>,
+        bank_msb: Option<&Bound<'_, PyAny>>,
+        bank_lsb: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        let mut value = match version {
+            1 => messages::ProgramChange::new(program),
+            2 => messages::ProgramChange::new_midi2(program),
+            _ => return Err(PyValueError::new_err("version must be 1 or 2")),
+        }
+        .map_err(value_error)?;
+        match (bank_msb, bank_lsb) {
+            (Some(msb), Some(lsb)) => {
+                value = value
+                    .with_bank(integer(msb, "bank_msb")?, integer(lsb, "bank_lsb")?)
+                    .map_err(value_error)?
+            }
+            (None, None) => {}
+            _ => {
+                return Err(PyValueError::new_err(
+                    "bank_msb and bank_lsb must be supplied together",
+                ))
+            }
+        }
+        if let Some(v) = channel {
+            value = value
+                .with_channel(integer(v, "channel")?)
+                .map_err(value_error)?;
+        }
+        if let Some(v) = group {
+            value = value
+                .with_group(integer(v, "group")?)
+                .map_err(value_error)?;
+        }
+        Ok(PyClassInitializer::from(Message::default()).add_subclass(Self { value }))
+    }
+    #[getter]
+    fn program(&self) -> u8 {
+        self.value.program()
+    }
+    #[getter]
+    fn channel(&self) -> Option<u8> {
+        self.value.channel()
+    }
+    #[getter]
+    fn group(&self) -> Option<u8> {
+        self.value.group()
+    }
+    #[getter]
+    fn version(&self) -> u8 {
+        self.value.version()
+    }
+    #[getter]
+    fn bank_msb(&self) -> Option<u8> {
+        self.value.bank_msb()
+    }
+    #[getter]
+    fn bank_lsb(&self) -> Option<u8> {
+        self.value.bank_lsb()
+    }
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, Self>>()
+            .is_ok_and(|v| self.value == v.value)
+    }
+    fn __hash__(&self) -> u64 {
+        value_hash(&self.value)
+    }
+    fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
+        let py = slf.py();
+        let mut fields = vec!["program", "channel"];
+        if slf.value.version() == 2 {
+            fields.push("version");
+        }
+        if slf.value.group().is_some() {
+            fields.push("group");
+        }
+        if slf.value.bank_msb().is_some() {
+            fields.extend(["bank_msb", "bank_lsb"]);
+        }
+        crate::tuning::render(slf.into_pyobject(py)?.as_any(), "ProgramChange", &fields)
+    }
+    #[pyo3(signature=(**changes))]
+    fn replace<'py>(
+        slf: PyRef<'py, Self>,
+        changes: Option<&Bound<'py, PyDict>>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        if slf.value.version() == 2
+            && changes
+                .map(|c| c.get_item("group"))
+                .transpose()?
+                .flatten()
+                .is_some_and(|v| v.is_none())
+        {
+            return Err(PyValueError::new_err("MIDI 2 requires a group"));
+        }
+        if let Some(v) = changes
+            .map(|c| c.get_item("version"))
+            .transpose()?
+            .flatten()
+        {
+            if integer(&v, "version")? != i64::from(slf.value.version()) {
+                return Err(PyValueError::new_err(
+                    "version cannot change through replace; convert explicitly",
+                ));
+            }
+        }
+        let py = slf.py();
+        crate::tuning::replacement(
+            slf.into_pyobject(py)?.as_any(),
+            &[
+                "program", "channel", "version", "group", "bank_msb", "bank_lsb",
+            ],
+            changes,
+        )
+    }
+    #[classattr]
+    fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+        let fields = PyDict::new(py);
+        for name in ["program", "version"] {
+            fields.set_item(name, py.get_type::<PyInt>())?;
+        }
+        for name in ["channel", "group", "bank_msb", "bank_lsb"] {
+            fields.set_item(
+                name,
+                py.import("typing")?
+                    .getattr("Optional")?
+                    .get_item(py.get_type::<PyInt>())?,
+            )?;
+        }
+        Ok(fields)
+    }
+    #[classattr]
+    fn __match_args__() -> (&'static str, &'static str) {
+        ("program", "channel")
+    }
+}
 versioned_message! { ChannelPressure (pressure=None, channel=None, *, version=1, group=None) {} {pressure => with_pressure} {} }
 versioned_message! { PitchBend (value=None, channel=None, *, version=1, group=None) {} {value => with_value} {} }
 
@@ -566,6 +721,17 @@ pub fn extract_command(command: &Bound<'_, PyAny>) -> PyResult<messages::AnyComm
         return Ok(messages::AnyCommand::ControlChange(command.value.clone()));
     }
     extract!(ParameterSet, ParameterStep);
+    if let Ok(command) = command.extract::<PyRef<'_, ProgramChange>>() {
+        if command.value.version() != 1 {
+            return Err(PyTypeError::new_err(
+                "MIDI 2 program changes use UMP encoding",
+            ));
+        }
+        if command.value.channel().is_none() {
+            return Err(PyValueError::new_err("message channel is unassigned"));
+        }
+        return Ok(messages::AnyCommand::ProgramChange(command.value.clone()));
+    }
     crate::profiles::extract_command(command)?
         .ok_or_else(|| PyTypeError::new_err("command must be a supported compound command"))
 }
@@ -576,6 +742,14 @@ pub fn command_wire(
     let kwargs = PyDict::new(py);
     kwargs.set_item("group", command.group())?;
     let name = match command {
+        messages::AnyCommand::ProgramChange(value) => {
+            kwargs.set_item("program", value.program())?;
+            kwargs.set_item("channel", value.channel())?;
+            kwargs.set_item("version", value.version())?;
+            kwargs.set_item("bank_msb", value.bank_msb())?;
+            kwargs.set_item("bank_lsb", value.bank_lsb())?;
+            "ProgramChange".into()
+        }
         messages::AnyCommand::ControlChange(value) => {
             kwargs.set_item("controller", value.controller())?;
             kwargs.set_item("value", value.value())?;

@@ -107,8 +107,9 @@ fn expanded_commands_retain_the_original_provenance() {
                 .with_channel(2)
                 .unwrap(),
         ),
-        AnyCommand::BankProgramSelect(
-            gm::BankProgramSelect::new(34)
+        AnyCommand::ProgramChange(
+            meedee::messages::ProgramChange::new(34)
+                .and_then(|m| m.with_bank(0, 0))
                 .unwrap()
                 .with_channel(2)
                 .unwrap(),

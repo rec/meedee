@@ -343,14 +343,18 @@ fn command(out: &mut Vec<u8>, c: &m::AnyCommand) -> io::Result<()> {
                 v.parameter().into(),
             ],
         ),
-        BankProgramSelect(v) => (
+        ProgramChange(v) => (
             8,
             vec![
                 v.channel()
                     .ok_or_else(|| invalid(0, "message channel is unassigned"))?
                     .into(),
-                v.bank_msb().into(),
-                v.bank_lsb().into(),
+                v.bank_msb()
+                    .ok_or_else(|| invalid(0, "banked program command requires a bank"))?
+                    .into(),
+                v.bank_lsb()
+                    .ok_or_else(|| invalid(0, "banked program command requires a bank"))?
+                    .into(),
                 v.program().into(),
             ],
         ),
@@ -787,10 +791,9 @@ fn decode_command(b: &[u8]) -> io::Result<m::AnyCommand> {
             let bank_msb = f.i64()?;
             let bank_lsb = f.i64()?;
             let program = f.i64()?;
-            BankProgramSelect(
-                crate::gm::BankProgramSelect::new(program)
-                    .and_then(|m| m.with_bank_msb(bank_msb))
-                    .and_then(|m| m.with_bank_lsb(bank_lsb))
+            ProgramChange(
+                m::ProgramChange::new(program)
+                    .and_then(|m| m.with_bank(bank_msb, bank_lsb))
                     .and_then(|m| m.with_channel(channel))
                     .map_err(|e| invalid(0, e))?,
             )

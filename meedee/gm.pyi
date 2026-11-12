@@ -2,41 +2,6 @@
 
 from . import events, messages
 
-class BankProgramSelect(messages.Message):
-    def __init__(
-        self,
-        program: int,
-        bank_msb: int = 0,
-        bank_lsb: int = 0,
-        channel: int | None = None,
-        *,
-        group: int | None = None,
-    ) -> None: ...
-    @property
-    def channel(self) -> int | None: ...
-    @property
-    def group(self) -> int | None: ...
-    @property
-    def bank_msb(self) -> int: ...
-    @property
-    def bank_lsb(self) -> int: ...
-    @property
-    def program(self) -> int: ...
-    def replace(
-        self,
-        *,
-        channel: int | None = ...,
-        group: int | None = ...,
-        bank_msb: int = ...,
-        bank_lsb: int = ...,
-        program: int = ...,
-        timestamp: events.Timestamp | None = ...,
-        stream: str | None = ...,
-        span: events.SourceSpan | None = ...,
-    ) -> BankProgramSelect: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
-
 class Gm1On(messages.Message):
     def __init__(self, *, device_id: int) -> None: ...
     @property

@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meedee import events, gm, messages, midi, mpe
+from meedee import events, messages, midi, mpe
 from meedee._clients import Input, Output
 from meedee._native import CallbackBridge
 from meedee._transport import ReceiveQueue
@@ -734,7 +734,7 @@ def test_profile_commands_preserve_types_bytes_and_progress_across_the_worker_pi
     command = (
         mpe.ZoneConfiguration(manager_channel=16, members=15)
         if mode == "check_mpe"
-        else gm.BankProgramSelect(channel=16, bank_msb=121, bank_lsb=3, program=128)
+        else messages.ProgramChange(channel=16, bank_msb=121, bank_lsb=3, program=128)
     )
     if mode == "partial_command_2":
         with pytest.raises(midi.CompoundSendError) as error:

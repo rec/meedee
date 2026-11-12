@@ -848,7 +848,7 @@ impl Universe {
                         },
                     );
                     state.program = Some(v.program());
-                    if scope.version == 2 && v.options().is_some_and(|v| v & 1 != 0) {
+                    if scope.version == 2 && v.bank_msb().is_some() {
                         state.bank_msb = v.bank_msb();
                         state.bank_lsb = v.bank_lsb();
                         state.pending_msb = v.bank_msb();

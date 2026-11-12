@@ -64,7 +64,6 @@ pub fn to_python(py: Python<'_>, v: model::Payload) -> PyResult<Py<PyAny>> {
         model::Payload::Command(v) => {
             let (name, kwargs) = crate::messages::command_wire(py, &v)?;
             let module = match name.as_str() {
-                "BankProgramSelect" => "meedee.gm",
                 "ZoneConfiguration" => "meedee.mpe",
                 _ => "meedee.messages",
             };

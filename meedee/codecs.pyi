@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from . import gm, messages, mpe
+from . import messages, mpe
 from .messages import Message
 
 def encode(message: Message) -> bytes: ...
@@ -10,7 +10,7 @@ def expand(
     command: messages.ControlChange
     | messages.ParameterSet
     | messages.ParameterStep
-    | gm.BankProgramSelect
+    | messages.ProgramChange
     | mpe.ZoneConfiguration,
 ) -> list[Message]: ...
 

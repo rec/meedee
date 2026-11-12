@@ -67,114 +67,6 @@ mod gm {
         GmOff {device_id:int=>number:PyInt};
         Gm2On {device_id:int=>number:PyInt};
     }
-    #[pyclass(frozen, extends=Message, module="meedee.gm")]
-    pub(super) struct BankProgramSelect {
-        pub(super) value: model::BankProgramSelect,
-    }
-    #[pymethods]
-    impl BankProgramSelect {
-        #[new]
-        #[pyo3(signature=(program, bank_msb=0, bank_lsb=0, channel=None, *, group=None))]
-        fn new(
-            #[pyo3(from_py_with=int)] program: i64,
-            #[pyo3(from_py_with=int)] bank_msb: i64,
-            #[pyo3(from_py_with=int)] bank_lsb: i64,
-            channel: Option<&Bound<'_, PyAny>>,
-            group: Option<&Bound<'_, PyAny>>,
-        ) -> PyResult<PyClassInitializer<Self>> {
-            let channel = channel.map(int).transpose()?;
-            Ok(
-                PyClassInitializer::from(Message::default()).add_subclass(Self {
-                    value: {
-                        let mut value = model::BankProgramSelect::new(program)
-                            .and_then(|m| m.with_bank_msb(bank_msb))
-                            .and_then(|m| m.with_bank_lsb(bank_lsb))
-                            .map_err(value_error)?;
-                        if let Some(g) = group {
-                            value = value.with_group(int(g)?).map_err(value_error)?;
-                        }
-                        if let Some(channel) = channel {
-                            value.with_channel(channel).map_err(value_error)?
-                        } else {
-                            value
-                        }
-                    },
-                }),
-            )
-        }
-        #[getter]
-        fn group(&self) -> Option<u8> {
-            self.value.group()
-        }
-        #[getter]
-        fn channel(&self) -> Option<u8> {
-            self.value.channel()
-        }
-        #[getter]
-        fn program(&self) -> u8 {
-            self.value.program()
-        }
-        #[getter]
-        fn bank_msb(&self) -> u8 {
-            self.value.bank_msb()
-        }
-        #[getter]
-        fn bank_lsb(&self) -> u8 {
-            self.value.bank_lsb()
-        }
-        fn __repr__(slf: PyRef<'_, Self>) -> PyResult<String> {
-            let py = slf.py();
-            render(
-                slf.into_pyobject(py)?.as_any(),
-                "BankProgramSelect",
-                &["program", "bank_msb", "bank_lsb", "channel", "group"],
-            )
-        }
-        fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
-            other
-                .extract::<PyRef<'_, Self>>()
-                .is_ok_and(|v| self.value == v.value)
-        }
-        fn __hash__(&self) -> u64 {
-            hash(&self.value)
-        }
-        #[pyo3(signature=(**changes))]
-        fn replace<'py>(
-            slf: PyRef<'py, Self>,
-            changes: Option<&Bound<'py, PyDict>>,
-        ) -> PyResult<Bound<'py, PyAny>> {
-            let py = slf.py();
-            replacement(
-                slf.into_pyobject(py)?.as_any(),
-                &["program", "bank_msb", "bank_lsb", "channel", "group"],
-                changes,
-            )
-        }
-        #[classattr]
-        fn __match_args__() -> (&'static str, &'static str, &'static str, &'static str) {
-            ("program", "bank_msb", "bank_lsb", "channel")
-        }
-        #[classattr]
-        fn __annotations__(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
-            let fields = PyDict::new(py);
-            for name in ["program", "bank_msb", "bank_lsb"] {
-                fields.set_item(name, py.get_type::<PyInt>())?;
-            }
-            fields.set_item(
-                "group",
-                py.import("typing")?
-                    .getattr("Optional")?
-                    .get_item(py.get_type::<PyInt>())?,
-            )?;
-            fields.set_item(
-                "channel",
-                py.import("typing")?
-                    .getattr("Optional")?
-                    .get_item(py.get_type::<PyInt>())?,
-            )?;
-            Ok(fields)
-        }
-    }
     entries! {
         Program {program:u8=>PyInt,name:&'static str=>PyString,family:&'static str=>PyString};
         BankProgram {program:u8=>PyInt,bank_msb:u8=>PyInt,bank_lsb:u8=>PyInt,name:&'static str=>PyString,family:&'static str=>PyString};
@@ -269,7 +161,6 @@ mod gm {
             .transpose()
     }
     pub(super) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
-        module.add_class::<BankProgramSelect>()?;
         module.add_class::<Gm1On>()?;
         module.add_class::<GmOff>()?;
         module.add_class::<Gm2On>()?;
@@ -506,11 +397,6 @@ primitives!(
 pub fn extract_command(
     command: &Bound<'_, PyAny>,
 ) -> PyResult<Option<meedee::messages::AnyCommand>> {
-    if let Ok(value) = command.extract::<PyRef<'_, gm::BankProgramSelect>>() {
-        return Ok(Some(meedee::messages::AnyCommand::BankProgramSelect(
-            value.value.clone(),
-        )));
-    }
     if let Ok(value) = command.extract::<PyRef<'_, mpe::ZoneConfiguration>>() {
         return Ok(Some(meedee::messages::AnyCommand::ZoneConfiguration(
             value.value.clone(),
@@ -523,21 +409,6 @@ pub fn command_wire(
 ) -> (String, std::collections::HashMap<String, i64>) {
     use meedee::messages::AnyCommand;
     match command {
-        AnyCommand::BankProgramSelect(value) => (
-            "BankProgramSelect".into(),
-            [
-                (
-                    "channel",
-                    value.channel().expect("resolved command channel"),
-                ),
-                ("bank_msb", value.bank_msb()),
-                ("bank_lsb", value.bank_lsb()),
-                ("program", value.program()),
-            ]
-            .into_iter()
-            .map(|(key, value)| (key.into(), value.into()))
-            .collect(),
-        ),
         AnyCommand::ZoneConfiguration(value) => (
             "ZoneConfiguration".into(),
             [
