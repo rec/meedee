@@ -51,7 +51,7 @@ def test_archive_mapping_and_tolerance_cover_spans_and_metadata() -> None:
         take("a", "ca", 10),
         take("b", "cb", 11),
         format="archive",
-        tick_tolerance=1,
+        tick_tolerance="1 tick",
         source_map={"a": "b"},
         clock_map={"ca": "cb"},
     )
@@ -71,6 +71,17 @@ def test_archive_mapping_and_tolerance_cover_spans_and_metadata() -> None:
             take("b", "cb", 0),
             format="archive",
             source_map={"a": "b", "c": "b"},
+        )
+
+
+@pytest.mark.parametrize("tolerance", ["1 ns", "0.5 tick", "-1 tick"])
+def test_tolerance_requires_whole_nonnegative_ticks(tolerance: str) -> None:
+    with pytest.raises(ValueError):
+        inspection.compare_files(
+            take("a", "c", 0),
+            take("a", "c", 0),
+            format="archive",
+            tick_tolerance=tolerance,
         )
 
 

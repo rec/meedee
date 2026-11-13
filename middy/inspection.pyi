@@ -151,7 +151,7 @@ def compare_files(
     source_map: dict[str, str] | None = None,
     clock_map: dict[str, str] | None = None,
     ignore_timestamps: bool = False,
-    tick_tolerance: int = 0,
+    tick_tolerance: int | str = 0,
     payload_limit: int | str = 1_048_576,
     detail_limit: int = 128,
     preserve_unknown: bool = False,

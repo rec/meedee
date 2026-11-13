@@ -1205,3 +1205,17 @@ the builders and options shown above, with typed validation errors. Units,
 defaults, lazy opening, terminal closure and resource ownership are unchanged.
 Python copying/pickling is rejected, and Rust input/output owners remain
 non-`Clone`; a new resource is constructed from configuration.
+
+## Exact clock mapping
+
+```rust
+use middy::events::{Clock, ClockMapping, Rational};
+
+let source = Clock::new("source".into(), 1, 1_000_000_000, "host".into(), None)?;
+let target = Clock::new("target".into(), 1, 1_000_000_000, "host".into(), None)?;
+let mapping = ClockMapping::new(
+    source, target, Rational::new(1001, 1000)?,
+    Rational::new(1, 4)?, Some(Rational::new(1, 1_000_000)?),
+)?;
+println!("{mapping:?}");
+```

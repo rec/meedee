@@ -1,4 +1,4 @@
-use crate::files::{limit, os_error, uint, Stream};
+use crate::files::{limit, os_error, Stream};
 use middy::inspection;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -78,7 +78,7 @@ fn compare_files(
     source_map: Option<BTreeMap<String, String>>,
     clock_map: Option<BTreeMap<String, String>>,
     #[pyo3(from_py_with=crate::ump::boolean)] ignore_timestamps: bool,
-    #[pyo3(from_py_with=uint)] tick_tolerance: u64,
+    #[pyo3(from_py_with=crate::units::ticks)] tick_tolerance: u64,
     #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
     #[pyo3(from_py_with=limit)] detail_limit: usize,
     #[pyo3(from_py_with=crate::ump::boolean)] preserve_unknown: bool,

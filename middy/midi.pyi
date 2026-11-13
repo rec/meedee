@@ -244,7 +244,7 @@ class Output(ResourceModel):
         self,
         *,
         channel: int | None = None,
-        bpm: int | float | None = None,
+        bpm: int | float | str | None = None,
         port: str | None = None,
         encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,

@@ -41,7 +41,7 @@ def run_ci(
     cancel: events.Cancellation,
     now: Callable[[], int],
     message_limit: int,
-    byte_limit: int,
+    byte_limit: int | str,
 ) -> ci.BrowseReport: ...
 def run_tuning(
     query: tuning.Query,

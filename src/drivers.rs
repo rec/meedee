@@ -360,7 +360,7 @@ pub(crate) fn run_ci(
     cancel: Bound<'_, PyAny>,
     now: Bound<'_, PyAny>,
     #[pyo3(from_py_with=crate::files::limit)] message_limit: usize,
-    #[pyo3(from_py_with=crate::files::limit)] byte_limit: usize,
+    #[pyo3(from_py_with=crate::units::bytes)] byte_limit: usize,
 ) -> PyResult<crate::ci::BrowseReport> {
     if browser.value.snapshot().status != "ready" {
         return Err(PyValueError::new_err("browser must be fresh"));

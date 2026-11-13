@@ -290,8 +290,9 @@ impl Universe {
     fn feed(
         &mut self,
         event: &Bound<'_, PyAny>,
-        now_ns: Option<u64>,
+        now_ns: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Vec<crate::event_views::Observation>> {
+        let now_ns = now_ns.map(crate::units::nanoseconds).transpose()?;
         let out = if let Ok(d) = event.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             self.value.feed_diagnostic(&d.value)
         } else {
@@ -305,7 +306,11 @@ impl Universe {
             .collect())
     }
     #[pyo3(signature=(*,now_ns=None))]
-    fn poll(&mut self, now_ns: Option<u64>) -> PyResult<Vec<crate::event_views::Observation>> {
+    fn poll(
+        &mut self,
+        now_ns: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Vec<crate::event_views::Observation>> {
+        let now_ns = now_ns.map(crate::units::nanoseconds).transpose()?;
         Ok(self
             .value
             .poll(now_ns)

@@ -22,6 +22,34 @@ pub fn nanoseconds(value: &Bound<'_, PyAny>) -> PyResult<u64> {
     crate::files::uint(&normalize(value, "nanosecond", "integer")?)
 }
 
+pub fn ticks(value: &Bound<'_, PyAny>) -> PyResult<u64> {
+    crate::files::uint(&normalize(value, "tick", "integer")?)
+}
+
+pub fn byte_offset(value: &Bound<'_, PyAny>) -> PyResult<u64> {
+    crate::files::uint(&normalize(value, "byte", "integer")?)
+}
+
+pub fn semitones(value: &Bound<'_, PyAny>) -> PyResult<i64> {
+    crate::messages::strict_integer(&normalize(value, "semitone", "integer")?)
+}
+
+pub fn rational(value: &Bound<'_, PyAny>, unit: &str) -> PyResult<middy::events::Rational> {
+    if !value.is_instance_of::<PyString>() {
+        return Ok(value
+            .extract::<PyRef<'_, crate::event_values::Rational>>()?
+            .value);
+    }
+    let (numerator, denominator) = value
+        .py()
+        .import("middy._units")?
+        .getattr("rational")?
+        .call1((value, unit))?
+        .extract::<(i128, i128)>()?;
+    middy::events::Rational::new(numerator, denominator)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+}
+
 pub fn seconds(value: &Bound<'_, PyAny>) -> PyResult<f64> {
     normalize(value, "second", "real")?.extract()
 }

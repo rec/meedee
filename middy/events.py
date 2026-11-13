@@ -3,15 +3,17 @@
 import sys
 from collections.abc import Iterator
 
-from . import _core, messages, ump
+from . import _core, _units, messages, ump
 
 _core.populate_events(sys.modules[__name__])
 
 del sys, _core, messages, ump
 
 
-def with_gap[T](items: Iterator[T], gap: float) -> Iterator[T | float]:
-    """Yield each item followed by gap seconds, including after the final item."""
+def with_gap[T](items: Iterator[T], gap: float | str) -> Iterator[T | float | str]:
+    """Yield each item followed by a contextual or explicitly unit-bearing delay."""
+    if isinstance(gap, str):
+        _units.musical_duration(gap)
     for i in items:
         yield i
         yield gap

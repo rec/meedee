@@ -14,7 +14,7 @@ macro_rules! note_methods {
     ($name:ident; [$($all:ident),*]; [note $(, $rest:ident)*]; {$($methods:item)*}) => {
         value_methods_impl!($name; $($all),*; {
             $($methods)*
-            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with = messages::strict_integer)] semitones: i64) -> PyResult<Py<PyAny>> {
+            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with = crate::units::semitones)] semitones: i64) -> PyResult<Py<PyAny>> {
                 let py = slf.py();
                 messages::transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
             }

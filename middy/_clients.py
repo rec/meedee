@@ -420,8 +420,10 @@ class Output(_Client, frozen=True):
     @field_validator("bpm", mode="before")
     @classmethod
     def _numeric_bpm(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = _units.tempo_bpm(value)
         if value is not None and type(value) not in (int, float):
-            raise ValueError("bpm must be a number")
+            raise ValueError("bpm must be a number or tempo expression")
         if isinstance(value, (int, float)) and not math.isfinite(value):
             raise ValueError("bpm must be positive and finite")
         return value

@@ -12,11 +12,13 @@ from middy import (
     controls,
     events,
     messages,
+    midi,
     smf,
     testing,
     timecode,
     tuning,
     ump,
+    universe,
 )
 from middy._cli import WatchPorts
 
@@ -124,3 +126,96 @@ def test_timecode_fields_and_clock_resolution_accept_units() -> None:
     assert (
         events.Clock(identity="test", resolution_ticks="2 tick").resolution_ticks == 2
     )
+
+
+@pytest.mark.parametrize("tempo", ["120 bpm", "500 ms / beat", "120"])
+def test_output_normalizes_tempo_without_opening_a_device(tempo: str) -> None:
+    with midi.Output(bpm=tempo) as output:
+        assert output.bpm == 120
+
+
+@pytest.mark.parametrize("tempo", ["1 Hz", "0 bpm", "-1 ms / beat"])
+def test_output_rejects_incompatible_and_nonpositive_tempos(tempo: str) -> None:
+    with pytest.raises(ValueError):
+        midi.Output(bpm=tempo)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        messages.NoteOn(60),
+        messages.NoteOff(60),
+        messages.PolyPressure(60, 10),
+        messages.NoteOn(60, version=2),
+        messages.PerNoteController(group=1, channel=1, note=60, controller=1, value=2),
+        messages.PerNotePitchBend(group=1, channel=1, note=60, value=0),
+    ],
+)
+def test_transposition_converts_intervals_and_preserves_metadata(
+    message: messages.Message,
+) -> None:
+    value = message.replace(stream="keys")
+    shifted = value.transpose("1 octave")
+    assert shifted == value.transpose(12)
+    assert shifted.stream == "keys"
+    for interval in ("50 cents", "1 s"):
+        with pytest.raises(ValueError):
+            value.transpose(interval)
+
+
+def test_non_note_and_file_record_transposition_accepts_intervals() -> None:
+    message = messages.TimingClock()
+    assert message.transpose("100 cents") is message
+    event = smf.Event(track=0, tick="1 tick", record=messages.NoteOn(60, channel=1))
+    assert event.transpose("-1 octave") == event.transpose(-12)
+    assert event.transpose("-1 octave").tick == 1
+    smf.validate_meta(81, b"\x07\xa1\x20", offset="1 KiB")
+    with pytest.raises(ValueError):
+        smf.validate_meta(81, b"\x07\xa1\x20", offset="1 bit")
+
+
+def test_clock_mapping_retains_exact_time_and_dimensionless_rate_strings() -> None:
+    source = events.Clock(identity="source", tick_numerator=1, tick_denominator=1)
+    target = events.Clock(identity="target")
+    mapping = events.ClockMapping(
+        source=source,
+        target=target,
+        rate="1001 / 1000",
+        offset="250 ms",
+        uncertainty="1 ns / 3",
+    )
+    expected = events.ClockMapping(
+        source=source,
+        target=target,
+        rate=events.Rational(numerator=1001, denominator=1000),
+        offset=events.Rational(numerator=1, denominator=4),
+        uncertainty=events.Rational(numerator=1, denominator=3_000_000_000),
+    )
+    assert mapping == expected
+    assert mapping.map_time(events.Timestamp(ticks=1, clock=source)) == events.Rational(
+        numerator=1251, denominator=1000
+    )
+    assert mapping.replace(offset="500 ms").offset == events.Rational(
+        numerator=1, denominator=2
+    )
+    for changes in ({"rate": "2 Hz"}, {"offset": "1 tick"}, {"uncertainty": "-1 ns"}):
+        with pytest.raises(ValueError):
+            mapping.replace(**changes)
+
+
+def test_universe_timestamps_convert_units_before_observation() -> None:
+    cache = universe.Universe(timecode_timeout="1 s")
+    cache.feed(messages.Start(), now_ns="1 ms")
+    assert cache.poll(now_ns="2 ms") == []
+    for value in ("1 beat", "1 ns / 3", "-1 ns"):
+        with pytest.raises(ValueError):
+            cache.poll(now_ns=value)
+
+
+def test_raw_addresses_and_format_selectors_stay_numeric() -> None:
+    with pytest.raises(TypeError):
+        messages.NoteOn(60, channel="1")  # ty: ignore[invalid-argument-type]
+    with pytest.raises(TypeError):
+        messages.ControlChange(7, 10, resolution="14 bit")  # ty: ignore[invalid-argument-type]
+    with pytest.raises(ValueError):
+        events.Timestamp(ticks="1 s", clock=events.Clock(identity="test"))

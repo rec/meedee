@@ -21,7 +21,7 @@ macro_rules! values {
             }
             $(#[getter] fn $field(&self) -> $ty { self.value.$field() })*
             #[getter] fn version(&self) -> u8 { self.value.version() }
-            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with=crate::messages::strict_integer)] semitones: i64) -> PyResult<Py<PyAny>> {
+            fn transpose(slf: PyRef<'_, Self>, #[pyo3(from_py_with=crate::units::semitones)] semitones: i64) -> PyResult<Py<PyAny>> {
                 let py = slf.py();
                 let fields: &[&str] = &[$(stringify!($field)),*];
                 if fields.contains(&"note") { crate::messages::transpose_note(slf.into_pyobject(py)?.as_any(), semitones) }
@@ -97,7 +97,7 @@ macro_rules! family_values {
             $(#[getter] fn $field(&self)->$ty { self.value.$field() })*
             #[getter] fn version(&self)->u8 { 2 }
             #[getter] fn family(&self)->&'static str {family_name(self.value.family())}
-            fn transpose(slf:PyRef<'_,Self>,#[pyo3(from_py_with=crate::messages::strict_integer)] semitones:i64)->PyResult<Py<PyAny>> {
+            fn transpose(slf:PyRef<'_,Self>,#[pyo3(from_py_with=crate::units::semitones)] semitones:i64)->PyResult<Py<PyAny>> {
                 let py=slf.py(); let fields:&[&str]=&[$(stringify!($field)),*];
                 if fields.contains(&"note") {crate::messages::transpose_note(slf.into_pyobject(py)?.as_any(),semitones)} else {Ok(slf.into_pyobject(py)?.into_any().unbind())}
             }

@@ -7,6 +7,13 @@ import pytest
 from middy.events import with_gap
 
 
+def test_explicit_gap_units_are_preserved_and_incompatible_units_rejected() -> None:
+    assert list(with_gap(iter(["item"]), "250 ms")) == ["item", "250 ms"]
+    assert list(with_gap(iter(["item"]), "1 beat")) == ["item", "1 beat"]
+    with pytest.raises(ValueError):
+        list(with_gap(iter([]), "440 Hz"))
+
+
 def test_each_item_is_followed_by_gap_including_the_last() -> None:
     assert list(with_gap(iter(["a", "b"]), 0.1)) == ["a", 0.1, "b", 0.1]
     item = object()

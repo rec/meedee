@@ -46,7 +46,7 @@ md.Output().send(md.Note("500 ms", 60))
 ```python
 import middy as md
 
-md.Output(bpm=120).send(
+md.Output(bpm="120 bpm").send(
     md.Note(duration=1, note=60, velocity=90),  # 1 beat
     md.Note(0.5, 62, 70),
     md.Note(0.5, 64, 100),
@@ -71,7 +71,7 @@ import middy as md
 
 with md.Input() as input, md.Output() as output:
     for m in input:
-        output.send(m.transpose(12))
+        output.send(m.transpose("1 octave"))
 ```
 
 Errors are printed on the console. To handle them yourself, use `md.Input.with_errors()`:
@@ -84,7 +84,7 @@ import middy as md
 with md.Input() as input, md.Output() as output:
     for m in input.with_errors():
         if isinstance(m, md.Message):
-            output.send(m.transpose(12))
+            output.send(m.transpose("1 octave"))
         else:
             print("ERROR", m, file=sys.stderr)
 ```
@@ -290,7 +290,7 @@ Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
 
 Only `md.tuning.convert()` needs uFor. The shared Rust builders `md.tuning.bulk_dump()` and `md.tuning.note_changes()` also accept `md.NoteTuning` values constructed directly.
-Use `output.send(md.events.with_gap(iter(messages), 0.1))` for explicit waits;
+Use `output.send(md.events.with_gap(iter(messages), "100 ms"))` for explicit waits;
 `md.tuning.note_changes()` produces
 ordered messages of at most 127 keys each.
 
@@ -720,6 +720,23 @@ length, including reserved message types. It does not validate a packet's conten
 `md.smf.validate_meta()` returns `None` on success and raises a file-validation error on
 failure. Supply `offset=...` to identify a byte position in that error. The SMF
 reader and writer already perform this validation during normal file operations.
+
+## Map two clocks
+
+```python
+import middy as md
+
+source = md.Clock(identity="source", origin="host")
+target = md.Clock(identity="target", origin="host")
+mapping = md.ClockMapping(
+    source=source,
+    target=target,
+    rate="1001 / 1000",
+    offset="250 ms",
+    uncertainty="1 us",
+)
+print(mapping)
+```
 
 ## Create a virtual MIDI port
 

@@ -12,7 +12,23 @@ pub(crate) struct ClockMapping {
     pub(crate) value: model::ClockMapping,
 }
 frozen!(ClockMapping;source,target,rate,offset,uncertainty;{
-#[new]#[pyo3(signature=(*,source,target,rate=None,offset=None,uncertainty=None))]fn new(source:PyRef<'_,Clock>,target:PyRef<'_,Clock>,rate:Option<PyRef<'_,Rational>>,offset:Option<PyRef<'_,Rational>>,uncertainty:Option<PyRef<'_,Rational>>)->PyResult<Self>{Ok(Self{value:model::ClockMapping::new(source.value.clone(),target.value.clone(),rate.map_or(middy::events::Rational::new(1,1).expect("constant"),|v|v.value),offset.map_or(middy::events::Rational::new(0,1).expect("constant"),|v|v.value),uncertainty.map(|v|v.value)).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
+#[new]
+#[pyo3(signature=(*,source,target,rate=None,offset=None,uncertainty=None))]
+fn new(
+    source: PyRef<'_, Clock>, target: PyRef<'_, Clock>,
+    rate: Option<&Bound<'_, PyAny>>, offset: Option<&Bound<'_, PyAny>>,
+    uncertainty: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Self> {
+    let rate = rate.map(|v| crate::units::rational(v, "dimensionless")).transpose()?
+        .unwrap_or(middy::events::Rational::new(1, 1).expect("constant"));
+    let offset = offset.map(|v| crate::units::rational(v, "second")).transpose()?
+        .unwrap_or(middy::events::Rational::new(0, 1).expect("constant"));
+    let uncertainty = uncertainty.map(|v| crate::units::rational(v, "second")).transpose()?;
+    Ok(Self {
+        value: model::ClockMapping::new(source.value.clone(), target.value.clone(), rate, offset, uncertainty)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+    })
+}
 #[getter]fn source(&self)->Clock{Clock{value:self.value.source.clone()}}#[getter]fn target(&self)->Clock{Clock{value:self.value.target.clone()}}#[getter]fn rate(&self)->Rational{Rational{value:self.value.rate}}#[getter]fn offset(&self)->Rational{Rational{value:self.value.offset}}#[getter]fn uncertainty(&self)->Option<Rational>{self.value.uncertainty.map(|value|Rational{value})}
 fn map_time(&self,timestamp:PyRef<'_,Timestamp>)->PyResult<Rational>{Ok(Rational{value:self.value.map(&timestamp.value).map_err(|e|pyo3::exceptions::PyValueError::new_err(e.to_string()))?})}
 });

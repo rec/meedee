@@ -206,7 +206,7 @@ frozen!(Event;track,tick,record;{
 #[new]#[pyo3(signature=(*,track,tick,record))]fn new(track:&Bound<'_,PyAny>,tick:&Bound<'_,PyAny>,record:&Bound<'_,PyAny>)->PyResult<Self>{Ok(Self{value:smf::Event{track:uint(track)?.try_into().map_err(|_|PyValueError::new_err("track out of range"))?,tick:uint(&crate::units::field(tick,"tick")?)?,record:extract_record(record)?}})}
 #[getter]fn track(&self)->u16{self.value.track}#[getter]fn tick(&self)->u64{self.value.tick}#[getter]fn record(&self,py:Python<'_>)->PyResult<Py<PyAny>>{record_python(py,self.value.record.clone())}
 #[getter]fn channel(&self)->Option<u8>{self.value.channel()}
-fn transpose(&self,#[pyo3(from_py_with=crate::messages::strict_integer)] semitones:i64)->Self{Self{value:self.value.clone().transpose(semitones)}}
+fn transpose(&self,#[pyo3(from_py_with=crate::units::semitones)] semitones:i64)->Self{Self{value:self.value.clone().transpose(semitones)}}
 });
 fn extract_record(v: &Bound<'_, PyAny>) -> PyResult<smf::Record> {
     if let Ok(v) = v.extract::<PyRef<'_, Meta>>() {
@@ -405,7 +405,7 @@ impl ClipWriter {
 fn validate_meta(
     kind: &Bound<'_, PyAny>,
     data: &Bound<'_, PyAny>,
-    #[pyo3(from_py_with=uint)] offset: u64,
+    #[pyo3(from_py_with=crate::units::byte_offset)] offset: u64,
 ) -> PyResult<()> {
     let kind = u8::try_from(uint(kind)?).map_err(|_| PyValueError::new_err("kind exceeds u8"))?;
     smf::validate_meta(kind, &bytes(data, usize::MAX)?, offset).map_err(os_error)

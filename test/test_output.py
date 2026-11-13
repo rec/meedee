@@ -205,8 +205,21 @@ def test_delay_only_call_waits_without_sending(transport: NativeConnection) -> N
     assert transport.packets() == []
 
 
+@pytest.mark.parametrize(
+    ("gap", "bpm", "step"),
+    [
+        (0.1, None, 100_000_000),
+        (0.1, 120, 50_000_000),
+        ("100 ms", "120 bpm", 100_000_000),
+        ("1 / 5 beat", "500 ms / beat", 100_000_000),
+    ],
+)
 def test_with_gap_schedules_sysex_and_trailing_wait(
-    transport: NativeConnection, monkeypatch: pytest.MonkeyPatch
+    transport: NativeConnection,
+    monkeypatch: pytest.MonkeyPatch,
+    gap: float | str,
+    bpm: int | str | None,
+    step: int,
 ) -> None:
     from middy import _native
 
@@ -224,9 +237,9 @@ def test_with_gap_schedules_sysex_and_trailing_wait(
 
     monkeypatch.setattr(_native, "output_sequence", sequence)
     message = messages.SysEx(data=b"\x7d")
-    with midi.Output() as out:
-        out.send(events.with_gap(iter([message, message]), 0.1))
-    assert deadlines == [0, 100_000_000, 200_000_000]
+    with midi.Output(bpm=bpm) as out:
+        out.send(events.with_gap(iter([message, message]), gap))
+    assert deadlines == [0, step, 2 * step]
     assert transport.packets() == [b"\xf0\x7d\xf7"] * 2
 
 

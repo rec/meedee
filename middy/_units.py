@@ -46,31 +46,23 @@ def duration(value: float | str) -> int:
 
 def tempo(value: float | str, units_per_second: int) -> int:
     """Convert BPM or an authored beat period to an exact MIDI tempo integer."""
-    if isinstance(value, str):
-        from reccy.configuration.units import magnitude, quantity_unit
-
-        if quantity_unit(value) == "second / beat":
-            period = Fraction(
-                cast(Fraction, magnitude(value, "second / beat", exact=True))
-            )
-        else:
-            rate = Fraction(cast(Fraction, magnitude(value, "bpm", exact=True)))
-            if rate <= 0:
-                raise ValueError("Tempo must be positive")
-            period = 60 / rate
-    else:
-        if type(value) not in (int, float):
-            raise TypeError("Tempo must be BPM or a unit expression")
-        rate = Fraction(str(value))
-        if rate <= 0:
-            raise ValueError("Tempo must be positive")
-        period = 60 / rate
-    if period <= 0:
-        raise ValueError("Tempo must be positive")
-    period *= units_per_second
+    period = _beat_period(value) * units_per_second
     if period.denominator != 1:
         raise ValueError("Tempo cannot be represented exactly in the MIDI field")
     return period.numerator
+
+
+def tempo_bpm(value: str) -> float:
+    """Normalize an authored tempo rate or beat period to numeric BPM."""
+    return float(60 / _beat_period(value))
+
+
+def rational(value: str, unit: str) -> tuple[int, int]:
+    """Keep exact authored magnitudes across the native binding boundary."""
+    from reccy.configuration.units import magnitude
+
+    parsed = Fraction(cast(Fraction, magnitude(value, unit, exact=True)))
+    return parsed.numerator, parsed.denominator
 
 
 def musical_duration(value: float | str) -> tuple[Fraction, str | None]:
@@ -101,3 +93,28 @@ def sequence_duration(value: float | str, beat_period: Fraction | None) -> Fract
     if unit != "second" and beat_period is not None:
         amount *= beat_period
     return amount
+
+
+def _beat_period(value: float | str) -> Fraction:
+    if isinstance(value, str):
+        from reccy.configuration.units import magnitude, quantity_unit
+
+        if quantity_unit(value) == "second / beat":
+            period = Fraction(
+                cast(Fraction, magnitude(value, "second / beat", exact=True))
+            )
+        else:
+            rate = Fraction(cast(Fraction, magnitude(value, "bpm", exact=True)))
+            if rate <= 0:
+                raise ValueError("Tempo must be positive")
+            period = 60 / rate
+    else:
+        if type(value) not in (int, float):
+            raise TypeError("Tempo must be BPM or a unit expression")
+        rate = Fraction(str(value))
+        if rate <= 0:
+            raise ValueError("Tempo must be positive")
+        period = 60 / rate
+    if period <= 0:
+        raise ValueError("Tempo must be positive")
+    return period

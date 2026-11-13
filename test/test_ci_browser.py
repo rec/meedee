@@ -182,24 +182,27 @@ def run(
     receiver: Receiver,
     output: Output,
     cancel: events.Cancellation | None = None,
+    byte_limit: int | str = 8_388_608,
 ) -> ci.BrowseReport:
     return ci.browse(
         b,
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         cancel=cancel,
+        byte_limit=byte_limit,
     )
 
 
 @pytest.mark.parametrize("group", [None, 3])
+@pytest.mark.parametrize("byte_limit", [8_388_608, "8 MiB"])
 def test_live_scan_preserves_both_protocols_and_obtains_endpoint_ids(
-    group: int | None, monkeypatch: pytest.MonkeyPatch
+    group: int | None, byte_limit: int | str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clock = [0]
     monkeypatch.setattr(ci, "monotonic_ns", lambda: clock[0])
     receiver = Receiver(clock)
     output = Output(receiver, group)
-    report = run(browser(group), receiver, output)
+    report = run(browser(group), receiver, output, byte_limit=byte_limit)
     assert report.status == "completed" and report.problems == 0
     assert (
         report.confirmed_actions == 2

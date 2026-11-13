@@ -44,7 +44,7 @@ impl Message {
     /// Return this message unchanged; note-addressed subclasses shift their note number.
     fn transpose(
         slf: PyRef<'_, Self>,
-        #[pyo3(from_py_with = strict_integer)] semitones: i64,
+        #[pyo3(from_py_with = crate::units::semitones)] semitones: i64,
     ) -> PyResult<Py<PyAny>> {
         let _ = semitones;
         let py = slf.py();
@@ -230,7 +230,7 @@ pub(crate) fn transpose_note<'py>(
 macro_rules! versioned_note {
     ($name:ident) => {
         versioned_message! { $name (note, velocity=None, channel=None, *, version=1, group=None, attribute_type=None, attribute_data=None) {note} {velocity => with_velocity} {attribute_type => with_attribute_type, attribute_data => with_attribute_data};
-            fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=strict_integer)] semitones:i64) -> PyResult<Py<PyAny>> {
+            fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=crate::units::semitones)] semitones:i64) -> PyResult<Py<PyAny>> {
                 let py=slf.py();
                 transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
             }
@@ -240,7 +240,7 @@ macro_rules! versioned_note {
 versioned_note!(NoteOn);
 versioned_note!(NoteOff);
 versioned_message! { PolyPressure (note, pressure=None, channel=None, *, version=1, group=None) {note} {pressure => with_pressure} {};
-    fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=strict_integer)] semitones:i64) -> PyResult<Py<PyAny>> {
+    fn transpose(slf:PyRef<'_,Self>, #[pyo3(from_py_with=crate::units::semitones)] semitones:i64) -> PyResult<Py<PyAny>> {
         let py=slf.py();
         transpose_note(slf.into_pyobject(py)?.as_any(), semitones)
     }

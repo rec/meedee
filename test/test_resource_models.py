@@ -53,7 +53,7 @@ def test_unit_values_and_iterable_channels_become_validated_fields() -> None:
         (lambda: midi.Input(channel=[True]), "channel"),
         (lambda: midi.Input(event_limit="128"), "event_limit"),  # ty: ignore[invalid-argument-type]
         (lambda: midi.Output(channel=True), "channel"),
-        (lambda: midi.Output(bpm="120"), "bpm"),  # ty: ignore[invalid-argument-type]
+        (lambda: midi.Output(bpm="120 Hz"), "bpm"),
         (lambda: discovery.Poller(encoding="bytes", port_limit=True), "port_limit"),
     ],
 )

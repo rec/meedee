@@ -4,7 +4,7 @@ from collections.abc import Iterator
 
 from . import messages, metrics, midi
 
-def with_gap[T](items: Iterator[T], gap: float) -> Iterator[T | float]: ...
+def with_gap[T](items: Iterator[T], gap: float | str) -> Iterator[T | float | str]: ...
 
 class Clock:
     def __init__(
@@ -137,9 +137,9 @@ class ClockMapping:
         *,
         source: Clock,
         target: Clock,
-        rate: Rational | None = None,
-        offset: Rational | None = None,
-        uncertainty: Rational | None = None,
+        rate: Rational | str | None = None,
+        offset: Rational | str | None = None,
+        uncertainty: Rational | str | None = None,
     ) -> None: ...
     @property
     def source(self) -> Clock: ...

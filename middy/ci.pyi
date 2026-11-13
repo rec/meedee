@@ -385,5 +385,5 @@ def browse(
     *,
     cancel: events.Cancellation | None = None,
     message_limit: int = 1_048_576,
-    byte_limit: int = 8_388_608,
+    byte_limit: int | str = 8_388_608,
 ) -> BrowseReport: ...
