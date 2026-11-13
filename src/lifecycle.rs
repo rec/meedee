@@ -96,11 +96,18 @@ impl<C: Send, N: Send> Resource for Managed<C, N> {
             // A queued job keeps its reservation until a worker consumes it,
             // even if an explicit close has already completed its native work.
             if self.native.closed() {
-                let _ = self
-                    .cleanup
-                    .fetch_update(Ordering::AcqRel, Ordering::Acquire, |state| {
-                        (state != QUEUED).then_some(FINISHED)
-                    });
+                let mut state = self.cleanup.load(Ordering::Acquire);
+                while state != QUEUED {
+                    match self.cleanup.compare_exchange_weak(
+                        state,
+                        FINISHED,
+                        Ordering::AcqRel,
+                        Ordering::Acquire,
+                    ) {
+                        Ok(_) => break,
+                        Err(current) => state = current,
+                    }
+                }
             }
             result
         } else {
