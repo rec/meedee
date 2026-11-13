@@ -174,12 +174,13 @@ def test_syx_stream_writer_preserves_ownership_limits_and_format_errors() -> Non
 
 
 def test_tuning_dump_writes_directly_without_opaque_wrapping() -> None:
-    values = [
-        md.NoteTuning(
-            note=69, pitch=md.tuning.Pitch.from_frequency(frequency_hz=440).pitch
-        )
+    values: list[md.tuning.Pitch | md.tuning.NoChange] = [
+        md.tuning.NoChange() for _ in range(128)
     ]
-    dump = md.tuning.bulk_dump(values, device_id=0, program=2, name="A")
+    values[69] = md.tuning.Pitch.from_frequency(frequency_hz=440).pitch
+    dump = md.tuning.BulkDump(
+        device_id=0, program=2, name="A", table=md.tuning.TuningTable(values=values)
+    )
     stream = BytesIO()
     with md.Writer(stream, format="syx") as writer:
         writer.write(dump)

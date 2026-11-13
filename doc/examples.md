@@ -109,7 +109,7 @@ with (
 ## 9. Export a just-intonation tuning
 
 Create `just-three.syx` with keys 69, 70 and 71 tuned to 440, 660 and 880 Hz.
-Install the `ufor` extra first. The dump targets MTS device ID 0, tuning program 2;
+Install the `ufor` extra first. The dump targets MTS device ID 0, tuning program 0;
 unselected keys use NoChange. Send it with the restore example when the receiving
 synth supports these features and is configured for that device ID.
 
@@ -119,12 +119,10 @@ from ufor.tuning import RatioTable, Tuning
 import middy as md
 
 source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
-pitches = [md.tuning.convert(source, n) for n in [69, 70, 71]]
-print(pitches)
 dump = md.tuning.bulk_dump(
-    pitches,
+    source,
+    notes=[69, 70, 71],
     device_id=0,
-    program=2,
     name="Just three",
 )
 with md.Writer("just-three.syx") as writer:
@@ -132,11 +130,16 @@ with md.Writer("just-three.syx") as writer:
 ```
 
 After the instrument has loaded it, select the tuning with
-`output.send(md.controls.tuning_program(channel=1, program=2))`.
+`output.send(md.controls.tuning_program(channel=1))`.
 Then use the beat-based tune example with notes 69, 70 and 71.
 MTS program numbers are 0..127, unlike ordinary program changes.
+Both calls default to tuning program 0; pass `program=...` to choose another.
 
-Only `md.tuning.convert()` needs uFor. The shared Rust builders `md.tuning.bulk_dump()` and `md.tuning.note_changes()` also accept `md.NoteTuning` values constructed directly.
+Python's `md.tuning.bulk_dump()` accepts a uFor tuning and converts the selected
+keys internally. Unselected keys and keys outside a finite source's coverage use
+`NoChange`; invalid frequencies and evaluation errors raise errors. This is a
+Python-only convenience: Rust's `tuning::bulk_dump()` accepts `NoteTuning` values.
+Without uFor, construct `md.BulkDump` with a complete `md.TuningTable` directly.
 Use `output.send(md.events.with_gap(iter(messages), "100 ms"))` for explicit waits;
 `md.tuning.note_changes()` produces
 ordered messages of at most 127 keys each.

@@ -478,12 +478,16 @@ for units, names, checksum behavior and request tracking.
 Install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
 `middy.tuning.convert(source, note)` converts one note from an existing uFor
 `Tuning` to a native `NoteTuning`. Missing source notes raise `KeyError`; invalid
-frequencies and evaluation failures raise errors. Collect notes with a comprehension
-when building a multi-key message. `bulk_dump()` and `note_changes()` accept those
-notes and construct messages with explicit device/program/bank and real-time
-settings. They open no ports and send nothing. Omitted bulk keys automatically
-use `NoChange`, and both builders accept explicit `NoChange` values. See the
+frequencies and evaluation failures raise errors. Python's
+`bulk_dump(source, notes=[...], device_id=..., name=..., program=0, bank=None)`
+converts selected keys internally, preserving omitted keys and missing source
+mappings with `NoChange`. This is an explicit Python-only uFor integration;
+Rust's builder accepts `NoteTuning` values. Python's `note_changes()` still accepts
+`NoteTuning` values, and `BulkDump(table=..., ...)` supports direct construction
+without uFor. These operations open no ports and send nothing. See the
 [bridge contract](plan/ufor-tuning.md).
+Python bulk dumps, `controls.tuning_program()` and `ufor-export` default to tuning
+program 0. Rust callers pass the program explicitly.
 
 middy supports Python 3.13 and newer. Ordinary installs
 use reccy for unit-aware Python inputs; uFor remains an optional extra.

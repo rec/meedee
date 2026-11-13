@@ -573,8 +573,8 @@ Profiles, Property Exchange or instrument configuration writes.
 ## 16. Export a just-intonation tuning
 
 Create `just-three.syx` with keys 69, 70 and 71 tuned to 440, 660 and 880 Hz.
-Unselected keys are preserved. This uses the same `bulk_dump` builder as Python;
-Rust supplies frequencies directly instead of using Python's optional uFor adapter.
+Unselected keys are preserved. Rust's `bulk_dump` accepts `NoteTuning` values;
+Python's `bulk_dump` instead accepts a uFor tuning and selected MIDI keys.
 
 ```rust
 use middy::{file_io, tuning};
@@ -587,7 +587,7 @@ let pitches = [(69, 440.0), (70, 660.0), (71, 880.0)]
         )
     })
     .collect::<Result<Vec<_>, _>>()?;
-let dump = tuning::bulk_dump(&pitches, 0, 2, "Just three".into(), None)?;
+let dump = tuning::bulk_dump(&pitches, 0, 0, "Just three".into(), None)?;
 let mut writer = file_io::Writer::create("just-three.syx")?;
 writer.write(&dump)?;
 writer.finish()?;
@@ -597,10 +597,12 @@ println!("{dump:?}");
 Use `output.send(events::with_gap(messages, gap))` to insert explicit waits
 between complete SysEx messages and after the final message.
 For individual real-time changes, use
-`tuning::note_changes(&pitches, 0, 2, true, None)?`.
+`tuning::note_changes(&pitches, 0, 0, true, None)?`.
 These builders do not open ports or send messages. `None` selects the unbanked
 format; `Some(bank)` selects the banked format. Omitted keys are preserved
 automatically, and both builders accept explicit `NoChange` entries.
+Python defaults bulk dumps and tuning-program selection to program 0; Rust passes
+the program explicitly because Rust functions do not support default arguments.
 
 ## Live routing with progress reports
 

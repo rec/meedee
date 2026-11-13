@@ -26,26 +26,23 @@ def run_ufor(config: UforExport) -> int:
             root_note=config.root_note,
             root_frequency=config.root_frequency,
         )
-    result: list[tuning.NoteTuning] = []
-    for note in range(config.first_note, config.last_note + 1):
-        try:
-            result.append(tuning.convert(source, note))
-        except KeyError:
-            result.append(tuning.NoteTuning(note=note, pitch=tuning.NoChange()))
-        except ArithmeticError as error:
-            raise ValueError(f"cannot convert note {note}: {error}") from error
-    converted = sum(isinstance(k.pitch, tuning.Pitch) for k in result)
+    notes = list(range(config.first_note, config.last_note + 1))
+    try:
+        dump = tuning.bulk_dump(
+            source,
+            notes=notes,
+            device_id=config.device_id,
+            program=config.program,
+            name=config.name,
+            bank=config.bank,
+        )
+    except ArithmeticError as error:
+        raise ValueError(f"cannot convert tuning: {error}") from error
+    converted = sum(isinstance(p, tuning.Pitch) for p in dump.table.values)
     data: dict[str, object] = {
-        "selected_keys": len(result),
+        "selected_keys": len(notes),
         "converted_keys": converted,
     }
-    dump = tuning.bulk_dump(
-        result,
-        device_id=config.device_id,
-        program=config.program,
-        name=config.name,
-        bank=config.bank,
-    )
     wire = codecs.encode(dump)
     with file_io.Writer(config.destination) as destination:
         destination.write(dump)

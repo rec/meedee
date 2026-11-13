@@ -346,10 +346,11 @@ class Query:
 
 def convert(source: Tuning, note: int) -> NoteTuning: ...
 def bulk_dump(
-    result: list[NoteTuning],
+    source: Tuning,
     *,
+    notes: list[int],
     device_id: int,
-    program: int,
+    program: int = 0,
     name: str,
     bank: int | None = None,
 ) -> BulkDump: ...

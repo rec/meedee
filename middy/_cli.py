@@ -312,7 +312,7 @@ class UforExport(BaseModel, frozen=True):
 
     destination: tyro.conf.Positional[Path]
     device_id: int = Field(ge=0, le=126)
-    program: int = Field(ge=0, le=127)
+    program: int = Field(default=0, ge=0, le=127)
     name: str = Field(max_length=16, pattern=r"^[\x00-\x7f]*$")
     bank: int | None = Field(default=None, ge=0, le=127)
 

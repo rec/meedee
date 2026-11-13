@@ -9,6 +9,17 @@ import pytest
 from middy import codecs, controls, events, messages, translation, ump
 
 
+def test_tuning_program_defaults_to_zero_and_accepts_an_explicit_program() -> None:
+    assert controls.tuning_program(channel=1) == messages.ParameterSet(
+        3, 0, resolution=7, channel=1
+    )
+    assert controls.tuning_program(channel=1, program=2) == messages.ParameterSet(
+        3, 2, resolution=7, channel=1
+    )
+    with pytest.raises(TypeError):
+        controls.tuning_program(channel=1, program=True)
+
+
 def test_controller_resolution_is_explicit_and_preserved() -> None:
     coarse = messages.ControlChange(1, 90, channel=2)
     fine = messages.ControlChange(1, 90, channel=2, resolution=14)

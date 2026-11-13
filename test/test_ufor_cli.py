@@ -53,8 +53,6 @@ def test_scala_export_converts_each_selected_note(
                 "72",
                 "--device-id",
                 "1",
-                "--program",
-                "0",
                 "--name",
                 "scale",
                 "--output",
@@ -68,6 +66,7 @@ def test_scala_export_converts_each_selected_note(
     plan = list(file_io.Reader(destination))
     decoded = tuning.decode(plan[0])
     assert decoded is not None and isinstance(decoded.message, tuning.BulkDump)
+    assert decoded.message.program == 0
     assert decoded.message.table.values[71] == tuning.Pitch(semitone=76, fraction=320)
 
 

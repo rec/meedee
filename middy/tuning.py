@@ -19,6 +19,39 @@ _core.populate_tuning(sys.modules[__name__])
 del sys
 
 
+def bulk_dump(
+    source: Tuning,
+    *,
+    notes: list[int],
+    device_id: int,
+    program: int = 0,
+    name: str,
+    bank: int | None = None,
+) -> tuning.BulkDump:
+    """Build a bulk dump from uFor; preserve omitted and unmapped MIDI keys.
+
+    Invalid frequencies and source evaluation errors propagate. No ports are opened.
+    """
+    from ufor.tuning import Tuning
+
+    if not isinstance(source, Tuning):
+        raise TypeError("source must be a uFor Tuning")
+    notes = _check_notes(notes)
+    values: list[tuning.Pitch | tuning.NoChange] = [
+        tuning.NoChange() for _ in range(128)
+    ]
+    for note in notes:
+        if _covered(source, note):
+            values[note] = convert(source, note).pitch
+    return tuning.BulkDump(
+        device_id=device_id,
+        program=program,
+        name=name,
+        table=tuning.TuningTable(values=values),
+        bank=bank,
+    )
+
+
 def convert(source: Tuning, note: int) -> tuning.NoteTuning:
     """Convert one source note to MTS; raise KeyError outside finite coverage."""
     from ufor.tuning import Tuning

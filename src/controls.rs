@@ -204,15 +204,28 @@ macro_rules! helpers {
             $(module.add_function(wrap_pyfunction!($cc,module)?)?;)*
             module.add_class::<Controller>()?;
             module.add_function(wrap_pyfunction!(local_control,module)?)?;
+            module.add_function(wrap_pyfunction!(tuning_program,module)?)?;
             Ok(())
         }
     };
 }
 helpers! {
     rpn: {pitch_bend_sensitivity(channel,semitones,cents);channel_fine_tuning(channel,value);
-    channel_coarse_tuning(channel,semitones);tuning_program(channel,program);tuning_bank(channel,bank);modulation_depth_range(channel,value)};
+    channel_coarse_tuning(channel,semitones);tuning_bank(channel,bank);modulation_depth_range(channel,value)};
     cc: {all_sound_off(channel);reset_all_controllers(channel);all_notes_off(channel);omni_off(channel);omni_on(channel);mono_mode(channel,channels);poly_mode(channel)}
 }
+#[pyfunction]
+#[pyo3(signature=(*,channel,program=0))]
+fn tuning_program(
+    py: Python<'_>,
+    channel: &Bound<'_, PyAny>,
+    #[pyo3(from_py_with = crate::messages::strict_integer)] program: i64,
+) -> PyResult<Py<PyAny>> {
+    let value = controls::tuning_program(crate::messages::integer(channel, "channel")?, program)
+        .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
+    crate::messages::parameter_set_to_python(py, value)
+}
+
 #[pyfunction]
 #[pyo3(signature=(*,channel,enabled))]
 fn local_control(

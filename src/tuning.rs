@@ -449,33 +449,8 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Query>()?;
     module.add_class::<QueryReport>()?;
     module.add_function(wrap_pyfunction!(decode, module)?)?;
-    module.add_function(wrap_pyfunction!(bulk_dump, module)?)?;
     module.add_function(wrap_pyfunction!(note_changes, module)?)?;
     Ok(())
-}
-
-/// Build an ordinary or banked 128-key dump, preserving omitted keys with NoChange.
-#[pyfunction]
-#[pyo3(signature=(result, *, device_id, program, name, bank=None))]
-fn bulk_dump(
-    py: Python<'_>,
-    #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
-    #[pyo3(from_py_with=int)] device_id: i64,
-    #[pyo3(from_py_with=int)] program: i64,
-    name: String,
-    bank: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Py<PyAny>> {
-    message_object(
-        py,
-        model::bulk_dump(
-            &result,
-            device_id,
-            program,
-            name,
-            bank.map(int).transpose()?,
-        )
-        .map_err(value_error)?,
-    )
 }
 
 /// Build ordered batches of at most 127 keys, with explicit real-time intent.

@@ -70,16 +70,12 @@ def test_out_of_range_exact_pitch_cannot_round_onto_a_valid_endpoint(
         tuning.convert(source, 0)
 
 
-def test_bulk_preserves_omitted_keys_and_explicit_no_change_entries() -> None:
-    result = [
-        tuning.NoteTuning(note=68, pitch=tuning.NoChange()),
-        tuning.convert(
-            Tuning(source=FrequencyTable(values=["440"], first_note=69)), 69
-        ),
-    ]
+def test_bulk_preserves_omitted_keys_and_missing_source_mappings() -> None:
+    source = Tuning(source=FrequencyTable(values=["440"], first_note=69))
     for bank in [None, 3]:
         message = tuning.bulk_dump(
-            result,
+            source,
+            notes=[68, 69],
             device_id=1,
             program=2,
             name="test",
@@ -97,9 +93,56 @@ def test_bulk_preserves_omitted_keys_and_explicit_no_change_entries() -> None:
         assert decoded is not None and decoded.message == message
 
 
+@pytest.mark.parametrize(
+    "notes, exception",
+    [
+        ([], ValueError),
+        ([69, 69], ValueError),
+        (list(range(129)), ValueError),
+        ([-1], ValueError),
+        ([128], ValueError),
+        ([True], TypeError),
+        ([69.0], TypeError),
+        ((69,), TypeError),
+    ],
+)
+def test_bulk_rejects_invalid_key_selections(
+    notes: list[int], exception: type[Exception]
+) -> None:
+    with pytest.raises(exception):
+        tuning.bulk_dump(
+            Tuning(source=Computed()), notes=notes, device_id=1, program=0, name="test"
+        )
+
+
+def test_bulk_converts_the_example_and_preserves_finite_source_boundaries() -> None:
+    source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
+    dump = tuning.bulk_dump(
+        source, notes=[68, 71, 70, 69, 72], device_id=0, name="Just three"
+    )
+    assert dump.program == 0
+    assert dump.table.values[69:72] == (
+        tuning.Pitch(semitone=69, fraction=0),
+        tuning.Pitch(semitone=76, fraction=320),
+        tuning.Pitch(semitone=81, fraction=0),
+    )
+    assert sum(isinstance(p, tuning.NoChange) for p in dump.table.values) == 125
+
+
+def test_bulk_rejects_invalid_frequencies_and_propagates_evaluation_errors() -> None:
+    source = Tuning(source=FrequencyTable(values=["1/10"], first_note=69))
+    with pytest.raises(ValueError, match="MTS frequency range"):
+        tuning.bulk_dump(source, notes=[69], device_id=1, program=0, name="test")
+    assert isinstance(source.source, FrequencyTable)
+    source.source.values[0] = "1/0"
+    with pytest.raises(ValueError, match="undefined or out of range"):
+        tuning.bulk_dump(source, notes=[69], device_id=1, program=0, name="test")
+
+
 def test_partial_bulk_and_note_changes_preserve_unselected_keys() -> None:
-    result = [tuning.convert(Tuning(source=Computed()), 69)]
-    dump = tuning.bulk_dump(result, device_id=1, program=0, name="partial")
+    source = Tuning(source=Computed())
+    result = [tuning.convert(source, 69)]
+    dump = tuning.bulk_dump(source, notes=[69], device_id=1, program=0, name="partial")
     assert dump.table.values[69] == result[0].pitch
     assert sum(isinstance(p, tuning.NoChange) for p in dump.table.values) == 127
     message = tuning.note_changes(result, device_id=1, program=0, realtime=True)[0]
@@ -111,10 +154,16 @@ def test_partial_bulk_and_note_changes_preserve_unselected_keys() -> None:
 
 
 def test_full_keyboard_builds_both_bulk_formats_and_bounded_note_batches() -> None:
-    result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
+    source = Tuning(source=Computed())
+    result = [tuning.convert(source, n) for n in range(128)]
     for bank in [None, 0]:
         message = tuning.bulk_dump(
-            result, device_id=127, program=127, name="equal", bank=bank
+            source,
+            notes=list(range(128)),
+            device_id=127,
+            program=127,
+            name="equal",
+            bank=bank,
         )
         assert len(message.table.values) == 128
         assert not any(isinstance(p, tuning.NoChange) for p in message.table.values)
@@ -159,13 +208,14 @@ def test_conversion_requires_a_midi_note(note: int, exception: type[Exception]) 
 def test_message_builders_keep_native_validation_and_require_explicit_settings() -> (
     None
 ):
-    result = [tuning.convert(Tuning(source=Computed()), 69)]
+    source = Tuning(source=Computed())
+    result = [tuning.convert(source, 69)]
     with pytest.raises(TypeError):
         tuning.note_changes(result, device_id=True, program=0, realtime=True)
     with pytest.raises(ValueError):
         tuning.note_changes(result, device_id=1, program=128, realtime=True)
     with pytest.raises(ValueError):
-        tuning.bulk_dump(result, device_id=1, program=0, name="x" * 17)
+        tuning.bulk_dump(source, notes=[69], device_id=1, program=0, name="x" * 17)
 
 
 def test_detuning_uses_ufor_and_converted_notes_do_not_change_with_source_edits() -> (
@@ -177,9 +227,8 @@ def test_detuning_uses_ufor_and_converted_notes_do_not_change_with_source_edits(
     assert isinstance(source.source, RatioTable)
     source.source.values[0] = "2"
     assert result[0].pitch == tuning.Pitch(semitone=70, fraction=0)
-    result.append(result[0])
-    with pytest.raises(ValueError, match="distinct"):
-        tuning.bulk_dump(result, device_id=1, program=0, name="duplicate")
+    dump = tuning.bulk_dump(source, notes=[69], device_id=1, program=0, name="updated")
+    assert dump.table.values[69] == tuning.Pitch(semitone=82, fraction=0)
 
 
 @pytest.mark.parametrize("detune", [1e308, -1e308])
@@ -195,8 +244,14 @@ def test_bulk_dump_can_be_sent_as_sysex_with_library_broadcast(
 ) -> None:
     from middy.testing import Output
 
-    result = [tuning.convert(Tuning(source=Computed()), n) for n in range(128)]
-    dump = tuning.bulk_dump(result, device_id=127, program=2, name="dump", bank=bank)
+    dump = tuning.bulk_dump(
+        Tuning(source=Computed()),
+        notes=list(range(128)),
+        device_id=127,
+        program=2,
+        name="dump",
+        bank=bank,
+    )
     wire = codecs.encode(dump)
     message = messages.SysEx(data=wire[1:-1])
     output = Output(encoding="bytes")

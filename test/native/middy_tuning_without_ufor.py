@@ -28,7 +28,13 @@ def check_without_ufor() -> None:
             pitch=tuning.Pitch(semitone=69, fraction=0),
         )
     ]
-    dump = tuning.bulk_dump(result, device_id=1, program=0, name="test")
+    values: list[tuning.Pitch | tuning.NoChange] = [
+        tuning.NoChange() for _ in range(128)
+    ]
+    values[69] = result[0].pitch
+    dump = tuning.BulkDump(
+        device_id=1, program=0, name="test", table=tuning.TuningTable(values=values)
+    )
     assert dump.table.values[69] == tuning.Pitch(semitone=69, fraction=0)
     assert sum(isinstance(p, tuning.NoChange) for p in dump.table.values) == 127
     outgoing = tuning.note_changes(result, device_id=1, program=0, realtime=True)

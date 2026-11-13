@@ -13,8 +13,9 @@ The optional bridge uses the `ufor` extra on Python 3.13:
 uv sync --extra ufor --python 3.13
 ```
 
-Only `convert()` imports uFor. Core MTS values and message builders remain usable
-without it. Ordinary MIDI workflows do not load uFor, and the root package does
+`convert()` and Python's `bulk_dump()` import uFor when called. Core MTS values,
+direct `BulkDump` construction and `note_changes()` remain usable without it.
+Ordinary MIDI workflows do not load uFor, and the root package does
 not re-export these symbols.
 
 ## Convert one note
@@ -52,21 +53,29 @@ error through `PitchConversion.error_cents`.
 
 ## Construct messages
 
-Collect converted notes only when a message needs several keys:
+Python bulk dumps accept a uFor source directly:
 
 ```python
-notes = [tuning.convert(source, n) for n in [69, 70, 71]]
 dump = tuning.bulk_dump(
-    notes, device_id=1, program=0, name="Just three"
+    source, notes=[69, 70, 71], device_id=1, name="Just three"
 )
 print(dump)
 ```
 
-`bulk_dump(notes, *, device_id, program, name, bank=None)` creates a `BulkDump`
-with an optional bank. Omitted keys automatically use `NoChange`. Callers may
-also supply `NoteTuning(note=..., pitch=NoChange())`.
+Python's `bulk_dump(source, *, notes, device_id, program=0, name, bank=None)` creates
+a `BulkDump` with an optional bank. `source` must be a uFor `Tuning`; `notes` is a
+list of 1..128 distinct MIDI keys. The function converts covered selected keys;
+omitted keys and keys outside finite source coverage automatically use `NoChange`.
+Invalid frequencies and source evaluation errors propagate.
 NoChange leaves the receiver's value unchanged; it does not establish that value.
 Names must contain at most 16 ASCII characters.
+The tuning program defaults to 0, as does `controls.tuning_program(channel=...)`.
+Pass `program=...` explicitly to load or select a different tuning program.
+
+This is an explicit Python-only uFor integration. Rust's `bulk_dump` continues to
+accept `NoteTuning` values. Python callers supplying pitches directly construct
+`BulkDump(table=TuningTable(values=...), ...)` with all 128 table entries;
+this does not require uFor.
 
 `note_changes(notes, *, device_id, program, realtime, bank=None)` builds
 `NoteChange` messages with an optional bank.
@@ -75,8 +84,8 @@ The unbanked format requires `realtime=True`. Omitted keys are unchanged, and
 explicit `NoChange` values are accepted. These messages do not form
 an atomic device transaction.
 
-Both builders accept lists of 1..128 distinct `NoteTuning` values and retain
-native message validation. Device, bank and program identifiers use MTS values
+`note_changes` accepts lists of 1..128 distinct `NoteTuning` values. Both builders
+retain native message validation. Device, bank and program identifiers use MTS values
 0..127. Library callers may explicitly select broadcast device ID 127.
 Construction opens no ports and sends nothing.
 
@@ -105,7 +114,8 @@ become `NoChange`; evaluation and range failures always abort.
 The summary reports selected, converted and preserved key counts, without
 per-note status records.
 
-Export requires device ID 0..126, program 0..127 and a name. Optional `--bank`
+Export requires device ID 0..126 and a name. The program defaults to 0;
+`--program` selects another value in 0..127. Optional `--bank`
 selects the banked format. Conversion and validation finish before the destination
 is opened. Exclusive creation preserves existing files; a write failure can leave
 a partial new file. Success returns 0; argument, conversion or file errors return
