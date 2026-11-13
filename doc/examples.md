@@ -2,37 +2,6 @@
 
 A graded series of examples.
 
-## Inspect one input universe
-
-```python
-from middy import controls, messages, universe
-
-options = universe.CacheOptions(
-    default=universe.Retention.Minimum,
-    universe=universe.Retention.Full,
-    categories={universe.Category.Notes: universe.Retention.Minimum},
-)
-cache = universe.Universe(options=options)
-for controller, value in [(99, 1), (98, 2), (6, 10), (38, 5)]:
-    cache.feed(messages.ControlChange(controller, value, channel=1))
-
-state = cache.parameter_state(
-    universe.Scope(), 1, controls.ParameterFamily.Nrpn, 130
-)
-assert state is not None and state.components is not None
-assert (state.components.coarse, state.components.fine) == (10, 5)
-snapshot = cache.snapshot()
-cache.reset()
-assert len(snapshot.parameters) == 1
-```
-
-Each instance binds to its first event's source identity, including an anonymous
-source. Reset before feeding another source. Pass received primitives to
-`feed`, including `StreamDiagnostic` loss events. Snapshots hold independent
-copies. A category in minimum mode can still expose mandatory decoder state.
-
-For the Rust API, see the [practical Rust examples](rust-examples.md).
-
 ## 1. Play middle C for half a second
 
 ```python
@@ -107,116 +76,19 @@ with md.Input(channel=1) as input, md.Output() as out:
     out.send(md.ProgramChange(81, channel=3))
 
     for m in input:
-        if hasattr(m, 'note'):
-            channel = 2 if m.note < 60 else 3
-            out.send(m.replace(channel=channel))
-        elif hasattr(m, 'channel'):
-            out.send(m.replace(channel=2))
-            out.send(m.replace(channel=3))
-        else:
-            out.send(m)
-```
 
-Another way.
 
 ```python
 import middy as md
 
-with md.Input() as input, md.Output(channel=2) as o2, md.Output(channel=3) as o3:
-    o2.send(md.ProgramChange(34))
-    o3.send(md.ProgramChange(81))
+# This time depends on the make and model of your unit and
+# can range from a few milliseconds to a full second. Unfortunately
+# you have to look at your manual to find out
 
-    for m in input:
-        if hasattr(m, 'note'):
-            out = o2 if m.note < 60 else o3
-            out.send(m)
-        elif hasattr(m, "channel"):
-            o2.send(m)
-            o3.send(m)
-        else:
-            o2.send(m)
-```
-
-## 6. Record and replay a performance
-
-Record ten seconds in memory, then replay it.
-
-```python
-import middy as md
-
-md.Output().send(md.Input().record(10))
-```
-
-Or save the recording and play it later:
-
-```python
-import middy as md
-
-filename = "rec.middy"
-md.Input().record(10, output=filename, overwrite=True)
-
-# Later:
-md.Output().send(md.Reader(filename))
-```
-
-## 7. Transpose a MIDI file
-
-Read `song.mid` and write `song-up.mid`, preserving tracks, timing and metadata.
-Channel 10 is left unchanged under the GM drum convention. This opens no ports.
-
-```python
-import middy as md
-
-with md.Writer("song-up.mid") as writer:
-    for m in md.Reader("song.mid"):
-        if getattr(m, "channel", 10) != 10:
-            m = m.transpose(12)
-        writer.write(m)
-```
-
-`Reader` detects MIDI files, SysEx streams and middy archives from their contents. For a MIDI
-file, it yields the header first, then file events. Events expose `channel` and
-`transpose()` directly; transposition clamps note numbers to 0..127 and preserves
-all other file data. `Writer` chooses the format from `.mid`, `.midi`, `.syx` or `.middy`
-and refuses to overwrite an existing file. The context finalizes it on success;
-an error can leave a partial output, while the source remains unchanged.
-For a stream destination, use `Writer(stream, format="syx")` for SysEx;
-the default for streams remains an archive. Empty input is an empty SysEx stream.
-
-## 8. Back up and restore SysEx
-
-Start a dump on the instrument during this 30-second recording. Save the complete
-recording with timing, then export its SysEx messages to a new `.syx` file.
-The recording's diagnostics remain available for checking loss or failure.
-
-```python
-import middy as md
-
-recording = md.Input().record(30, output="backup.middy")
-print(recording)
-with md.Writer("backup.syx") as writer:
-    for m in recording:
-        if isinstance(m, md.SysEx):
-            writer.write(m)
-```
-
-Replay the recording, preserving its timing:
-
-```python
-import middy as md
-
-print(md.Output().send(md.Reader("backup.middy")))
-```
-
-Alternatively, restore an untimed `.syx` file with explicit waits in the sequence.
-Use the instrument's documented pause; restoration can replace sounds/settings.
-Successful handoff does not prove the instrument accepted the dump.
-
-```python
-import middy as md
+SYSEX_WAIT = '100 ms'
 
 with md.Output() as output:
-    print(output.send(md.events.with_gap(md.Reader("backup.syx"), 0.1)))
+    print(output.send(md.events.with_gap(md.Reader("backup.syx"), SYSEX_WAIT)))
 ```
 
 ### Request or capture an opaque instrument dump
@@ -224,39 +96,15 @@ with md.Output() as output:
 ```python
 from middy import file_io, midi, sysex
 
-with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
-    result = sysex.dump(receiver, output)
-    print(result.status, result.reason)
-    with file_io.Writer("vl70.syx") as writer:
-        for m in result.messages:
-            writer.write(m)
+with (
+    midi.Input(port="VL70") as input,
+    midi.Output(port="VL70") as output,
+    file_io.Writer("vl70.syx") as writer
+):
+    for m in sysex.dump(receiver, output).messages:
+        writer.write(m)
+        output.send(result.messages)
 ```
-
-The call sends an identity request and requires exactly one supported reply
-before requesting the dump. Set `model="yamaha/vl70-m"` to skip detection.
-Omit `output` and supply `model` for a dump started on the instrument. The call
-retains opaque SysEx and leaves connections open; manual completion remains
-unverified.
-See [model coverage and scope limits](sysex-dumps.md) before interpreting a
-capture as a backup. Some models support only manual capture or current/system
-requests, and `all` names the documented collection for that model.
-
-To restore the in-memory capture with its observed relative message timing,
-run this separately after checking the capture report and deciding to restore:
-
-```python
-with midi.Output(port="VL70") as output:
-    print(output.send(result.messages))
-```
-
-This uses timestamps retained from the input, whose default timestamp mode is
-`Absolute`. It preserves observed message timing; it does not infer the synth's
-required receive gap. In particular, separately requested replies include request
-turnaround time. Saving to `.syx` discards timing. For an untimed `.syx` file, use
-the `events.with_gap(..., 0.1)` example above, choosing the gap in seconds from
-the instrument's documentation. It inserts a wait after every item, including
-the last. Output uses ordinary sequence timing, not completion-relative pacing.
-The helper itself only yields items and gap values; it does not sleep or send.
 
 ## 9. Export a just-intonation tuning
 
@@ -1006,3 +854,32 @@ Invalid settings raise `pydantic.ValidationError`, a `ValueError`. Configuration
 fields are read-only; native handles and mutable runtime state are private.
 Copying and pickling a resource is rejected. Create a fresh connection from its
 settings when needed; message iteration and normal context cleanup are unchanged.
+
+## Inspect one input universe
+
+```python
+from middy import controls, messages, universe
+
+options = universe.CacheOptions(
+    default=universe.Retention.Minimum,
+    universe=universe.Retention.Full,
+    categories={universe.Category.Notes: universe.Retention.Minimum},
+)
+cache = universe.Universe(options=options)
+for controller, value in [(99, 1), (98, 2), (6, 10), (38, 5)]:
+    cache.feed(messages.ControlChange(controller, value, channel=1))
+
+state = cache.parameter_state(
+    universe.Scope(), 1, controls.ParameterFamily.Nrpn, 130
+)
+assert state is not None and state.components is not None
+assert (state.components.coarse, state.components.fine) == (10, 5)
+snapshot = cache.snapshot()
+cache.reset()
+assert len(snapshot.parameters) == 1
+```
+
+Each instance binds to its first event's source identity, including an anonymous
+source. Reset before feeding another source. Pass received primitives to
+`feed`, including `StreamDiagnostic` loss events. Snapshots hold independent
+copies. A category in minimum mode can still expose mandatory decoder state.
