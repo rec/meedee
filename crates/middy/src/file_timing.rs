@@ -410,7 +410,7 @@ pub fn export_smf(
             c.expand()?
         }
         Payload::Ump(_) | Payload::Message(_) => {
-            let report = translation::to_midi1(&event, allow_loss).map_err(|e| invalid(0, e))?;
+            let report = translation::to_midi1(event, allow_loss).map_err(|e| invalid(0, e))?;
             if report.group.is_some() {
                 return Ok(denied(translation::TranslationStatus::ContextRequired,"resolve UMP group routing explicitly before legacy SMF export; use the translation report to choose a destination"));
             }

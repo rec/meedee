@@ -24,6 +24,8 @@ pub struct Input {
 #[pymethods]
 impl Input {
     #[new]
+    // Match the Python keyword interface without introducing a second options type.
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (*, identity, encoding=Encoding::Bytes, backend=None, timestamps=TimestampMode::Absolute, receive_byte_limit=8_388_608, worker_program=None, worker_args=None, worker_timeout=5.0))]
     fn new(
         py: Python<'_>,

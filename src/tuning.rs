@@ -828,7 +828,7 @@ impl Query {
         item: &Bound<'_, PyAny>,
         #[pyo3(from_py_with=crate::units::nanoseconds)] now_ns: u64,
     ) -> PyResult<()> {
-        let item = if let Ok(e) = crate::event_values::extract(&item) {
+        let item = if let Ok(e) = crate::event_values::extract(item) {
             middy::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             middy::events::InputItem::Diagnostic(d.value.clone())

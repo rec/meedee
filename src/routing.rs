@@ -108,7 +108,7 @@ impl Router {
         })
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let Ok(e) = crate::event_values::extract(&item) {
+        if let Ok(e) = crate::event_values::extract(item) {
             self.value.feed(&e).map_err(error)
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             self.value.boundary(

@@ -316,7 +316,7 @@ pub struct BulkDump {
     program: u8,
     bank: Option<u8>,
     name: String,
-    table: TuningTable,
+    table: Box<TuningTable>,
 }
 crate::messages::value_metadata!(BulkDump {
     device_id,
@@ -341,7 +341,7 @@ impl BulkDump {
             program: range(program, 127, "program")? as u8,
             bank: None,
             name: format!("{name:<16}"),
-            table,
+            table: Box::new(table),
         })
     }
     pub fn device_id(&self) -> u8 {

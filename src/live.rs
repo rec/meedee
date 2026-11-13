@@ -238,7 +238,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[pyfunction]
 pub fn live_size(item: &Bound<'_, PyAny>) -> PyResult<usize> {
-    if let Ok(v) = crate::event_values::extract(&item) {
+    if let Ok(v) = crate::event_values::extract(item) {
         return Ok(match &v {
             Payload::Message(v) => v.encoded_len(),
             Payload::Ump(v) => {

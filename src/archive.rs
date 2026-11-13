@@ -64,7 +64,7 @@ pub fn extract(v: &Bound<'_, PyAny>) -> PyResult<model::Record> {
             clock_identity: v.value.2.clone(),
         });
     }
-    if let Ok(v) = crate::event_values::extract(&v) {
+    if let Ok(v) = crate::event_values::extract(v) {
         return Ok(model::Record::Event(Box::new(v)));
     }
     if let Ok(v) = v.extract::<PyRef<'_, Gap>>() {

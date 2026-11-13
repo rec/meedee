@@ -27,7 +27,7 @@ impl Tracker {
         })
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
-        if let Ok(e) = crate::event_values::extract(&item) {
+        if let Ok(e) = crate::event_values::extract(item) {
             if e.stream() != Some(self.stream.as_str()) {
                 return Err(PyValueError::new_err("tracker belongs to one source"));
             }

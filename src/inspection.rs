@@ -196,7 +196,7 @@ impl Observer {
         })
     }
     fn feed(&mut self, item: &Bound<'_, PyAny>) -> PyResult<()> {
-        let item = if let Ok(e) = crate::event_values::extract(&item) {
+        let item = if let Ok(e) = crate::event_values::extract(item) {
             middy::events::InputItem::Message(Box::new(e))
         } else if let Ok(d) = item.extract::<PyRef<'_, crate::live::StreamDiagnostic>>() {
             middy::events::InputItem::Diagnostic(d.value.clone())
