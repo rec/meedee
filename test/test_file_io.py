@@ -179,9 +179,7 @@ def test_tuning_dump_writes_directly_without_opaque_wrapping() -> None:
             note=69, pitch=md.tuning.Pitch.from_frequency(frequency_hz=440).pitch
         )
     ]
-    dump = md.tuning.bulk_dump(
-        values, device_id=0, program=2, name="A", preserve_unmapped=True
-    )
+    dump = md.tuning.bulk_dump(values, device_id=0, program=2, name="A")
     stream = BytesIO()
     with md.Writer(stream, format="syx") as writer:
         writer.write(dump)

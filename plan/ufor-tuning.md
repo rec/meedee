@@ -57,24 +57,22 @@ Collect converted notes only when a message needs several keys:
 ```python
 notes = [tuning.convert(source, n) for n in [69, 70, 71]]
 dump = tuning.bulk_dump(
-    notes, device_id=1, program=0, name="Just three", preserve_unmapped=True
+    notes, device_id=1, program=0, name="Just three"
 )
 print(dump)
 ```
 
-`bulk_dump(notes, *, device_id, program, name, bank=None,
-preserve_unmapped=False)` creates a `BulkDump` with an optional bank.
-It requires all 128 distinct MIDI keys unless preservation is explicitly enabled.
-With preservation enabled, omitted keys use `NoChange`. Callers may also supply
-`NoteTuning(note=..., pitch=NoChange())`, which requires the same opt-in.
+`bulk_dump(notes, *, device_id, program, name, bank=None)` creates a `BulkDump`
+with an optional bank. Omitted keys automatically use `NoChange`. Callers may
+also supply `NoteTuning(note=..., pitch=NoChange())`.
 NoChange leaves the receiver's value unchanged; it does not establish that value.
 Names must contain at most 16 ASCII characters.
 
-`note_changes(notes, *, device_id, program, realtime, bank=None,
-preserve_unmapped=False)` builds `NoteChange` messages with an optional bank.
+`note_changes(notes, *, device_id, program, realtime, bank=None)` builds
+`NoteChange` messages with an optional bank.
 It preserves caller order and splits 128 keys into messages of 127 and one key.
-The unbanked format requires `realtime=True`. A subset needs no preservation
-flag unless it contains explicit `NoChange` values. These messages do not form
+The unbanked format requires `realtime=True`. Omitted keys are unchanged, and
+explicit `NoChange` values are accepted. These messages do not form
 an atomic device transaction.
 
 Both builders accept lists of 1..128 distinct `NoteTuning` values and retain
@@ -102,8 +100,8 @@ are rejected. `scala` uses uFor's parser and requires explicit root note and
 frequency. It does not add keyboard maps or a separate tuning engine.
 
 The default selection is all 128 keys. `--first-note` and `--last-note` select an
-inclusive ascending range. `--preserve-unmapped` permits missing source keys and
-unselected keys to become `NoChange`; evaluation and range failures always abort.
+inclusive ascending range. Missing source keys and unselected keys automatically
+become `NoChange`; evaluation and range failures always abort.
 The summary reports selected, converted and preserved key counts, without
 per-note status records.
 

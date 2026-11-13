@@ -315,7 +315,6 @@ class UforExport(BaseModel, frozen=True):
     program: int = Field(ge=0, le=127)
     name: str = Field(max_length=16, pattern=r"^[\x00-\x7f]*$")
     bank: int | None = Field(default=None, ge=0, le=127)
-    preserve_unmapped: bool = False
 
     @model_validator(mode="after")
     def check_source(self) -> Self:

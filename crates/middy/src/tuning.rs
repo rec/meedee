@@ -14,22 +14,16 @@ use std::io::{self, Write};
 const STEPS: f64 = 16384.0;
 const MAX_PITCH: u32 = 2_097_150; // 7F 7F 7F is not a frequency.
 
-/// Build an ordinary or banked 128-key dump. Partial coverage and NoChange
-/// entries require explicit preservation. Does not send anything.
+/// Build an ordinary or banked 128-key dump. Omitted keys use NoChange;
+/// explicit NoChange entries are preserved. Does not send anything.
 pub fn bulk_dump(
     result: &[NoteTuning],
     device_id: i64,
     program: i64,
     name: String,
     bank: Option<i64>,
-    preserve_unmapped: bool,
 ) -> Result<TuningMessage, ValueError> {
-    check_selection(result, preserve_unmapped)?;
-    if result.len() != 128 && !preserve_unmapped {
-        return Err(error(
-            "bulk dumps require all 128 keys or explicit preservation",
-        ));
-    }
+    check_selection(result)?;
     let mut values = [TuningValue::NoChange; 128];
     for change in result {
         values[change.note as usize] = change.pitch;
@@ -43,21 +37,20 @@ pub fn bulk_dump(
 }
 
 /// Build ordered messages of at most 127 keys each. Unbanked changes must
-/// be real-time. NoChange entries require explicit preservation.
+/// be real-time. Omitted keys are unchanged; explicit NoChange entries are preserved.
 pub fn note_changes(
     result: &[NoteTuning],
     device_id: i64,
     program: i64,
     realtime: bool,
     bank: Option<i64>,
-    preserve_unmapped: bool,
 ) -> Result<Vec<TuningMessage>, ValueError> {
     if bank.is_none() && !realtime {
         return Err(error(
             "unbanked note changes are real-time; use a bank for non-real-time",
         ));
     }
-    check_selection(result, preserve_unmapped)?;
+    check_selection(result)?;
     result
         .chunks(127)
         .map(|part| {
@@ -844,7 +837,7 @@ fn check_changes(changes: &[NoteTuning]) -> Result<(), ValueError> {
         Ok(())
     }
 }
-fn check_selection(changes: &[NoteTuning], preserve_unmapped: bool) -> Result<(), ValueError> {
+fn check_selection(changes: &[NoteTuning]) -> Result<(), ValueError> {
     if !(1..=128).contains(&changes.len()) {
         return Err(error("select between one and 128 MIDI keys"));
     }
@@ -853,9 +846,6 @@ fn check_selection(changes: &[NoteTuning], preserve_unmapped: bool) -> Result<()
         if std::mem::replace(&mut seen[change.note as usize], true) {
             return Err(error("selected MIDI keys must be distinct"));
         }
-    }
-    if !preserve_unmapped && changes.iter().any(|c| c.pitch == TuningValue::NoChange) {
-        return Err(error("NoChange requires explicit preservation"));
     }
     Ok(())
 }

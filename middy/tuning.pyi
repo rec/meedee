@@ -352,7 +352,6 @@ def bulk_dump(
     program: int,
     name: str,
     bank: int | None = None,
-    preserve_unmapped: bool = False,
 ) -> BulkDump: ...
 def note_changes(
     result: list[NoteTuning],
@@ -361,7 +360,6 @@ def note_changes(
     program: int,
     realtime: bool,
     bank: int | None = None,
-    preserve_unmapped: bool = False,
 ) -> list[NoteChange]: ...
 def query(
     query: Query,

@@ -70,15 +70,13 @@ def test_out_of_range_exact_pitch_cannot_round_onto_a_valid_endpoint(
         tuning.convert(source, 0)
 
 
-def test_bulk_requires_complete_resolution_or_explicit_preservation() -> None:
+def test_bulk_preserves_omitted_keys_and_explicit_no_change_entries() -> None:
     result = [
         tuning.NoteTuning(note=68, pitch=tuning.NoChange()),
         tuning.convert(
             Tuning(source=FrequencyTable(values=["440"], first_note=69)), 69
         ),
     ]
-    with pytest.raises(ValueError):
-        tuning.bulk_dump(result, device_id=1, program=2, name="test")
     for bank in [None, 3]:
         message = tuning.bulk_dump(
             result,
@@ -86,7 +84,6 @@ def test_bulk_requires_complete_resolution_or_explicit_preservation() -> None:
             program=2,
             name="test",
             bank=bank,
-            preserve_unmapped=True,
         )
         assert isinstance(message, tuning.BulkDump) and message.bank == bank
         assert message.table.values[69] == tuning.Pitch(semitone=69, fraction=0)
@@ -100,10 +97,11 @@ def test_bulk_requires_complete_resolution_or_explicit_preservation() -> None:
         assert decoded is not None and decoded.message == message
 
 
-def test_unselected_keys_need_preservation_for_bulk_but_not_for_note_changes() -> None:
+def test_partial_bulk_and_note_changes_preserve_unselected_keys() -> None:
     result = [tuning.convert(Tuning(source=Computed()), 69)]
-    with pytest.raises(ValueError, match="128"):
-        tuning.bulk_dump(result, device_id=1, program=0, name="partial")
+    dump = tuning.bulk_dump(result, device_id=1, program=0, name="partial")
+    assert dump.table.values[69] == result[0].pitch
+    assert sum(isinstance(p, tuning.NoChange) for p in dump.table.values) == 127
     message = tuning.note_changes(result, device_id=1, program=0, realtime=True)[0]
     assert isinstance(message, tuning.NoteChange)
     assert [p.note for p in message.changes] == [69]
@@ -132,21 +130,21 @@ def test_full_keyboard_builds_both_bulk_formats_and_bounded_note_batches() -> No
             assert decoded is not None and decoded.message == message
 
 
-def test_note_changes_preserve_only_explicit_unmapped_keys() -> None:
+@pytest.mark.parametrize("bank, realtime", [(None, True), (1, True), (1, False)])
+def test_note_changes_accept_explicit_no_change_entries(
+    bank: int | None, realtime: bool
+) -> None:
     result = [
         tuning.convert(Tuning(source=RatioTable(values=["1"])), 69),
         tuning.NoteTuning(note=70, pitch=tuning.NoChange()),
     ]
-    with pytest.raises(ValueError):
-        tuning.note_changes(result, device_id=1, program=0, realtime=True)
     outgoing = tuning.note_changes(
-        result, device_id=1, program=0, realtime=False, bank=1, preserve_unmapped=True
+        result, device_id=1, program=0, realtime=realtime, bank=bank
     )
+    assert len(outgoing) == 1 and outgoing[0].changes == tuple(result)
     assert isinstance(outgoing[0].changes[1].pitch, tuning.NoChange)
     with pytest.raises(ValueError, match="real-time"):
-        tuning.note_changes(
-            result, device_id=1, program=0, realtime=False, preserve_unmapped=True
-        )
+        tuning.note_changes(result, device_id=1, program=0, realtime=False)
 
 
 @pytest.mark.parametrize(
@@ -167,9 +165,7 @@ def test_message_builders_keep_native_validation_and_require_explicit_settings()
     with pytest.raises(ValueError):
         tuning.note_changes(result, device_id=1, program=128, realtime=True)
     with pytest.raises(ValueError):
-        tuning.bulk_dump(
-            result, device_id=1, program=0, name="x" * 17, preserve_unmapped=True
-        )
+        tuning.bulk_dump(result, device_id=1, program=0, name="x" * 17)
 
 
 def test_detuning_uses_ufor_and_converted_notes_do_not_change_with_source_edits() -> (
@@ -183,9 +179,7 @@ def test_detuning_uses_ufor_and_converted_notes_do_not_change_with_source_edits(
     assert result[0].pitch == tuning.Pitch(semitone=70, fraction=0)
     result.append(result[0])
     with pytest.raises(ValueError, match="distinct"):
-        tuning.bulk_dump(
-            result, device_id=1, program=0, name="duplicate", preserve_unmapped=True
-        )
+        tuning.bulk_dump(result, device_id=1, program=0, name="duplicate")
 
 
 @pytest.mark.parametrize("detune", [1e308, -1e308])

@@ -587,7 +587,7 @@ let pitches = [(69, 440.0), (70, 660.0), (71, 880.0)]
         )
     })
     .collect::<Result<Vec<_>, _>>()?;
-let dump = tuning::bulk_dump(&pitches, 0, 2, "Just three".into(), None, true)?;
+let dump = tuning::bulk_dump(&pitches, 0, 2, "Just three".into(), None)?;
 let mut writer = file_io::Writer::create("just-three.syx")?;
 writer.write(&dump)?;
 writer.finish()?;
@@ -597,10 +597,10 @@ println!("{dump:?}");
 Use `output.send(events::with_gap(messages, gap))` to insert explicit waits
 between complete SysEx messages and after the final message.
 For individual real-time changes, use
-`tuning::note_changes(&pitches, 0, 2, true, None, false)?`.
+`tuning::note_changes(&pitches, 0, 2, true, None)?`.
 These builders do not open ports or send messages. `None` selects the unbanked
-format; `Some(bank)` selects the banked format. The final boolean permits
-preserving unmapped keys and explicit `NoChange` entries.
+format; `Some(bank)` selects the banked format. Omitted keys are preserved
+automatically, and both builders accept explicit `NoChange` entries.
 
 ## Live routing with progress reports
 

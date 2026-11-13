@@ -126,7 +126,6 @@ dump = md.tuning.bulk_dump(
     device_id=0,
     program=2,
     name="Just three",
-    preserve_unmapped=True,
 )
 with md.Writer("just-three.syx") as writer:
     writer.write(dump)

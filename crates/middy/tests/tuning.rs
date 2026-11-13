@@ -26,9 +26,8 @@ fn bulk_builders_preserve_unmapped_keys_and_exact_transfer_bytes() {
     assert!(quiet.clone().without_bank().is_err());
     assert!(quiet.with_realtime(true).unwrap().without_bank().is_ok());
     let notes = changes();
-    assert!(bulk_dump(&notes, 1, 2, "partial".into(), None, false).is_err());
     for bank in [None, Some(3)] {
-        let dump = bulk_dump(&notes, 127, 2, "partial".into(), bank, true).unwrap();
+        let dump = bulk_dump(&notes, 127, 2, "partial".into(), bank).unwrap();
         let table = match &dump {
             TuningMessage::BulkDump(d) => {
                 assert_eq!(d.bank().map(i64::from), bank);
@@ -57,12 +56,18 @@ fn full_keyboard_builders_preserve_order_and_split_at_127_keys() {
         .map(|n| NoteTuning::new(n, TuningValue::Pitch(Pitch::new(n, 0).unwrap())).unwrap())
         .collect();
     for bank in [None, Some(0)] {
-        assert!(bulk_dump(&notes, 1, 2, "equal".into(), bank, false).is_ok());
+        let dump = bulk_dump(&notes, 1, 2, "equal".into(), bank).unwrap();
+        let TuningMessage::BulkDump(dump) = dump else {
+            panic!("expected bulk dump");
+        };
+        for note in &notes {
+            assert_eq!(dump.table().values()[note.note() as usize], note.pitch());
+        }
         for realtime in [true, false] {
             if bank.is_none() && !realtime {
                 continue;
             }
-            let messages = note_changes(&notes, 1, 2, realtime, bank, false).unwrap();
+            let messages = note_changes(&notes, 1, 2, realtime, bank).unwrap();
             let batches: Vec<_> = messages
                 .iter()
                 .map(|m| match m {
@@ -84,25 +89,48 @@ fn full_keyboard_builders_preserve_order_and_split_at_127_keys() {
 }
 
 #[test]
-fn builders_reject_invalid_selections_and_require_explicit_preservation() {
+fn builders_reject_invalid_selections() {
     let notes = changes();
     for invalid in [
         vec![],
         vec![notes[0].clone(); 2],
         vec![notes[0].clone(); 129],
     ] {
-        assert!(bulk_dump(&invalid, 1, 0, "test".into(), None, true).is_err());
-        assert!(note_changes(&invalid, 1, 0, true, None, true).is_err());
+        assert!(bulk_dump(&invalid, 1, 0, "test".into(), None).is_err());
+        assert!(note_changes(&invalid, 1, 0, true, None).is_err());
     }
-    let unchanged = [NoteTuning::new(69, TuningValue::NoChange).unwrap()];
-    assert!(bulk_dump(&unchanged, 1, 0, "test".into(), None, false).is_err());
-    assert!(note_changes(&unchanged, 1, 0, true, None, false).is_err());
-    assert!(note_changes(&unchanged, 1, 0, true, None, true).is_ok());
-    assert!(note_changes(&notes, 1, 0, false, None, false).is_err());
-    assert!(note_changes(&notes, 128, 0, true, None, false).is_err());
-    assert!(bulk_dump(&notes, 1, 128, "test".into(), None, true).is_err());
-    assert!(bulk_dump(&notes, 1, 0, "test".into(), Some(128), true).is_err());
-    assert!(bulk_dump(&notes, 1, 0, "x".repeat(17), None, true).is_err());
+    assert!(note_changes(&notes, 1, 0, false, None).is_err());
+    assert!(note_changes(&notes, 128, 0, true, None).is_err());
+    assert!(bulk_dump(&notes, 1, 128, "test".into(), None).is_err());
+    assert!(bulk_dump(&notes, 1, 0, "test".into(), Some(128)).is_err());
+    assert!(bulk_dump(&notes, 1, 0, "x".repeat(17), None).is_err());
+}
+
+#[test]
+fn builders_accept_explicit_no_change_entries() {
+    let notes = [
+        changes()[0].clone(),
+        NoteTuning::new(70, TuningValue::NoChange).unwrap(),
+    ];
+    for bank in [None, Some(3)] {
+        let dump = bulk_dump(&notes, 1, 0, "test".into(), bank).unwrap();
+        let TuningMessage::BulkDump(dump) = dump else {
+            panic!("expected bulk dump");
+        };
+        assert_eq!(dump.table().values()[69], notes[0].pitch());
+        assert_eq!(dump.table().values()[70], TuningValue::NoChange);
+        for realtime in [true, false] {
+            if bank.is_none() && !realtime {
+                continue;
+            }
+            let messages = note_changes(&notes, 1, 0, realtime, bank).unwrap();
+            assert_eq!(messages.len(), 1);
+            let TuningMessage::NoteChange(message) = &messages[0] else {
+                panic!("expected note changes");
+            };
+            assert_eq!(message.changes(), notes);
+        }
+    }
 }
 fn message(name: &str) -> TuningMessage {
     match name {

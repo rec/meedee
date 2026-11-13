@@ -12,7 +12,7 @@ fn unified_writer_accepts_structured_tuning_and_short_syx_streams() {
         tuning::TuningValue::Pitch(tuning::Pitch::from_frequency(440.0).unwrap().pitch),
     )
     .unwrap()];
-    let dump = tuning::bulk_dump(&pitches, 0, 2, "A".into(), None, true).unwrap();
+    let dump = tuning::bulk_dump(&pitches, 0, 2, "A".into(), None).unwrap();
     let mut bytes = Cursor::new(vec![]);
     let mut writer = file_io::Writer::new(&mut bytes, "syx", 1024).unwrap();
     writer.write(&dump).unwrap();

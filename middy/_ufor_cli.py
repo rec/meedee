@@ -30,9 +30,7 @@ def run_ufor(config: UforExport) -> int:
     for note in range(config.first_note, config.last_note + 1):
         try:
             result.append(tuning.convert(source, note))
-        except KeyError as error:
-            if not config.preserve_unmapped:
-                raise ValueError(str(error)) from error
+        except KeyError:
             result.append(tuning.NoteTuning(note=note, pitch=tuning.NoChange()))
         except ArithmeticError as error:
             raise ValueError(f"cannot convert note {note}: {error}") from error
@@ -47,7 +45,6 @@ def run_ufor(config: UforExport) -> int:
         program=config.program,
         name=config.name,
         bank=config.bank,
-        preserve_unmapped=config.preserve_unmapped,
     )
     wire = codecs.encode(dump)
     with file_io.Writer(config.destination) as destination:

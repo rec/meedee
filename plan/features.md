@@ -338,7 +338,7 @@ encoding a MIDI message.
 
 **Implemented foundation:** the optional Python
 [`middy.tuning` bridge](ufor-tuning.md) converts individual notes and constructs
-ordinary/banked per-key MTS messages with explicit preservation and error policy.
+ordinary/banked per-key MTS messages with automatic preservation of unmapped keys.
 It opens no ports. Bulk-dump construction and optional offline
 CLI exclusive SYX export accepts existing uFor Tuning JSON and Scala
 sources. Exported files use the existing explicit transfer workflow; no second

@@ -481,8 +481,8 @@ Install the `ufor` extra (`uv sync --extra ufor --python 3.13`).
 frequencies and evaluation failures raise errors. Collect notes with a comprehension
 when building a multi-key message. `bulk_dump()` and `note_changes()` accept those
 notes and construct messages with explicit device/program/bank and real-time
-settings. They open no ports and send nothing. Omitted bulk keys or explicit
-`NoChange` values require `preserve_unmapped=True`. See the
+settings. They open no ports and send nothing. Omitted bulk keys automatically
+use `NoChange`, and both builders accept explicit `NoChange` values. See the
 [bridge contract](plan/ufor-tuning.md).
 
 middy supports Python 3.13 and newer. Ordinary installs

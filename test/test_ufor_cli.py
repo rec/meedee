@@ -57,7 +57,6 @@ def test_scala_export_converts_each_selected_note(
                 "0",
                 "--name",
                 "scale",
-                "--preserve-unmapped",
                 "--output",
                 "json",
             ]
@@ -113,7 +112,7 @@ def test_complete_bulk_export_is_transfer_ready_and_refuses_overwrite(
     assert destination.read_bytes() == before
 
 
-def test_partial_export_requires_preservation_and_never_hides_invalid_pitches(
+def test_partial_export_preserves_missing_keys_and_never_hides_invalid_pitches(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -139,9 +138,7 @@ def test_partial_export_requires_preservation_and_never_hides_invalid_pitches(
         "--output",
         "json",
     ]
-    assert invoke(args) == 2 and not destination.exists()
-    assert capsys.readouterr().err
-    assert invoke(args + ["--preserve-unmapped"]) == 0
+    assert invoke(args) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["converted_keys"] == 2 and report["preserved_keys"] == 126
     reader = file_io.Reader(destination)
@@ -156,7 +153,7 @@ def test_partial_export_requires_preservation_and_never_hides_invalid_pitches(
     )
     failed = tmp_path / "invalid.syx"
     args[2] = str(failed)
-    assert invoke(args + ["--preserve-unmapped"]) == 2 and not failed.exists()
+    assert invoke(args) == 2 and not failed.exists()
     assert "MTS frequency range" in capsys.readouterr().err
 
 

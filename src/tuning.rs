@@ -454,10 +454,9 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-/// Build an ordinary or banked 128-key dump. Never open a port or send.
+/// Build an ordinary or banked 128-key dump, preserving omitted keys with NoChange.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature=(result, *, device_id, program, name, bank=None, preserve_unmapped=false))]
+#[pyo3(signature=(result, *, device_id, program, name, bank=None))]
 fn bulk_dump(
     py: Python<'_>,
     #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
@@ -465,7 +464,6 @@ fn bulk_dump(
     #[pyo3(from_py_with=int)] program: i64,
     name: String,
     bank: Option<&Bound<'_, PyAny>>,
-    #[pyo3(from_py_with=flag)] preserve_unmapped: bool,
 ) -> PyResult<Py<PyAny>> {
     message_object(
         py,
@@ -475,7 +473,6 @@ fn bulk_dump(
             program,
             name,
             bank.map(int).transpose()?,
-            preserve_unmapped,
         )
         .map_err(value_error)?,
     )
@@ -483,8 +480,7 @@ fn bulk_dump(
 
 /// Build ordered batches of at most 127 keys, with explicit real-time intent.
 #[pyfunction]
-#[allow(clippy::too_many_arguments)]
-#[pyo3(signature=(result, *, device_id, program, realtime, bank=None, preserve_unmapped=false))]
+#[pyo3(signature=(result, *, device_id, program, realtime, bank=None))]
 fn note_changes(
     py: Python<'_>,
     #[pyo3(from_py_with=selection)] result: Vec<model::NoteTuning>,
@@ -492,7 +488,6 @@ fn note_changes(
     #[pyo3(from_py_with=int)] program: i64,
     #[pyo3(from_py_with=flag)] realtime: bool,
     bank: Option<&Bound<'_, PyAny>>,
-    #[pyo3(from_py_with=flag)] preserve_unmapped: bool,
 ) -> PyResult<Vec<Py<PyAny>>> {
     model::note_changes(
         &result,
@@ -500,7 +495,6 @@ fn note_changes(
         program,
         realtime,
         bank.map(int).transpose()?,
-        preserve_unmapped,
     )
     .map_err(value_error)?
     .into_iter()
