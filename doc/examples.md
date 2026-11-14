@@ -43,7 +43,10 @@ with md.Input() as input, md.Output() as output:
         output.send(m.transpose("1 octave"))
 ```
 
-Errors are printed on the console. To handle them yourself, use `md.Input.with_errors()`:
+MIDI errors are just printed on the console. These are rare, and
+are nearly always caused by a cable being unplugged.
+
+To handle them yourself, use `md.Input.with_errors()`:
 
 ```python
 import sys
@@ -60,13 +63,6 @@ with md.Input() as input, md.Output() as output:
 
 ## 5. Split a keyboard into bass and lead
 
-Receive channel 1 and messages without a channel.
-
-Notes below middle C are sent to channel 2; middle C and above go to channel 3.
-
-Other channel messages, such as sustain and pitch bend, go to both channels.
-
-MIDI messages without channels, like SysEx, are forwarded once.
 
 ```python
 import middy as md
@@ -75,21 +71,20 @@ with md.Output() as out:
     out.send(md.ProgramChange(34, channel=2))
     out.send(md.ProgramChange(81, channel=3))
 
-    for m in md.Input(channel=(1, None)):
+    for m in md.Input(channel=1):
         if hasattr(m, 'note'):
-            channel = 2 if m.note < 60 else 3
-            out.send(m.replace(channel=channel))
+            if m.note < 60:
+                # Below middle C goes to channel 2
+                out.send(m.replace(channel=2))
+            else:
+                # At or above middle C goes to channel 3
+                out.send(m.replace(channel=3))
+            channel = 2
         else:
+            # Pitch bends, controllers, etc, go to both channels
             out.send(m.replace(channel=2))
             out.send(m.replace(channel=3))
 ```
-
-`channel=1` accepts exactly channel 1. A collection such as `(1, 3)` accepts
-those channels; include `None` to also accept channel-less messages. `(None,)`
-accepts only channel-less messages, and an empty collection accepts no messages.
-Omitting `channel` or passing `channel=None` accepts all messages. Diagnostics
-remain available through `with_errors()` regardless of the selection. The same
-selection applies to callbacks and recordings; raw input cannot filter channels.
 
 ## 6. Record and replay a performance
 
@@ -98,7 +93,7 @@ Record ten seconds in memory, then replay the captured events:
 ```python
 import middy as md
 
-md.Output().send(md.Input().record("10 s"))
+md.Output().send(md.Input().record(10))
 ```
 
 To save the capture and replay it later:
@@ -107,16 +102,12 @@ To save the capture and replay it later:
 import middy as md
 
 md.Input().record("10 s", output="rec.middy")
+
+# later
 md.Output().send(md.Reader("rec.middy"))
 ```
 
-Recording closes the input. The returned records retain timing and diagnostics;
-replay stops at known loss or malformed input rather than silently skipping it.
-
 ## 7. Transpose a MIDI file
-
-Preserve tracks, timing and metadata while leaving channel 10 unchanged under
-the GM drum convention. This opens no MIDI ports.
 
 ```python
 import middy as md
@@ -124,7 +115,7 @@ import middy as md
 with md.Reader("song.mid") as reader, md.Writer("song-up.mid") as writer:
     for m in reader:
         if getattr(m, "channel", 10) != 10:
-            m = m.transpose("1 octave")
+            m = m.transpose("1 octave")  # or just 12
         writer.write(m)
 ```
 

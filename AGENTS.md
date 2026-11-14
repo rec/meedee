@@ -1,4 +1,4 @@
-# Python and Rust API parity
+## Python and Rust API parity
 
 Keep the Python and Rust public APIs as similar as their languages allow.
 
@@ -17,3 +17,8 @@ Keep the Python and Rust public APIs as similar as their languages allow.
 - Replace superseded interfaces and migrate callers rather than retaining parallel
   legacy APIs unless the user explicitly requests compatibility.
 - Keep public-symbols.txt uncommitted unless the user explicitly requests otherwise.
+
+## doc/examples*.md
+
+Please don't erase human written comments there, and please do not add your
+own comments. Only make changes to the Rust code and the Python code, and then the minimum changes to the text that are required, if any.
