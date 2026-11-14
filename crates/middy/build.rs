@@ -17,8 +17,13 @@ fn main() {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let target = env::var("TARGET").unwrap();
-    let vendor = manifest.join("third_party/libremidi").canonicalize()
-        .expect("build from the complete middy checkout or source distribution: vendored libremidi is missing");
+    // CARGO_MANIFEST_DIR is absolute. Canonicalizing it adds a Windows verbatim
+    // prefix that CMake's generated compiler commands cannot use.
+    let vendor = manifest.join("third_party/libremidi");
+    assert!(
+        vendor.is_dir(),
+        "build from the complete middy checkout or source distribution: vendored libremidi is missing"
+    );
     let mut configure = Command::new("cmake");
     configure
         .args(["-S"])
