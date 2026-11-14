@@ -71,19 +71,17 @@ MIDI messages without channels, like SysEx, are forwarded once.
 ```python
 import middy as md
 
-with md.Input(channel=(1, None)) as input, md.Output() as out:
+with md.Output() as out:
     out.send(md.ProgramChange(34, channel=2))
     out.send(md.ProgramChange(81, channel=3))
 
-    for m in input:
-        if isinstance(m, (md.NoteOn, md.NoteOff, md.PolyPressure)):
+    for m in md.Input(channel=(1, None)):
+        if hasattr(m, 'note'):
             channel = 2 if m.note < 60 else 3
             out.send(m.replace(channel=channel))
-        elif getattr(m, "channel", None) is not None:
+        else:
             out.send(m.replace(channel=2))
             out.send(m.replace(channel=3))
-        else:
-            out.send(m)
 ```
 
 `channel=1` accepts exactly channel 1. A collection such as `(1, 3)` accepts
