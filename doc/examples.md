@@ -7,7 +7,7 @@ A graded series of examples.
 ```python
 import middy as md
 
-md.Output().send(md.Note("500 ms", 60))
+md.Output().send(md.Note('500 ms', 60))
 ```
 
 ## 2. Play a tune in 120 bpm
@@ -15,11 +15,11 @@ md.Output().send(md.Note("500 ms", 60))
 ```python
 import middy as md
 
-md.Output(bpm="120 bpm").send(
+md.Output(bpm='120 bpm').send(
     md.Note(duration=1, note=60, velocity=90),  # 1 beat
     md.Note(0.5, 62, 70),
     md.Note(0.5, 64, 100),
-    md.Rest("1 beat"),
+    md.Rest('1 beat'),
     md.Note(2, 64, 100),
 )
 ```
@@ -40,7 +40,7 @@ import middy as md
 
 with md.Input() as input, md.Output() as output:
     for m in input:
-        output.send(m.transpose("1 octave"))
+        output.send(m.transpose('1 octave'))
 ```
 
 MIDI errors are just printed on the console. These are rare, and
@@ -56,9 +56,9 @@ import middy as md
 with md.Input() as input, md.Output() as output:
     for m in input.with_errors():
         if isinstance(m, md.Message):
-            output.send(m.transpose("1 octave"))
+            output.send(m.transpose('1 octave'))
         else:
-            print("ERROR", m, file=sys.stderr)
+            print('ERROR', m, file=sys.stderr)
 ```
 
 ## 5. Split a keyboard into bass and lead
@@ -101,10 +101,10 @@ To save the capture and replay it later:
 ```python
 import middy as md
 
-md.write(md.Input().record("10 s"), "rec.middy")
+md.write(md.Input().record('10 s'), 'rec.middy')
 
 # later
-md.Output().send(md.Reader("rec.middy"))
+md.Output().send(md.Reader('rec.middy'))
 ```
 
 ## 7. Transpose a MIDI file
@@ -112,46 +112,32 @@ md.Output().send(md.Reader("rec.middy"))
 ```python
 import middy as md
 
-with md.Reader("song.mid") as reader, md.Writer("song-up.mid") as writer:
-    for m in reader:
-        if getattr(m, "channel", 10) != 10:
-            m = m.transpose("1 octave")  # or just 12
+with md.Writer('song-up.mid') as writer:
+    for m in md.Reader('song.mid'):
+        # Some messages don't have a channel!
+        if getattr(m, 'channel', 10) != 10:
+            m = m.transpose(12)  # '1 octave' works too
         writer.write(m)
 ```
 
-The reader yields the file header followed by events. Transposition clamps note
-numbers to 0..127. The writer refuses overwrite and finalizes on successful
-context exit; an error can leave a partial destination.
-
 ## 8. Back up and restore SysEx
 
-Start a dump on the instrument during a 30-second recording. Save the timed
-capture, then export complete SysEx messages separately. Inspect the recording
-for loss or failure before treating it as a backup.
-
 ```python
 import middy as md
 
-recording = md.Input().record("30 s")
-md.write(recording, "backup.middy")
-print(recording)
-with md.Writer("backup.syx") as writer:
-    for m in recording:
-        if isinstance(m, md.SysEx):
-            writer.write(m)
+md.write(md.Input().record('30 s'), 'backup.syx')
 ```
 
-Run restoration separately, choosing the pause from the instrument's manual.
-Restoration can replace sounds or settings; successful sending does not prove
-that the instrument accepted the dump.
-
 ```python
 import middy as md
 
-SYSEX_WAIT = "100 ms"
+SYSEX_WAIT = '100 ms'
+# This depends entirely on your manufacturer and model, and can vary from
+# a few milliseconds to a second and conceivably more.
+# Check your manual!
 
-with md.Reader("backup.syx") as reader, md.Output() as output:
-    print(output.send(md.events.with_gap(reader, SYSEX_WAIT)))
+with md.Reader('backup.syx') as reader:
+    md.Output().send(mdwith_gap(reader, SYSEX_WAIT)))
 ```
 
 ### Request or capture an opaque instrument dump
@@ -160,9 +146,9 @@ with md.Reader("backup.syx") as reader, md.Output() as output:
 from middy import file_io, midi, sysex
 
 with (
-    midi.Input(port="VL70") as receiver,
-    midi.Output(port="VL70") as output,
-    file_io.Writer("vl70.syx") as writer,
+    midi.Input(port='VL70') as receiver,
+    midi.Output(port='VL70') as output,
+    file_io.Writer('vl70.syx') as writer,
 ):
     result = sysex.dump(receiver, output)
     print(result.status, result.reason)
@@ -182,14 +168,14 @@ from ufor.tuning import RatioTable, Tuning
 
 import middy as md
 
-source = Tuning(source=RatioTable(values=["1", "3/2", "2"]), root_note=69)
+source = Tuning(source=RatioTable(values=['1', '3/2', '2']), root_note=69)
 dump = md.tuning.bulk_dump(
     source,
     notes=[69, 70, 71],
     device_id=0,
-    name="Just three",
+    name='Just three',
 )
-with md.Writer("just-three.syx") as writer:
+with md.Writer('just-three.syx') as writer:
     writer.write(dump)
 ```
 
@@ -204,7 +190,7 @@ keys internally. Unselected keys and keys outside a finite source's coverage use
 `NoChange`; invalid frequencies and evaluation errors raise errors. This is a
 Python-only convenience: Rust's `tuning::bulk_dump()` accepts `NoteTuning` values.
 Without uFor, construct `md.BulkDump` with a complete `md.TuningTable` directly.
-Use `output.send(md.events.with_gap(iter(messages), "100 ms"))` for explicit waits;
+Use `output.send(md.events.with_gap(iter(messages), '100 ms'))` for explicit waits;
 `md.tuning.note_changes()` produces
 ordered messages of at most 127 keys each.
 
@@ -222,12 +208,12 @@ allocator = md.mpe.Allocator(zone=zone)
 root = allocator.allocate(note=60, velocity=90)
 moving = allocator.allocate(note=64, velocity=75)
 bpm = 120
-clock = md.Clock(identity="mpe", tick_numerator=60, tick_denominator=bpm)
+clock = md.Clock(identity='mpe', tick_numerator=60, tick_denominator=bpm)
 origin = md.Timestamp(ticks=0, clock=clock)
 releases = [allocator.release(voice_id=v.id, velocity=0) for v in [root, moving]]
 ending = [*releases, md.PitchBend(channel=moving.channel, value=0)]
 sequence = [
-    m.replace(stream="mpe", timestamp=md.Timestamp(ticks=b, clock=clock))
+    m.replace(stream='mpe', timestamp=md.Timestamp(ticks=b, clock=clock))
     for b, m in [
         (0, root.note_on),
         (0, moving.note_on),
@@ -264,13 +250,13 @@ from secrets import randbelow
 import middy as md
 
 identity = md.ci.Identity(
-    manufacturer=b"\x7d\x00\x00", family=1, model=1, revision=b"\x00" * 4
+    manufacturer=b'\x7d\x00\x00', family=1, model=1, revision=b'\x00' * 4
 )
 with md.Input() as receiver, md.Output() as output:
     browser = md.ci.Browser(
         local_muid=randbelow(md.ci.MAX_MUID + 1),
         identity=identity,
-        route=md.ci.Route(input=receiver.stream, output="device"),
+        route=md.ci.Route(input=receiver.stream, output='device'),
         discovery_timeout=3,
         endpoint_timeout=1,
         timeout=30,
@@ -298,10 +284,10 @@ import middy as md
 
 with md.Input() as source, md.Output() as destination:
     router = md.Router(routes=[md.Route(
-        name="keys", source=source.stream, destination="synth",
-        encoding="bytes", remap_channel=2,
+        name='keys', source=source.stream, destination='synth',
+        encoding='bytes', remap_channel=2,
     )])
-    print(md.routing.run(router, source, {"synth": destination}, duration=10))
+    print(md.routing.run(router, source, {'synth': destination}, duration=10))
 ```
 
 The driver stops all routes on known loss, overload or send failure. After an
@@ -330,7 +316,7 @@ with md.Input() as source:
     print(md.inspection.run(monitor, source, duration=10, callback=show, metrics=True))
 ```
 
-Entries also provide `observations` and `note_state`. Set `types=["NoteOn"]`,
+Entries also provide `observations` and `note_state`. Set `types=['NoteOn']`,
 `channel=1`, or an explicit UMP `group` on the monitor to select displayed traffic.
 Filtering still updates interpretation; diagnostics and loss notifications always
 reach the callback. Known loss resets interpretation and monitoring continues.
@@ -351,7 +337,7 @@ print(md.gm.program(program=6, bank_lsb=4))
 print(md.gm.percussion(note=36, program=17))
 
 with md.Output() as out:
-    out.send(md.GmMode("gm2", device_id=1), "100 ms", md.ProgramChange(34))
+    out.send(md.GmMode('gm2', device_id=1), '100 ms', md.ProgramChange(34))
 ```
 
 ```python
@@ -389,7 +375,7 @@ import middy as md
 
 with md.Output() as out:
     out.send(md.ParameterSet(0, 2 << 7))  # Pitch-bend range: 2 semitones.
-    out.send(md.ParameterSet(1234, 10000, family="nrpn"))
+    out.send(md.ParameterSet(1234, 10000, family='nrpn'))
 ```
 
 Increment registered parameter 7 once, then decrement non-registered parameter 7
@@ -400,10 +386,10 @@ import middy as md
 
 with md.Output() as out:
     out.send(md.ParameterStep(7))
-    out.send(md.ParameterStep(7, -1, family="nrpn"))
+    out.send(md.ParameterStep(7, -1, family='nrpn'))
 ```
 
-`direction` is `1` or `-1`; it is not a step count. Family defaults to `"rpn"`.
+`direction` is `1` or `-1`; it is not a step count. Family defaults to `'rpn'`.
 The output supplies the channel when it is unassigned. `md.controls.ParameterStep`
 is a separate observation returned when interpreting incoming controller messages.
 
@@ -414,7 +400,7 @@ import middy as md
 
 with md.Output(encoding=md.Encoding.Ump) as out:
     out.send(md.messages.ParameterController(
-        group=1, channel=1, bank=1, index=2, value=2**31, family="assignable"
+        group=1, channel=1, bank=1, index=2, value=2**31, family='assignable'
     ))
 ```
 
@@ -425,7 +411,7 @@ to 1, and output resolves the channel. Values use their native MIDI 2 widths:
 import middy as md
 
 with md.Output(encoding=md.Encoding.Ump) as out:
-    out.send(md.NoteOn(60, 40_000, version=2), "500 ms", md.NoteOff(60, version=2))
+    out.send(md.NoteOn(60, 40_000, version=2), '500 ms', md.NoteOff(60, version=2))
 ```
 
 This requires a native UMP endpoint. Encoding conversion is always explicit.
@@ -447,7 +433,7 @@ assert md.ump.encode(legacy) == (0x22913C5A,)
 assert md.ump.decode((0x22913C5A,)) == legacy
 wide = md.translation.to_midi2(legacy, group=3).messages[0]
 assert wide.version == 2
-assert md.codecs.encode(legacy.replace(group=None)) == b"\x91\x3c\x5a"
+assert md.codecs.encode(legacy.replace(group=None)) == b'\x91\x3c\x5a'
 
 with md.Output(encoding=md.Encoding.Ump, channel=3) as out:
     out.send(md.messages.PerNotePitchBend(group=3, channel=2, note=60, value=1234))
@@ -557,7 +543,7 @@ an observation produced by the UMP assembler.
 ```python
 import middy as md
 
-message = next(md.Reader("tuning.syx"))
+message = next(md.Reader('tuning.syx'))
 print(md.tuning.decode(message))
 print(md.tuning.Decoder().feed(message))
 ```
@@ -575,7 +561,7 @@ from time import monotonic_ns
 
 import middy as md
 
-assembler = md.timecode.Assembler(timeout="100 ms")
+assembler = md.timecode.Assembler(timeout='100 ms')
 for message in md.Input():
     for observation in assembler.feed(message, now_ns=monotonic_ns()):
         print(observation)
@@ -596,8 +582,8 @@ For ordinary playback from a file, `md.smf.TimedReader` performs both steps for 
 ```python
 import middy as md
 
-reader = md.smf.MergedReader("performance.mid")
-timeline = md.smf.Timeline(reader.header, stream="performance")
+reader = md.smf.MergedReader('performance.mid')
+timeline = md.smf.Timeline(reader.header, stream='performance')
 for event in reader:
     for message in timeline.feed(event):
         print(message)
@@ -609,8 +595,8 @@ For a UMP Clip file, use the corresponding entry converter:
 ```python
 import middy as md
 
-timeline = md.clip.Timeline(stream="performance")
-for entry in md.clip.Reader("performance.clip"):
+timeline = md.clip.Timeline(stream='performance')
+for entry in md.clip.Reader('performance.clip'):
     for message in timeline.feed(entry):
         print(message)
 print(timeline.finish())
@@ -627,7 +613,7 @@ messages with `include_configuration=True`.
 import middy as md
 
 print(md.ump.word_count(0x40903C00))  # Two 32-bit words in this UMP packet.
-md.smf.validate_meta(81, b"\x07\xa1\x20")  # Valid tempo: 500,000 microseconds/beat.
+md.smf.validate_meta(81, b'\x07\xa1\x20')  # Valid tempo: 500,000 microseconds/beat.
 ```
 
 `md.ump.word_count()` checks the input is an unsigned 32-bit integer and reports framing
@@ -641,14 +627,14 @@ reader and writer already perform this validation during normal file operations.
 ```python
 import middy as md
 
-source = md.Clock(identity="source", origin="host")
-target = md.Clock(identity="target", origin="host")
+source = md.Clock(identity='source', origin='host')
+target = md.Clock(identity='target', origin='host')
 mapping = md.ClockMapping(
     source=source,
     target=target,
-    rate="1001 / 1000",
-    offset="250 ms",
-    uncertainty="1 us",
+    rate='1001 / 1000',
+    offset='250 ms',
+    uncertainty='1 us',
 )
 print(mapping)
 ```
@@ -661,8 +647,8 @@ its messages through the ordinary input API.
 ```python
 import middy as md
 
-with md.Output().create_virtual("middy-example") as out:
-    with md.Input(port="middy-example") as source:
+with md.Output().create_virtual('middy-example') as out:
+    with md.Input(port='middy-example') as source:
         out.send(md.NoteOn(60))
         print(source.receive(timeout=1))
         out.send(md.NoteOff(60))
@@ -700,7 +686,7 @@ from queue import Queue
 import middy as md
 
 received = Queue()
-with md.Input().create_virtual("middy-callback", callback=received.put):
+with md.Input().create_virtual('middy-callback', callback=received.put):
     print(received.get(timeout=10))
 ```
 
@@ -718,7 +704,7 @@ failure after close. This works even when close raises a cleanup error.
 ```python
 import middy as md
 
-with md.Input().create_virtual("middy-diagnostics") as source:
+with md.Input().create_virtual('middy-diagnostics') as source:
     print(source.clock)
 print(source.closed)
 print(source.dropped_packets)
@@ -741,7 +727,7 @@ GM mode changes, controller destinations, key controls and global parameters:
 ```python
 import middy as md
 
-with md.Reader("backup.syx") as dump:
+with md.Reader('backup.syx') as dump:
     for message in dump:
         if (decoded := md.gm.decode(message)) is not None:
             print(decoded)
@@ -759,7 +745,7 @@ clock's original tick units. This prints the times attached to a saved performan
 ```python
 import middy as md
 
-with md.Reader("rec.middy") as capture:
+with md.Reader('rec.middy') as capture:
     for message in capture:
         if isinstance(message, md.Message) and message.timestamp is not None:
             print(message.timestamp.seconds)
@@ -786,7 +772,7 @@ on calls to receive.
 import middy as md
 
 with md.Input() as source:
-    source.start("rec.middy")
+    source.start('rec.middy')
     print(source.receive(timeout=10))
     print(source.stop())
 ```
@@ -857,7 +843,7 @@ can ignore it.
 import middy as md
 
 with md.Output() as out:
-    print(out.send(md.Note("500 ms", 60), md.Reader("rec.middy"), md.Note("500 ms", 67)))
+    print(out.send(md.Note('500 ms', 60), md.Reader('rec.middy'), md.Note('500 ms', 67)))
 ```
 
 Each argument follows the previous argument. A direct message sends immediately,
@@ -885,7 +871,7 @@ in a child process, use:
 ```python
 import middy as md
 
-md.Output(run_in_subprocess=True).send(md.Note("500 ms", 60))
+md.Output(run_in_subprocess=True).send(md.Note('500 ms', 60))
 ```
 
 The default child is a Python interpreter bootstrapping the shared Rust worker.
@@ -894,7 +880,7 @@ With `middy-worker` installed on PATH, launch the Rust executable directly:
 ```python
 import middy as md
 
-md.Output(run_in_subprocess=True, subprocess_worker="rust").send(md.Note("500 ms", 60))
+md.Output(run_in_subprocess=True, subprocess_worker='rust').send(md.Note('500 ms', 60))
 ```
 
 `subprocess_executable` can select a particular interpreter or Rust executable.
