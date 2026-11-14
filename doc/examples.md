@@ -137,7 +137,7 @@ SYSEX_WAIT = '100 ms'
 # Check your manual!
 
 with md.Reader('backup.syx') as reader:
-    md.Output().send(mdwith_gap(reader, SYSEX_WAIT)))
+    md.Output().send(md.events.with_gap(reader, SYSEX_WAIT))
 ```
 
 ### Request or capture an opaque instrument dump
