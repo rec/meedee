@@ -9,6 +9,8 @@ pub const DEFAULT_LIMIT: usize = 1_048_576;
 /// Write a fallible record stream, choosing the format from the filename.
 /// Existing files are preserved unless overwrite is true. A failure can leave
 /// a partial destination; the writer is finished only after successful iteration.
+/// SYX output selects SysEx messages, discards timing and other MIDI traffic,
+/// and rejects recorded gaps and discontinuities.
 pub fn write<T: WriteRecord>(
     records: impl IntoIterator<Item = io::Result<T>>,
     filename: impl AsRef<std::path::Path>,
@@ -329,6 +331,8 @@ impl<W: Write + std::io::Seek> Writer<W> {
             limit,
         })
     }
+    /// SYX output selects SysEx messages and ignores clock/stream declarations,
+    /// metadata and other MIDI traffic. Gaps and discontinuities are errors.
     pub fn write(&mut self, record: &(impl WriteRecord + ?Sized)) -> io::Result<()> {
         record.write_to(self)
     }
@@ -338,13 +342,29 @@ impl<W: Write + std::io::Seek> Writer<W> {
                 Some(Output::Syx(writer)),
                 Record::Archive(crate::archive::Record::Event(message)),
             ) => {
-                let crate::events::Payload::Message(crate::messages::AnyMessage::SysEx(message)) =
-                    message.as_ref()
-                else {
-                    return Err(invalid(0, "SYX accepts only SysEx messages"));
-                };
-                syx::write(writer, message, self.limit)
+                if let crate::events::Payload::Message(crate::messages::AnyMessage::SysEx(
+                    message,
+                )) = message.as_ref()
+                {
+                    syx::write(writer, message, self.limit)?;
+                }
+                Ok(())
             }
+            (
+                Some(Output::Syx(_)),
+                Record::Archive(
+                    crate::archive::Record::Clock(_)
+                    | crate::archive::Record::Stream { .. }
+                    | crate::archive::Record::Metadata { .. },
+                ),
+            ) => Ok(()),
+            (
+                Some(Output::Syx(_)),
+                Record::Archive(
+                    crate::archive::Record::Gap { .. }
+                    | crate::archive::Record::Discontinuity { .. },
+                ),
+            ) => Err(invalid(0, "SYX cannot preserve a gap or discontinuity")),
             (Some(Output::Archive(writer)), Record::Archive(record)) => writer.write(record),
             (Some(Output::Smf(writer)), Record::Event(event)) => writer.write(event),
             (Some(Output::AwaitingHeader(_)), Record::Header(header)) => {

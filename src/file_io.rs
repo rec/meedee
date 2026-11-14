@@ -213,6 +213,8 @@ pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 
 /// Write an iterable of records using the filename's format and finish on success.
 /// Preserve existing files unless overwrite is true; failures can leave a partial file.
+/// SYX output selects SysEx messages, discards timing and other MIDI traffic,
+/// and rejects recorded gaps and discontinuities.
 #[pyfunction]
 #[pyo3(signature=(records,filename,overwrite=false))]
 fn write(

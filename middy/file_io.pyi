@@ -1,4 +1,8 @@
-"""Detect input formats; select output formats from filenames."""
+"""Detect input formats; select output formats from filenames.
+
+SYX output selects SysEx messages, discards timing and other MIDI traffic,
+and rejects recorded gaps and discontinuities.
+"""
 
 from collections.abc import Iterable, Iterator
 from os import PathLike

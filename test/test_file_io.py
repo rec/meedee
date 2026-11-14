@@ -222,8 +222,7 @@ def test_syx_stream_writer_preserves_ownership_limits_and_format_errors() -> Non
         writer.write(md.SysEx(data=b"\x7d"))
         with pytest.raises(OSError, match="limit"):
             writer.write(md.SysEx(data=b"\x7d\x01"))
-        with pytest.raises(OSError, match="SysEx"):
-            writer.write(md.NoteOn(60, channel=1))
+        writer.write(md.NoteOn(60, channel=1))
         with pytest.raises(OSError, match="archives"):
             writer.finish(complete=False)
     assert not stream.closed and stream.getvalue() == b"\xf0\x7d\xf7"
@@ -232,6 +231,22 @@ def test_syx_stream_writer_preserves_ownership_limits_and_format_errors() -> Non
         with pytest.raises(OSError):
             next(reader)
         assert not reader.complete and reader.problem
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    [
+        md.archive.Gap(stream="input", lost=1, reason="overflow"),
+        md.archive.Discontinuity(stream="input", reason="disconnected"),
+    ],
+)
+def test_syx_write_rejects_recording_loss(
+    tmp_path: Path, diagnostic: md.archive.Gap | md.archive.Discontinuity
+) -> None:
+    destination = tmp_path / "backup.syx"
+    with pytest.raises(OSError, match="gap or discontinuity"):
+        md.write([md.SysEx(b"\x7d"), diagnostic, md.SysEx(b"\x01")], destination)
+    assert destination.read_bytes() == b"\xf0\x7d\xf7"
 
 
 def test_tuning_dump_writes_directly_without_opaque_wrapping() -> None:

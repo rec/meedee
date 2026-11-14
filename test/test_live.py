@@ -724,6 +724,29 @@ def test_channel_selection_applies_to_callbacks_and_recordings(
         reader.close()
 
 
+def test_syx_write_selects_messages_from_input_recording(
+    iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
+) -> None:
+    client = midi.Input(run_in_subprocess=False)
+    client.connect(client.ports()[0])
+    iterable_input[0](packet(b"\xf0\x7d\x01\xf7\xf8\xf0\x7d\x02\xf7", 1, 2))
+    path = tmp_path / "backup.syx"
+    file_io.write(client.record("0 s"), path)
+    assert client.closed
+    assert path.read_bytes() == b"\xf0\x7d\x01\xf7\xf0\x7d\x02\xf7"
+    with file_io.Reader(path) as reader:
+        assert list(events.with_gap(reader, "100 ms")) == [
+            messages.SysEx(b"\x7d\x01"),
+            "100 ms",
+            messages.SysEx(b"\x7d\x02"),
+            "100 ms",
+        ]
+        assert reader.complete
+    empty = tmp_path / "no-sysex.syx"
+    file_io.write(midi.Input(run_in_subprocess=False).record(0), empty)
+    assert empty.read_bytes() == b""
+
+
 def test_record_returns_memory_capture_and_file_round_trip(
     iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
 ) -> None:

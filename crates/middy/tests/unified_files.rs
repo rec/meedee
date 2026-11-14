@@ -2,6 +2,61 @@ use middy::{archive, file_io, smf, AnyMessage, NoteOn, Reader, Writer};
 use std::io::{self, Cursor};
 
 #[test]
+fn syx_write_selects_messages_from_a_recording() {
+    use middy::events::{Clock, Payload, Timestamp};
+    use middy::messages::Message;
+
+    let clock = Clock::new("input".into(), 1, 1_000, "test".into(), None).unwrap();
+    let message = middy::SysEx::new(vec![125, 1])
+        .unwrap()
+        .with_stream("input")
+        .unwrap()
+        .with_timestamp(Timestamp {
+            ticks: 42,
+            clock: clock.clone(),
+        })
+        .unwrap();
+    let recording = middy::Recording {
+        records: vec![
+            archive::Record::Clock(clock),
+            archive::Record::Stream {
+                id: "input".into(),
+                label: "Keyboard".into(),
+                clock_identity: Some("input".into()),
+            },
+            archive::Record::Event(Box::new(Payload::Message(AnyMessage::NoteOn(
+                NoteOn::new(60).unwrap(),
+            )))),
+            archive::Record::Event(Box::new(Payload::Message(AnyMessage::SysEx(message)))),
+        ],
+    };
+    let path = output_path("syx");
+    middy::write(recording, &path, false).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), [240, 125, 1, 247]);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn syx_write_rejects_recording_loss() {
+    for diagnostic in [
+        archive::Record::Gap {
+            stream: "input".into(),
+            lost: 1,
+            reason: "overflow".into(),
+        },
+        archive::Record::Discontinuity {
+            stream: "input".into(),
+            reason: "disconnected".into(),
+        },
+    ] {
+        let path = output_path("syx");
+        let error = middy::write([Ok(diagnostic)], &path, false).unwrap_err();
+        assert!(error.to_string().contains("gap or discontinuity"));
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+#[test]
 fn write_streams_reader_results_and_selects_the_filename_format() {
     let (_, _, bytes) = fixture();
     let path = output_path("mid");

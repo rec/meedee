@@ -416,24 +416,15 @@ expose read-only getters with the same names as Python properties.
 
 ## 12. Capture and restore a SysEx dump
 
-Initiate a dump on the instrument during a ten-second recording. Save its SysEx
-messages separately; `recording.records` also retains timing and diagnostics.
+Initiate a dump on the instrument during a ten-second recording. SYX output
+selects SysEx messages and discards timing and other MIDI traffic. Gaps and
+discontinuities cause an error.
 
 ```rust
-use middy::{midi::Input, file_io, archive::Record, events::Payload, messages::AnyMessage};
+use middy::{midi::Input, write};
 use std::time::Duration;
 
-let recording = Input::new().record(Duration::from_secs(10))?;
-println!("{:?}", recording.records);
-let mut writer = file_io::Writer::create("backup.syx")?;
-for record in &recording.records {
-    if let Record::Event(message) = record {
-        if let Payload::Message(AnyMessage::SysEx(message)) = message.as_ref() {
-            writer.write(message)?;
-        }
-    }
-}
-writer.finish()?;
+write(Input::new().record(Duration::from_secs(10))?, "backup.syx", false)?;
 ```
 
 Run this separately to restore the backup. Choose the wait duration from the
