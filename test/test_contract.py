@@ -97,7 +97,7 @@ def test_client_initialization_is_deferred_until_discovery(
         client.ports()
 
 
-def test_root_exports_public_modules_curated_classes_and_write() -> None:
+def test_root_exports_public_modules_curated_classes_and_functions() -> None:
     from importlib import import_module
     from pkgutil import iter_modules
     from types import ModuleType
@@ -111,7 +111,7 @@ def test_root_exports_public_modules_curated_classes_and_write() -> None:
     assert {n for n in vars(md) if not n.startswith("_")} == set(md.__all__)
     for n in set(md.__all__) - modules:
         value = getattr(md, n)
-        assert isinstance(value, type) or n == "write"
+        assert isinstance(value, type) or n in {"dump", "write"}
         assert getattr(import_module(value.__module__), value.__name__) is value
     assert md.Input is md.midi.Input
     assert md.Output is md.midi.Output
@@ -119,6 +119,7 @@ def test_root_exports_public_modules_curated_classes_and_write() -> None:
     assert md.Reader is md.file_io.Reader
     assert md.Writer is md.file_io.Writer
     assert md.write is md.file_io.write
+    assert md.dump is md.sysex.dump
     assert md.Route is md.routing.Route
     assert md.ParameterStep is md.messages.ParameterStep
     assert not hasattr(md, "decode") and not hasattr(md, "run")

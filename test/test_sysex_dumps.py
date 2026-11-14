@@ -8,6 +8,7 @@ from typing import cast
 
 import pytest
 
+import middy
 from middy import events, file_io, messages, midi, sysex, testing, universal
 
 
@@ -77,7 +78,7 @@ def test_documented_requests_retain_opaque_replies(
     output = Output(receiver, requests, replies)
     # A stale matching response must not satisfy the request.
     receiver.items.append(messages.SysEx(replies[0]).replace(stream="s"))
-    report = sysex.dump(
+    report = middy.dump(
         cast(midi.Input, receiver), cast(midi.Output, output), model=model, scope=scope
     )
     assert report.status == vectors[-1][6]

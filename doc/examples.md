@@ -143,14 +143,14 @@ with md.Reader('backup.syx') as reader:
 ### Request or capture an opaque instrument dump
 
 ```python
-from middy import file_io, midi, sysex
+import middy as md
 
 with (
-    midi.Input(port='VL70') as receiver,
-    midi.Output(port='VL70') as output,
-    file_io.Writer('vl70.syx') as writer,
+    md.Input(port='VL70') as receiver,
+    md.Output(port='VL70') as output,
+    md.Writer('vl70.syx') as writer,
 ):
-    result = sysex.dump(receiver, output)
+    result = md.dump(receiver, output)
     print(result.status, result.reason)
     for m in result.messages:
         writer.write(m)
