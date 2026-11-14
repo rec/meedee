@@ -16,7 +16,7 @@ _core.populate_sysex(sys.modules[__name__])
 del sys
 
 
-def dump(
+def dump_sysex(
     receiver: midi.Input,
     output: midi.Output | None = None,
     *,

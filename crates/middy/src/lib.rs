@@ -72,7 +72,7 @@ pub use midi::{
 };
 pub use mpe::ZoneConfiguration;
 pub use routing::{Route, Router};
-pub use sysex::dump;
+pub use sysex::dump_sysex;
 pub use timecode::FrameRate;
 pub use transport::Packet;
 pub use tuning::{NoteTuning, Pitch, ScaleOffsets, TuningTable, TuningValue};

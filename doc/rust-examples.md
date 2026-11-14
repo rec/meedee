@@ -442,11 +442,11 @@ output.close()?;
 ### Request or capture an opaque instrument dump
 
 ```rust
-use middy::{dump, Input, Output, Writer};
+use middy::{dump_sysex, Input, Output, Writer};
 
 let mut receiver = Input::new().with_port("VL70")?;
 let mut output = Output::new().with_port("VL70")?;
-let result = dump(&mut receiver, Some(&mut output), None, &Default::default())?;
+let result = dump_sysex(&mut receiver, Some(&mut output), None, &Default::default())?;
 println!("{}: {:?}", result.status, result.reason);
 let mut writer = Writer::create("vl70.syx")?;
 for message in &result.messages {

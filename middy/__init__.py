@@ -97,7 +97,7 @@ __all__: list[str] = [
     "codecs",
     "controls",
     "discovery",
-    "dump",
+    "dump_sysex",
     "events",
     "file_io",
     "gm",
@@ -230,7 +230,7 @@ from .midi import (
 )
 from .mpe import ZoneConfiguration
 from .routing import Route, Router
-from .sysex import dump
+from .sysex import dump_sysex
 from .timecode import FrameRate
 from .tuning import NoChange, NoteTuning, Pitch, ScaleOffsets, TuningTable
 from .ump import SysEx7Packet, SysEx8Packet

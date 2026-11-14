@@ -26,7 +26,7 @@ class DumpReport:
     def reason(self) -> str | None: ...
 
 def models() -> list[str]: ...
-def dump(
+def dump_sysex(
     receiver: midi.Input,
     output: midi.Output | None = None,
     *,

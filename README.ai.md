@@ -16,11 +16,11 @@ load the optional CLI implementation or uFor adapter dependencies.
 
 The domain workflows are grouped under `md.tuning`, `md.ci` and `md.sysex`:
 `tuning.query` runs a tuning query, `ci.browse` runs a management scan, and
-`sysex.dump` captures instrument dumps. `events.with_gap` inserts explicit waits
+`sysex.dump_sysex` captures instrument dumps. `events.with_gap` inserts explicit waits
 into any item sequence. Use ordinary `Input.record()` and `Output.send()` to
 record and replay SysEx with timing.
 
-`sysex.dump(receiver, output)` detects a supported model with an identity request,
+`sysex.dump_sysex(receiver, output)` detects a supported model with an identity request,
 then requests and captures opaque dump replies. Set `model` explicitly to skip
 detection. Omit `output` and supply `model` to capture a dump started on the instrument.
 `result.messages` can be saved with `file_io.Writer("backup.syx")`; check `result.status` and

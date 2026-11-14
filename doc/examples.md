@@ -150,7 +150,7 @@ with (
     md.Output(port='VL70') as output,
     md.Writer('vl70.syx') as writer,
 ):
-    result = md.dump(receiver, output)
+    result = md.dump_sysex(receiver, output)
     print(result.status, result.reason)
     for m in result.messages:
         writer.write(m)

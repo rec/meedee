@@ -78,7 +78,7 @@ def test_documented_requests_retain_opaque_replies(
     output = Output(receiver, requests, replies)
     # A stale matching response must not satisfy the request.
     receiver.items.append(messages.SysEx(replies[0]).replace(stream="s"))
-    report = middy.dump(
+    report = middy.dump_sysex(
         cast(midi.Input, receiver), cast(midi.Output, output), model=model, scope=scope
     )
     assert report.status == vectors[-1][6]
@@ -115,7 +115,7 @@ def test_manual_capture_is_unverified_and_preserves_repeated_messages(
         reply,
         reply,
     ]
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver), model=model, silence="10 ms", timeout="100 ms"
     )
     assert report.status == "unverified" and not report.complete
@@ -136,7 +136,7 @@ def test_opaque_reply_contents_survive_checksum_validation(
     checksum = (-sum(reply[3:])) & 127
     reply += bytes([checksum ^ int(corrupt)])
     output = Output(receiver, [bytes.fromhex("432057000000")], [reply])
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         model="yamaha/vl70-m",
@@ -157,7 +157,7 @@ def test_loss_after_received_prefix_prevents_verified_completion(
     receiver.on_receive = lambda: setattr(receiver, "dropped_packets", 1)
     reply = bytes.fromhex("012f0f") + bytes(50)
     output = Output(receiver, [bytes.fromhex("012f0e")], [reply])
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         model="sequential/prophet-rev2",
@@ -175,14 +175,14 @@ def test_limits_and_cancellation_preserve_only_admitted_messages(
     receiver = Input(clock)
     reply = messages.SysEx(b"\x04\x01").replace(stream="s")
     receiver.scheduled = [reply, reply]
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver), model="moog/subsequent-37", message_limit=1
     )
     assert report.status == "limit_reached" and report.messages == [reply]
     cancel = events.Cancellation()
     cancel.cancel()
     output = Output(receiver, [], [])
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         model="yamaha/vl70-m",
@@ -199,13 +199,13 @@ def test_empty_capture_times_out_and_uncertain_send_never_retries(
     clock = testing.ManualClock()
     monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
     receiver = Input(clock)
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver), model="moog/subsequent-37", timeout="10 ms"
     )
     assert report.status == "timed_out" and not report.messages
     output = testing.Output(encoding="bytes")
     output.fail_next_send(accepted=True)
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         model="yamaha/vl70-m",
@@ -224,19 +224,19 @@ def test_unsupported_requests_fail_before_sending() -> None:
     receiver = Input(testing.ManualClock())
     output = Output(receiver, [], [])
     with pytest.raises(ValueError, match="manual"):
-        sysex.dump(
+        sysex.dump_sysex(
             cast(midi.Input, receiver),
             cast(midi.Output, output),
             model="moog/subsequent-37",
         )
     with pytest.raises(ValueError, match="conflict"):
-        sysex.dump(
+        sysex.dump_sysex(
             cast(midi.Input, receiver),
             cast(midi.Output, output),
             model="sequential/prophet-rev2",
         )
     with pytest.raises(ValueError, match="conflict"):
-        sysex.dump(
+        sysex.dump_sysex(
             cast(midi.Input, receiver),
             cast(midi.Output, output),
             model="korg/minilogue-xd",
@@ -285,7 +285,7 @@ def test_all_scope_requests_each_documented_block_once(
                     reply = data[:5] + b"\x02\x06" + data[6:8] + bytes(278)
             receiver.items.append(messages.SysEx(reply).replace(stream="s"))
 
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver), cast(midi.Output, Instrument()), model=model
     )
     assert report.complete and report.status == "complete"
@@ -306,7 +306,7 @@ def test_unrelated_and_foreign_events_do_not_extend_silence(
         messages.SysEx(b"\x7d").replace(stream="s"),
     ]
     receiver.on_receive = lambda: clock.advance(5_000_000)
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         model="moog/subsequent-37",
         silence="10 ms",
@@ -337,7 +337,7 @@ def test_truncated_frame_diagnostic_retains_only_complete_prefix(
     )
     reply = messages.SysEx(b"\x04\x02").replace(stream="s")
     receiver.scheduled = [reply, *decoder.finish()]
-    report = sysex.dump(cast(midi.Input, receiver), model="moog/subsequent-37")
+    report = sysex.dump_sysex(cast(midi.Input, receiver), model="moog/subsequent-37")
     assert report.status == "failed" and not report.complete
     assert report.messages == [reply] and report.reason
 
@@ -350,7 +350,7 @@ def test_byte_limits_apply_before_retention(
     monkeypatch.setattr(sysex, "monotonic_ns", lambda: clock.now_ns)
     receiver = Input(clock)
     receiver.scheduled = [messages.SysEx(b"\x04\x01").replace(stream="s")]
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver), model="moog/subsequent-37", **limits
     )
     assert (
@@ -366,7 +366,7 @@ def test_documented_negative_reply_is_retained(monkeypatch: pytest.MonkeyPatch) 
     receiver = Input(clock)
     reply = bytes.fromhex("423000015124")
     output = Output(receiver, [bytes.fromhex("42300001510e")], [reply])
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         model="korg/minilogue-xd",
@@ -403,7 +403,7 @@ def test_identity_selects_exact_model_and_wire_address(
     )
     # Stale identity replies cannot select a device or cause ambiguity.
     receiver.items.append(messages.SysEx(bytes.fromhex(identity)).replace(stream="s"))
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver), cast(midi.Output, output), scope="system"
     )
     assert report.model == model and report.status == status
@@ -434,7 +434,7 @@ def test_failed_detection_never_sends_a_dump_request(
         messages.SysEx(bytes.fromhex(r)).replace(stream="s") for r in replies
     ]
     output = testing.Output(encoding="bytes")
-    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    report = sysex.dump_sysex(cast(midi.Input, receiver), cast(midi.Output, output))
     assert report.status == "failed" and reason in (report.reason or "")
     assert report.model is None and report.requests_sent == 0 and not report.messages
     assert output.snapshot().accepted == 1
@@ -456,7 +456,7 @@ def test_later_identity_in_window_prevents_request(
             receiver.items.append(messages.SysEx(identity).replace(stream="s"))
 
     receiver.on_receive = delayed_reply
-    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    report = sysex.dump_sysex(cast(midi.Input, receiver), cast(midi.Output, output))
     assert report.status == "failed" and "multiple" in (report.reason or "")
     assert report.requests_sent == 0 and len(output.sent) == 1
 
@@ -473,7 +473,7 @@ def test_identity_from_another_stream_is_ignored(
         )
     ]
     output = testing.Output(encoding="bytes")
-    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    report = sysex.dump_sysex(cast(midi.Input, receiver), cast(midi.Output, output))
     assert report.status == "failed" and report.model is None
     assert report.ignored_events == 1 and report.requests_sent == 0
     output.close()
@@ -491,7 +491,7 @@ def test_identity_after_discovery_aborts_remaining_requests(
         [bytes.fromhex("7e7f0601"), bytes.fromhex("432057000000")],
         [identity, identity],
     )
-    report = sysex.dump(cast(midi.Input, receiver), cast(midi.Output, output))
+    report = sysex.dump_sysex(cast(midi.Input, receiver), cast(midi.Output, output))
     assert report.status == "failed" and "additional identity" in (report.reason or "")
     assert report.requests_sent == 1 and not report.messages and not report.complete
 
@@ -499,7 +499,7 @@ def test_identity_after_discovery_aborts_remaining_requests(
 def test_manual_capture_requires_explicit_model() -> None:
     receiver = Input(testing.ManualClock())
     with pytest.raises(ValueError, match="explicit model"):
-        sysex.dump(cast(midi.Input, receiver))
+        sysex.dump_sysex(cast(midi.Input, receiver))
 
 
 @pytest.mark.parametrize("failure", ["loss", "cancel", "send", "limit", "address"])
@@ -520,7 +520,7 @@ def test_discovery_failures_prevent_dump_requests(
     output = testing.Output(encoding="bytes")
     if failure == "send":
         output.fail_next_send(accepted=True)
-    report = sysex.dump(
+    report = sysex.dump_sysex(
         cast(midi.Input, receiver),
         cast(midi.Output, output),
         cancel=cancel,

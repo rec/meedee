@@ -62,7 +62,7 @@ impl Default for DumpOptions {
 /// an explicit model. Multiple identity replies never select a model.
 /// Connections remain open. Capture consumes input; do not concurrently receive
 /// from the same connection. Inspect the report before exporting its messages.
-pub fn dump(
+pub fn dump_sysex(
     receiver: &mut midi::Input,
     output: Option<&mut midi::Output>,
     model: Option<&str>,

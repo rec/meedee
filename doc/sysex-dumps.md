@@ -7,7 +7,7 @@ captures a dump you start on the instrument. The payload remains opaque.
 from middy import file_io, midi, sysex
 
 with midi.Input(port="VL70") as receiver, midi.Output(port="VL70") as output:
-    result = sysex.dump(receiver, output)
+    result = sysex.dump_sysex(receiver, output)
     print(result.status, result.reason)
     with file_io.Writer("vl70.syx") as writer:
         for m in result.messages:
@@ -18,7 +18,7 @@ For a manual dump, start capture first and then trigger the instrument's dump:
 
 ```python
 with midi.Input(port="Subsequent") as receiver:
-    result = sysex.dump(receiver, model="moog/subsequent-37")
+    result = sysex.dump_sysex(receiver, model="moog/subsequent-37")
     with file_io.Writer("subsequent.syx") as writer:
         for m in result.messages:
             writer.write(m)
@@ -32,7 +32,7 @@ use middy::{midi, sysex};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 let mut receiver = midi::Input::new().with_port("VL70")?;
 let mut output = midi::Output::new().with_port("VL70")?;
-let result = sysex::dump(
+let result = sysex::dump_sysex(
     &mut receiver, Some(&mut output), None, &Default::default(),
 )?;
 println!("{}: {:?}", result.status, result.reason);
