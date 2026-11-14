@@ -205,15 +205,15 @@ To save and read the capture:
 
 ```rust
 use middy::midi::{Input, Output};
-use middy::Reader;
+use middy::{write, Reader};
 use std::time::Duration;
 
-Input::new().record_to(Duration::from_secs(10), "rec.middy", true)?;
+write(Input::new().record(Duration::from_secs(10))?, "rec.middy", false)?;
 let report = Output::new().send(Reader::open("rec.middy")?)?;
 println!("{report:?}");
 ```
 
-The final `true` allows overwriting; use `false` to preserve existing files.
+The final `false` preserves existing files; use `true` to allow overwriting.
 Recording retains the capture in memory before writing, so memory use grows with
 traffic. A disk-write failure can leave a partial file, rejected by the strict
 reader. Receive errors remain visible as gap/discontinuity records; a structurally
@@ -965,7 +965,7 @@ same bounded receive queue as iteration. Closures must be `Send + 'static` and
 return promptly. Blocking MIDI operations are rejected inside callbacks. Use a
 channel to ask the controlling thread to perform them.
 
-Receive, iteration and timed record/record_to are unavailable in callback mode.
+Receive, iteration and timed record are unavailable in callback mode.
 Attached background recording is available through start.
 Callback panic stops further delivery and is observable through `check_health()`.
 Close stops native delivery, drains accepted input to the callback and joins the

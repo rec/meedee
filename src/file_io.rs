@@ -85,14 +85,12 @@ impl Reader {
 struct Writer {
     value: Option<model::Writer<Stream>>,
 }
-#[pymethods]
 impl Writer {
-    #[new]
-    #[pyo3(signature=(destination,*,format=None,payload_limit=1_048_576))]
-    fn new(
+    fn open(
         destination: &Bound<'_, PyAny>,
         format: Option<&str>,
-        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
+        payload_limit: usize,
+        overwrite: bool,
     ) -> PyResult<Self> {
         let extension = if destination.hasattr("write")? {
             format.unwrap_or("middy").to_ascii_lowercase()
@@ -119,13 +117,29 @@ impl Writer {
         Ok(Self {
             value: Some(
                 model::Writer::new(
-                    Stream::exclusive_output(destination)?,
+                    if overwrite {
+                        Stream::output(destination)?
+                    } else {
+                        Stream::exclusive_output(destination)?
+                    },
                     &extension,
                     payload_limit,
                 )
                 .map_err(os_error)?,
             ),
         })
+    }
+}
+#[pymethods]
+impl Writer {
+    #[new]
+    #[pyo3(signature=(destination,*,format=None,payload_limit=1_048_576))]
+    fn new(
+        destination: &Bound<'_, PyAny>,
+        format: Option<&str>,
+        #[pyo3(from_py_with=crate::units::bytes)] payload_limit: usize,
+    ) -> PyResult<Self> {
+        Self::open(destination, format, payload_limit, false)
     }
     fn write(&mut self, py: Python<'_>, record: &Bound<'_, PyAny>) -> PyResult<()> {
         let record = if let Ok(header) = record.extract::<PyRef<'_, crate::files::Header>>() {
@@ -193,5 +207,25 @@ impl Writer {
 
 pub fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Reader>()?;
-    module.add_class::<Writer>()
+    module.add_class::<Writer>()?;
+    module.add_function(wrap_pyfunction!(write, module)?)
+}
+
+/// Write an iterable of records using the filename's format and finish on success.
+/// Preserve existing files unless overwrite is true; failures can leave a partial file.
+#[pyfunction]
+#[pyo3(signature=(records,filename,overwrite=false))]
+fn write(
+    py: Python<'_>,
+    records: &Bound<'_, PyAny>,
+    filename: PathBuf,
+    #[pyo3(from_py_with=crate::ump::boolean)] overwrite: bool,
+) -> PyResult<()> {
+    let records = records.try_iter()?;
+    let filename = filename.into_pyobject(py)?;
+    let mut writer = Writer::open(filename.as_any(), None, model::DEFAULT_LIMIT, overwrite)?;
+    for record in records {
+        writer.write(py, &record?)?;
+    }
+    writer.finish(py, true, "")
 }

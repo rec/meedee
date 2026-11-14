@@ -101,7 +101,7 @@ To save the capture and replay it later:
 ```python
 import middy as md
 
-md.Input().record("10 s", output="rec.middy")
+md.write(md.Input().record("10 s"), "rec.middy")
 
 # later
 md.Output().send(md.Reader("rec.middy"))
@@ -132,7 +132,8 @@ for loss or failure before treating it as a backup.
 ```python
 import middy as md
 
-recording = md.Input().record("30 s", output="backup.middy")
+recording = md.Input().record("30 s")
+md.write(recording, "backup.middy")
 print(recording)
 with md.Writer("backup.syx") as writer:
     for m in recording:

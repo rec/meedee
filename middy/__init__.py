@@ -117,6 +117,7 @@ __all__: list[str] = [
     "ump",
     "universal",
     "universe",
+    "write",
 ]
 
 from . import (
@@ -170,7 +171,7 @@ from .events import (
     StreamDiagnostic,
     Timestamp,
 )
-from .file_io import Reader, Writer
+from .file_io import Reader, Writer, write
 from .gm import (
     DrumKit,
     GmMode,

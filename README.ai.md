@@ -170,8 +170,10 @@ policy described above. Memory recording includes buffered input events present
 when it starts, without consuming them from the independent receive queue.
 
 `Input.record(duration)` uses this same attached memory recorder, closes the input
-and finalizes accepted events before returning the records. Its optional file
-output is saved from those records afterward, preserving overwrite behavior.
+and finalizes accepted events before returning the records. Save them separately
+with `write(records, "rec.middy", overwrite=False)`. The filename selects the
+format; existing files are preserved unless overwrite is enabled. Rust uses
+`write(recording, "rec.middy", false)` for the same operation.
 For explicit control without closing the input:
 
 ```python

@@ -5,6 +5,22 @@ use std::io::{self, Read, Write};
 pub(crate) mod syx;
 
 pub const DEFAULT_LIMIT: usize = 1_048_576;
+
+/// Write a fallible record stream, choosing the format from the filename.
+/// Existing files are preserved unless overwrite is true. A failure can leave
+/// a partial destination; the writer is finished only after successful iteration.
+pub fn write<T: WriteRecord>(
+    records: impl IntoIterator<Item = io::Result<T>>,
+    filename: impl AsRef<std::path::Path>,
+    overwrite: bool,
+) -> io::Result<()> {
+    let mut writer = Writer::create_with_overwrite(filename, overwrite)?;
+    for record in records {
+        writer.write(&record?)?;
+    }
+    writer.finish()
+}
+
 pub fn invalid(offset: u64, reason: impl std::fmt::Display) -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
@@ -267,12 +283,20 @@ pub struct Writer<W = std::fs::File> {
 }
 impl Writer {
     pub fn create(path: impl AsRef<std::path::Path>) -> io::Result<Self> {
+        Self::create_with_overwrite(path, false)
+    }
+    fn create_with_overwrite(
+        path: impl AsRef<std::path::Path>,
+        overwrite: bool,
+    ) -> io::Result<Self> {
         let path = path.as_ref();
         let extension = path.extension().and_then(|v| v.to_str()).unwrap_or("");
         validate_extension(extension)?;
         let file = std::fs::OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(overwrite)
+            .truncate(overwrite)
+            .create_new(!overwrite)
             .open(path)?;
         Self::new(file, extension, DEFAULT_LIMIT)
     }
@@ -376,6 +400,11 @@ pub trait WriteRecord {
 impl WriteRecord for Record {
     fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()> {
         writer.write_record(self)
+    }
+}
+impl WriteRecord for crate::archive::Record {
+    fn write_to<W: Write + std::io::Seek>(&self, writer: &mut Writer<W>) -> io::Result<()> {
+        writer.write_record(&Record::Archive(self.clone()))
     }
 }
 impl<T: Clone + Into<crate::events::Payload>> WriteRecord for T {

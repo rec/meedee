@@ -1060,9 +1060,8 @@ mod tests {
         ));
         let first = input(transport::Encoding::Bytes);
         first.queue.push(packet(0, &[0x90, 60, 90, 0x80, 60, 0]));
-        let recording = Input::decoded(first)
-            .record_to(Duration::ZERO, &path, false)
-            .unwrap();
+        let recording = Input::decoded(first).record(Duration::ZERO).unwrap();
+        crate::write(recording.clone(), &path, false).unwrap();
         let original = std::fs::read(&path).unwrap();
         assert_eq!(
             crate::archive::Reader::open(&path)
@@ -1071,13 +1070,15 @@ mod tests {
                 .unwrap(),
             recording.records
         );
-        assert!(
-            matches!(Input::decoded(input(transport::Encoding::Bytes)).record_to(Duration::ZERO, &path, false).unwrap_err(), crate::midi::Error::Io(e) if e.kind() == io::ErrorKind::AlreadyExists)
+        assert_eq!(
+            crate::write(recording, &path, false).unwrap_err().kind(),
+            io::ErrorKind::AlreadyExists
         );
         assert_eq!(std::fs::read(&path).unwrap(), original);
         let second = Input::decoded(input(transport::Encoding::Bytes))
-            .record_to(Duration::ZERO, &path, true)
+            .record(Duration::ZERO)
             .unwrap();
+        crate::write(second.clone(), &path, true).unwrap();
         assert_eq!(
             crate::archive::Reader::open(&path)
                 .unwrap()

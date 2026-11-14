@@ -56,7 +56,7 @@ pub use events::{
     Cancellation, Clock, ClockMapping, PacketDecoder, PlaybackPlan, PlaybackReport, Rational,
     ReceivedPacket, SourceSpan, StreamDiagnostic, Timestamp,
 };
-pub use file_io::{Reader, Writer};
+pub use file_io::{write, Reader, Writer};
 pub use gm::{DrumKit, GmMode, Percussion, Program};
 pub use inspection::{ComparisonReport, Monitor, MonitorReport};
 pub use messages::{

@@ -152,9 +152,6 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
     def record(
         self,
         duration: float | str,
-        *,
-        output: str | PathLike[str] | None = None,
-        overwrite: bool = False,
     ) -> list[
         events.Clock
         | archive.Stream

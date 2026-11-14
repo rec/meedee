@@ -1,6 +1,92 @@
 use middy::{archive, file_io, smf, AnyMessage, NoteOn, Reader, Writer};
 use std::io::{self, Cursor};
 
+#[test]
+fn write_streams_reader_results_and_selects_the_filename_format() {
+    let (_, _, bytes) = fixture();
+    let path = output_path("mid");
+    let reader = Reader::new(bytes.as_slice(), 1024, false, false).unwrap();
+    middy::write(reader, &path, false).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    std::fs::remove_file(path).unwrap();
+
+    let path = output_path("syx");
+    let message = middy::SysEx::new(vec![125, 1]).unwrap();
+    middy::write([Ok(message)], &path, false).unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), [240, 125, 1, 247]);
+    std::fs::remove_file(path).unwrap();
+
+    let path = output_path("middy");
+    middy::write(
+        std::iter::empty::<io::Result<file_io::Record>>(),
+        &path,
+        false,
+    )
+    .unwrap();
+    let mut reader = Reader::open(&path).unwrap();
+    assert!(reader.next().is_none() && reader.complete());
+    drop(reader);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn write_propagates_source_failure_without_claiming_completion() {
+    let path = output_path("middy");
+    let record = archive::Record::Metadata {
+        stream: None,
+        timestamp: None,
+        key: "title".into(),
+        data: vec![1],
+    };
+    let error = middy::write(
+        [
+            Ok(record.clone()),
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "source failed",
+            )),
+        ],
+        &path,
+        false,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    let mut reader =
+        archive::Reader::new(std::fs::File::open(&path).unwrap(), 1024, true, false).unwrap();
+    assert_eq!(
+        reader.by_ref().collect::<io::Result<Vec<_>>>().unwrap(),
+        [record]
+    );
+    assert!(!reader.complete && reader.problem.is_some());
+    drop(reader);
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn write_checks_the_format_before_overwriting() {
+    let path = output_path("txt");
+    std::fs::write(&path, b"keep").unwrap();
+    assert!(middy::write(
+        std::iter::empty::<io::Result<file_io::Record>>(),
+        &path,
+        true
+    )
+    .is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), b"keep");
+    std::fs::remove_file(path).unwrap();
+}
+
+fn output_path(extension: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!(
+        "middy-write-{}-{}.{extension}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ))
+}
+
 fn fixture() -> (smf::Header, Vec<smf::Event>, Vec<u8>) {
     let header = smf::Header::new(1, 2, 480, vec![1, 2]).unwrap();
     let records = vec![

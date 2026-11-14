@@ -11,7 +11,7 @@ from typing import Self
 import pytest
 from pydantic import PrivateAttr
 
-from middy import _native, archive, events, messages, midi, ump
+from middy import _native, archive, events, file_io, messages, midi, ump
 
 
 def test_unopened_diagnostics_remain_readable_without_native_initialization(
@@ -729,15 +729,16 @@ def test_record_returns_memory_capture_and_file_round_trip(
 ) -> None:
     path = tmp_path / "rec.middy"
     client = midi.Input(run_in_subprocess=False)
-    records = client.record(0, output=path)
+    records = client.record(0)
+    file_io.write(records, path)
     assert [r for r in records if isinstance(r, messages.Message)] == [
         messages.NoteOn(60, 100, 1)
     ]
     original = path.read_bytes()
-    with pytest.raises(FileExistsError):
-        midi.Input().record(0, output=path)
+    with pytest.raises(OSError):
+        file_io.write(records, path)
     assert path.read_bytes() == original
-    midi.Input().record("0 seconds", output=path, overwrite=True)
+    file_io.write(midi.Input().record("0 seconds"), path, overwrite=True)
     reader = archive.Reader(path)
     try:
         assert [r for r in reader if isinstance(r, messages.Message)] == [

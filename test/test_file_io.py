@@ -1,11 +1,72 @@
 """The simple file-editing loop preserves the complete file structure."""
 
+from collections.abc import Iterator
 from io import BytesIO
 from pathlib import Path
 
 import pytest
 
 import middy as md
+
+
+def test_write_streams_midi_reader_results_and_preserves_overwrite_policy(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.mid"
+    header, events = midi_file(source)
+    destination = tmp_path / "copy.mid"
+    with md.Reader(source) as reader:
+        assert md.write(reader, destination) is None
+        assert reader.complete
+    with md.Reader(destination) as reader:
+        assert list(reader) == [header, *events]
+        assert reader.complete
+    before = destination.read_bytes()
+    with pytest.raises(OSError):
+        md.write([], destination)
+    assert destination.read_bytes() == before
+    destination.write_bytes(before + b"trailing bytes")
+    with md.Reader(source) as reader:
+        md.write(reader, destination, overwrite=True)
+    assert destination.read_bytes() == before
+
+
+def test_write_accepts_sysex_iterators_and_empty_archives(tmp_path: Path) -> None:
+    messages = [md.SysEx(b"\x7d\x01"), md.SysEx(b"\x7d\x02")]
+    destination = tmp_path / "dump.syx"
+    md.write(iter(messages), destination)
+    assert destination.read_bytes() == b"\xf0\x7d\x01\xf7\xf0\x7d\x02\xf7"
+    archive = tmp_path / "empty.middy"
+    md.write([], archive)
+    with md.Reader(archive) as reader:
+        assert list(reader) == [] and reader.complete
+
+
+def test_write_preserves_iterator_errors_and_leaves_incomplete_output(
+    tmp_path: Path,
+) -> None:
+    failure = RuntimeError("source failed")
+    record = md.archive.Metadata(key="title", data=b"capture")
+
+    def records() -> Iterator[md.archive.Metadata]:
+        yield record
+        raise failure
+
+    destination = tmp_path / "partial.middy"
+    with pytest.raises(RuntimeError) as error:
+        md.write(records(), destination)
+    assert error.value is failure
+    with md.Reader(destination, recover=True) as reader:
+        assert list(reader) == [record]
+        assert not reader.complete and reader.problem
+
+
+def test_write_validates_format_before_overwriting(tmp_path: Path) -> None:
+    destination = tmp_path / "existing.txt"
+    destination.write_bytes(b"keep")
+    with pytest.raises(ValueError, match="destination"):
+        md.write([], destination, overwrite=True)
+    assert destination.read_bytes() == b"keep"
 
 
 def midi_file(path: Path) -> tuple[md.smf.Header, list[md.smf.Event]]:

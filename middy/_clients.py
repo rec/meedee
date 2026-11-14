@@ -209,9 +209,6 @@ class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True
     def record(
         self,
         duration: float | str,
-        *,
-        output: str | PathLike[str] | None = None,
-        overwrite: bool = False,
     ) -> list[
         events.Clock
         | archive.Stream
@@ -219,7 +216,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True
         | archive.Gap
         | archive.Discontinuity
     ]:
-        """Capture to memory, optionally saving the same records to an archive."""
+        """Capture to memory and close the input; use file_io.write to save records."""
         seconds = _units.real(duration, "second")
         if not math.isfinite(seconds) or seconds < 0:
             raise ValueError("duration must be finite and nonnegative")
@@ -239,12 +236,6 @@ class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True
             receiver.close()
         records = recorder.records
         assert records is not None
-        if output is not None:
-            with Path(output).open("wb" if overwrite else "xb") as destination:
-                writer = archive.Writer(destination)
-                for r in records:
-                    writer.write(r)
-                writer.finish()
         return cast(
             list[
                 events.Clock

@@ -1,11 +1,27 @@
 """Detect input formats; select output formats from filenames."""
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from os import PathLike
 from types import TracebackType
 from typing import BinaryIO, Literal
 
 from . import archive, events, messages, smf
+
+def write(
+    records: Iterable[
+        events.Clock
+        | archive.Stream
+        | messages.Message
+        | archive.Gap
+        | archive.Metadata
+        | archive.Discontinuity
+        | archive.Opaque
+        | smf.Header
+        | smf.Event
+    ],
+    filename: str | PathLike[str],
+    overwrite: bool = False,
+) -> None: ...
 
 class Reader:
     def __init__(
