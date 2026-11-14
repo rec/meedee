@@ -1,7 +1,7 @@
 """Regenerate the archive v2 wire fixtures without importing middy.
 
 Run with ``uv run --extra cli scripts/archive_vectors.py``.
-Fields follow plan/archive-format.md; framing uses the standard CRC implementation.
+Fields follow doc/archive-format.md; framing uses the standard CRC implementation.
 """
 
 from pathlib import Path
@@ -106,7 +106,7 @@ class Generate(BaseModel, frozen=True):
             ]
         )
         lines = [
-            "# Generated from plan/archive-format.md by scripts/archive_vectors.py."
+            "# Generated from doc/archive-format.md by scripts/archive_vectors.py."
         ]
         lines.extend(f"{n}|{e}|{archive(r).hex()}" for n, e, r in cases)
         path = (

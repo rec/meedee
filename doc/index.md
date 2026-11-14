@@ -9,6 +9,10 @@ Start with the [practical Python examples](examples.md) or
 progress from playing a melody on a synthesizer to recording performances,
 transferring instrument dumps and discovering MIDI-CI devices.
 
-Browse the API Reference for module, class and function details. For installation
-and source-build requirements, see the
-[project README](https://github.com/rec/middy/blob/main/README.md).
+For detailed transfer behavior, see [opaque SysEx dumps](sysex-dumps.md).
+The [archive format](archive-format.md) describes `.middy` files, and
+[specification baselines](specifications.md) records codec/vector provenance.
+
+For module, class and function details, use the Python stubs and generated Rust
+documentation. Installation and source-build requirements are in the
+[build instructions](https://github.com/rec/middy/blob/main/README.ai.md#build-and-qualification).

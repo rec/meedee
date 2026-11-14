@@ -159,7 +159,7 @@ necessarily happens after the identity request.
 ## Model coverage
 
 The following recipes have source-based synthetic regression fixtures, shared
-between Python and Rust. None has been physically qualified by this change.
+between Python and Rust. Physical instrument qualification remains separate.
 `all` means the exact collection below, not every aspect of instrument state.
 Manual mode accepts only `scope="all"`; choose the actual scope on the instrument.
 

@@ -35,9 +35,10 @@ monotonic clock. Supply `Some(now_ns)` consistently for deterministic replay.
 `set_timecode_timeout` accepts a positive `Duration` before feeding events.
 `configure_mpe` accepts an explicit zone configuration.
 
-These examples use the `middy` Rust crate. Each block is an independent function
-body; put it inside a function returning `Result<(), Box<dyn std::error::Error>>`
-and finish with `Ok(())`. The `?` operator propagates a checked error.
+These examples use the `middy` Rust crate. Put a complete example inside a
+function returning `Result<(), Box<dyn std::error::Error>>` and finish with
+`Ok(())`. Later fragments sometimes reuse connections from the preceding block.
+The `?` operator propagates a checked error.
 
 Both Rust and Python construct Input/Output lazily; first discovery or I/O
 initializes the resource. Empty playback opens no ports.
@@ -96,8 +97,9 @@ out.close()?;
 ```
 
 This discovery example assumes there is at least one output. `Input` supports
-the same selection methods. The low-level `transport` module remains available
-for virtual ports, callbacks and backend-specific settings. Closing is terminal;
+the same selection methods. The low-level `transport` module exposes native
+driver primitives; high-level Input/Output also support virtual ports and callbacks.
+Closing is terminal;
 create a new object to reconnect. Python `connect()` returns the same object; Rust
 `connect()` consumes and returns the resource to express ownership.
 
@@ -155,13 +157,14 @@ for message in Input::new().with_channel(1)? {
     let key = match &message {
         Payload::Message(AnyMessage::NoteOn(note)) => Some(note.note()),
         Payload::Message(AnyMessage::NoteOff(note)) => Some(note.note()),
+        Payload::Message(AnyMessage::PolyPressure(note)) => Some(note.note()),
         _ => None,
     };
     match key {
         Some(note) if note < 60 => low.send(message)?,
         Some(_) => high.send(message)?,
         None if matches!(&message, Payload::Message(
-            AnyMessage::ControlChange(_) | AnyMessage::PolyPressure(_) |
+            AnyMessage::ControlChange(_) |
             AnyMessage::ChannelPressure(_) | AnyMessage::ProgramChange(_) |
             AnyMessage::PitchBend(_)
         )) => {
@@ -1039,9 +1042,9 @@ Rust keeps Read-based functions such as inspection::inspect alongside the path
 operation inspection::inspect_file. Python's inspect_file accepts either a path
 or a binary reader. Both use the same parser and limits. Rust option fields
 correspond to Python keywords, including ComparisonOptions.source_map and
-clock_map. with_playback settings persist across subsequent play calls; Python's
-play keywords apply to one call. Clocks are automatic in ordinary playback.
-play leaves a retained output open for subsequent playback or sending, with
+clock_map. with_playback settings persist across subsequent send calls; Python's
+send keywords apply to one call. Clocks are automatic in ordinary playback.
+send leaves a retained output open for subsequent playback or sending, with
 normal close/Drop cleanup. Rust compound-send errors retain their typed cause;
 Python exposes that cause through __cause__ and uses WorkerError for worker
 failures in both real and simulated transports.

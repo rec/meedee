@@ -138,7 +138,7 @@ def render(
         "- Rust reflects the current target/configuration, not all platforms.",
         "- Names do not establish behavioral parity. "
         "Preserved annotations are historical, not revalidated.",
-        "- See plan/fix-differences.md for the reviewed mappings and their scope.",
+        "- See AGENTS.md for the Python/Rust parity policy and doc/ for examples.",
         "- No middy import, MIDI runtime or device flow was run.",
         "- Keep public-symbols.txt uncommitted.",
         "",

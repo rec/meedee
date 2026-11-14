@@ -1,10 +1,8 @@
 # middy binary archive version 2
 
-Approved binary format for slices 9–10. Extension: `.middy`.
-
-Additional work beyond the prompt
-
-None.
+Current binary format. Extension: `.middy`. The shared independent vectors are
+in `crates/middy/tests/fixtures/archive-v2.txt`; regenerate them with
+`scripts/archive_vectors.py`.
 
 ## Encoding
 
@@ -124,34 +122,3 @@ Streaming bounds working record/descriptor storage, not returned records,
 caller-held objects, allocator overhead, OS buffers or CPU use. File errors
 must be handled even when the source is local. Blocking filesystems remain a
 liveness risk outside native MIDI isolation.
-
-## Local format review, 2026-10-23
-
-The review compared this layout with the Rust encoder/decoder, Python bridge,
-existing corruption/recovery checks and independent byte vectors. Header/version,
-integer widths/endianness, record/command IDs, timestamp absence, signed ticks,
-CRC framing and completion counts agree. The new shared fixture
-`crates/middy/tests/fixtures/archive-v2.txt` is framed independently using fixed
-field values, struct packing and the standard CRC implementation, rather than
-middy's writer. Rust and Python read the same vectors and rewrite valid inputs
-byte for byte, including all nine commands and future Event representations/IDs.
-
-The review found and corrected malformed-input acceptance in preservation mode:
-reserved record 0 could be read but not rewritten, and future Events bypassed
-known envelope checks. Regressions cover both unknown representations and unknown
-commands with undeclared streams, reversed spans, disabled timestamps, stream
-clock mismatches and cross-clock spans. Strict reading still rejects future
-representations; recovery stops at the bad record without claiming completion.
-Valid v1 bytes, IDs and framing are unchanged. No migration path or parallel
-decoder was added.
-
-Current compatibility behavior is explicit: readers reject other header versions;
-within v1, unknown records/message representations require preservation opt-in.
-Known record layouts are checked rather than treated as opaque on any parse error.
-Archive metadata cannot authorize MIDI output, and successful completion remains
-structural rather than a claim of capture quality or durable media storage.
-
-This completes the local implementation review, not publication or a permanent
-compatibility promise. Version 1 remains unpublished. Freezing the wire format,
-future compatibility guarantees and release/publication remain owner decisions.
-Target resource limits and platform qualification remain separate gates.

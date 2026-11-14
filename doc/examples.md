@@ -62,11 +62,11 @@ with md.Input() as input, md.Output() as output:
 
 Receive channel 1.
 
-Notes below middle C are sent to channel 2; above that, to channel 3.
+Notes below middle C are sent to channel 2; middle C and above go to channel 3.
 
 Other channel messages, such as sustain and pitch bend, go to both channels.
 
-MIDI messages without channels, like sysexes, are passed through
+MIDI messages without channels, like SysEx, are forwarded once.
 
 ```python
 import middy as md
@@ -76,19 +76,85 @@ with md.Input(channel=1) as input, md.Output() as out:
     out.send(md.ProgramChange(81, channel=3))
 
     for m in input:
+        if isinstance(m, (md.NoteOn, md.NoteOff, md.PolyPressure)):
+            channel = 2 if m.note < 60 else 3
+            out.send(m.replace(channel=channel))
+        elif getattr(m, "channel", None) is not None:
+            out.send(m.replace(channel=2))
+            out.send(m.replace(channel=3))
+        else:
+            out.send(m)
+```
 
+## 6. Record and replay a performance
+
+Record ten seconds in memory, then replay the captured events:
 
 ```python
 import middy as md
 
-# This time depends on the make and model of your unit and
-# can range from a few milliseconds to a full second. Unfortunately
-# you have to look at your manual to find out
+md.Output().send(md.Input().record("10 s"))
+```
 
-SYSEX_WAIT = '100 ms'
+To save the capture and replay it later:
 
-with md.Output() as output:
-    print(output.send(md.events.with_gap(md.Reader("backup.syx"), SYSEX_WAIT)))
+```python
+import middy as md
+
+md.Input().record("10 s", output="rec.middy")
+md.Output().send(md.Reader("rec.middy"))
+```
+
+Recording closes the input. The returned records retain timing and diagnostics;
+replay stops at known loss or malformed input rather than silently skipping it.
+
+## 7. Transpose a MIDI file
+
+Preserve tracks, timing and metadata while leaving channel 10 unchanged under
+the GM drum convention. This opens no MIDI ports.
+
+```python
+import middy as md
+
+with md.Reader("song.mid") as reader, md.Writer("song-up.mid") as writer:
+    for m in reader:
+        if getattr(m, "channel", 10) != 10:
+            m = m.transpose("1 octave")
+        writer.write(m)
+```
+
+The reader yields the file header followed by events. Transposition clamps note
+numbers to 0..127. The writer refuses overwrite and finalizes on successful
+context exit; an error can leave a partial destination.
+
+## 8. Back up and restore SysEx
+
+Start a dump on the instrument during a 30-second recording. Save the timed
+capture, then export complete SysEx messages separately. Inspect the recording
+for loss or failure before treating it as a backup.
+
+```python
+import middy as md
+
+recording = md.Input().record("30 s", output="backup.middy")
+print(recording)
+with md.Writer("backup.syx") as writer:
+    for m in recording:
+        if isinstance(m, md.SysEx):
+            writer.write(m)
+```
+
+Run restoration separately, choosing the pause from the instrument's manual.
+Restoration can replace sounds or settings; successful sending does not prove
+that the instrument accepted the dump.
+
+```python
+import middy as md
+
+SYSEX_WAIT = "100 ms"
+
+with md.Reader("backup.syx") as reader, md.Output() as output:
+    print(output.send(md.events.with_gap(reader, SYSEX_WAIT)))
 ```
 
 ### Request or capture an opaque instrument dump
@@ -97,13 +163,14 @@ with md.Output() as output:
 from middy import file_io, midi, sysex
 
 with (
-    midi.Input(port="VL70") as input,
+    midi.Input(port="VL70") as receiver,
     midi.Output(port="VL70") as output,
-    file_io.Writer("vl70.syx") as writer
+    file_io.Writer("vl70.syx") as writer,
 ):
-    for m in sysex.dump(receiver, output).messages:
+    result = sysex.dump(receiver, output)
+    print(result.status, result.reason)
+    for m in result.messages:
         writer.write(m)
-        output.send(result.messages)
 ```
 
 ## 9. Export a just-intonation tuning
@@ -219,9 +286,10 @@ Exchange or instrument configuration writes. An empty inventory does not prove
 the device is offline. For native UMP, set both clients' encoding to
 `md.Encoding.Ump` and set `group=1` on the route; backend support is required.
 
-See the [API contract](https://github.com/rec/middy/blob/main/plan/api.md) and
-[MIDI-CI contract](https://github.com/rec/middy/blob/main/plan/ci.md) for ownership,
-bounds and failure behavior.
+The browser borrows the connections and leaves them open. Known loss or terminal
+failure stops the scan; it does not retry. The surrounding contexts close both
+connections. See the [CI API](https://github.com/rec/middy/blob/main/middy/ci.pyi)
+for report fields and options.
 
 ## Live routing with progress reports
 
@@ -703,8 +771,8 @@ with md.Reader("rec.middy") as capture:
 Python file functions accept paths or binary readers. Rust keeps separate path
 and Read-based entry points, such as inspect_file and inspect. Rust options
 structs correspond to Python keyword arguments; they do not require extra Python
-objects. Rust with_playback settings persist across play calls, while Python's
-play keywords apply to the current call. Both create their playback clock
+objects. Rust with_playback settings persist across send calls, while Python's
+send keywords apply to the current call. Both create their playback clock
 automatically.
 send() leaves a retained output open for subsequent playback or sending; context
 exit, close() or destruction performs its usual cleanup. CompoundSendError keeps
@@ -806,7 +874,7 @@ Execution failures preserve their original exception type, such as SendError or
 CompoundSendError, with report and completed_events attached. Validation before
 execution can raise without those progress attributes.
 
-send accepts the former playback options: origin, mappings, cancel,
+send accepts playback options: origin, mappings, cancel,
 allow_rounding and metrics. A cancelled call returns a report with cancelled=True
 and leaves the output open. Empty input opens no ports. Cancellation can leave a
 note active until explicit release or normal output cleanup.

@@ -8,8 +8,8 @@ None.
 
 middy targets macOS, Windows and Linux. This is the Linux part of
 [platform/backend qualification](qualification.md), usable on an available Linux
-host. A Raspberry Pi may serve as that host, but no board model or special Pi
-milestone is required. Mac results in validation.md do not qualify Linux.
+host. No board model or special Pi milestone is required. Mac results do not
+qualify Linux.
 Preparing this procedure does not authorize host access, installations or
 runtime tests.
 
@@ -92,8 +92,9 @@ export CARGO_TARGET_DIR="$PWD/target"
 export CARGO_BUILD_JOBS=1
 export UV_PYTHON_DOWNLOADS=never
 export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
-timeout --kill-after=10s 30m uv sync --frozen --python 3.13 --all-extras
+timeout --kill-after=10s 30m uv sync --frozen --no-editable --python 3.13 --all-extras
 export PYO3_PYTHON="$UV_PROJECT_ENVIRONMENT/bin/python"
+export PYTHONPATH="$UV_PROJECT_ENVIRONMENT/lib/python3.13/site-packages:$PWD"
 timeout --kill-after=10s 5m cargo fmt --all --check
 timeout --kill-after=10s 30m cargo clippy --locked --workspace --all-targets -- -D warnings
 timeout --kill-after=10s 30m cargo test --locked --workspace -- --test-threads=1
@@ -110,7 +111,7 @@ failure threshold or permission to change system settings. Record cold build
 costs separately from steady workloads. Do not compare a debug Python extension
 with optimized Rust as a language-overhead benchmark.
 
-Only Python 3.13 is supported; use the main project environment, including the
+Use Python 3.13 for this procedure's baseline, including the
 frozen optional dependencies for uFor checks. Do not create a version matrix.
 Build wheels from the source distribution and run installed-package checks
 outside the checkout using the release workflow, adapting the native Linux

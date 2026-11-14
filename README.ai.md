@@ -36,7 +36,7 @@ are available, along with GM sound maps and selected profile codecs/helpers.
 UMP/MIDI 2.0 values, codecs and explicit translation are available. Streaming
 SMF/SYX/MIDI Clip files, exact event archives, typed I/O, bounded recording and
 explicit clock-aware playback are implemented. Remaining qualification work is
-tracked in [the plan](plan/middy.md).
+tracked in [remaining qualification](plan/qualification.md).
 `out.send(...)` accepts message objects, compound control/bank/MPE
 commands and encoded bytes or UMP packets. Encoding and expansion are handled
 internally; protocol conversion remains explicit.
@@ -114,13 +114,13 @@ not a metadata-preserving replacement for `Reader`. `smf.export_event` reports
 unsupported content and quantization; loss and UMP group routing require explicit
 decisions. `sysex` handles concatenated SysEx dumps; `clip` handles MIDI Clip 1.0.
 File writers require `finish()`. Readers have `close()`; borrowed streams remain
-open. No codec starts MIDI workers. See [the API contract](plan/api.md).
+open. No codec starts MIDI workers. See [Python examples](doc/examples.md).
 
-The [archive v1 layout and local review](plan/archive-format.md) document exact
+The [archive v2 layout](doc/archive-format.md) documents exact
 clock/record encoding and verified-prefix recovery. Unknown content requires
 explicit preservation; known Event headers are validated even for future message
-representations. Version 1 remains unpublished, with format freeze and future
-compatibility guarantees still owner decisions.
+representations. Format freeze and future compatibility guarantees remain owner
+decisions.
 
 `midi.Input()` decodes received packets into events; `midi.Input(raw=True)`
 returns unchanged transport packets. `midi.Output` owns discovery and one connection, supporting `out.send(...)` for messages, compound operations and
@@ -200,7 +200,7 @@ accidental corruption and do not authenticate a file.
 
 Pass `metrics=True` to `start` or `archive.Recorder` for live/final
 `.pressure` reports: admitted records, capacity rejections and peak reserved
-records/payload bytes, including in-flight writes. Pass it to `output.play` for
+records/payload bytes, including in-flight writes. Pass it to `output.send` for
 `.lateness`, a bounded histogram with exact count/minimum/maximum/sum covering
 successful handoffs. Defaults leave these fields `None`. These observations do
 not establish device acceptance or physical latency.
@@ -209,8 +209,7 @@ not establish device acceptance or physical latency.
 final summary, before display filters. `middy.metrics` also exposes reusable
 Rust-backed `Histogram` and caller-timed `Delivery` accumulators, with independent
 frozen snapshots and no native client initialization. See
-[timing and load diagnostics](plan/api.md#timing-and-load-diagnostics) for units,
-histogram boundaries and measurement windows.
+[metrics API](middy/metrics.pyi) for accumulator and snapshot fields.
 
 ## Passive SysEx capture
 
@@ -225,14 +224,14 @@ its SysEx messages to a new file. It refuses overwrite and writes nothing after
 recording loss, decoding failure, or an empty SysEx result. Finishing the duration
 does not establish instrument-specific dump completeness. Final disk errors can
 leave a partial file. Library users use `Input.record()` and `file_io.Writer()`.
-See [capture semantics](plan/api.md#passive-midi-1-sysex-capture).
+See [capture examples](doc/examples.md#8-back-up-and-restore-sysex).
 
 ## Offline uFor tuning
 
 Python 3.13 users with `middy[cli,ufor]` can run `middy ufor-export` on uFor Tuning JSON or Scala `.scl`. Scala requires explicit
 root note/frequency. Export creates an ordinary or banked bulk `.syx` file without
 overwriting; sending remains a separate `transfer-send` action. See the
-[offline tuning workflow](plan/ufor-tuning.md#offline-file-export).
+[tuning example](doc/examples.md#9-export-a-just-intonation-tuning).
 
 ## Request an MTS tuning dump
 
@@ -246,7 +245,7 @@ dump request and saves only a matched reply, after closing both connections.
 Existing files are preserved. Raw checksum bytes remain unchanged; a legacy
 checksum mismatch is saved with a flag and exit status 1. Other failures do not
 retry. Library users can drive `tuning.Query` with `tuning.query`. See
-[query semantics](plan/api.md#one-shot-midi-1-mts-dump-queries).
+[tuning API](middy/tuning.pyi).
 
 ## File inspection and capture validation
 
@@ -394,7 +393,7 @@ InvalidateMuid and ACK/NAK values, encoded with `codecs.encode`. Interpretation
 is explicit through `ci.decode(SysEx)`; raw input still supplies primitive SysEx.
 `ci.Session` is a caller-driven management state machine with explicit random
 local MUIDs, routes, send-result reporting, integer-time deadlines and restart.
-It sends nothing and starts no threads. Read [the CI contract](plan/ci.md) before
+It sends nothing and starts no threads. Read [the CI API](middy/ci.pyi) before
 wiring actions to transport, including provisional replies and send-result reporting.
 
 Profiles and Property Exchange are deferred pending full specification access.
@@ -437,7 +436,7 @@ Encoding adds full status/framing bytes. No timestamps are invented or attached
 to decoded values by the codec. Decoded Input attaches event timing; raw mode
 preserves transport packets. Input snapshots and returned
 lists have memory costs beyond the retained SysEx limit. Details and remaining
-protocol boundaries are in [the API contract](plan/api.md).
+protocol boundaries are in [Python examples](doc/examples.md).
 
 ## MIDI Tuning Standard
 
@@ -470,8 +469,8 @@ legacy interoperability; later formats require a correct checksum. `ReplyTracker
 offers caller-driven unicast correlation, deadlines and cancellation without
 opening ports or sending requests. MTS has no transaction ID, so identical late
 or unsolicited dumps cannot be distinguished. A successful send does not prove
-an instrument accepted or applied the tuning. See [the API contract](plan/api.md)
-for units, names, checksum behavior and request tracking.
+an instrument accepted or applied the tuning. See the [tuning API](middy/tuning.pyi)
+for constructors and request-tracking operations.
 
 ## Optional uFor tuning bridge
 
@@ -485,7 +484,7 @@ mappings with `NoChange`. This is an explicit Python-only uFor integration;
 Rust's builder accepts `NoteTuning` values. Python's `note_changes()` still accepts
 `NoteTuning` values, and `BulkDump(table=..., ...)` supports direct construction
 without uFor. These operations open no ports and send nothing. See the
-[bridge contract](plan/ufor-tuning.md).
+[tuning example](doc/examples.md#9-export-a-just-intonation-tuning).
 Python bulk dumps, `controls.tuning_program()` and `ufor-export` default to tuning
 program 0. Rust callers pass the program explicitly.
 
@@ -577,12 +576,12 @@ explicitly, to invalidate cached context. Constructing/sending a value has no
 automatic connection to that pure interpreter. Bounded GM2 controller-destination,
 key-based instrument-control and global effect-parameter SysEx codecs are available.
 These codecs and maps do not imply a synthesizer, complete GM2 message coverage,
-device support or live qualification. See [the API contract](plan/api.md).
+device support or live qualification. See [Python examples](doc/examples.md).
 
 Slice 6.5 adds bounded GM2 routing/key/global-parameter SysEx, a pure MPE allocator
 and overlap-aware tracker, one-shot high-resolution velocity interpretation, and
 caller-driven quarter-frame time-code assembly. These operate without ports or
-background clocks. See [the API policies](plan/api.md) for explicit source/reset,
+background clocks. See [the interpretation examples](doc/examples.md#interpret-controller-gestures) for explicit source/reset,
 allocation, sustain, entry limits and sequence-lock behavior.
 
 
@@ -862,7 +861,7 @@ loopbacks pass in Rust and both Python modes, along with typed capture/replay/
 cancellation and a CoreMIDI UMP SysEx7 discovery/reply exchange. These passed in
 the owner's Terminal; a direct Apple API probe isolates the agent's first-call
 failure to its execution context. Physical hardware, fault recovery, Windows
-and Linux qualification remain open. See [validation](plan/validation.md).
+and Linux qualification remain open. See [remaining qualification](plan/qualification.md).
 
 CoreMIDI retains one additional native client and notification-loop thread per
 MIDI-using process until exit, avoiding Apple's last-client disposal/reopen hazard
@@ -893,7 +892,7 @@ The opt-in [qualification procedure](plan/qualification.md) provides bounded
 synthetic workloads and supervised test-owned virtual-port measurements in Rust
 and Python. Mac software baselines do not establish Windows/Linux performance,
 physical device behavior or live MIDI 2.0 support on other backends. See the
-[feature matrix and evidence](plan/validation.md).
+[remaining platform gates](plan/qualification.md#open-gates).
 middy targets macOS, Windows and Linux. Raspberry Pi systems are ordinary Linux
 hosts, with no separate project milestone or required model. The
 [Linux qualification procedure](plan/linux-qualification.md) separates host
@@ -943,7 +942,7 @@ affected history. Nothing generates cleanup traffic or claims device ownership.
 same state as `report.note_state`, keeping SMF tracks separate. CLI inspection,
 monitor event rows and final summaries include it. Monitor filters affect display
 only. Outstanding notes and unmatched releases do not change file completeness
-or validation exit codes. See [the API contract](plan/api.md#observed-note-activity)
+or validation exit codes. See [the note-state API](middy/notes.pyi)
 for reset, channel-mode and uncertainty policies.
 
 ### Static routing and patch bay
@@ -989,7 +988,7 @@ and uncertain destinations. Input loss, overload or output failure stops the who
 session without cleanup or retry. Already-sent notes can remain active. Object and
 provenance overhead is outside the payload-byte budget; returned snapshots/examples
 are caller-owned copies. External feedback loops and physical device responses
-remain unqualified. See [the routing contract](plan/api.md#static-protocol-aware-routing).
+remain unqualified. See [the routing API](middy/routing.pyi).
 
 ### Port discovery and topology changes
 
@@ -1029,7 +1028,7 @@ changed-scan history entries. These bound retained cardinality, not native
 enumeration allocation or metadata byte sizes. Input and output enumeration is
 serial; polling can miss transient changes and does not establish physical
 identity or device health. No reconnect, route change or MIDI-state restoration
-is performed. See [the topology contract](plan/api.md#topology-observations-and-discovery-polling).
+is performed. See [the discovery API](middy/discovery.py).
 
 ### Explicit MIDI 1 SysEx transfers
 
@@ -1067,7 +1066,7 @@ messages directly; use `Writer(stream, format="syx")` for file-like destinations
 Standalone `universal.identify(receiver, output)` collects all raw identity
 replies in a bounded window without model selection or deduplication. Dump
 capture reuses that inquiry and requires exactly one supported reply. See the
-[transfer contract](plan/api.md#bounded-midi-1-sysex-transfers).
+[SysEx transfer guide](doc/sysex-dumps.md).
 
 ### One MIDI-CI management scan
 
@@ -1095,7 +1094,7 @@ It performs no Profiles, Property Exchange or instrument configuration writes.
 An empty scan or timeout does not prove a device is offline. Peer identities and
 capability bits are declarations; successful output handoff is not device
 acknowledgement. Rust `ci::Browser`, Python `ci.Browser` and `ci.browse`
-provide the same reusable workflow. See the [browser contract](plan/ci.md#one-scan-management-browser)
+provide the same reusable workflow. See the [browser API](middy/ci.pyi)
 for bounds, cancellation, reporting, local identity and qualification limits.
 
 ### Deterministic transport tests
@@ -1127,6 +1126,6 @@ while raising SendError, so callers must retain uncertainty rather than retry.
 `ManualClock.advance` changes time only when called. Empty receive returns None
 immediately, even with a timeout; it never advances a clock. Hosts must arrange
 explicit time progression. Rust has the same `testing` core. See the
-[testing contract](plan/api.md#deterministic-in-memory-testing-transports) for the
+[testing API](middy/testing.pyi) for the
 supported connection subset, bounds and queue semantics. These tools do not
 establish native driver or physical-device behavior.
