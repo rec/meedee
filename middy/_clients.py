@@ -78,7 +78,7 @@ _Channel = Annotated[int, BeforeValidator(_builtin_integer), Field(ge=1, le=16)]
 
 class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True):
     raw: bool = False
-    channel: _Channel | list[_Channel] | None = None
+    channel: _Channel | list[_Channel | None] | None = None
     event_limit: int = Field(default=128, gt=0)
     sysex_limit: int = Field(default=1_048_576, gt=0)
     timestamps: midi.TimestampMode = Field(
@@ -88,7 +88,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](_Client, frozen=True
 
     _native_client: _native.Input | None = PrivateAttr(default=None)
     _connection: _InputState[T] | None = PrivateAttr(default=None)
-    _channels: frozenset[int] | None = PrivateAttr(default=None)
+    _channels: frozenset[int | None] | None = PrivateAttr(default=None)
 
     @field_validator("channel", mode="before")
     @classmethod
@@ -896,7 +896,7 @@ class _OutputState:
 
 class _InputState[T = messages.Message | events.StreamDiagnostic]:
     _raw: _InputTransport[T] | None
-    _channels: frozenset[int] | None
+    _channels: frozenset[int | None] | None
     _stream: str
     _decoder: events.PacketDecoder | None
     _bridge: _native.CallbackBridge | None
@@ -1040,7 +1040,6 @@ class _InputState[T = messages.Message | events.StreamDiagnostic]:
                     i
                     for i in items
                     if not isinstance(i, messages.Message)
-                    or getattr(i, "channel", None) is None
                     or getattr(i, "channel", None) in self._channels
                 ]
             self._accept(items)

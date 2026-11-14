@@ -34,14 +34,16 @@ def test_settings_roundtrip_creates_a_distinct_resource_without_runtime_state(
 
 
 def test_unit_values_and_iterable_channels_become_validated_fields() -> None:
-    source = [1, 3]
+    source = [1, 3, None]
     resource = midi.Input(
         channel=iter(source), timeout="250 ms", receive_byte_limit="1 KiB"
     )
     source.append(5)
-    assert resource.channel == [1, 3]
+    assert resource.channel == [1, 3, None]
     assert resource.timeout == 0.25 and resource.receive_byte_limit == 1024
-    assert resource.model_dump()["channel"] == [1, 3]
+    assert resource.model_dump()["channel"] == [1, 3, None]
+    restored = midi.Input(**resource.model_dump())
+    assert restored.channel == [1, 3, None]
     output = midi.Output(bpm=2**53 + 1)
     assert output.bpm == 2**53 + 1
 

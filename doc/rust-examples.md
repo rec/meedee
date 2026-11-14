@@ -115,8 +115,12 @@ for message in Input::new() {
 
 Input yields messages, never full `Note` values. Malformed traffic and loss are
 reported on stderr; decoding continues. Terminal connection errors stop the
-iterator. `with_channel(1)?` or `with_channels([1, 3])?` filters channel messages;
-system messages and diagnostics still pass through.
+iterator. `with_channel(1)?` accepts only channel 1.
+`with_channels([Some(1), Some(3)])?` accepts channels 1 and 3; include `None` to
+also accept channel-less messages. `with_channels([None])?` accepts only
+channel-less messages, and `with_channels([])?` accepts no messages. Without a
+selection, all messages pass through. Diagnostics are never channel-filtered;
+callbacks and recordings use the same selection.
 
 ## 4. Transpose a keyboard
 
@@ -153,7 +157,7 @@ let mut high = Output::new().with_channel(3)?;
 low.send(ProgramChange::new(34)?)?;
 high.send(ProgramChange::new(81)?)?;
 
-for message in Input::new().with_channel(1)? {
+for message in Input::new().with_channels([Some(1), None])? {
     let key = match &message {
         Payload::Message(AnyMessage::NoteOn(note)) => Some(note.note()),
         Payload::Message(AnyMessage::NoteOff(note)) => Some(note.note()),
@@ -178,7 +182,7 @@ low.close()?;
 high.close()?;
 ```
 
-System messages pass through the input filter and are forwarded once.
+The explicit `None` includes system messages, which are forwarded once.
 An explicitly configured output channel overrides a MIDI 1 message's channel.
 Without that setting, an output preserves assigned channels and supplies channel
 1 only for unassigned messages. To send several channels through one output,

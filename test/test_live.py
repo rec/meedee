@@ -2,7 +2,7 @@
 
 import gc
 import weakref
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from io import BytesIO
 from pathlib import Path
 from threading import Thread
@@ -503,7 +503,7 @@ def iterable_input(
 
     class Client:
         def __init__(self, **settings: object) -> None:
-            pass
+            self.encoding = settings["encoding"]
 
         def ports(self) -> list[midi.Port]:
             return [port]
@@ -515,7 +515,12 @@ def iterable_input(
             identity: str,
         ) -> Connection:
             callbacks.append(callback)
-            callback(packet(b"\x90\x3c\x64", 0, 1))
+            initial = (
+                midi.UmpPacket(words=(0x20903C64,))
+                if self.encoding == midi.Encoding.Ump
+                else b"\x90\x3c\x64"
+            )
+            callback(packet(initial, 0, 1))
             return Connection()
 
     monkeypatch.setattr(_native, "Input", Client)
@@ -572,18 +577,45 @@ def test_close_failure_retains_original_error_and_input_metadata(
         client.__enter__()
 
 
-@pytest.mark.parametrize("channels", [1, [1, 3], (1, 3), {1, 3}, []])
+@pytest.mark.parametrize("encoding", [midi.Encoding.Bytes, midi.Encoding.Ump])
+@pytest.mark.parametrize(
+    "channels, expected_notes, nonchannel",
+    [
+        (None, [60, 61, 62, 63], True),
+        (1, [60, 63], False),
+        ([1, 3], [60, 62, 63], False),
+        ((1, 3), [60, 62, 63], False),
+        ({1, 3}, [60, 62, 63], False),
+        ((1, None), [60, 63], True),
+        ({1, None}, [60, 63], True),
+        ((None,), [], True),
+        ([], [], False),
+    ],
+)
 def test_input_channel_selection_filters_messages_but_keeps_diagnostics(
     iterable_input: list[Callable[[events.ReceivedPacket], object]],
-    channels: int | list[int] | tuple[int, ...] | set[int],
+    encoding: midi.Encoding,
+    channels: int | Iterable[int | None] | None,
+    expected_notes: list[int],
+    nonchannel: bool,
 ) -> None:
-    with midi.Input(channel=channels, run_in_subprocess=False) as receiver:
-        iterable_input[0](packet(b"\x91\x3d\x64\x92\x3e\x64\xf8", 1, 2))
-        iterable_input[0](packet(b"\x90\x3f\x64", 3, 3))
+    with midi.Input(
+        channel=channels, encoding=encoding, run_in_subprocess=False
+    ) as receiver:
+        if encoding == midi.Encoding.Ump:
+            incoming = midi.UmpPacket(
+                words=(0x21913D64, 0x22923E64, 0x10F80000, 0x30027D01, 0)
+            )
+            final = midi.UmpPacket(words=(0x20903F64,))
+        else:
+            incoming = b"\x91\x3d\x64\x92\x3e\x64\xf8\xf0\x7d\x01\xf7"
+            final = b"\x90\x3f\x64"
+        iterable_input[0](packet(incoming, 1, 2))
+        iterable_input[0](packet(final, 3, 3))
         receiver.close()
         items = list(receiver.with_errors())
     notes = [i.note for i in items if isinstance(i, messages.NoteOn)]
-    assert notes == ([60, 63] if channels == 1 else [60, 62, 63] if channels else [])
+    assert notes == expected_notes
     assert (
         len(
             [
@@ -594,9 +626,22 @@ def test_input_channel_selection_filters_messages_but_keeps_diagnostics(
         )
         == 1
     )
-    assert any(isinstance(i, messages.TimingClock) for i in items)
+    assert any(isinstance(i, messages.TimingClock) for i in items) is nonchannel
+    assert (
+        any(isinstance(i, (messages.SysEx, ump.SysEx7Packet)) for i in items)
+        is nonchannel
+    )
     assert all(
-        isinstance(i, (messages.NoteOn, messages.TimingClock, events.StreamDiagnostic))
+        isinstance(
+            i,
+            (
+                messages.NoteOn,
+                messages.TimingClock,
+                messages.SysEx,
+                ump.SysEx7Packet,
+                events.StreamDiagnostic,
+            ),
+        )
         for i in items
     )
 
@@ -626,39 +671,55 @@ def test_input_iteration_drains_then_reports_terminal_overflow(
     assert "overflowed" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("channel", [0, 17, [1, 17]])
-def test_input_rejects_invalid_channel_selection(channel: int | list[int]) -> None:
+@pytest.mark.parametrize("channel", [0, 17, [1, 17], [None, 0], [1, True], [1, 1.0]])
+def test_input_rejects_invalid_channel_selection(
+    channel: int | list[int | None],
+) -> None:
     with pytest.raises(ValueError, match="channel"):
         midi.Input(channel=channel, run_in_subprocess=False)
 
 
-def test_raw_input_rejects_channel_selection() -> None:
+@pytest.mark.parametrize("channel", [1, [1, None], [None], []])
+def test_raw_input_rejects_channel_selection(channel: int | list[int | None]) -> None:
     with pytest.raises(ValueError, match="decoded"):
-        midi.Input(raw=True, channel=1, run_in_subprocess=False)
+        midi.Input(raw=True, channel=channel, run_in_subprocess=False)
 
 
+@pytest.mark.parametrize(
+    "channel, note_selected, nonchannel",
+    [
+        (1, True, False),
+        ([1, None], True, True),
+        ([None], False, True),
+        ([], False, False),
+    ],
+)
 def test_channel_selection_applies_to_callbacks_and_recordings(
-    iterable_input: list[Callable[[events.ReceivedPacket], object]], tmp_path: Path
+    iterable_input: list[Callable[[events.ReceivedPacket], object]],
+    tmp_path: Path,
+    channel: int | list[int | None],
+    note_selected: bool,
+    nonchannel: bool,
 ) -> None:
     observed: list[messages.Message | events.StreamDiagnostic] = []
-    client = midi.Input(channel=[1], run_in_subprocess=False)
+    client = midi.Input(channel=channel, run_in_subprocess=False)
     path = tmp_path / "selected.middy"
     with client.connect(client.ports()[0], observed.append) as receiver:
         receiver.start(path)
         iterable_input[0](packet(b"\x91\x3d\x64\x90\x3e\x64\xf8", 1, 2))
         report = receiver.stop()
     assert report.complete
-    assert [i for i in observed if isinstance(i, messages.Message)] == [
-        messages.NoteOn(60, 100, 1),
-        messages.NoteOn(62, 100, 1),
-        messages.TimingClock(),
-    ]
+    expected: list[messages.Message] = (
+        [messages.NoteOn(62, 100, 1)] if note_selected else []
+    )
+    if nonchannel:
+        expected.append(messages.TimingClock())
+    assert [i for i in observed if isinstance(i, messages.Message)] == (
+        ([messages.NoteOn(60, 100, 1)] if note_selected else []) + expected
+    )
     reader = archive.Reader(path)
     try:
-        assert [i for i in reader if isinstance(i, messages.Message)] == [
-            messages.NoteOn(62, 100, 1),
-            messages.TimingClock(),
-        ]
+        assert [i for i in reader if isinstance(i, messages.Message)] == expected
     finally:
         reader.close()
 

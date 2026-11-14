@@ -82,7 +82,7 @@ class Port:
 
 class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
     raw: bool
-    channel: int | list[int] | None
+    channel: int | list[int | None] | None
     port: str | None
     event_limit: int
     sysex_limit: int
@@ -100,7 +100,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
         self: Input[events.ReceivedPacket],
         *,
         raw: Literal[True],
-        channel: int | Iterable[int] | None = None,
+        channel: int | Iterable[int | None] | None = None,
         port: str | None = None,
         encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,
@@ -118,7 +118,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
         self: Input[messages.Message | events.StreamDiagnostic],
         *,
         raw: Literal[False] = False,
-        channel: int | Iterable[int] | None = None,
+        channel: int | Iterable[int | None] | None = None,
         port: str | None = None,
         encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,
@@ -136,7 +136,7 @@ class Input[T = messages.Message | events.StreamDiagnostic](ResourceModel):
         self: Input[messages.Message | events.StreamDiagnostic | events.ReceivedPacket],
         *,
         raw: bool,
-        channel: int | Iterable[int] | None = None,
+        channel: int | Iterable[int | None] | None = None,
         port: str | None = None,
         encoding: Encoding = Encoding.Bytes,
         backend: Backend | None = None,

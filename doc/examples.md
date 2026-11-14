@@ -60,7 +60,7 @@ with md.Input() as input, md.Output() as output:
 
 ## 5. Split a keyboard into bass and lead
 
-Receive channel 1.
+Receive channel 1 and messages without a channel.
 
 Notes below middle C are sent to channel 2; middle C and above go to channel 3.
 
@@ -71,7 +71,7 @@ MIDI messages without channels, like SysEx, are forwarded once.
 ```python
 import middy as md
 
-with md.Input(channel=1) as input, md.Output() as out:
+with md.Input(channel=(1, None)) as input, md.Output() as out:
     out.send(md.ProgramChange(34, channel=2))
     out.send(md.ProgramChange(81, channel=3))
 
@@ -85,6 +85,13 @@ with md.Input(channel=1) as input, md.Output() as out:
         else:
             out.send(m)
 ```
+
+`channel=1` accepts exactly channel 1. A collection such as `(1, 3)` accepts
+those channels; include `None` to also accept channel-less messages. `(None,)`
+accepts only channel-less messages, and an empty collection accepts no messages.
+Omitting `channel` or passing `channel=None` accepts all messages. Diagnostics
+remain available through `with_errors()` regardless of the selection. The same
+selection applies to callbacks and recordings; raw input cannot filter channels.
 
 ## 6. Record and replay a performance
 

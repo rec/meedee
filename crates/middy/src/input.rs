@@ -29,7 +29,7 @@ pub(super) struct Core {
     run_in_subprocess: bool,
     subprocess_options: transport::subprocess::SubprocessOptions,
     port: Option<String>,
-    channels: Option<u16>,
+    channels: Option<u32>,
     sysex_limit: usize,
     queue: Arc<Queue>,
     client: Option<transport::Input>,
@@ -87,20 +87,22 @@ impl Core {
         }
     }
     pub fn with_channel(self, channel: i64) -> crate::midi::Result<Self> {
-        self.with_channels([channel])
+        self.with_channels([Some(channel)])
     }
-    /// An empty selection excludes all channel messages. System messages and
-    /// diagnostics always pass through, including on UMP input.
+    /// Select exact channels; None selects messages without a channel.
+    /// An empty selection excludes all messages. Diagnostics are never filtered.
     pub fn with_channels(
         mut self,
-        channels: impl IntoIterator<Item = i64>,
+        channels: impl IntoIterator<Item = Option<i64>>,
     ) -> crate::midi::Result<Self> {
         let mut mask = 0;
         for channel in channels {
-            if !(1..=16).contains(&channel) {
-                return Err(invalid("channel must be in 1..=16").into());
-            }
-            mask |= 1 << (channel - 1);
+            let bit = match channel {
+                Some(channel) if (1..=16).contains(&channel) => channel - 1,
+                Some(_) => return Err(invalid("channel must be in 1..=16").into()),
+                None => 16,
+            };
+            mask |= 1 << bit;
         }
         self.channels = Some(mask);
         Ok(self)
@@ -361,7 +363,7 @@ impl Core {
     fn accept_item(&mut self, item: Item) {
         if let (Some(mask), Item::Message(message)) = (self.channels, &item) {
             match crate::routing::classify(message) {
-                Ok(info) if info.channel.is_some_and(|c| mask & (1 << (c - 1)) == 0) => return,
+                Ok(info) if mask & (1 << info.channel.map_or(16, |c| c - 1)) == 0 => return,
                 Err(error) => {
                     self.pending.push_back(Err(error));
                     return;
@@ -776,7 +778,7 @@ mod tests {
     #[test]
     fn input_iterates_messages_with_provenance_and_channel_filtering() {
         let mut input = input(transport::Encoding::Bytes)
-            .with_channels([1, 3])
+            .with_channels([Some(1), Some(3), None])
             .unwrap();
         input
             .queue
@@ -797,22 +799,62 @@ mod tests {
         }
     }
     #[test]
-    fn ump_channels_filter_without_dropping_system_messages() {
-        let mut input = input(transport::Encoding::Ump).with_channel(3).unwrap();
-        for (sequence, words) in [vec![0x2090_3c5a], vec![0x2192_3e46], vec![0x10f8_0000]]
-            .into_iter()
-            .enumerate()
-        {
-            input.queue.push(Ingress {
-                packet: Packet::Ump(words),
-                sequence: sequence as u64,
-                timestamp: Some(100),
-            });
-        }
+    fn channel_selection_is_exact_for_midi1() {
+        let mut input = input(transport::Encoding::Bytes).with_channel(1).unwrap();
+        input.queue.push(packet(
+            0,
+            &[0x90, 60, 90, 0x91, 62, 70, 0xf8, 0xf0, 0x7d, 1, 0xf7],
+        ));
         input.close().unwrap();
         let messages: Vec<_> = input.collect();
-        assert_eq!(messages.len(), 2);
-        assert!(matches!(&messages[0],Payload::Message(m) if m.group()==Some(2)));
+        assert_eq!(messages.len(), 1);
+        assert!(
+            matches!(&messages[0],Payload::Message(AnyMessage::NoteOn(m)) if m.channel()==Some(1))
+        );
+        for channel in [0, 17] {
+            assert!(Core::new().with_channel(channel).is_err());
+            assert!(Core::new().with_channels([Some(channel), None]).is_err());
+        }
+    }
+    #[test]
+    fn ump_selection_distinguishes_channels_from_system_sysex_and_utility() {
+        let packets = [
+            vec![0x2090_3c5a],
+            vec![0x2192_3e46],
+            vec![0x4f9f_3f00, 0xffff_0000],
+            vec![0x10f8_0000],
+            vec![0x3f02_7d01, 0],
+            vec![0],
+        ];
+        for (selection, expected) in [
+            (None, vec![0, 1, 2, 3, 4, 5]),
+            (Some(vec![Some(3)]), vec![1]),
+            (Some(vec![Some(16)]), vec![2]),
+            (Some(vec![Some(3), None]), vec![1, 3, 4, 5]),
+            (Some(vec![None]), vec![3, 4, 5]),
+            (Some(vec![]), vec![]),
+        ] {
+            let mut input = input(transport::Encoding::Ump);
+            if let Some(selection) = selection {
+                input = input.with_channels(selection).unwrap();
+            }
+            for (sequence, words) in packets.iter().enumerate() {
+                input.queue.push(Ingress {
+                    packet: Packet::Ump(words.clone()),
+                    sequence: sequence as u64,
+                    timestamp: Some(100),
+                });
+            }
+            input.close().unwrap();
+            let messages: Vec<_> = input.collect();
+            assert_eq!(
+                messages,
+                expected
+                    .into_iter()
+                    .map(|i| crate::ump::decode(&packets[i], false).unwrap())
+                    .collect::<Vec<_>>()
+            );
+        }
     }
     #[test]
     fn queue_loss_is_reported_during_silence_without_double_counting_next_packet() {

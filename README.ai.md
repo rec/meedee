@@ -131,6 +131,12 @@ provide either a callback or `receive(timeout=..., cancel=...)`, returning an
 immutable `messages.Message` or `events.StreamDiagnostic`. Messages carry optional
 `timestamp`, `stream` and `span` fields directly. `replace()` and `transpose()`
 preserve this metadata; equality and hashing compare MIDI content only.
+Input channel selection is exact: `Input(channel=1)` excludes messages without a
+channel. Use `Input(channel=(1, None))` to include them, `(None,)` for channel-less
+messages only, or an empty collection for no messages. Omission or `channel=None`
+means no filter. Selection applies to iteration, receive, callbacks and recordings;
+diagnostics are not channel-filtered. Rust uses `with_channel(1)` or
+`with_channels([Some(1), None])` for the corresponding selections.
 Optional `ControlInterpreter`,
 `VelocityInterpreter`, `Tracker`, tuning `Decoder` and the timecode/UMP `Assembler` classes
 views live in their respective controls/MPE/tuning/timecode/UMP modules. Views

@@ -146,12 +146,18 @@ impl Input<Payload> {
             },
         }))
     }
+    /// Select exactly one channel, excluding messages without a channel.
     pub fn with_channel(mut self, channel: i64) -> midi::Result<Self> {
         let core = self.take_core()?.with_channel(channel)?;
         self.core = Arc::new(Mutex::new(core));
         Ok(self)
     }
-    pub fn with_channels(mut self, channels: impl IntoIterator<Item = i64>) -> midi::Result<Self> {
+    /// Select exact channels; include None for messages without a channel.
+    /// An empty selection excludes all messages; diagnostics still pass through.
+    pub fn with_channels(
+        mut self,
+        channels: impl IntoIterator<Item = Option<i64>>,
+    ) -> midi::Result<Self> {
         let core = self.take_core()?.with_channels(channels)?;
         self.core = Arc::new(Mutex::new(core));
         Ok(self)
